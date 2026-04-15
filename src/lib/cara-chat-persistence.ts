@@ -51,6 +51,65 @@ export function isCaraStorageUnavailableError(err: unknown): boolean {
 const OPENAI_HISTORY_CAP = 80;
 const LIST_MESSAGES_CAP = 400;
 const LIST_CONVERSATIONS_CAP = 25;
+const DUBLIN_TZ = "Europe/Dublin";
+
+function dublinDateKey(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: DUBLIN_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function pickGreetingLine(lines: readonly string[], seed: number): string {
+  if (lines.length === 0) return CARA_WELCOME_TEXT;
+  return lines[Math.abs(seed) % lines.length] ?? CARA_WELCOME_TEXT;
+}
+
+function buildDynamicCaraWelcomeText(input: {
+  priorConversationCount: number;
+  hasConversationToday: boolean;
+}): string {
+  if (input.priorConversationCount <= 0) {
+    return "Hey there 👋 I’m Cara — your salon manager sidekick. What are we sorting first today?";
+  }
+
+  if (input.hasConversationToday) {
+    const options = [
+      "Welcome back 👋 Ready for the next salon win?",
+      "Back again — love it 👋 What are we tackling now?",
+      "Hey, welcome back 👋 What needs sorting this round?",
+    ] as const;
+    return pickGreetingLine(options, Date.now());
+  }
+
+  const options = [
+    "Welcome back 👋 Great to see you again. What are we sorting today?",
+    "Hey again 👋 Ready to run through today’s salon priorities?",
+    "Nice to have you back 👋 What do you want to tackle first?",
+  ] as const;
+  return pickGreetingLine(options, Date.now());
+}
+
+async function resolveCaraWelcomeText(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userId: string
+): Promise<string> {
+  const previous = await listRecentConversations(supabase, organizationId, userId);
+  if (previous.length === 0) return CARA_WELCOME_TEXT;
+  const todayKey = dublinDateKey(new Date());
+  const hasConversationToday = previous.some((c) => {
+    const when = new Date(c.updated_at);
+    if (Number.isNaN(when.getTime())) return false;
+    return dublinDateKey(when) === todayKey;
+  });
+  return buildDynamicCaraWelcomeText({
+    priorConversationCount: previous.length,
+    hasConversationToday,
+  });
+}
 
 export async function getLatestConversationId(
   supabase: SupabaseClient,
@@ -81,6 +140,12 @@ export async function createConversationWithWelcome(
   organizationId: string,
   userId: string,
 ): Promise<{ conversationId: string }> {
+  const welcomeText = await resolveCaraWelcomeText(
+    supabase,
+    organizationId,
+    userId
+  );
+
   const { data: conv, error: cErr } = await supabase
     .from("cara_conversations")
     .insert({
@@ -97,7 +162,7 @@ export async function createConversationWithWelcome(
   const { error: mErr } = await supabase.from("cara_messages").insert({
     conversation_id: conv.id,
     role: "assistant",
-    content: CARA_WELCOME_TEXT,
+    content: welcomeText,
   });
 
   if (mErr) {

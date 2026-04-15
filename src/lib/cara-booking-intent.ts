@@ -210,6 +210,7 @@ function inferCustomerName(
     const tl = t.toLowerCase();
     if (services.some((s) => tl.includes(s.name.toLowerCase()))) continue;
     if (!/^[a-zA-Z .'-]+$/.test(t)) continue;
+    if (looksLikeNonNamePhrase(t)) continue;
     if (/\b(book|booking|appointment|schedule|reserve)\b/i.test(t)) continue;
     if (BOOKING_INTENT_RE.test(t) && t.length > 18) continue;
     return t.replace(/\s+/g, " ").trim();
@@ -219,6 +220,34 @@ function inferCustomerName(
 
 const CALENDARISH_RE =
   /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|january|february|march|april|may|june|july|august|september|october|november|december)\b/i;
+
+const NON_NAME_WORDS = new Set([
+  "hey",
+  "hi",
+  "hello",
+  "yo",
+  "thanks",
+  "thankyou",
+  "please",
+  "client",
+  "customer",
+  "guest",
+  "person",
+  "someone",
+]);
+
+function looksLikeNonNamePhrase(raw: string): boolean {
+  const t = raw.trim().toLowerCase();
+  if (!t) return true;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  if (words.length === 1 && NON_NAME_WORDS.has(words[0]!)) return true;
+  if (words.every((w) => NON_NAME_WORDS.has(w))) return true;
+  if (/^(a|an|the)\s+(client|customer|guest|person|someone)$/.test(t)) {
+    return true;
+  }
+  return false;
+}
 
 function tokenLooksLikeServiceWord(word: string, services: { name: string }[]): boolean {
   const w = word.toLowerCase();
@@ -252,6 +281,7 @@ function inferCustomerNameFromFullText(
     const tl = t.toLowerCase();
     if (CALENDARISH_RE.test(tl)) return null;
     if (tokenLooksLikeServiceWord(tl, services)) return null;
+    if (looksLikeNonNamePhrase(t)) return null;
     if (/\b(book|booking|appointment|schedule|reserve|slot)\b/i.test(tl)) return null;
     const digitsInToken = tl.replace(/\D/g, "");
     if (tail && digitsInToken.includes(tail)) return null;
