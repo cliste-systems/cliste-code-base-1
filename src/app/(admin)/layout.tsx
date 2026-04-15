@@ -44,12 +44,16 @@ export default async function AdminShellLayout({
                 <span className="mt-0.5 text-xs text-gray-500">
                   Internal console
                 </span>
-                <span className="mt-3 flex items-center gap-1 text-xs text-gray-400">
-                  Logged in as{" "}
-                  <span className="font-medium text-gray-700">{loggedInAs}</span>
-                </span>
               </div>
             </Link>
+            <div className="mt-3 rounded-lg border border-gray-200/80 bg-white px-3 py-2 shadow-sm">
+              <p className="text-[11px] font-medium tracking-[0.08em] text-gray-400 uppercase">
+                Logged in as
+              </p>
+              <p className="mt-1 truncate text-sm font-medium text-gray-800">
+                {loggedInAs}
+              </p>
+            </div>
           </div>
 
           <AdminNav loggedInAs={loggedInAs} />

@@ -7,6 +7,8 @@ import { LayoutGrid, LifeBuoy, Shield, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+import { AdminSignOutButton } from "./admin-sign-out-button";
+
 const nav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
   { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },
@@ -28,7 +30,7 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
 
 export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
   const pathname = usePathname() ?? "";
-  const initial = loggedInAs.trim().charAt(0).toUpperCase() || "N";
+  const initial = loggedInAs.trim().charAt(0).toUpperCase() || "A";
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -61,15 +63,15 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
       </nav>
 
       <div className="shrink-0 border-t border-gray-200/60 p-4">
-        <Link
-          href="/dashboard"
-          className="group flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-normal text-gray-500 transition-colors hover:bg-gray-100/80 hover:text-gray-900"
-        >
+        <div className="mb-3 flex items-center gap-2 px-1">
           <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white shadow-sm">
             {initial}
           </span>
-          Back to salon dashboard
-        </Link>
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-[0.08em]">
+            Admin session
+          </span>
+        </div>
+        <AdminSignOutButton />
       </div>
     </div>
   );

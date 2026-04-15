@@ -14,8 +14,17 @@ import {
   logSecurityEvent,
 } from "@/lib/security-events";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
+import { SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
 
 const ADMIN_GATE_COOKIE = "cliste_admin_gate";
+const DASHBOARD_GATE_COOKIE = "cliste_dashboard_gate";
+
+export async function clearAdminSessionCookies(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(ADMIN_GATE_COOKIE);
+  jar.delete(SUPPORT_DASHBOARD_COOKIE);
+  jar.delete(DASHBOARD_GATE_COOKIE);
+}
 
 export async function unlockAdminGate(formData: FormData): Promise<void> {
   const h = await headers();
