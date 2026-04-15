@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 
+import { requireAdminSessionUser } from "@/lib/admin-session";
 import {
   purchasePhoneNumbers,
   searchAvailableUsPhoneNumbers,
@@ -20,6 +21,10 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function assertAdminOperator(): Promise<void> {
+  await requireAdminSessionUser();
+}
 
 function parseRefererOrigin(referer: string | null): string | null {
   if (!referer) return null;
@@ -169,6 +174,7 @@ export async function createOrganization(payload: {
   /** From `window.location.origin` so invite redirect matches this app */
   clientOrigin?: string | null;
 }): Promise<CreateOrganizationResult> {
+  await assertAdminOperator();
   const name = payload.name.trim();
   const slug = payload.slug.trim().toLowerCase();
   const tier = payload.tier;
@@ -307,6 +313,7 @@ export async function updateOrganizationNiche(
   organizationId: string,
   niche: string,
 ): Promise<UpdateOrganizationNicheResult> {
+  await assertAdminOperator();
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -354,6 +361,7 @@ export type DeleteOrganizationResult =
 export async function deleteOrganization(
   organizationId: string
 ): Promise<DeleteOrganizationResult> {
+  await assertAdminOperator();
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -420,6 +428,7 @@ export async function createSupportDashboardLink(
   organizationId: string,
   clientOrigin?: string | null
 ): Promise<SupportDashboardLinkResult> {
+  await assertAdminOperator();
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -517,6 +526,7 @@ export async function adminSendPasswordRecoveryLink(
   userEmail: string,
   clientOrigin?: string | null
 ): Promise<AdminRecoveryLinkResult> {
+  await assertAdminOperator();
   const id = userId.trim();
   const email = userEmail.trim().toLowerCase();
   if (!UUID_RE.test(id)) {
@@ -573,10 +583,70 @@ export async function adminSendPasswordRecoveryLink(
 
 export type AdminSuspendUserResult = { ok: true } | { ok: false; message: string };
 
+export type AdminConsoleAccessResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+async function setAdminConsoleAccess(
+  userId: string,
+  enabled: boolean
+): Promise<AdminConsoleAccessResult> {
+  await assertAdminOperator();
+  const id = userId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid user id." };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { data: userData, error: loadError } =
+    await admin.auth.admin.getUserById(id);
+  if (loadError || !userData.user) {
+    return { ok: false, message: loadError?.message ?? "User not found." };
+  }
+
+  const appMeta = (userData.user.app_metadata ?? {}) as Record<string, unknown>;
+  const nextAppMeta: Record<string, unknown> = {
+    ...appMeta,
+    cliste_admin_console: enabled,
+  };
+
+  const { error: updateError } = await admin.auth.admin.updateUserById(id, {
+    app_metadata: nextAppMeta,
+  });
+  if (updateError) {
+    return { ok: false, message: updateError.message };
+  }
+
+  revalidatePath("/admin/users");
+  return { ok: true };
+}
+
+export async function adminGrantConsoleAccess(
+  userId: string
+): Promise<AdminConsoleAccessResult> {
+  return setAdminConsoleAccess(userId, true);
+}
+
+export async function adminRevokeConsoleAccess(
+  userId: string
+): Promise<AdminConsoleAccessResult> {
+  return setAdminConsoleAccess(userId, false);
+}
+
 /** Long-lived ban (~100y). Lift with adminUnsuspendUser. */
 export async function adminSuspendUser(
   userId: string
 ): Promise<AdminSuspendUserResult> {
+  await assertAdminOperator();
   const id = userId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid user id." };
@@ -606,6 +676,7 @@ export async function adminSuspendUser(
 export async function adminUnsuspendUser(
   userId: string
 ): Promise<AdminSuspendUserResult> {
+  await assertAdminOperator();
   const id = userId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid user id." };
@@ -639,6 +710,7 @@ export type AdminCloseSupportTicketResult =
 export async function adminCloseSupportTicket(
   ticketId: string
 ): Promise<AdminCloseSupportTicketResult> {
+  await assertAdminOperator();
   const id = ticketId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid ticket id." };
@@ -683,6 +755,7 @@ export async function adminReplyToSupportTicket(
   ticketId: string,
   body: string
 ): Promise<AdminReplySupportTicketResult> {
+  await assertAdminOperator();
   const id = ticketId.trim();
   const text = body.trim();
   if (!UUID_RE.test(id)) {
@@ -749,6 +822,7 @@ export async function updateTenantAIConfig(
   organizationId: string,
   formData: FormData
 ): Promise<UpdateTenantAIConfigResult> {
+  await assertAdminOperator();
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -807,6 +881,7 @@ export type AssignLivekitUsPhoneResult =
 export async function assignLivekitUsPhoneToOrganization(
   organizationId: string
 ): Promise<AssignLivekitUsPhoneResult> {
+  await assertAdminOperator();
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };

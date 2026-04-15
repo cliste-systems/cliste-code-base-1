@@ -99,7 +99,7 @@ export default function AuthCallbackPage() {
             "Sign-in link is invalid or expired.";
           setMessage(String(msg));
           router.replace(
-            `/login?error=${encodeURIComponent(String(msg).slice(0, 200))}`
+            `/authenticate?error=${encodeURIComponent(String(msg).slice(0, 200))}`
           );
           return;
         }
@@ -138,7 +138,7 @@ export default function AuthCallbackPage() {
             finishAuthCallback(claimKey, false);
             setMessage(error.message);
             router.replace(
-              `/login?error=${encodeURIComponent(error.message)}`
+              `/authenticate?error=${encodeURIComponent(error.message)}`
             );
             return;
           }
@@ -156,7 +156,7 @@ export default function AuthCallbackPage() {
             finishAuthCallback(claimKey, false);
             setMessage(error.message);
             router.replace(
-              `/login?error=${encodeURIComponent(error.message)}`
+              `/authenticate?error=${encodeURIComponent(error.message)}`
             );
             return;
           }
@@ -177,7 +177,7 @@ export default function AuthCallbackPage() {
             finishAuthCallback(claimKey, false);
             setMessage(error.message);
             router.replace(
-              `/login?error=${encodeURIComponent(error.message)}`
+              `/authenticate?error=${encodeURIComponent(error.message)}`
             );
             return;
           }
@@ -204,7 +204,7 @@ export default function AuthCallbackPage() {
         finishAuthCallback(claimKey, false);
         setMessage("Could not complete sign-in.");
         router.replace(
-          "/login?error=session&message=" +
+          "/authenticate?error=session&message=" +
             encodeURIComponent(
               "This sign-in link could not be completed. Try opening it in the same browser you use for the app, or request a new invite."
             )
@@ -212,7 +212,7 @@ export default function AuthCallbackPage() {
       } catch {
         finishAuthCallback(claimKey, false);
         setMessage("Something went wrong.");
-        router.replace("/login?error=unknown");
+        router.replace("/authenticate?error=unknown");
       }
     })();
   }, [router]);

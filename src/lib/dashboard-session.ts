@@ -57,8 +57,8 @@ export const requireDashboardSession = cache(
     const r = await resolveDashboardAuth();
     if (r.tag === "ok") return r.session;
     if (r.tag === "user_no_org") {
-      redirect("/login?error=profile");
+      redirect("/authenticate?error=profile");
     }
-    redirect("/login");
+    redirect("/authenticate");
   }
 );

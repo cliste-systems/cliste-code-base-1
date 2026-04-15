@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { MoreHorizontal } from "lucide-react";
 
 import {
+  adminGrantConsoleAccess,
+  adminRevokeConsoleAccess,
   adminSendPasswordRecoveryLink,
   adminSuspendUser,
   adminUnsuspendUser,
@@ -27,6 +29,8 @@ export type IdentityAccessRow = {
   status: "active" | "pending" | "suspended";
   passwordStatus: "set" | "must_set";
   lastLoginLabel: string;
+  adminConsoleAccess: boolean;
+  adminConsoleLocked: boolean;
 };
 
 type IdentityAccessTableProps = {
@@ -51,6 +55,9 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
             <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
               Password
             </th>
+            <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
+              Admin console
+            </th>
             <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
               Last login
             </th>
@@ -63,7 +70,7 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
           {rows.length === 0 ? (
             <tr>
               <td
-                colSpan={6}
+                colSpan={7}
                 className="px-5 py-12 text-center text-sm text-gray-500"
               >
                 No auth users found.
@@ -96,6 +103,12 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
                 <td className="whitespace-nowrap px-5 py-4">
                   <PasswordBadge status={row.passwordStatus} />
                 </td>
+                <td className="whitespace-nowrap px-5 py-4">
+                  <AdminConsoleBadge
+                    hasAccess={row.adminConsoleAccess}
+                    locked={row.adminConsoleLocked}
+                  />
+                </td>
                 <td className="px-5 py-4 text-sm font-normal whitespace-nowrap text-gray-500">
                   {row.lastLoginLabel}
                 </td>
@@ -105,6 +118,8 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
                       userId={row.userId}
                       email={row.email}
                       status={row.status}
+                      hasAdminConsoleAccess={row.adminConsoleAccess}
+                      adminConsoleLocked={row.adminConsoleLocked}
                     />
                   </div>
                 </td>
@@ -158,14 +173,46 @@ function StatusBadge({ status }: { status: IdentityAccessRow["status"] }) {
   );
 }
 
+function AdminConsoleBadge({
+  hasAccess,
+  locked,
+}: {
+  hasAccess: boolean;
+  locked: boolean;
+}) {
+  if (hasAccess && locked) {
+    return (
+      <span className="inline-flex items-center rounded-md border border-blue-200/70 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+        Owner allowlist
+      </span>
+    );
+  }
+  if (hasAccess) {
+    return (
+      <span className="inline-flex items-center rounded-md border border-green-200/60 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+        Granted
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-md border border-gray-200/80 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
+      No access
+    </span>
+  );
+}
+
 function RowActions({
   userId,
   email,
   status,
+  hasAdminConsoleAccess,
+  adminConsoleLocked,
 }: {
   userId: string;
   email: string;
   status: IdentityAccessRow["status"];
+  hasAdminConsoleAccess: boolean;
+  adminConsoleLocked: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -229,6 +276,34 @@ function RowActions({
     });
   }, [router, userId]);
 
+  const onGrantAdminConsoleAccess = useCallback(() => {
+    setRowError(null);
+    startTransition(async () => {
+      const result = await adminGrantConsoleAccess(userId);
+      if (!result.ok) {
+        setRowError(result.message);
+        return;
+      }
+      router.refresh();
+    });
+  }, [router, userId]);
+
+  const onRevokeAdminConsoleAccess = useCallback(() => {
+    if (adminConsoleLocked) {
+      setRowError("This owner account is always allowlisted via env.");
+      return;
+    }
+    setRowError(null);
+    startTransition(async () => {
+      const result = await adminRevokeConsoleAccess(userId);
+      if (!result.ok) {
+        setRowError(result.message);
+        return;
+      }
+      router.refresh();
+    });
+  }, [adminConsoleLocked, router, userId]);
+
   return (
     <div className="flex flex-col items-end gap-1">
       <DropdownMenu>
@@ -248,6 +323,21 @@ function RowActions({
           <DropdownMenuItem onClick={onRecovery} disabled={pending || !email}>
             Send password reset link
           </DropdownMenuItem>
+          {hasAdminConsoleAccess ? (
+            <DropdownMenuItem
+              onClick={onRevokeAdminConsoleAccess}
+              disabled={pending || adminConsoleLocked}
+            >
+              Revoke admin console access
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={onGrantAdminConsoleAccess}
+              disabled={pending}
+            >
+              Grant admin console access
+            </DropdownMenuItem>
+          )}
           {status === "suspended" ? (
             <DropdownMenuItem onClick={onUnsuspend} disabled={pending}>
               Lift suspension

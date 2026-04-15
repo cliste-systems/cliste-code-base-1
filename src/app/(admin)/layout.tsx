@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { Building2 } from "lucide-react";
 
+import { requireAdminSessionUser } from "@/lib/admin-session";
+
 import { AdminNav } from "./admin-nav";
 
 function adminSessionLabel(): string {
@@ -10,12 +12,14 @@ function adminSessionLabel(): string {
   return "admin";
 }
 
-export default function AdminShellLayout({
+export default async function AdminShellLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const loggedInAs = adminSessionLabel();
+  const user = await requireAdminSessionUser();
+  const loggedInAs =
+    user.email?.trim().toLowerCase() || adminSessionLabel();
 
   return (
     <div className="flex min-h-screen w-full overflow-hidden bg-[#fafafa] antialiased text-gray-900">

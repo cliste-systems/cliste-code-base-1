@@ -637,7 +637,7 @@ export function SalonNativeBookingStorefront({
             </div>
             <div className="hidden items-center gap-4 sm:flex">
               <Link
-                href="/login"
+                href="/authenticate"
                 className="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
               >
                 Log in

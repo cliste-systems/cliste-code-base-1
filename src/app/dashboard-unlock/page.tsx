@@ -83,7 +83,7 @@ export default async function DashboardUnlockPage({
             </Button>
           </form>
           <p className="text-muted-foreground text-center text-xs">
-            <Link href="/login" className="underline-offset-4 hover:underline">
+            <Link href="/authenticate" className="underline-offset-4 hover:underline">
               Supabase sign-in
             </Link>
             {" · "}

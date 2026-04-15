@@ -7,10 +7,22 @@ import {
 import { timingSafeEqualUtf8 } from "./src/lib/timing-safe-equal";
 import { updateSession } from "./src/utils/supabase/middleware";
 
+const ADMIN_GATE_COOKIE = "cliste_admin_gate";
+
 function copySessionCookies(from: NextResponse, to: NextResponse) {
   for (const c of from.cookies.getAll()) {
     to.cookies.set(c.name, c.value, c);
   }
+}
+
+function rootToLoginRedirect(
+  request: NextRequest,
+  response: NextResponse
+): NextResponse {
+  if (request.nextUrl.pathname !== "/") return response;
+  const redirectRes = NextResponse.redirect(new URL("/authenticate", request.url));
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
 }
 
 /**
@@ -55,9 +67,47 @@ async function dashboardGate(
   return response;
 }
 
+/**
+ * Extra password gate for /admin routes. This is separate from salon login and
+ * must be set in deploy envs to keep internal pages private.
+ */
+async function adminGate(
+  request: NextRequest,
+  response: NextResponse
+): Promise<NextResponse> {
+  const path = request.nextUrl.pathname;
+  if (!path.startsWith("/admin")) return response;
+
+  const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
+  if (!secret) {
+    if (path === "/admin-unlock") return response;
+    const redirectRes = NextResponse.redirect(
+      new URL("/admin-unlock?error=config", request.url)
+    );
+    copySessionCookies(response, redirectRes);
+    return redirectRes;
+  }
+
+  if (path === "/admin-unlock") return response;
+
+  const cookie = request.cookies.get(ADMIN_GATE_COOKIE)?.value ?? "";
+  if (!(await timingSafeEqualUtf8(cookie, secret))) {
+    const redirectRes = NextResponse.redirect(
+      new URL("/admin-unlock", request.url)
+    );
+    copySessionCookies(response, redirectRes);
+    return redirectRes;
+  }
+
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const response = await updateSession(request);
-  return dashboardGate(request, response);
+  const maybeRootRedirect = rootToLoginRedirect(request, response);
+  if (maybeRootRedirect !== response) return maybeRootRedirect;
+  const gatedAdmin = await adminGate(request, response);
+  return dashboardGate(request, gatedAdmin);
 }
 
 export const config = {

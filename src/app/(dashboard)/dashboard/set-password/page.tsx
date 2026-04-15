@@ -12,7 +12,7 @@ export default function SetPasswordPage() {
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
           If your invite link signed you in without choosing a password, define
           one here so you can also use{" "}
-          <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
+          <Link href="/authenticate" className="text-foreground underline-offset-4 hover:underline">
             email sign-in
           </Link>{" "}
           later.

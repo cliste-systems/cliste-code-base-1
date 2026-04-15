@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { Shield, Users } from "lucide-react";
 
+import { isAdminEmailAllowlisted } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import {
@@ -120,8 +121,14 @@ export default async function AdminIdentityAccessPage() {
         : "—";
 
       const meta = user.user_metadata as Record<string, unknown> | undefined;
+      const appMeta = user.app_metadata as Record<string, unknown> | undefined;
       const needsPassword =
         meta?.needs_password === true || meta?.needs_password === "true";
+      const adminConsoleLocked = isAdminEmailAllowlisted(user.email);
+      const adminConsoleAccess =
+        adminConsoleLocked ||
+        appMeta?.cliste_admin_console === true ||
+        appMeta?.cliste_admin_console === "true";
 
       return {
         userId: user.id,
@@ -131,6 +138,8 @@ export default async function AdminIdentityAccessPage() {
         status: resolveStatus(user),
         passwordStatus: needsPassword ? "must_set" : "set",
         lastLoginLabel: formatLastLogin(user.last_sign_in_at),
+        adminConsoleAccess,
+        adminConsoleLocked,
       };
     });
   } catch (e) {
@@ -155,9 +164,14 @@ export default async function AdminIdentityAccessPage() {
           </p>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <h1 className="text-3xl font-medium tracking-tight text-gray-900">
-            Access log
-          </h1>
+          <div>
+            <h1 className="text-3xl font-medium tracking-tight text-gray-900">
+              Access log
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Use each user&apos;s action menu to grant or revoke admin console access.
+            </p>
+          </div>
           <div className="flex shrink-0 items-center gap-1.5 text-sm text-gray-400 sm:mb-0.5">
             <Users className="size-4 shrink-0" aria-hidden />
             <span className="tabular-nums">{userLabel}</span>

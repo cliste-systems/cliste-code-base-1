@@ -18,7 +18,7 @@ export function DashboardSignOutButton() {
     const supabase = createClient();
     await supabase.auth.signOut();
     await clearDashboardSessionCookies();
-    router.push("/login");
+    router.push("/authenticate");
     router.refresh();
     setPending(false);
   }

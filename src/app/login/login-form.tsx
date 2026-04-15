@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Check, Eye, EyeOff } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { clearSupportDashboardCookie } from "./actions";
@@ -15,6 +15,8 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [staySignedIn, setStaySignedIn] = useState(true);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,37 +38,87 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="login-email">Email</Label>
+        <Label htmlFor="login-email" className="text-xs text-zinc-500">
+          Email address
+        </Label>
         <Input
           id="login-email"
           type="email"
           autoComplete="email"
           required
+          placeholder="name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          className="border-zinc-200/80 bg-zinc-50/50 text-zinc-900 placeholder:text-zinc-400 focus-visible:border-zinc-900 focus-visible:ring-zinc-900"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="login-password">Password</Label>
-        <Input
-          id="login-password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="login-password" className="text-xs text-zinc-500">
+            Password
+          </Label>
+          <span className="text-xs text-zinc-400">Use your invite password</span>
+        </div>
+        <div className="relative">
+          <Input
+            id="login-password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            required
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border-zinc-200/80 bg-zinc-50/50 pr-10 text-zinc-900 placeholder:text-zinc-400 focus-visible:border-zinc-900 focus-visible:ring-zinc-900"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-zinc-400 transition-colors hover:text-zinc-900"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4.5 w-4.5" aria-hidden />
+            ) : (
+              <Eye className="h-4.5 w-4.5" aria-hidden />
+            )}
+          </button>
+        </div>
       </div>
+      <label className="flex w-max cursor-pointer items-center gap-2.5 pt-1 pb-2">
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={staySignedIn}
+          onChange={(e) => setStaySignedIn(e.target.checked)}
+          aria-label="Stay signed in"
+        />
+        <span className="flex h-4 w-4 items-center justify-center rounded-[4px] border border-zinc-300 bg-white text-white transition-colors peer-checked:border-zinc-900 peer-checked:bg-zinc-900">
+          <Check className="h-3 w-3 opacity-0 transition-opacity peer-checked:opacity-100" />
+        </span>
+        <span className="text-sm text-zinc-500 transition-colors hover:text-zinc-800">
+          Stay signed in
+        </span>
+      </label>
+      {!staySignedIn ? (
+        <p className="-mt-2 text-xs text-zinc-400">
+          Session persistence is managed securely by Supabase in this browser.
+        </p>
+      ) : null}
       {error ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-sm text-red-600" role="alert">
           {error}
         </p>
       ) : null}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Signing in…" : "Sign in"}
-      </Button>
+      <button
+        type="submit"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-normal text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
+        disabled={pending}
+      >
+        {pending ? "Signing in..." : "Sign in"}
+        <ArrowRight className="h-4 w-4" aria-hidden />
+      </button>
     </form>
   );
 }
