@@ -1,0 +1,354 @@
+import { revalidatePath } from "next/cache";
+import { NextResponse } from "next/server";
+
+import {
+  APPOINTMENT_OVERLAP_MESSAGE,
+  hasConfirmedAppointmentOverlap,
+  isDatabaseOverlapConstraintError,
+} from "@/lib/appointments-overlap";
+import { generateBookingReference, normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
+import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
+import { createAdminClient } from "@/utils/supabase/admin";
+
+export const dynamic = "force-dynamic";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type BookingPayload = {
+  customer_name: string;
+  customer_phone: string;
+  service_id: string;
+  start_time: string;
+  end_time: string;
+  ai_booking_notes?: string | null;
+  confirmation_sms_sent_at?: string | null;
+};
+
+type VoiceCallCompleteBody = {
+  organization_id: string;
+  caller_number: string;
+  duration_seconds?: number;
+  outcome: string;
+  transcript?: string | null;
+  transcript_review?: string | null;
+  ai_summary?: string | null;
+  /** When set, creates a native appointment tied to this call log. */
+  booking?: BookingPayload | null;
+};
+
+function unauthorized() {
+  return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+}
+
+function voiceSecretNotConfigured() {
+  return NextResponse.json(
+    {
+      ok: false,
+      error:
+        "Set CLISTE_VOICE_WEBHOOK_SECRET in .env.local (same value in your voice worker).",
+    },
+    { status: 503 },
+  );
+}
+
+async function authorize(request: Request): Promise<"ok" | "no_secret" | "bad"> {
+  const secret = process.env.CLISTE_VOICE_WEBHOOK_SECRET?.trim();
+  if (!secret) {
+    return "no_secret";
+  }
+  const auth = request.headers.get("authorization");
+  const bearer =
+    auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
+  const header = request.headers.get("x-cliste-voice-secret");
+  const token = bearer ?? header ?? "";
+  return (await timingSafeEqualUtf8(token, secret)) ? "ok" : "bad";
+}
+
+/**
+ * Called by the LiveKit / voice worker after a call ends.
+ * Inserts `call_logs` (→ Call history, dashboard feed). Optionally creates an
+ * `appointments` row with `source = ai_call` and `call_log_id`.
+ *
+ * Configure the worker with the same secret as `CLISTE_VOICE_WEBHOOK_SECRET`
+ * and POST JSON with `Authorization: Bearer <secret>`.
+ */
+export async function POST(request: Request) {
+  const auth = await authorize(request);
+  if (auth === "no_secret") {
+    return voiceSecretNotConfigured();
+  }
+  if (auth === "bad") {
+    return unauthorized();
+  }
+
+  let body: VoiceCallCompleteBody;
+  try {
+    body = (await request.json()) as VoiceCallCompleteBody;
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid JSON body" },
+      { status: 400 },
+    );
+  }
+
+  const orgId = String(body.organization_id ?? "").trim();
+  if (!UUID_RE.test(orgId)) {
+    return NextResponse.json(
+      { ok: false, error: "organization_id must be a valid UUID" },
+      { status: 400 },
+    );
+  }
+
+  const callerNumber = String(body.caller_number ?? "").trim();
+  if (!callerNumber) {
+    return NextResponse.json(
+      { ok: false, error: "caller_number is required" },
+      { status: 400 },
+    );
+  }
+
+  const outcome = String(body.outcome ?? "").trim();
+  if (!outcome) {
+    return NextResponse.json(
+      { ok: false, error: "outcome is required" },
+      { status: 400 },
+    );
+  }
+
+  const durationSeconds = Math.max(
+    0,
+    Math.floor(Number(body.duration_seconds ?? 0)) || 0,
+  );
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          e instanceof Error ? e.message : "Server configuration error",
+      },
+      { status: 503 },
+    );
+  }
+
+  const { data: orgRow, error: orgErr } = await admin
+    .from("organizations")
+    .select("id")
+    .eq("id", orgId)
+    .maybeSingle();
+
+  if (orgErr) {
+    return NextResponse.json(
+      { ok: false, error: orgErr.message },
+      { status: 500 },
+    );
+  }
+  if (!orgRow) {
+    return NextResponse.json(
+      { ok: false, error: "Organization not found" },
+      { status: 404 },
+    );
+  }
+
+  const { data: insertedCall, error: callErr } = await admin
+    .from("call_logs")
+    .insert({
+      organization_id: orgId,
+      caller_number: callerNumber,
+      duration_seconds: durationSeconds,
+      outcome,
+      transcript: body.transcript ?? null,
+      transcript_review: body.transcript_review ?? null,
+      ai_summary: body.ai_summary ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (callErr || !insertedCall?.id) {
+    return NextResponse.json(
+      { ok: false, error: callErr?.message ?? "Failed to save call log" },
+      { status: 500 },
+    );
+  }
+
+  const callLogId = insertedCall.id as string;
+  let appointmentId: string | null = null;
+
+  const booking = body.booking;
+  if (booking && typeof booking === "object") {
+    const customerName = String(booking.customer_name ?? "").trim();
+    const customerPhone = String(booking.customer_phone ?? "").trim();
+    const serviceId = String(booking.service_id ?? "").trim();
+    if (!customerName || !customerPhone || !UUID_RE.test(serviceId)) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning:
+            "Call saved; booking skipped (customer_name, customer_phone, service_id invalid).",
+        },
+        { status: 200 },
+      );
+    }
+
+    const start = new Date(booking.start_time);
+    const end = new Date(booking.end_time);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning: "Call saved; booking skipped (invalid start_time/end_time).",
+        },
+        { status: 200 },
+      );
+    }
+
+    const { data: svc, error: svcErr } = await admin
+      .from("services")
+      .select("id")
+      .eq("id", serviceId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+
+    if (svcErr || !svc) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning: "Call saved; booking skipped (service not found for org).",
+        },
+        { status: 200 },
+      );
+    }
+
+    const { overlap, error: ovErr } = await hasConfirmedAppointmentOverlap(
+      admin,
+      orgId,
+      start,
+      end,
+    );
+    if (ovErr) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning: `Call saved; booking skipped (${ovErr}).`,
+        },
+        { status: 200 },
+      );
+    }
+    if (overlap) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning: `Call saved; booking skipped (${APPOINTMENT_OVERLAP_MESSAGE})`,
+        },
+        { status: 200 },
+      );
+    }
+
+    const notes =
+      typeof booking.ai_booking_notes === "string"
+        ? booking.ai_booking_notes.trim() || null
+        : null;
+    const confirmAt =
+      typeof booking.confirmation_sms_sent_at === "string" &&
+      booking.confirmation_sms_sent_at.trim()
+        ? booking.confirmation_sms_sent_at.trim()
+        : null;
+
+    const phoneE164 = normalizeCustomerPhoneE164(customerPhone);
+
+    let apptErr: { message: string } | null = null;
+    let appt: { id: string } | null = null;
+    for (let attempt = 0; attempt < 14; attempt++) {
+      const ref = generateBookingReference();
+      const res = await admin
+        .from("appointments")
+        .insert({
+          organization_id: orgId,
+          customer_name: customerName,
+          customer_phone: phoneE164,
+          service_id: serviceId,
+          booking_reference: ref,
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          status: "confirmed",
+          source: "ai_call",
+          call_log_id: callLogId,
+          ai_booking_notes: notes,
+          ...(confirmAt
+            ? { confirmation_sms_sent_at: confirmAt }
+            : {}),
+        })
+        .select("id")
+        .single();
+
+      if (!res.error && res.data?.id) {
+        appt = { id: res.data.id as string };
+        apptErr = null;
+        break;
+      }
+      const msg = res.error?.message ?? "";
+      if (msg.includes("booking_reference") || msg.includes("23505")) {
+        continue;
+      }
+      apptErr = { message: msg };
+      break;
+    }
+
+    if (apptErr) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning: isDatabaseOverlapConstraintError(apptErr.message)
+            ? `Call saved; booking skipped (${APPOINTMENT_OVERLAP_MESSAGE})`
+            : `Call saved; booking failed: ${apptErr.message}`,
+        },
+        { status: 200 },
+      );
+    }
+
+    if (!appt?.id) {
+      revalidateAfterWrite();
+      return NextResponse.json(
+        {
+          ok: true,
+          call_log_id: callLogId,
+          warning:
+            "Call saved; booking failed (could not allocate booking reference).",
+        },
+        { status: 200 },
+      );
+    }
+
+    appointmentId = appt.id;
+  }
+
+  revalidateAfterWrite();
+
+  return NextResponse.json({
+    ok: true,
+    call_log_id: callLogId,
+    ...(appointmentId ? { appointment_id: appointmentId } : {}),
+  });
+}
+
+function revalidateAfterWrite() {
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/call-history");
+  revalidatePath("/dashboard/bookings");
+}
