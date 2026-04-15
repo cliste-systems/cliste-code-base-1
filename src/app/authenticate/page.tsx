@@ -21,38 +21,38 @@ export default async function AuthenticatePage({
   const urlError = describeAuthCallbackError(q.error, q.message);
 
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-[#FAFAFA] via-[#FAFAFA] to-emerald-50/60 p-4 text-zinc-600 antialiased sm:p-6 lg:p-8">
-      <main className="relative z-10 grid w-full max-w-[1040px] overflow-hidden rounded-[24px] bg-white shadow-[0_12px_40px_-16px_rgba(0,0,0,0.08)] ring-1 ring-zinc-200/50 lg:grid-cols-[1.2fr_420px]">
-        <section className="relative hidden flex-col justify-between overflow-hidden bg-zinc-950 p-12 text-white lg:flex">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-emerald-500/15 via-zinc-950 to-zinc-950" />
+    <div className="relative flex min-h-[100dvh] items-center justify-center bg-[#f5f7fb] p-4 text-slate-600 antialiased sm:p-6 lg:p-8">
+      <main className="relative z-10 grid w-full max-w-[1080px] overflow-hidden rounded-[24px] bg-white shadow-[0_14px_42px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 lg:grid-cols-[1.2fr_440px]">
+        <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#1f2e4d] via-[#25365a] to-[#2f4672] p-12 text-white lg:flex">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
           <div className="relative z-10">
-            <div className="mb-16 flex h-9 w-9 items-center justify-center rounded-md bg-white shadow-sm">
+            <div className="mb-16 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
               <Image
                 src="/cliste-logo.png"
                 alt="Cliste"
-                width={24}
-                height={24}
-                className="h-6 w-6 object-contain"
+                width={30}
+                height={30}
+                className="h-7 w-7 object-contain"
                 priority
               />
             </div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-zinc-800/60 bg-zinc-900/40 px-3 py-1.5 text-xs text-zinc-400 backdrop-blur-md">
-              Admin Portal
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-slate-100/90 backdrop-blur-md">
+              Cliste Systems
             </div>
-            <h2 className="mb-6 text-3xl leading-[1.15] font-light tracking-tight text-zinc-100 lg:text-4xl">
-              Automate the ringing phone.
+            <h2 className="mb-6 text-3xl leading-[1.12] font-light tracking-tight text-white lg:text-4xl">
+              The New Standard for
               <br />
-              <span className="text-zinc-500">The standard for AI voice.</span>
+              <span className="text-slate-200/90">AI Voice in Ireland.</span>
             </h2>
-            <p className="max-w-sm text-sm leading-relaxed font-light text-zinc-400/80">
-              Manage hyper-realistic voice agents built to handle your administrative
-              workload securely and efficiently.
+            <p className="max-w-sm text-sm leading-relaxed font-light text-slate-200/85">
+              Automate the ringing phone. We build hyper-realistic Irish voice
+              agents to handle admin 24/7 so your team can focus on their work.
             </p>
           </div>
-          <div className="relative z-10 mt-16 flex items-center gap-3 pt-6 text-xs text-zinc-500">
+          <div className="relative z-10 mt-16 flex items-center gap-3 pt-6 text-xs text-slate-200/75">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-20" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-300 opacity-20" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_8px_rgba(125,211,252,0.45)]" />
             </span>
             All systems operational
           </div>
@@ -60,29 +60,29 @@ export default async function AuthenticatePage({
 
         <section className="relative flex flex-col justify-center bg-white p-8 sm:p-12">
           <div className="mb-10 flex flex-col lg:hidden">
-            <div className="mb-6 flex h-9 w-9 items-center justify-center rounded-md bg-zinc-950 shadow-sm">
+            <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
               <Image
                 src="/cliste-logo.png"
                 alt="Cliste"
-                width={24}
-                height={24}
-                className="h-6 w-6 object-contain invert"
+                width={30}
+                height={30}
+                className="h-7 w-7 object-contain"
                 priority
               />
             </div>
-            <h1 className="mb-1.5 text-2xl font-light tracking-tight text-zinc-900">
+            <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
               Authenticate
             </h1>
-            <p className="text-sm font-light text-zinc-500">
+            <p className="text-sm font-light text-slate-500">
               Continue to your Cliste account
             </p>
           </div>
 
           <div className="mb-10 hidden lg:block">
-            <h1 className="mb-1.5 text-2xl font-light tracking-tight text-zinc-900">
+            <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
               Authenticate
             </h1>
-            <p className="text-sm font-light text-zinc-500">
+            <p className="text-sm font-light text-slate-500">
               Continue to your Cliste account
             </p>
           </div>

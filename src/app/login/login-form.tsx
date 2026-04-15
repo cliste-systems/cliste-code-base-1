@@ -51,15 +51,15 @@ export function LoginForm() {
           placeholder="name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="border-zinc-200/80 bg-zinc-50/50 text-zinc-900 placeholder:text-zinc-400 focus-visible:border-zinc-900 focus-visible:ring-zinc-900"
+          className="border-slate-200/90 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#1f2e4d] focus-visible:ring-[#1f2e4d]"
         />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="login-password" className="text-xs text-zinc-500">
+          <Label htmlFor="login-password" className="text-xs text-slate-500">
             Password
           </Label>
-          <span className="text-xs text-zinc-400">Use your invite password</span>
+          <span className="text-xs text-slate-400">Use your invite password</span>
         </div>
         <div className="relative">
           <Input
@@ -70,18 +70,18 @@ export function LoginForm() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border-zinc-200/80 bg-zinc-50/50 pr-10 text-zinc-900 placeholder:text-zinc-400 focus-visible:border-zinc-900 focus-visible:ring-zinc-900"
+            className="border-slate-200/90 bg-slate-50/70 pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#1f2e4d] focus-visible:ring-[#1f2e4d]"
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-zinc-400 transition-colors hover:text-zinc-900"
+            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-900"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? (
-              <EyeOff className="h-4.5 w-4.5" aria-hidden />
+              <EyeOff className="h-4 w-4" aria-hidden />
             ) : (
-              <Eye className="h-4.5 w-4.5" aria-hidden />
+              <Eye className="h-4 w-4" aria-hidden />
             )}
           </button>
         </div>
@@ -94,15 +94,15 @@ export function LoginForm() {
           onChange={(e) => setStaySignedIn(e.target.checked)}
           aria-label="Stay signed in"
         />
-        <span className="flex h-4 w-4 items-center justify-center rounded-[4px] border border-zinc-300 bg-white text-white transition-colors peer-checked:border-zinc-900 peer-checked:bg-zinc-900">
+        <span className="flex h-4 w-4 items-center justify-center rounded-[4px] border border-slate-300 bg-white text-white transition-colors peer-checked:border-[#1f2e4d] peer-checked:bg-[#1f2e4d]">
           <Check className="h-3 w-3 opacity-0 transition-opacity peer-checked:opacity-100" />
         </span>
-        <span className="text-sm text-zinc-500 transition-colors hover:text-zinc-800">
+        <span className="text-sm text-slate-500 transition-colors hover:text-slate-800">
           Stay signed in
         </span>
       </label>
       {!staySignedIn ? (
-        <p className="-mt-2 text-xs text-zinc-400">
+        <p className="-mt-2 text-xs text-slate-400">
           Session persistence is managed securely by Supabase in this browser.
         </p>
       ) : null}
@@ -113,7 +113,7 @@ export function LoginForm() {
       ) : null}
       <button
         type="submit"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-normal text-white transition-colors hover:bg-zinc-800 disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#1f2e4d] px-4 py-2.5 text-sm font-normal text-white transition-colors hover:bg-[#1a2741] disabled:opacity-60"
         disabled={pending}
       >
         {pending ? "Signing in..." : "Sign in"}
