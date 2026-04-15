@@ -21,8 +21,8 @@ export default async function AdminUnlockPage({
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center bg-[#f5f7fb] p-4 text-slate-600 antialiased sm:p-6 lg:p-8">
       <main className="relative z-10 grid w-full max-w-[1080px] overflow-hidden rounded-[24px] bg-white shadow-[0_14px_42px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 lg:grid-cols-[1.2fr_440px]">
-        <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#1f2e4d] via-[#25365a] to-[#2f4672] p-12 text-white lg:flex">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
+        <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0b0d12] via-[#111827] to-[#0f172a] p-12 text-white lg:flex">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-emerald-400/16 via-transparent to-transparent" />
           <div className="relative z-10 flex flex-col items-start">
             <div className="mb-16 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
               <Image
@@ -34,23 +34,23 @@ export default async function AdminUnlockPage({
                 priority
               />
             </div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-light text-slate-100/90 backdrop-blur-md">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-light text-emerald-100/95 backdrop-blur-md">
               <ShieldCheck className="h-3.5 w-3.5" />
               Employee Portal
             </div>
             <h2 className="mb-6 text-3xl leading-[1.12] font-light tracking-tight text-white lg:text-4xl">
               Welcome back.
               <br />
-              <span className="text-slate-200/90">Sign in to your account.</span>
+              <span className="text-zinc-300/90">Sign in to your account.</span>
             </h2>
-            <p className="max-w-sm text-sm leading-relaxed font-light text-slate-200/85">
+            <p className="max-w-sm text-sm leading-relaxed font-light text-zinc-300/90">
               Enter your details to securely access the Cliste workspace.
             </p>
           </div>
-          <div className="relative z-10 mt-auto flex items-center gap-3 pt-16 text-xs font-light text-slate-200/75">
+          <div className="relative z-10 mt-auto flex items-center gap-3 pt-16 text-xs font-light text-zinc-300/80">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-300 opacity-20" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_8px_rgba(125,211,252,0.45)]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-20" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.45)]" />
             </span>
             System operational
           </div>
@@ -105,7 +105,7 @@ export default async function AdminUnlockPage({
                 autoComplete="off"
                 placeholder="••••••••"
                 disabled={!gateConfigured}
-                className="block w-full appearance-none rounded-md border border-slate-200/90 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#1f2e4d] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1f2e4d] disabled:cursor-not-allowed disabled:opacity-60"
+                className="block w-full appearance-none rounded-md border border-slate-200/90 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -117,7 +117,7 @@ export default async function AdminUnlockPage({
 
             <button
               type="submit"
-              className="w-full rounded-md bg-[#1f2e4d] px-4 py-2.5 text-sm font-light text-white transition-all hover:bg-[#1a2741] focus:outline-none focus:ring-2 focus:ring-[#1f2e4d] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-md bg-[#111827] px-4 py-2.5 text-sm font-light text-white transition-all hover:bg-[#0b1220] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!gateConfigured}
             >
               Continue to admin

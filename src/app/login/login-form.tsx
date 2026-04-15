@@ -51,7 +51,7 @@ export function LoginForm() {
           placeholder="name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="border-slate-200/90 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#1f2e4d] focus-visible:ring-[#1f2e4d]"
+          className="border-slate-200/90 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:ring-emerald-500"
         />
       </div>
       <div className="space-y-2">
@@ -70,7 +70,7 @@ export function LoginForm() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border-slate-200/90 bg-slate-50/70 pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#1f2e4d] focus-visible:ring-[#1f2e4d]"
+            className="border-slate-200/90 bg-slate-50/70 pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:ring-emerald-500"
           />
           <button
             type="button"
@@ -94,7 +94,7 @@ export function LoginForm() {
           onChange={(e) => setStaySignedIn(e.target.checked)}
           aria-label="Stay signed in"
         />
-        <span className="flex h-4 w-4 items-center justify-center rounded-[4px] border border-slate-300 bg-white text-white transition-colors peer-checked:border-[#1f2e4d] peer-checked:bg-[#1f2e4d]">
+        <span className="flex h-4 w-4 items-center justify-center rounded-[4px] border border-slate-300 bg-white text-white transition-colors peer-checked:border-emerald-600 peer-checked:bg-emerald-600">
           <Check className="h-3 w-3 opacity-0 transition-opacity peer-checked:opacity-100" />
         </span>
         <span className="text-sm text-slate-500 transition-colors hover:text-slate-800">
@@ -113,7 +113,7 @@ export function LoginForm() {
       ) : null}
       <button
         type="submit"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#1f2e4d] px-4 py-2.5 text-sm font-normal text-white transition-colors hover:bg-[#1a2741] disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#111827] px-4 py-2.5 text-sm font-normal text-white transition-colors hover:bg-[#0b1220] disabled:opacity-60"
         disabled={pending}
       >
         {pending ? "Signing in..." : "Sign in"}
