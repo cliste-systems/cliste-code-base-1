@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ShieldCheck } from "lucide-react";
 
 import { unlockAdminGate } from "./actions";
 
@@ -34,17 +33,17 @@ export default async function AdminUnlockPage({
                 priority
               />
             </div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-light text-emerald-100/95 backdrop-blur-md">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Employee Portal
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-100/95 backdrop-blur-md">
+              Cliste Systems
             </div>
             <h2 className="mb-6 text-3xl leading-[1.12] font-light tracking-tight text-white lg:text-4xl">
-              Welcome back.
+              The New Standard for
               <br />
-              <span className="text-zinc-300/90">Sign in to your account.</span>
+              <span className="text-zinc-300/90">AI Voice in Ireland.</span>
             </h2>
             <p className="max-w-sm text-sm leading-relaxed font-light text-zinc-300/85">
-              Enter your details to securely access the Cliste workspace.
+              Automate the ringing phone. We build hyper-realistic Irish voice
+              agents to handle admin 24/7 so your team can focus on their work.
             </p>
           </div>
           <div className="relative z-10 mt-auto flex items-center gap-3 pt-16 text-xs font-light text-zinc-300/80">
@@ -69,16 +68,20 @@ export default async function AdminUnlockPage({
               />
             </div>
             <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
-              Admin Sign In
+              Authenticate
             </h1>
-            <p className="text-sm font-light text-slate-500">Cliste Systems</p>
+            <p className="text-sm font-light text-slate-500">
+              Continue to your Cliste account
+            </p>
           </div>
 
           <div className="mb-10 hidden lg:block">
             <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
-              Admin Sign In
+              Authenticate
             </h1>
-            <p className="text-sm font-light text-slate-500">Cliste Systems</p>
+            <p className="text-sm font-light text-slate-500">
+              Continue to your Cliste account
+            </p>
           </div>
 
           {showConfigError ? (
