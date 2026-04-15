@@ -21,7 +21,7 @@ export default async function AdminUnlockPage({
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center bg-[#f5f7fb] p-4 text-slate-600 antialiased sm:p-6 lg:p-8">
       <main className="relative z-10 grid w-full max-w-[1080px] overflow-hidden rounded-[24px] bg-white shadow-[0_14px_42px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 lg:grid-cols-[1.2fr_440px]">
-        <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0b0d12] via-[#111827] to-[#0f172a] p-12 text-white lg:flex">
+        <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#030406] via-[#07090d] to-[#0a0c10] p-12 text-white lg:flex">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-emerald-400/16 via-transparent to-transparent" />
           <div className="relative z-10 flex flex-col items-start">
             <div className="mb-16 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
@@ -43,7 +43,7 @@ export default async function AdminUnlockPage({
               <br />
               <span className="text-zinc-300/90">Sign in to your account.</span>
             </h2>
-            <p className="max-w-sm text-sm leading-relaxed font-light text-zinc-300/90">
+            <p className="max-w-sm text-sm leading-relaxed font-light text-zinc-300/85">
               Enter your details to securely access the Cliste workspace.
             </p>
           </div>
@@ -117,7 +117,7 @@ export default async function AdminUnlockPage({
 
             <button
               type="submit"
-              className="w-full rounded-md bg-[#111827] px-4 py-2.5 text-sm font-light text-white transition-all hover:bg-[#0b1220] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-md bg-[#090b0f] px-4 py-2.5 text-sm font-light text-white transition-all hover:bg-[#05070b] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!gateConfigured}
             >
               Continue to admin
