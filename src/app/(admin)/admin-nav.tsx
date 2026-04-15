@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { LayoutGrid, LifeBuoy, Users } from "lucide-react";
+import { LayoutGrid, LifeBuoy, Shield, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
   { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },
+  { href: "/admin/security", label: "Security", icon: Shield, exact: false },
   {
     href: "/admin/support",
     label: "Support tickets",

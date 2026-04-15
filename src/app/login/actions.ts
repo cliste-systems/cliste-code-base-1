@@ -9,6 +9,10 @@ import {
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
 import { verifyTurnstileToken } from "@/lib/public-booking-security";
+import {
+  buildSecurityEventContext,
+  logSecurityEvent,
+} from "@/lib/security-events";
 import { SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
 import { createClient } from "@/utils/supabase/server";
 
@@ -53,6 +57,7 @@ export async function passwordSignIn(payload: {
   }
 
   const h = await headers();
+  const securityCtx = buildSecurityEventContext(h);
   const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
   const ipFingerprint = rateLimitFingerprint(h, "auth-ip");
   const emailFingerprint = rateLimitFingerprint(h, `auth-email:${email}`);
@@ -70,6 +75,16 @@ export async function passwordSignIn(payload: {
       email,
       retryAfterSeconds,
     });
+    await logSecurityEvent(securityCtx, {
+      eventType: "auth_password_sign_in",
+      outcome: "rate_limited",
+      loginEmail: email,
+      attemptCount: Math.max(
+        ipStatus.failuresInWindow,
+        emailStatus.failuresInWindow
+      ),
+      metadata: { retryAfterSeconds },
+    });
     return {
       ok: false,
       message: genericAuthFailureMessage(retryAfterSeconds),
@@ -81,6 +96,12 @@ export async function passwordSignIn(payload: {
   if (preRequiresCaptcha && turnstileEnabled) {
     const ts = await verifyTurnstileToken(payload.turnstileToken);
     if (!ts.ok) {
+      await logSecurityEvent(securityCtx, {
+        eventType: "auth_password_sign_in",
+        outcome: "failure",
+        loginEmail: email,
+        metadata: { reason: "turnstile_failed" },
+      });
       return {
         ok: false,
         message: ts.message,
@@ -111,6 +132,20 @@ export async function passwordSignIn(payload: {
       retryAfterSeconds,
       requiresCaptcha,
     });
+    await logSecurityEvent(securityCtx, {
+      eventType: "auth_password_sign_in",
+      outcome: requiresCaptcha ? "rate_limited" : "failure",
+      loginEmail: email,
+      attemptCount: Math.max(
+        afterIp.failuresInWindow,
+        afterEmail.failuresInWindow
+      ),
+      metadata: {
+        retryAfterSeconds,
+        requiresCaptcha,
+        reason: signError.message,
+      },
+    });
     return {
       ok: false,
       message: genericAuthFailureMessage(retryAfterSeconds),
@@ -123,5 +158,10 @@ export async function passwordSignIn(payload: {
   clearRateLimit("authenticate", emailFingerprint);
   (await cookies()).delete(SUPPORT_DASHBOARD_COOKIE);
   console.info("[security] auth_sign_in_success", { email });
+  await logSecurityEvent(securityCtx, {
+    eventType: "auth_password_sign_in",
+    outcome: "success",
+    loginEmail: email,
+  });
   return { ok: true };
 }

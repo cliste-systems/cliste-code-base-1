@@ -18,6 +18,10 @@ import {
   type OrganizationNiche,
   isOrganizationNiche,
 } from "@/lib/organization-niche";
+import {
+  buildSecurityEventContext,
+  logSecurityEvent,
+} from "@/lib/security-events";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const UUID_RE =
@@ -633,6 +637,16 @@ async function setAdminConsoleAccess(
     targetUserId: id,
     targetEmail: userData.user.email?.trim().toLowerCase() ?? null,
     enabled,
+  });
+  const h = await headers();
+  await logSecurityEvent(buildSecurityEventContext(h), {
+    eventType: "admin_console_access_updated",
+    outcome: "success",
+    actorUserId: actor.id,
+    actorEmail: actor.email ?? null,
+    targetUserId: id,
+    targetEmail: userData.user.email ?? null,
+    metadata: { enabled },
   });
 
   revalidatePath("/admin/users");
