@@ -107,7 +107,7 @@ export default function AuthCallbackPage() {
         claimKey = getCallbackClaimKey(params);
         const gate = tryBeginAuthCallback(claimKey);
         if (gate === "skip_done") {
-          router.replace("/dashboard");
+          router.replace("/auth/post-login");
           router.refresh();
           return;
         }
@@ -143,7 +143,7 @@ export default function AuthCallbackPage() {
             return;
           }
           finishAuthCallback(claimKey, true);
-          router.replace("/dashboard");
+          router.replace("/auth/post-login");
           router.refresh();
           return;
         }
@@ -161,7 +161,7 @@ export default function AuthCallbackPage() {
             return;
           }
           finishAuthCallback(claimKey, true);
-          router.replace("/dashboard");
+          router.replace("/auth/post-login");
           router.refresh();
           return;
         }
@@ -187,7 +187,7 @@ export default function AuthCallbackPage() {
             "",
             `${window.location.pathname}${window.location.search}`
           );
-          router.replace("/dashboard");
+          router.replace("/auth/post-login");
           router.refresh();
           return;
         }
@@ -196,7 +196,7 @@ export default function AuthCallbackPage() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
-          router.replace("/dashboard");
+          router.replace("/auth/post-login");
           router.refresh();
           return;
         }

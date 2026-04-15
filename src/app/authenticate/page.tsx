@@ -16,7 +16,7 @@ export default async function AuthenticatePage({
 }: AuthenticatePageProps) {
   const session = await getOptionalDashboardSession();
   if (session) {
-    redirect("/dashboard");
+    redirect("/auth/post-login");
   }
 
   const q = await searchParams;

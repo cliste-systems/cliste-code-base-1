@@ -33,7 +33,7 @@ export function isAdminEmailAllowlisted(
   return parseAllowedAdminEmails().has(v);
 }
 
-function canAccessAdminConsole(user: User): boolean {
+export function canAccessAdminConsole(user: User): boolean {
   return isAdminEmailAllowlisted(user.email) || hasConsoleAccessFlag(user);
 }
 
