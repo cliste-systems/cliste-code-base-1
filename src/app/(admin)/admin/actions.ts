@@ -8,6 +8,7 @@ import {
   searchAvailableUsPhoneNumbers,
 } from "@/lib/livekit-phone-numbers";
 import {
+  createSupportDashboardCookieValue,
   SUPPORT_DASHBOARD_COOKIE,
   supportDashboardCookieOptions,
 } from "@/lib/support-dashboard-cookie";
@@ -492,11 +493,14 @@ export async function createSupportDashboardLink(
     };
   }
 
-  (await cookies()).set(
-    SUPPORT_DASHBOARD_COOKIE,
-    "1",
-    supportDashboardCookieOptions()
-  );
+  const supportCookieValue = await createSupportDashboardCookieValue();
+  if (supportCookieValue) {
+    (await cookies()).set(
+      SUPPORT_DASHBOARD_COOKIE,
+      supportCookieValue,
+      supportDashboardCookieOptions()
+    );
+  }
 
   return { ok: true, url: linkData.properties.action_link };
 }

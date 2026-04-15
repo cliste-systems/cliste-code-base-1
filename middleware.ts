@@ -1,5 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import {
+  isValidSupportDashboardCookieValue,
+  SUPPORT_DASHBOARD_COOKIE,
+} from "./src/lib/support-dashboard-cookie";
 import { timingSafeEqualUtf8 } from "./src/lib/timing-safe-equal";
 import { updateSession } from "./src/utils/supabase/middleware";
 
@@ -31,6 +35,13 @@ async function dashboardGate(
   }
 
   if (path === "/dashboard-unlock") return response;
+
+  // Admin "Open dashboard" launches set this cookie; bypass the extra gate
+  // so support can jump straight into the tenant dashboard.
+  const supportView = await isValidSupportDashboardCookieValue(
+    request.cookies.get(SUPPORT_DASHBOARD_COOKIE)?.value
+  );
+  if (supportView) return response;
 
   const cookie = request.cookies.get("cliste_dashboard_gate")?.value ?? "";
   if (!(await timingSafeEqualUtf8(cookie, secret))) {

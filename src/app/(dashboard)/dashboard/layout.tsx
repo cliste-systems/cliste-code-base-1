@@ -23,7 +23,10 @@ import {
   DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
   parseSeenAtCookie,
 } from "@/lib/dashboard-nav-seen-cookies";
-import { SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
+import {
+  isValidSupportDashboardCookieValue,
+  SUPPORT_DASHBOARD_COOKIE,
+} from "@/lib/support-dashboard-cookie";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { DashboardMobileNav } from "./dashboard-mobile-nav";
@@ -76,8 +79,9 @@ export default async function DashboardLayout({
     .maybeSingle();
 
   const cookieStore = await cookies();
-  const supportView =
-    cookieStore.get(SUPPORT_DASHBOARD_COOKIE)?.value === "1";
+  const supportView = await isValidSupportDashboardCookieValue(
+    cookieStore.get(SUPPORT_DASHBOARD_COOKIE)?.value
+  );
 
   let loggedInAs: string;
   if (supportView) {
