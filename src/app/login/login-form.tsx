@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { clearSupportDashboardCookie } from "./actions";
-import { createClient } from "@/utils/supabase/client";
+import { passwordSignIn } from "./actions";
 
 export function LoginForm() {
   const router = useRouter();
@@ -16,22 +16,33 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileSiteKey =
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setPending(true);
-    const supabase = createClient();
-    const { error: signError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setPending(false);
-    if (signError) {
-      setError(signError.message);
+    if (requiresCaptcha && turnstileSiteKey && !turnstileToken) {
+      setError("Please complete the security check.");
       return;
     }
-    await clearSupportDashboardCookie();
+    setPending(true);
+    const result = await passwordSignIn({
+      email,
+      password,
+      turnstileToken: turnstileToken ?? null,
+    });
+    setPending(false);
+    if (!result.ok) {
+      setError(result.message);
+      setRequiresCaptcha(result.requiresCaptcha);
+      if (result.requiresCaptcha) {
+        setTurnstileToken(null);
+      }
+      return;
+    }
     router.push("/dashboard");
     router.refresh();
   }
@@ -85,6 +96,25 @@ export function LoginForm() {
           </button>
         </div>
       </div>
+      {requiresCaptcha ? (
+        <div className="space-y-2 rounded-md border border-emerald-200/70 bg-emerald-50/40 p-3">
+          <p className="text-xs text-slate-600">
+            Extra security check is required after failed attempts.
+          </p>
+          {turnstileSiteKey ? (
+            <Turnstile
+              siteKey={turnstileSiteKey}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken(null)}
+            />
+          ) : (
+            <p className="text-xs text-amber-700">
+              Captcha site key missing (
+              <code>NEXT_PUBLIC_TURNSTILE_SITE_KEY</code>).
+            </p>
+          )}
+        </div>
+      ) : null}
       {error ? (
         <p className="text-sm text-red-600" role="alert">
           {error}

@@ -117,6 +117,11 @@ export default async function AdminUnlockPage({
                 Wrong password. Try again.
               </p>
             ) : null}
+            {error === "rate" ? (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                Too many attempts. Wait a few minutes and try again.
+              </p>
+            ) : null}
 
             <button
               type="submit"

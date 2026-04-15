@@ -1,5 +1,6 @@
 "use server";
 
+import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 
@@ -22,8 +23,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-async function assertAdminOperator(): Promise<void> {
-  await requireAdminSessionUser();
+async function assertAdminOperator(): Promise<User> {
+  return requireAdminSessionUser();
 }
 
 function parseRefererOrigin(referer: string | null): string | null {
@@ -591,7 +592,7 @@ async function setAdminConsoleAccess(
   userId: string,
   enabled: boolean
 ): Promise<AdminConsoleAccessResult> {
-  await assertAdminOperator();
+  const actor = await assertAdminOperator();
   const id = userId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid user id." };
@@ -625,6 +626,14 @@ async function setAdminConsoleAccess(
   if (updateError) {
     return { ok: false, message: updateError.message };
   }
+
+  console.info("[security] admin_console_access_updated", {
+    actorUserId: actor.id,
+    actorEmail: actor.email?.trim().toLowerCase() ?? null,
+    targetUserId: id,
+    targetEmail: userData.user.email?.trim().toLowerCase() ?? null,
+    enabled,
+  });
 
   revalidatePath("/admin/users");
   return { ok: true };
