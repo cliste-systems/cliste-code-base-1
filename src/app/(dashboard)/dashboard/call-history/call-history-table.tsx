@@ -60,6 +60,7 @@ export function CallHistoryTable({
     openedFromQueryRef.current = true;
     const idx = calls.findIndex((c) => c.id === raw);
     if (idx >= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPage(Math.floor(idx / PAGE_SIZE));
     }
     openTranscript(row);

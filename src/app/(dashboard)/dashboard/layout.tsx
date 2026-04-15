@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
@@ -191,12 +192,12 @@ export default async function DashboardLayout({
           {needsPassword ? (
             <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/90 px-4 py-3 text-xs leading-snug text-amber-950 lg:hidden">
               Finish setup: choose a password for this account.{" "}
-              <a
+              <Link
                 href="/dashboard/set-password"
                 className="font-semibold underline-offset-2 hover:underline"
               >
                 Set password
-              </a>
+              </Link>
             </div>
           ) : null}
           <main className="dashboard-main-scroll flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-[#FAFAFA]">

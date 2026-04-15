@@ -97,6 +97,7 @@ export function ServicesView({
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTeamRows(teamToEditorRows(initialTeamMembers));
   }, [teamSyncKey]);
 

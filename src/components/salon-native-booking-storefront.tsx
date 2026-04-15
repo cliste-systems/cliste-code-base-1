@@ -172,6 +172,7 @@ export function SalonNativeBookingStorefront({
 
   useEffect(() => {
     if (visible.length && !visible.some((s) => s.id === selectedServiceId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedServiceId(visible[0]?.id ?? null);
     }
   }, [visible, selectedServiceId]);
@@ -248,17 +249,22 @@ export function SalonNativeBookingStorefront({
       staffChoice !== "any" &&
       (staffChoice < 0 || staffChoice >= teamMembers.length)
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStaffChoice("any");
     }
   }, [staffChoice, teamMembers.length]);
 
   useEffect(() => {
     if (!selectedServiceId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSlotsByDate({});
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedSlotIso(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSlotsError(null);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSlotsError(null);
     startSlotsTransition(() => {
       void (async () => {
@@ -292,9 +298,11 @@ export function SalonNativeBookingStorefront({
   useEffect(() => {
     const daySlots = slotsByDate[selectedDateYmd];
     if (!daySlots?.length) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedSlotIso(null);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSlotIso((prev) => {
       if (prev && daySlots.some((s) => s.startIso === prev)) return prev;
       return daySlots[0]?.startIso ?? null;

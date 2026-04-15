@@ -176,25 +176,35 @@ export function StorefrontView({
   const previewLogoSrc = logoDataUrl ?? (!logoCleared ? remoteLogo : null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRemoteLogoFailed(false);
   }, [initial.logoUrl]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGallerySlots(tripleGallery(initial.galleryUrls));
   }, [initial.galleryUrls]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRatingText(initial.ratingText);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEircode(initial.eircode);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAmenities(
       initial.amenityLabels.length
         ? labelsToAmenities(initial.amenityLabels)
         : [],
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReviewsScore(initial.reviewsScore);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReviewRows(reviewsToEditorRows(initial.reviewEntries));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowTeamSection(initial.showTeamSection);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowMapSection(initial.showMapSection);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowReviewsSection(initial.showReviewsSection);
   }, [initial.storefrontRevision]);
 

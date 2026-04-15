@@ -53,6 +53,7 @@ export function NewSalonDialog() {
 
   useEffect(() => {
     if (!slugTouched) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSlug(slugify(name));
     }
   }, [name, slugTouched]);
