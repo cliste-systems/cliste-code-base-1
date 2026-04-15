@@ -5,6 +5,8 @@ import { LoginForm } from "@/app/login/login-form";
 import { describeAuthCallbackError } from "@/lib/auth-error-message";
 import { getOptionalDashboardSession } from "@/lib/dashboard-session";
 
+import { AuthParamForwarder } from "./auth-param-forwarder";
+
 type AuthenticatePageProps = {
   searchParams: Promise<{ error?: string; message?: string }>;
 };
@@ -22,6 +24,7 @@ export default async function AuthenticatePage({
 
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center bg-[#f5f7fb] p-4 text-slate-600 antialiased sm:p-6 lg:p-8">
+      <AuthParamForwarder />
       <main className="relative z-10 grid w-full max-w-[1080px] overflow-hidden rounded-[24px] bg-white shadow-[0_14px_42px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 lg:grid-cols-[1.2fr_440px]">
         <section className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#030406] via-[#07090d] to-[#0a0c10] p-12 text-white lg:flex">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-emerald-400/16 via-transparent to-transparent" />
