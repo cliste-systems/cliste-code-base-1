@@ -52,6 +52,23 @@ function normalizeClientOrigin(raw: string | null | undefined): string | null {
   }
 }
 
+function normalizeConfiguredOrigin(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const value = raw.trim().replace(/\/$/, "");
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.origin;
+    }
+  } catch {
+    // Allow host-only env values (e.g. my-app.vercel.app).
+    if (/^[a-z0-9.-]+$/i.test(value)) {
+      return `https://${value}`;
+    }
+  }
+  return null;
+}
+
 function isDevLocalOrLanHostname(hostname: string): boolean {
   if (hostname === "localhost" || hostname === "127.0.0.1") return true;
   if (hostname === "[::1]" || hostname === "::1") return true;
@@ -78,8 +95,16 @@ function isDevLocalOrLanHostname(hostname: string): boolean {
 async function getAppOriginForRedirect(
   clientOrigin?: string | null
 ): Promise<string> {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
+  const explicit = normalizeConfiguredOrigin(process.env.NEXT_PUBLIC_APP_URL);
+  if (explicit) return explicit;
+
+  const vercelProduction = normalizeConfiguredOrigin(
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+  );
+  if (vercelProduction) return vercelProduction;
+
+  const vercelPreview = normalizeConfiguredOrigin(process.env.VERCEL_URL);
+  if (vercelPreview) return vercelPreview;
 
   const h = await headers();
   const refererOrigin = parseRefererOrigin(h.get("referer"));
@@ -101,7 +126,8 @@ async function getAppOriginForRedirect(
 
   if (refererOrigin) return refererOrigin;
   if (headerOrigin) return headerOrigin;
-  return "http://localhost:3000";
+  if (process.env.NODE_ENV === "development") return "http://localhost:3000";
+  return "https://cliste-systems-salon.vercel.app";
 }
 
 export type CreateOrganizationResult =
