@@ -128,7 +128,7 @@ async function getAppOriginForRedirect(
   if (refererOrigin) return refererOrigin;
   if (headerOrigin) return headerOrigin;
   if (process.env.NODE_ENV === "development") return "http://localhost:3000";
-  return "https://cliste-systems-salon.vercel.app";
+  return "https://app.clistesystems.ie";
 }
 
 export type CreateOrganizationResult =
