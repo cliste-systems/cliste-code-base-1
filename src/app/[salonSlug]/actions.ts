@@ -52,6 +52,11 @@ import {
   hasConfirmedAppointmentOverlap,
   isDatabaseOverlapConstraintError,
 } from "@/lib/appointments-overlap";
+import {
+  checkTwilioVerifyBookingCode,
+  isTwilioVerifyConfigured,
+  startTwilioVerifyBookingSms,
+} from "@/lib/twilio-verify-public-booking";
 import { servicesTableHasExtendedColumns } from "@/lib/services-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
@@ -400,6 +405,19 @@ async function verifyAndConsumeOtpChallenge(
   return { ok: true };
 }
 
+async function verifyPublicBookingOtp(
+  admin: SupabaseClient,
+  organizationId: string,
+  phoneE164: string,
+  codeRaw: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (isOtpBypassEnabled()) return { ok: true };
+  if (isTwilioVerifyConfigured()) {
+    return checkTwilioVerifyBookingCode(phoneE164, codeRaw);
+  }
+  return verifyAndConsumeOtpChallenge(admin, organizationId, phoneE164, codeRaw);
+}
+
 /** Send SMS OTP after Turnstile + rate limits (public booking). */
 export async function requestPublicBookingOtp(payload: {
   organizationId: string;
@@ -464,6 +482,20 @@ export async function requestPublicBookingOtp(payload: {
     ipHash,
   );
   if (!rate.ok) return { success: false, message: rate.message };
+
+  if (isTwilioVerifyConfigured()) {
+    const v = await startTwilioVerifyBookingSms(phoneE164);
+    if (!v.ok) {
+      return { success: false, message: v.message };
+    }
+    await recordPublicBookingRateEvent(admin, {
+      kind: "otp_request",
+      organizationId,
+      ipHash,
+      phoneE164,
+    });
+    return { success: true };
+  }
 
   const code = generateSixDigitOtp();
   const codeHash = hashBookingOtpCode(organizationId, phoneE164, code);
@@ -697,7 +729,7 @@ export async function submitPublicBooking(
     return { success: false, message: APPOINTMENT_OVERLAP_MESSAGE };
   }
 
-  const otpOk = await verifyAndConsumeOtpChallenge(
+  const otpOk = await verifyPublicBookingOtp(
     admin,
     organizationId,
     phoneE164,

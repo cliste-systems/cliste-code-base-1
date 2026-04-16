@@ -47,7 +47,7 @@ export async function assertOtpSendRateAllowed(
     };
   }
 
-  const { count: otpCount, error: otpErr } = await admin
+  const { count: otpChallengeCount, error: otpErr } = await admin
     .from("public_booking_otp_challenges")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
@@ -57,7 +57,25 @@ export async function assertOtpSendRateAllowed(
   if (otpErr) {
     return { ok: false, message: "Please try again in a moment." };
   }
-  if ((otpCount ?? 0) >= OTP_SENDS_PER_PHONE_PER_HOUR) {
+
+  /** Twilio Verify path records `otp_request` only on rate_events (no DB challenge row). */
+  const { count: otpEventCount, error: otpEvErr } = await admin
+    .from("public_booking_rate_events")
+    .select("*", { count: "exact", head: true })
+    .eq("kind", "otp_request")
+    .eq("organization_id", organizationId)
+    .eq("phone_e164", phoneE164)
+    .gte("created_at", hourAgo);
+
+  if (otpEvErr) {
+    return { ok: false, message: "Please try again in a moment." };
+  }
+
+  const phoneOtpStarts = Math.max(
+    otpChallengeCount ?? 0,
+    otpEventCount ?? 0,
+  );
+  if (phoneOtpStarts >= OTP_SENDS_PER_PHONE_PER_HOUR) {
     return {
       ok: false,
       message: "Too many codes sent to this number. Try again later.",
