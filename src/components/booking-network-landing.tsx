@@ -10,7 +10,14 @@ import {
   Navigation,
   Scissors,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import {
   type PublicDirectoryNicheOption,
@@ -30,6 +37,9 @@ export type BookingNetworkLandingProps = {
 const hoverReveal =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0)_100%)]";
 
+/** Initial batch + each “Show more”; keeps first paint light for dozens of venues. */
+const VENUE_PAGE_SIZE = 12;
+
 export function BookingNetworkLanding({
   appOrigin,
   directoryNicheOptions,
@@ -42,6 +52,7 @@ export function BookingNetworkLanding({
   );
   const [location, setLocation] = useState("");
   const [salons, setSalons] = useState<PublicSalonDirectoryRow[]>([]);
+  const [venueVisibleCount, setVenueVisibleCount] = useState(VENUE_PAGE_SIZE);
   const [viewerGeo, setViewerGeo] = useState<{
     lat: number;
     lng: number;
@@ -107,6 +118,15 @@ export function BookingNetworkLanding({
     setOpenId(null);
   }, []);
 
+  const visibleSalons = useMemo(
+    () => salons.slice(0, venueVisibleCount),
+    [salons, venueVisibleCount],
+  );
+
+  useEffect(() => {
+    setVenueVisibleCount(VENUE_PAGE_SIZE);
+  }, [salons]);
+
   const runDirectorySearch = useCallback(() => {
     setSearchError(null);
     setHasSearched(true);
@@ -131,7 +151,7 @@ export function BookingNetworkLanding({
   return (
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
       <nav className="relative z-[70] w-full border-b border-zinc-200 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between px-6">
+        <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between gap-3 px-4 sm:px-6">
           <Link href="/" className="group flex cursor-pointer items-center">
             <Image
               src="/cliste-logo.png"
@@ -162,7 +182,7 @@ export function BookingNetworkLanding({
       </nav>
 
       <main className="relative z-50 pt-16 pb-12 md:pt-24">
-        <div className="mx-auto max-w-[1400px] px-6">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
           <div className="mb-16">
             <p className="mb-8 flex items-center gap-4 text-sm font-normal tracking-widest text-zinc-400 uppercase">
               <span className="h-px w-12 bg-zinc-300" />
@@ -410,16 +430,16 @@ export function BookingNetworkLanding({
 
           {hasSearched ? (
             <div
-              className="mt-12 border border-zinc-200 bg-white p-6 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:p-10"
+              className="mt-8 overflow-x-hidden border border-zinc-200 bg-white p-4 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] sm:mt-12 sm:p-6 md:p-10"
               role="region"
               aria-label="Search results"
             >
-              <div className="mb-8 flex flex-col gap-1 border-b border-zinc-100 pb-6 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
+              <div className="mb-6 flex flex-col gap-3 border-b border-zinc-100 pb-5 sm:mb-8 sm:pb-6 md:flex-row md:items-end md:justify-between md:gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold tracking-tight text-black sm:text-2xl md:text-3xl">
                     Places you can book
                   </h2>
-                  <p className="mt-1 text-sm text-zinc-500">
+                  <p className="mt-1 max-w-prose text-sm leading-snug text-zinc-500">
                     Live storefronts on Cliste — pick a venue, then choose
                     services and a time.
                   </p>
@@ -427,7 +447,9 @@ export function BookingNetworkLanding({
                 <p className="text-sm font-medium text-zinc-400 tabular-nums">
                   {isSearching
                     ? "Searching…"
-                    : `${salons.length} ${salons.length === 1 ? "venue" : "venues"}`}
+                    : venueVisibleCount < salons.length
+                      ? `Showing ${visibleSalons.length} of ${salons.length}`
+                      : `${salons.length} ${salons.length === 1 ? "venue" : "venues"}`}
                 </p>
               </div>
               {searchError ? (
@@ -441,14 +463,15 @@ export function BookingNetworkLanding({
                   sent you.
                 </p>
               ) : (
-                <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                  {salons.map((s) => (
+                <>
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:gap-6 xl:grid-cols-3">
+                  {visibleSalons.map((s) => (
                     <li key={s.slug} className="list-none">
                       <Link
                         href={getPublicBookingPageUrl(`/${s.slug}`)}
-                        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-zinc-200/60 transition-all hover:-translate-y-0.5 hover:border-emerald-200/80 hover:shadow-[0_12px_40px_-12px_rgba(16,185,129,0.25)]"
+                        className="group flex h-full touch-manipulation flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-zinc-200/60 transition-[transform,box-shadow,border-color] motion-safe:md:hover:-translate-y-0.5 motion-safe:md:hover:border-emerald-200/80 motion-safe:md:hover:shadow-[0_12px_40px_-12px_rgba(16,185,129,0.25)] active:scale-[0.99] md:active:scale-100"
                       >
-                        <div className="relative h-36 bg-zinc-100 md:h-40">
+                        <div className="relative h-32 bg-zinc-100 min-[400px]:h-36 md:h-40">
                           {s.coverImageUrl ? (
                             <img
                               src={s.coverImageUrl}
@@ -472,7 +495,7 @@ export function BookingNetworkLanding({
                                 : `${Math.round(s.distanceKm * 10) / 10} km`}
                             </span>
                           ) : null}
-                          <div className="absolute -bottom-7 left-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg ring-1 ring-black/5">
+                          <div className="absolute -bottom-6 left-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border-[3px] border-white bg-white shadow-lg ring-1 ring-black/5 min-[400px]:-bottom-7 min-[400px]:left-5 min-[400px]:h-[4.5rem] min-[400px]:w-[4.5rem] min-[400px]:rounded-2xl">
                             {s.logoUrl ? (
                               <img
                                 src={s.logoUrl}
@@ -488,11 +511,11 @@ export function BookingNetworkLanding({
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-1 flex-col px-5 pb-5 pt-10 md:px-6 md:pb-6 md:pt-11">
-                          <div className="flex flex-1 flex-col gap-3 md:flex-row md:justify-between md:gap-4">
+                        <div className="flex flex-1 flex-col px-4 pb-4 pt-9 min-[400px]:px-5 min-[400px]:pb-5 min-[400px]:pt-10 md:px-6 md:pb-6 md:pt-11">
+                          <div className="flex flex-1 flex-col gap-4 md:flex-row md:justify-between md:gap-4">
                             <div className="min-w-0 flex-1 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="text-lg font-semibold tracking-tight text-black transition-colors group-hover:text-emerald-900 md:text-xl">
+                                <h3 className="text-base font-semibold tracking-tight text-black transition-colors group-hover:text-emerald-900 min-[400px]:text-lg md:text-xl">
                                   {s.name}
                                 </h3>
                                 <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
@@ -528,12 +551,12 @@ export function BookingNetworkLanding({
                                 Native online booking on Cliste
                               </p>
                             </div>
-                            <div className="flex shrink-0 flex-col justify-end md:items-end">
-                              <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold tracking-wide text-black shadow-sm transition-colors group-hover:bg-emerald-400">
+                            <div className="flex shrink-0 flex-col justify-stretch md:items-end">
+                              <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold tracking-wide text-black shadow-sm transition-colors group-hover:bg-emerald-400 md:min-h-0 md:w-auto md:py-3">
                                 Book now
                                 <ArrowUpRight
                                   strokeWidth={2}
-                                  className="h-4 w-4"
+                                  className="h-4 w-4 shrink-0"
                                 />
                               </span>
                             </div>
@@ -543,6 +566,22 @@ export function BookingNetworkLanding({
                     </li>
                   ))}
                 </ul>
+                {venueVisibleCount < salons.length ? (
+                  <div className="mt-8 flex justify-center px-1">
+                    <button
+                      type="button"
+                      className="min-h-11 w-full max-w-md rounded-xl border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-800 shadow-sm transition-colors hover:border-zinc-400 hover:bg-zinc-50 sm:w-auto sm:min-w-56"
+                      onClick={() =>
+                        setVenueVisibleCount((c) =>
+                          Math.min(c + VENUE_PAGE_SIZE, salons.length),
+                        )
+                      }
+                    >
+                      Show more ({salons.length - venueVisibleCount} left)
+                    </button>
+                  </div>
+                ) : null}
+                </>
               )}
             </div>
           ) : null}
