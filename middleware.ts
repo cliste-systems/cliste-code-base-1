@@ -3,6 +3,10 @@ import { type NextRequest, NextResponse } from "next/server";
 import { hostMatchesConfiguredBookingHost } from "./src/lib/booking-site-origin";
 import { clisteHostRoutingRedirect } from "./src/lib/cliste-host-routing";
 import {
+  pathIsAgencyAdminSection,
+  pathIsTenantDashboardSection,
+} from "./src/lib/staff-route-paths";
+import {
   isValidSupportDashboardCookieValue,
   SUPPORT_DASHBOARD_COOKIE,
 } from "./src/lib/support-dashboard-cookie";
@@ -39,7 +43,7 @@ async function dashboardGate(
   response: NextResponse
 ): Promise<NextResponse> {
   const path = request.nextUrl.pathname;
-  if (!path.startsWith("/dashboard")) return response;
+  if (!pathIsTenantDashboardSection(path)) return response;
 
   const secret = process.env.CLISTE_DASHBOARD_GATE_SECRET?.trim();
   if (!secret) {
@@ -81,7 +85,7 @@ async function adminGate(
   response: NextResponse
 ): Promise<NextResponse> {
   const path = request.nextUrl.pathname;
-  if (!path.startsWith("/admin")) return response;
+  if (!pathIsAgencyAdminSection(path)) return response;
 
   const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
   if (!secret) {

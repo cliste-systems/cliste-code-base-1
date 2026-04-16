@@ -4,6 +4,7 @@ import {
   resolveAppSiteOrigin,
   resolveBookingSiteOrigin,
 } from "./booking-site-origin";
+import { pathIsStaffRouteRedirectingBookToApp } from "./staff-route-paths";
 
 /** Single path segment at root that is not a public salon slug. */
 const RESERVED_APP_ROOT_SEGMENTS = new Set(
@@ -24,18 +25,6 @@ const RESERVED_APP_ROOT_SEGMENTS = new Set(
 function requestHostname(request: NextRequest): string | null {
   const host = request.headers.get("host")?.split(":")[0]?.toLowerCase();
   return host || null;
-}
-
-/** Staff / internal paths on `book.*` that must be served from `app.*`. */
-function pathIsStaffRouteRedirectingToApp(path: string): boolean {
-  if (path === "/login" || path.startsWith("/login/")) return true;
-  if (path === "/dashboard" || path.startsWith("/dashboard/")) return true;
-  if (path === "/admin" || path.startsWith("/admin/")) return true;
-  if (path === "/dashboard-unlock" || path.startsWith("/dashboard-unlock/"))
-    return true;
-  if (path === "/admin-unlock" || path.startsWith("/admin-unlock/"))
-    return true;
-  return false;
 }
 
 /**
@@ -67,7 +56,7 @@ export function clisteHostRoutingRedirect(
     return NextResponse.redirect(new URL(pathAndQuery, bookingOrigin));
   }
 
-  if (pathIsStaffRouteRedirectingToApp(path)) {
+  if (pathIsStaffRouteRedirectingBookToApp(path)) {
     return NextResponse.redirect(new URL(pathAndQuery, appOrigin));
   }
 
