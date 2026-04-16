@@ -808,7 +808,7 @@ export async function submitPublicBooking(
   if (customerEmailNorm) {
     if (!isSendGridConfigured()) {
       emailNotice =
-        "Your booking is saved, but confirmation email is off on this server (add SENDGRID_API_KEY and SENDGRID_FROM_EMAIL in hosting env, e.g. Vercel).";
+        "Your booking is confirmed. We could not send an email summary from this page yet — you will still get a text on the number you entered.";
     } else {
       const emailBodies = buildBookingConfirmationEmailBodies({
         customerName,

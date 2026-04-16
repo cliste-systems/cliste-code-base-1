@@ -205,6 +205,9 @@ export function PublicBookingDialog({
                   autoComplete="email"
                   placeholder="you@example.com"
                 />
+                <p className="text-muted-foreground text-xs leading-snug">
+                  Optional — we&apos;ll email you a booking summary if you add your address.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor={whenId}>Date &amp; time</Label>

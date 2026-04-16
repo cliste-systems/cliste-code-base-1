@@ -1077,7 +1077,7 @@ export function BookingsView({
               </div>
               <DialogDescription className="pl-11 text-sm leading-relaxed text-gray-500">
                 Only open slots are shown. SMS sends when Twilio is configured;
-                add an email below for a SendGrid confirmation as well.
+                add their email below if you want them to get a confirmation in their inbox too.
               </DialogDescription>
             </DialogHeader>
           </div>

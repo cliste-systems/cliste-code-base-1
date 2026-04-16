@@ -663,7 +663,7 @@ export function SalonNativeBookingStorefront({
                 placeholder="you@example.com"
               />
               <p className="text-[11px] leading-snug text-gray-500">
-                Optional confirmation email when SendGrid is configured on the server.
+                Optional — we&apos;ll email you a booking summary if you add your address.
               </p>
             </div>
             {bookingError ? (
