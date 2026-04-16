@@ -64,21 +64,15 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
       <nav className="relative z-[70] w-full border-b border-zinc-200 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between px-6">
-          <Link
-            href="/"
-            className="group flex cursor-pointer items-center gap-3"
-          >
+          <Link href="/" className="group flex cursor-pointer items-center">
             <Image
               src="/cliste-logo.png"
-              alt=""
+              alt="Cliste"
               width={40}
               height={40}
               priority
               className="h-9 w-9 shrink-0 object-contain"
             />
-            <span className="text-xl font-normal tracking-tighter text-black uppercase">
-              Cliste
-            </span>
           </Link>
 
           <div className="flex items-center gap-6">
