@@ -123,14 +123,11 @@ export function BookingNetworkLanding({
     [salons, venueVisibleCount],
   );
 
-  useEffect(() => {
-    setVenueVisibleCount(VENUE_PAGE_SIZE);
-  }, [salons]);
-
   const runDirectorySearch = useCallback(() => {
     setSearchError(null);
     setHasSearched(true);
     setSalons([]);
+    setVenueVisibleCount(VENUE_PAGE_SIZE);
     startTransition(async () => {
       const res = await searchPublicSalonsDirectory({
         service,
@@ -141,6 +138,7 @@ export function BookingNetworkLanding({
       });
       if (!res.ok) {
         setSalons([]);
+        setVenueVisibleCount(VENUE_PAGE_SIZE);
         setSearchError(res.message);
         return;
       }
