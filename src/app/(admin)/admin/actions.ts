@@ -180,7 +180,7 @@ export async function createOrganization(payload: {
   niche?: OrganizationNiche;
   /** Optional; shown on the public book directory and used for distance search */
   address?: string | null;
-  /** Optional; geocoded with address via OpenStreetMap Nominatim (Ireland) */
+  /** Optional; geocoded with address via Google Geocoding API (Ireland) */
   storefrontEircode?: string | null;
   /** From `window.location.origin` so invite redirect matches this app */
   clientOrigin?: string | null;

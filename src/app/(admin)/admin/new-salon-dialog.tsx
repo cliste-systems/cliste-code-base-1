@@ -193,7 +193,7 @@ export function NewSalonDialog() {
               autoComplete="postal-code"
             />
             <p className="text-muted-foreground text-xs">
-              Resolved with OpenStreetMap (free) to pin the salon on the map.
+              Resolved with Google Maps Geocoding to pin the salon on the map.
             </p>
           </div>
           <div className="space-y-2">

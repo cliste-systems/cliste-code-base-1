@@ -54,6 +54,7 @@ import {
   todayYmdInTimeZone,
 } from "@/lib/booking-available-slots";
 import { StorefrontMapEmbed } from "@/components/storefront-map-embed";
+import { StorefrontStreetView } from "@/components/storefront-street-view";
 import type {
   StorefrontReviewsBlock,
   StorefrontTeamMember,
@@ -1296,6 +1297,33 @@ export function SalonNativeBookingStorefront({
                       </div>
                     </div>
                   ) : null}
+                </section>
+              ) : null}
+
+              {showMapCard && mapLat != null && mapLng != null ? (
+                <section className="mt-2 border-t border-gray-200/80 pt-8">
+                  <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                    <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-5 py-3">
+                      <h3 className="text-sm font-medium tracking-tight text-gray-900">
+                        Street view
+                      </h3>
+                      <a
+                        href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${mapLat},${mapLng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-blue-600 transition-colors hover:text-blue-800"
+                      >
+                        Open in Google Maps
+                      </a>
+                    </div>
+                    <div className="relative h-64 w-full sm:h-80">
+                      <StorefrontStreetView
+                        lat={mapLat}
+                        lng={mapLng}
+                        title={`${salonName} — street view`}
+                      />
+                    </div>
+                  </div>
                 </section>
               ) : null}
             </div>
