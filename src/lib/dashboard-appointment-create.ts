@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { parseBusinessHoursFromDb } from "@/app/(dashboard)/dashboard/settings/business-hours";
 import {
+  buildBookingConfirmationEmailBodies,
+  normalizeOptionalCustomerEmail,
+} from "@/lib/booking-transactional-email";
+import {
   buildBookingConfirmationSmsBody,
   sendTwilioBookingSms,
 } from "@/lib/booking-confirmation-sms";
@@ -25,12 +29,17 @@ import {
   isDatabaseOverlapConstraintError,
 } from "@/lib/appointments-overlap";
 import { appendCaraDiaryNoticeForDashboardUser } from "@/lib/cara-chat-persistence";
+import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type CreateAppointmentResult =
-  | { ok: true; confirmationSmsFailed?: string }
+  | {
+      ok: true;
+      confirmationSmsFailed?: string;
+      confirmationEmailFailed?: string;
+    }
   | { ok: false; message: string };
 
 export async function fetchBusyIntervalsForCalendarDayForOrg(
@@ -68,6 +77,8 @@ export async function createDashboardAppointment(params: {
   userId: string;
   customerName: string;
   customerPhone: string;
+  /** Optional — confirmation email when SendGrid is configured. */
+  customerEmail?: string | null;
   serviceId: string;
   startTimeIso: string;
   diaryOrigin?: "bookings" | "cara";
@@ -76,6 +87,7 @@ export async function createDashboardAppointment(params: {
   const phone = params.customerPhone.trim();
   const serviceId = params.serviceId.trim();
   const diaryOrigin = params.diaryOrigin ?? "bookings";
+  const emailNorm = normalizeOptionalCustomerEmail(params.customerEmail);
 
   if (!name) {
     return { ok: false, message: "Customer name is required." };
@@ -174,6 +186,14 @@ export async function createDashboardAppointment(params: {
     };
   }
 
+  const emailRaw = String(params.customerEmail ?? "").trim();
+  if (emailRaw && !emailNorm) {
+    return {
+      ok: false,
+      message: "That email address does not look valid.",
+    };
+  }
+
   let insertedId: string | null = null;
   let bookingRef: string | null = null;
   for (let attempt = 0; attempt < 14; attempt++) {
@@ -184,6 +204,7 @@ export async function createDashboardAppointment(params: {
         organization_id: organizationId,
         customer_name: name,
         customer_phone: phoneE164,
+        customer_email: emailNorm,
         service_id: serviceId,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
@@ -228,6 +249,38 @@ export async function createDashboardAppointment(params: {
   });
 
   const sms = await sendTwilioBookingSms(phoneE164, body);
+
+  let confirmationEmailFailed: string | undefined;
+  if (emailNorm) {
+    if (!isSendGridConfigured()) {
+      confirmationEmailFailed =
+        "SendGrid is not configured — confirmation email was not sent.";
+    } else {
+      const emailBodies = buildBookingConfirmationEmailBodies({
+        customerName: name,
+        salonName,
+        serviceName: typeof svc.name === "string" ? svc.name : "Appointment",
+        startTimeIso: start.toISOString(),
+        bookingReference: bookingRef,
+      });
+      const er = await sendTransactionalEmail({
+        to: emailNorm,
+        subject: emailBodies.subject,
+        text: emailBodies.text,
+        html: emailBodies.html,
+      });
+      if (er.ok) {
+        await supabase
+          .from("appointments")
+          .update({ confirmation_email_sent_at: new Date().toISOString() })
+          .eq("id", insertedId)
+          .eq("organization_id", organizationId);
+      } else {
+        confirmationEmailFailed = er.message;
+      }
+    }
+  }
+
   const svcLabel =
     typeof svc.name === "string" ? svc.name : "Appointment";
   const whenLabel = formatInTimeZone(start, tz, "EEE d MMM, h:mm a");
@@ -251,7 +304,12 @@ export async function createDashboardAppointment(params: {
     revalidatePath("/dashboard/bookings");
     revalidatePath("/dashboard/calendar");
     revalidatePath("/dashboard");
-    return { ok: true };
+    return {
+      ok: true,
+      ...(confirmationEmailFailed
+        ? { confirmationEmailFailed }
+        : {}),
+    };
   }
 
   const smsFailedReason =
@@ -262,5 +320,9 @@ export async function createDashboardAppointment(params: {
   revalidatePath("/dashboard/bookings");
   revalidatePath("/dashboard/calendar");
   revalidatePath("/dashboard");
-  return { ok: true, confirmationSmsFailed: smsFailedReason };
+  return {
+    ok: true,
+    confirmationSmsFailed: smsFailedReason,
+    ...(confirmationEmailFailed ? { confirmationEmailFailed } : {}),
+  };
 }

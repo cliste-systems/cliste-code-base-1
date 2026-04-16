@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import twilio from "twilio";
 
 import { reminderSmsBody } from "@/lib/appointment-reminder-sms";
+import {
+  buildAppointmentReminderEmailBodies,
+  normalizeOptionalCustomerEmail,
+} from "@/lib/booking-transactional-email";
+import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +20,10 @@ type AppointmentRow = {
   booking_reference: string;
   organizations: { name: string } | { name: string }[] | null;
   services: { name: string } | { name: string }[] | null;
+};
+
+type AppointmentEmailRow = AppointmentRow & {
+  customer_email: string | null;
 };
 
 function embedName(
@@ -52,14 +61,17 @@ async function runReminders(request: Request) {
 
   const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const token = process.env.TWILIO_AUTH_TOKEN?.trim();
-  const from =
+  const smsFrom =
     process.env.TWILIO_SMS_FROM?.trim() ||
     process.env.TWILIO_PHONE_NUMBER?.trim();
-  if (!sid || !token || !from) {
+  const twilioReady = Boolean(sid && token && smsFrom);
+  const sendgridReady = isSendGridConfigured();
+
+  if (!twilioReady && !sendgridReady) {
     return NextResponse.json(
       {
         error:
-          "Twilio not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SMS_FROM or TWILIO_PHONE_NUMBER)",
+          "Configure Twilio (SMS reminders) and/or SendGrid with SENDGRID_API_KEY + SENDGRID_FROM_EMAIL (email reminders).",
       },
       { status: 503 },
     );
@@ -80,10 +92,15 @@ async function runReminders(request: Request) {
   const windowStart = new Date(now + 23.5 * 60 * 60 * 1000).toISOString();
   const windowEnd = new Date(now + 24.5 * 60 * 60 * 1000).toISOString();
 
-  const { data: rows, error: qErr } = await supabase
-    .from("appointments")
-    .select(
-      `
+  const smsSent: string[] = [];
+  const smsFailed: { id: string; message: string }[] = [];
+  let smsMatched = 0;
+
+  if (twilioReady) {
+    const { data: rows, error: qErr } = await supabase
+      .from("appointments")
+      .select(
+        `
       id,
       customer_name,
       customer_phone,
@@ -92,60 +109,141 @@ async function runReminders(request: Request) {
       organizations ( name ),
       services ( name )
     `,
-    )
-    .eq("status", "confirmed")
-    .is("reminder_sent_at", null)
-    .gte("start_time", windowStart)
-    .lte("start_time", windowEnd);
+      )
+      .eq("status", "confirmed")
+      .is("reminder_sent_at", null)
+      .gte("start_time", windowStart)
+      .lte("start_time", windowEnd);
 
-  if (qErr) {
-    console.error("appointment-reminders query", qErr);
-    return NextResponse.json({ error: qErr.message }, { status: 500 });
+    if (qErr) {
+      console.error("appointment-reminders SMS query", qErr);
+      return NextResponse.json({ error: qErr.message }, { status: 500 });
+    }
+
+    const list = (rows ?? []) as AppointmentRow[];
+    smsMatched = list.length;
+    const client = twilio(sid!, token!);
+
+    for (const row of list) {
+      const salonName =
+        embedName(row.organizations)?.trim() || "the salon";
+      const serviceName =
+        embedName(row.services)?.trim() || "your appointment";
+      const body = reminderSmsBody({
+        customerName: row.customer_name,
+        salonName,
+        serviceName,
+        startTimeIso: row.start_time,
+        bookingReference: row.booking_reference,
+      });
+      const to = row.customer_phone.trim();
+      try {
+        await client.messages.create({ from: smsFrom!, to, body });
+        const { error: upErr } = await supabase
+          .from("appointments")
+          .update({ reminder_sent_at: new Date().toISOString() })
+          .eq("id", row.id)
+          .is("reminder_sent_at", null);
+        if (upErr) {
+          smsFailed.push({ id: row.id, message: upErr.message });
+          continue;
+        }
+        smsSent.push(row.id);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.error("Twilio reminder failed", row.id, message);
+        smsFailed.push({ id: row.id, message });
+      }
+    }
   }
 
-  const list = (rows ?? []) as AppointmentRow[];
-  const client = twilio(sid, token);
-  const sent: string[] = [];
-  const failed: { id: string; message: string }[] = [];
+  const emailSent: string[] = [];
+  const emailFailed: { id: string; message: string }[] = [];
+  let emailMatched = 0;
 
-  for (const row of list) {
-    const salonName =
-      embedName(row.organizations)?.trim() || "the salon";
-    const serviceName =
-      embedName(row.services)?.trim() || "your appointment";
-    const body = reminderSmsBody({
-      customerName: row.customer_name,
-      salonName,
-      serviceName,
-      startTimeIso: row.start_time,
-      bookingReference: row.booking_reference,
-    });
-    const to = row.customer_phone.trim();
-    try {
-      await client.messages.create({ from, to, body });
-      const { error: upErr } = await supabase
-        .from("appointments")
-        .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", row.id)
-        .is("reminder_sent_at", null);
-      if (upErr) {
-        failed.push({ id: row.id, message: upErr.message });
+  if (sendgridReady) {
+    const { data: emailRows, error: emailQErr } = await supabase
+      .from("appointments")
+      .select(
+        `
+      id,
+      customer_name,
+      customer_phone,
+      customer_email,
+      start_time,
+      booking_reference,
+      organizations ( name ),
+      services ( name )
+    `,
+      )
+      .eq("status", "confirmed")
+      .is("reminder_email_sent_at", null)
+      .gte("start_time", windowStart)
+      .lte("start_time", windowEnd);
+
+    if (emailQErr) {
+      console.error("appointment-reminders email query", emailQErr);
+      return NextResponse.json({ error: emailQErr.message }, { status: 500 });
+    }
+
+    const elist = (emailRows ?? []) as AppointmentEmailRow[];
+    const withEmail = elist.filter((r) =>
+      Boolean(normalizeOptionalCustomerEmail(r.customer_email)),
+    );
+    emailMatched = withEmail.length;
+
+    for (const row of withEmail) {
+      const to = normalizeOptionalCustomerEmail(row.customer_email)!;
+      const salonName =
+        embedName(row.organizations)?.trim() || "the salon";
+      const serviceName =
+        embedName(row.services)?.trim() || "your appointment";
+      const bodies = buildAppointmentReminderEmailBodies({
+        customerName: row.customer_name,
+        salonName,
+        serviceName,
+        startTimeIso: row.start_time,
+        bookingReference: row.booking_reference,
+      });
+      const res = await sendTransactionalEmail({
+        to,
+        subject: bodies.subject,
+        text: bodies.text,
+        html: bodies.html,
+      });
+      if (!res.ok) {
+        emailFailed.push({ id: row.id, message: res.message });
         continue;
       }
-      sent.push(row.id);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error("Twilio reminder failed", row.id, message);
-      failed.push({ id: row.id, message });
+      const { error: upErr } = await supabase
+        .from("appointments")
+        .update({ reminder_email_sent_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .is("reminder_email_sent_at", null);
+      if (upErr) {
+        emailFailed.push({ id: row.id, message: upErr.message });
+        continue;
+      }
+      emailSent.push(row.id);
     }
   }
 
   return NextResponse.json({
     ok: true,
     window: { windowStart, windowEnd },
-    matched: list.length,
-    sent: sent.length,
-    sentIds: sent,
-    failed,
+    sms: {
+      enabled: twilioReady,
+      matched: smsMatched,
+      sent: smsSent.length,
+      sentIds: smsSent,
+      failed: smsFailed,
+    },
+    email: {
+      enabled: sendgridReady,
+      matched: emailMatched,
+      sent: emailSent.length,
+      sentIds: emailSent,
+      failed: emailFailed,
+    },
   });
 }

@@ -9,6 +9,7 @@ import {
   touchConversation,
 } from "@/lib/cara-chat-persistence";
 import { sendAppointmentCancellationSms } from "@/lib/appointment-cancellation-sms";
+import { sendAppointmentCancellationEmailBestEffort } from "@/lib/booking-transactional-email";
 import { cancelConfirmedAppointmentForOrganization } from "@/lib/dashboard-appointment-cancel";
 import { getOptionalDashboardSession } from "@/lib/dashboard-session";
 
@@ -133,10 +134,11 @@ export async function POST(request: Request) {
     cancelResult.didPerformCancellation &&
     row.appointment_id
   ) {
+    const apptId = String(row.appointment_id);
     const sms = await sendAppointmentCancellationSms(
       session.supabase,
       session.organizationId,
-      String(row.appointment_id),
+      apptId,
     );
     if (sms.sent) {
       smsNote = " They’ve been sent a text to confirm it’s cancelled.";
@@ -147,6 +149,11 @@ export async function POST(request: Request) {
       smsNote =
         " The automatic cancellation text didn’t go through — tell the client if they should know, or message Cliste Support.";
     }
+    await sendAppointmentCancellationEmailBestEffort(
+      session.supabase,
+      session.organizationId,
+      apptId,
+    );
   }
 
   const outcomeText = stripChatMarkdownDisplay(

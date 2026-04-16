@@ -132,6 +132,7 @@ export function SalonNativeBookingStorefront({
 }: SalonNativeBookingStorefrontProps) {
   const nameId = useId();
   const phoneId = useId();
+  const emailId = useId();
   const otpId = useId();
   const honeypotId = useId();
 
@@ -392,6 +393,10 @@ export function SalonNativeBookingStorefront({
         (form.elements.namedItem("customer_phone") as HTMLInputElement)
           ?.value ?? "",
       ).trim();
+      const customerEmail = String(
+        (form.elements.namedItem("customer_email") as HTMLInputElement)
+          ?.value ?? "",
+      ).trim();
       const bookingOtpCode = String(
         (form.elements.namedItem("booking_otp_code") as HTMLInputElement)
           ?.value ?? "",
@@ -402,6 +407,7 @@ export function SalonNativeBookingStorefront({
           const fd = new FormData();
           fd.set("customer_name", customerName);
           fd.set("customer_phone", customerPhone);
+          fd.set("customer_email", customerEmail);
           fd.set("start_time_iso", selectedSlotIso);
           fd.set("booking_otp_code", bookingOtpCode);
           if (selectedStaffIdForSlots) {
@@ -592,6 +598,22 @@ export function SalonNativeBookingStorefront({
             ) : (
               <input type="hidden" name="booking_otp_code" value="" />
             )}
+            <div className="space-y-2">
+              <Label htmlFor={emailId}>
+                Email <span className="font-normal text-gray-400">(optional)</span>
+              </Label>
+              <Input
+                id={emailId}
+                name="customer_email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+              />
+              <p className="text-[11px] leading-snug text-gray-500">
+                If you add an email, we&apos;ll send a booking confirmation there too
+                (when email is enabled for this site).
+              </p>
+            </div>
             {bookingError ? (
               <p className="text-sm text-red-600" role="alert">
                 {bookingError}

@@ -18,6 +18,7 @@ import {
   Clock,
   FileText,
   Loader2,
+  Mail,
   MessageSquareText,
   Phone,
   Scissors,
@@ -72,6 +73,7 @@ export type AppointmentListRow = {
   id: string;
   customer_name: string;
   customer_phone: string;
+  customer_email: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -84,8 +86,11 @@ export type AppointmentListRow = {
   /** Allergies, preferences, etc. — written by the AI or integrations. */
   ai_booking_notes: string | null;
   confirmation_sms_sent_at: string | null;
+  confirmation_email_sent_at: string | null;
   /** 24h reminder SMS (Twilio cron); null if not sent. */
   reminder_sent_at: string | null;
+  /** 24h reminder email (SendGrid cron); null if not sent. */
+  reminder_email_sent_at: string | null;
 };
 
 function formatAppointmentDateLine(isoStart: string): string {
@@ -304,9 +309,13 @@ export function BookingsView({
   );
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [bookingSmsNotice, setBookingSmsNotice] = useState<string | null>(null);
+  const [bookingChannelNotices, setBookingChannelNotices] = useState<{
+    sms?: string;
+    email?: string;
+  } | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [date, setDate] = useState("");
   const [slotIso, setSlotIso] = useState("");
@@ -320,6 +329,7 @@ export function BookingsView({
   const resetForm = useCallback(() => {
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerEmail("");
     setServiceId(services[0]?.id ?? "");
     setDate("");
     setSlotIso("");
@@ -394,6 +404,7 @@ export function BookingsView({
       const result = await createAppointment({
         customerName,
         customerPhone,
+        customerEmail,
         serviceId,
         startTimeIso: slotIso,
       });
@@ -401,13 +412,25 @@ export function BookingsView({
         setFormError(result.message);
         return;
       }
-      setBookingSmsNotice(result.confirmationSmsFailed ?? null);
+      setBookingChannelNotices(
+        result.confirmationSmsFailed || result.confirmationEmailFailed
+          ? {
+              ...(result.confirmationSmsFailed
+                ? { sms: result.confirmationSmsFailed }
+                : {}),
+              ...(result.confirmationEmailFailed
+                ? { email: result.confirmationEmailFailed }
+                : {}),
+            }
+          : null,
+      );
       setOpen(false);
       resetForm();
     });
   }, [
     customerName,
     customerPhone,
+    customerEmail,
     serviceId,
     date,
     slotIso,
@@ -538,21 +561,32 @@ export function BookingsView({
         </p>
       ) : null}
 
-      {bookingSmsNotice ? (
+      {bookingChannelNotices ? (
         <Alert
           className="mb-4 border-amber-200/80 bg-amber-50/80 text-amber-950 [&>svg]:text-amber-700"
           role="alert"
         >
           <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
           <div className="min-w-0">
-            <AlertTitle>Booking saved — confirmation SMS not sent</AlertTitle>
-            <AlertDescription className="text-amber-900/90">
-              {bookingSmsNotice}
+            <AlertTitle>Booking saved — some notifications did not send</AlertTitle>
+            <AlertDescription className="space-y-2 text-amber-900/90">
+              {bookingChannelNotices.sms ? (
+                <p>
+                  <span className="font-medium">SMS:</span>{" "}
+                  {bookingChannelNotices.sms}
+                </p>
+              ) : null}
+              {bookingChannelNotices.email ? (
+                <p>
+                  <span className="font-medium">Email:</span>{" "}
+                  {bookingChannelNotices.email}
+                </p>
+              ) : null}
             </AlertDescription>
             <button
               type="button"
               className="mt-2 text-xs font-medium text-amber-900 underline-offset-2 hover:underline"
-              onClick={() => setBookingSmsNotice(null)}
+              onClick={() => setBookingChannelNotices(null)}
             >
               Dismiss
             </button>
@@ -628,6 +662,16 @@ export function BookingsView({
                           </span>
                         </div>
                         <PhoneLine raw={row.customer_phone} inset />
+                        {row.customer_email ? (
+                          <div
+                            className={cn(
+                              "mt-0.5 text-xs text-gray-500",
+                              "pl-10",
+                            )}
+                          >
+                            {row.customer_email}
+                          </div>
+                        ) : null}
                         {row.booking_reference ? (
                           <div className="mt-1 font-mono text-xs text-gray-500">
                             Ref {row.booking_reference}
@@ -706,6 +750,9 @@ export function BookingsView({
                     </span>
                   </div>
                   <PhoneLine raw={row.customer_phone} inset={false} />
+                  {row.customer_email ? (
+                    <p className="text-xs text-gray-500">{row.customer_email}</p>
+                  ) : null}
                   {row.booking_reference ? (
                     <div className="font-mono text-xs text-gray-500">
                       Ref {row.booking_reference}
@@ -722,7 +769,9 @@ export function BookingsView({
                       {cancelButton(row)}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400">Tap for notes, call &amp; texts</p>
+                  <p className="text-xs text-gray-400">
+                    Tap for notes, call, texts &amp; email
+                  </p>
                 </div>
               </div>
             ))}
@@ -776,6 +825,12 @@ export function BookingsView({
                       {formatE164ForDisplay(
                         detailRow.customer_phone.trim() || detailRow.customer_phone,
                       ) || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-500">Email</span>
+                    <span className="max-w-[60%] break-all text-right text-gray-900">
+                      {detailRow.customer_email?.trim() || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between gap-4">
@@ -886,11 +941,11 @@ export function BookingsView({
                 <div>
                   <h3 className="mb-2 flex items-center gap-2 text-xs font-medium tracking-wider text-gray-500 uppercase">
                     <MessageSquareText className="size-3.5 text-gray-400" aria-hidden />
-                    Text messages
+                    SMS &amp; email
                   </h3>
                   <div className="divide-y divide-gray-100 rounded-lg border border-gray-100">
                     <div className="flex items-center justify-between gap-4 px-3 py-2.5">
-                      <span className="text-sm text-gray-600">Confirmation</span>
+                      <span className="text-sm text-gray-600">SMS confirmation</span>
                       {detailRow.confirmation_sms_sent_at ? (
                         <span className="text-sm font-medium text-gray-900 tabular-nums">
                           Sent{" "}
@@ -901,10 +956,32 @@ export function BookingsView({
                       )}
                     </div>
                     <div className="flex items-center justify-between gap-4 px-3 py-2.5">
-                      <span className="text-sm text-gray-600">Reminder</span>
+                      <span className="text-sm text-gray-600">Email confirmation</span>
+                      {detailRow.confirmation_email_sent_at ? (
+                        <span className="text-sm font-medium text-gray-900 tabular-nums">
+                          Sent{" "}
+                          {formatDetailTimestamp(detailRow.confirmation_email_sent_at)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">Not sent</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+                      <span className="text-sm text-gray-600">SMS reminder (~24h)</span>
                       {detailRow.reminder_sent_at ? (
                         <span className="text-sm font-medium text-gray-900 tabular-nums">
                           Sent {formatDetailTimestamp(detailRow.reminder_sent_at)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">Not sent</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-3 py-2.5">
+                      <span className="text-sm text-gray-600">Email reminder (~24h)</span>
+                      {detailRow.reminder_email_sent_at ? (
+                        <span className="text-sm font-medium text-gray-900 tabular-nums">
+                          Sent{" "}
+                          {formatDetailTimestamp(detailRow.reminder_email_sent_at)}
                         </span>
                       ) : (
                         <span className="text-sm text-gray-400">Not sent</span>
@@ -999,8 +1076,8 @@ export function BookingsView({
                 </DialogTitle>
               </div>
               <DialogDescription className="pl-11 text-sm leading-relaxed text-gray-500">
-                Only open slots are shown. SMS confirmation sends when Twilio is
-                set up.
+                Only open slots are shown. SMS sends when Twilio is configured;
+                add an email below for a SendGrid confirmation as well.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -1047,6 +1124,24 @@ export function BookingsView({
                       placeholder="+353 87 123 4567"
                     />
                   </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <Label
+                    htmlFor="bk-email"
+                    className="flex items-center gap-1.5 text-sm font-medium text-gray-700"
+                  >
+                    <Mail className="size-3.5 text-gray-400" aria-hidden />
+                    Email <span className="font-normal text-gray-400">(optional)</span>
+                  </Label>
+                  <Input
+                    id="bk-email"
+                    className={newBookingFieldClass}
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    autoComplete="email"
+                    placeholder="client@example.com"
+                  />
                 </div>
               </div>
 

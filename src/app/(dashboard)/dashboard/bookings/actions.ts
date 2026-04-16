@@ -10,6 +10,7 @@ import {
   type DashboardBookingSlot,
 } from "@/lib/booking-available-slots";
 import { sendAppointmentCancellationSms } from "@/lib/appointment-cancellation-sms";
+import { sendAppointmentCancellationEmailBestEffort } from "@/lib/booking-transactional-email";
 import { appendCaraDiaryNoticeForDashboardUser } from "@/lib/cara-chat-persistence";
 import { cancelConfirmedAppointmentForOrganization } from "@/lib/dashboard-appointment-cancel";
 import {
@@ -95,6 +96,7 @@ export type { CreateAppointmentResult };
 export async function createAppointment(payload: {
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   serviceId: string;
   /** ISO 8601 start instant (client sends local wall time as ISO). */
   startTimeIso: string;
@@ -106,6 +108,7 @@ export async function createAppointment(payload: {
     userId: user.id,
     customerName: payload.customerName,
     customerPhone: payload.customerPhone,
+    customerEmail: payload.customerEmail,
     serviceId: payload.serviceId,
     startTimeIso: payload.startTimeIso,
     diaryOrigin: "bookings",
@@ -151,6 +154,11 @@ export async function cancelAppointment(
     if (!sms.sent && sms.reason === "twilio_error") {
       console.warn("Cancellation SMS failed", id, sms.message);
     }
+    await sendAppointmentCancellationEmailBestEffort(
+      supabase,
+      organizationId,
+      id,
+    );
   }
 
   const tz = getSalonTimeZone();

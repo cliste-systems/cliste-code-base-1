@@ -27,6 +27,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 import { AdminMetricRangeToggle } from "./admin-metric-range-toggle";
 import { NewSalonDialog } from "./new-salon-dialog";
+import { SendGridTestPanel } from "./sendgrid-test-panel";
 import { TenantRowActions } from "./tenant-row-actions";
 
 export const dynamic = "force-dynamic";
@@ -358,6 +359,8 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           </p>
         </div>
       ) : null}
+
+      <SendGridTestPanel />
 
       <section className="mb-14" aria-labelledby="global-metrics-heading">
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

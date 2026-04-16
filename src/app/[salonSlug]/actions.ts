@@ -10,6 +10,10 @@ import {
   sendTwilioBookingSms,
 } from "@/lib/booking-confirmation-sms";
 import {
+  buildBookingConfirmationEmailBodies,
+  normalizeOptionalCustomerEmail,
+} from "@/lib/booking-transactional-email";
+import {
   addDaysToYmd,
   computeAvailableBookingSlots,
   getCalendarDayUtcRange,
@@ -50,6 +54,7 @@ import {
 } from "@/lib/appointments-overlap";
 import { servicesTableHasExtendedColumns } from "@/lib/services-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const UUID_RE =
@@ -526,6 +531,8 @@ export async function submitPublicBooking(
 
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const customerPhone = String(formData.get("customer_phone") ?? "").trim();
+  const customerEmailRaw = String(formData.get("customer_email") ?? "").trim();
+  const customerEmailNorm = normalizeOptionalCustomerEmail(customerEmailRaw);
   const startIso = String(formData.get("start_time_iso") ?? "").trim();
   const otpCode = String(formData.get("booking_otp_code") ?? "").trim();
 
@@ -534,6 +541,9 @@ export async function submitPublicBooking(
   }
   if (!customerPhone) {
     return { success: false, message: "Please enter your phone number." };
+  }
+  if (customerEmailRaw && !customerEmailNorm) {
+    return { success: false, message: "Please check the email address." };
   }
   if (!startIso) {
     return { success: false, message: "Please choose a date and time." };
@@ -686,6 +696,7 @@ export async function submitPublicBooking(
         organization_id: organizationId,
         customer_name: customerName,
         customer_phone: phoneE164,
+        customer_email: customerEmailNorm,
         service_id: serviceId,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
@@ -738,6 +749,31 @@ export async function submitPublicBooking(
       .update({ confirmation_sms_sent_at: new Date().toISOString() })
       .eq("id", insertedId)
       .eq("organization_id", organizationId);
+  }
+
+  if (customerEmailNorm && isSendGridConfigured()) {
+    const emailBodies = buildBookingConfirmationEmailBodies({
+      customerName,
+      salonName,
+      serviceName,
+      startTimeIso: start.toISOString(),
+      bookingReference: bookingRef,
+    });
+    const er = await sendTransactionalEmail({
+      to: customerEmailNorm,
+      subject: emailBodies.subject,
+      text: emailBodies.text,
+      html: emailBodies.html,
+    });
+    if (er.ok) {
+      await admin
+        .from("appointments")
+        .update({ confirmation_email_sent_at: new Date().toISOString() })
+        .eq("id", insertedId)
+        .eq("organization_id", organizationId);
+    } else {
+      console.warn("Public booking confirmation email failed", er.message);
+    }
   }
 
   await recordPublicBookingRateEvent(admin, {

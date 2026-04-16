@@ -45,6 +45,7 @@ export function PublicBookingDialog({
 }: PublicBookingDialogProps) {
   const nameId = useId();
   const phoneId = useId();
+  const emailId = useId();
   const whenId = useId();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -137,6 +138,11 @@ export function PublicBookingDialog({
                   (form.elements.namedItem("customer_phone") as HTMLInputElement)
                     .value
                 );
+                fd.set(
+                  "customer_email",
+                  (form.elements.namedItem("customer_email") as HTMLInputElement)
+                    ?.value ?? "",
+                );
                 fd.set("start_time_iso", start.toISOString());
 
                 startTransition(async () => {
@@ -175,6 +181,18 @@ export function PublicBookingDialog({
                   autoComplete="tel"
                   required
                   placeholder="+353 …"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={emailId}>
+                  Email <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id={emailId}
+                  name="customer_email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
                 />
               </div>
               <div className="space-y-2">

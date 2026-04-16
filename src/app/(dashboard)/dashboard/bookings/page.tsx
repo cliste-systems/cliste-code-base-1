@@ -42,7 +42,10 @@ export default async function BookingsPage() {
           call_log_id,
           ai_booking_notes,
           confirmation_sms_sent_at,
+          confirmation_email_sent_at,
           reminder_sent_at,
+          reminder_email_sent_at,
+          customer_email,
           services (
             name,
             price
@@ -86,6 +89,14 @@ export default async function BookingsPage() {
             .confirmation_sms_sent_at ?? null,
         reminder_sent_at:
           (row as { reminder_sent_at?: string | null }).reminder_sent_at ?? null,
+        reminder_email_sent_at:
+          (row as { reminder_email_sent_at?: string | null })
+            .reminder_email_sent_at ?? null,
+        customer_email:
+          (row as { customer_email?: string | null }).customer_email ?? null,
+        confirmation_email_sent_at:
+          (row as { confirmation_email_sent_at?: string | null })
+            .confirmation_email_sent_at ?? null,
         services: Array.isArray(row.services)
           ? row.services[0] ?? null
           : row.services ?? null,

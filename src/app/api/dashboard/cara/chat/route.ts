@@ -372,9 +372,17 @@ export async function POST(request: Request) {
           diaryOrigin: "cara",
         });
         if (created.ok) {
-          replyText = created.confirmationSmsFailed
-            ? `All set — I saved ${bookingIntent.summaryForReply} in Bookings. The confirmation text did not go through (${created.confirmationSmsFailed}). Tell the client or use Support if that’s unexpected.`
-            : `All set — I saved ${bookingIntent.summaryForReply} in Bookings and sent the confirmation SMS.`;
+          const parts: string[] = [];
+          if (created.confirmationSmsFailed) {
+            parts.push(`SMS: ${created.confirmationSmsFailed}`);
+          }
+          if (created.confirmationEmailFailed) {
+            parts.push(`Email: ${created.confirmationEmailFailed}`);
+          }
+          replyText =
+            parts.length > 0
+              ? `All set — I saved ${bookingIntent.summaryForReply} in Bookings. ${parts.join(" ")} Tell the client or use Support if that’s unexpected.`
+              : `All set — I saved ${bookingIntent.summaryForReply} in Bookings and sent the confirmation SMS.`;
         } else {
           replyText = `I parsed a booking (${bookingIntent.summaryForReply}) but could not save it: ${created.message}`;
         }
