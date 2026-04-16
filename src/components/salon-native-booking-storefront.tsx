@@ -89,6 +89,12 @@ function gallerySrc(urls: string[], index: number): string {
   return FALLBACK_GALLERY[index] ?? FALLBACK_GALLERY[0];
 }
 
+/** Default seed copy; real salons should replace it in Storefront. */
+function isLikelyDemoAddressLine(s: string | null | undefined): boolean {
+  const t = (s ?? "").trim().toLowerCase();
+  return t.includes("123 main street") && t.includes("dublin");
+}
+
 type SalonNativeBookingStorefrontProps = {
   salonName: string;
   addressLine: string | null;
@@ -447,13 +453,34 @@ export function SalonNativeBookingStorefront({
     ],
   );
 
-  const addressText = addressLine ?? "123 Main Street, Dublin";
+  const eircodeTrim = eircode?.trim() ?? "";
+  const addressTrim = addressLine?.trim() ?? "";
+  const demoAddr = isLikelyDemoAddressLine(addressLine);
+  /** Match map pin: prefer Eircode when the saved street line is still demo text. */
+  const addressText = (() => {
+    if (eircodeTrim && demoAddr) return eircodeTrim;
+    if (demoAddr && mapLat != null && mapLng != null) {
+      return eircodeTrim || "Location shown on map";
+    }
+    if (addressTrim && eircodeTrim) return `${addressTrim} · ${eircodeTrim}`;
+    if (addressTrim) return addressTrim;
+    if (eircodeTrim) return eircodeTrim;
+    return "123 Main Street, Dublin";
+  })();
+
   const bioText =
     bio ??
     "Award-winning contemporary hair salon specializing in bespoke cutting, coloring and premium extensions. Our expert team is dedicated to providing a luxurious, relaxing experience tailored entirely to you.";
 
-  const directionsQuery = [addressLine, eircode].filter(Boolean).join(", ");
-  const directionsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(directionsQuery || addressText)}`;
+  const directionsHref = (() => {
+    if (mapLat != null && mapLng != null) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${mapLat},${mapLng}`)}`;
+    }
+    const q = eircodeTrim
+      ? `${eircodeTrim}, Ireland`
+      : addressTrim || addressText;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  })();
 
   const hasReviewCardContent = Boolean(
     reviewsBlock &&
@@ -1173,11 +1200,11 @@ export function SalonNativeBookingStorefront({
                             Directions
                           </a>
                         </div>
-                        {eircode ? (
+                        {eircodeTrim && !demoAddr ? (
                           <p className="text-xs text-gray-500">
                             <span className="text-gray-400">Eircode: </span>
                             <span className="font-medium text-blue-600">
-                              {eircode}
+                              {eircodeTrim}
                             </span>
                           </p>
                         ) : mapLat == null || mapLng == null ? (

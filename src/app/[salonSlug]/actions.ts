@@ -484,17 +484,24 @@ export async function requestPublicBookingOtp(payload: {
       insErr.message,
       insErr.details,
     );
-    const hint =
-      insErr.message?.includes("relation") ||
-      insErr.message?.includes("does not exist")
-        ? " Database table may be missing — run Supabase migration 019_public_booking_security.sql."
-        : "";
+    const m = (insErr.message ?? "").toLowerCase();
+    const hints: string[] = [];
+    if (m.includes("relation") || m.includes("does not exist")) {
+      hints.push("Run Supabase migration 019_public_booking_security.sql.");
+    }
+    if (m.includes("permission denied") || insErr.code === "42501") {
+      hints.push(
+        "Confirm SUPABASE_SERVICE_ROLE_KEY is set on the server for this app.",
+      );
+    }
+    const hintSuffix = hints.length ? ` ${hints.join(" ")}` : "";
+    const codeBit = insErr.code ? ` (${insErr.code})` : "";
     return {
       success: false,
       message:
         process.env.NODE_ENV === "development"
           ? `Could not send a code: ${insErr.message}`
-          : `Could not send a code right now. Try again shortly.${hint}`,
+          : `Could not send a verification code${codeBit}.${hintSuffix} Check Vercel logs for details.`,
     };
   }
 
