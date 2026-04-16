@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { getPublicBookingPageUrl } from "@/lib/booking-site-origin";
 import { cn } from "@/lib/utils";
 
 import { saveStorefront } from "./actions";
@@ -163,7 +164,7 @@ export function StorefrontView({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   const liveSlug = (initial.publicSlug || "").trim();
-  const liveHref = liveSlug ? `/${liveSlug}` : null;
+  const liveHref = liveSlug ? getPublicBookingPageUrl(`/${liveSlug}`) : null;
 
   const remoteLogo =
     initial.logoUrl &&

@@ -1,14 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-function parseOrigin(raw: string | undefined): URL | null {
-  const t = raw?.trim();
-  if (!t) return null;
-  try {
-    return new URL(t.startsWith("http") ? t : `https://${t}`);
-  } catch {
-    return null;
-  }
-}
+import {
+  resolveAppSiteOrigin,
+  resolveBookingSiteOrigin,
+} from "./booking-site-origin";
 
 /** Single path segment at root that is not a public salon slug. */
 const RESERVED_APP_ROOT_SEGMENTS = new Set(
@@ -31,18 +26,6 @@ function requestHostname(request: NextRequest): string | null {
   return host || null;
 }
 
-function bookingOriginFromEnv(): URL | null {
-  const explicit = parseOrigin(process.env.NEXT_PUBLIC_BOOKING_URL);
-  if (explicit) return explicit;
-
-  const app = parseOrigin(process.env.NEXT_PUBLIC_APP_URL);
-  if (!app || !app.hostname.startsWith("app.")) return null;
-
-  const u = new URL(app.href);
-  u.hostname = `book.${app.hostname.slice(4)}`;
-  return u;
-}
-
 /**
  * Keep customer storefront on `book.*` and staff routes on `app.*` when both
  * hosts are configured (production). No-op on other hosts (e.g. preview, localhost).
@@ -50,8 +33,8 @@ function bookingOriginFromEnv(): URL | null {
 export function clisteHostRoutingRedirect(
   request: NextRequest,
 ): NextResponse | null {
-  const appOrigin = parseOrigin(process.env.NEXT_PUBLIC_APP_URL);
-  const bookingOrigin = bookingOriginFromEnv();
+  const appOrigin = resolveAppSiteOrigin();
+  const bookingOrigin = resolveBookingSiteOrigin();
   if (!appOrigin || !bookingOrigin) return null;
 
   const appHost = appOrigin.hostname;
