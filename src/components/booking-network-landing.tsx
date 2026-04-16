@@ -9,7 +9,6 @@ import {
   MapPin,
   Navigation,
   Scissors,
-  Star,
 } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
@@ -127,20 +126,23 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
           <div className="mb-16">
             <p className="mb-8 flex items-center gap-4 text-sm font-normal tracking-widest text-zinc-400 uppercase">
               <span className="h-px w-12 bg-zinc-300" />
-              Global Booking Network
+              Irish AI voice & online booking
             </p>
             <h1 className="text-6xl leading-[0.85] font-normal tracking-tighter text-black uppercase md:text-8xl lg:text-9xl">
-              Reserve <br className="hidden md:block" />
+              BOOK <br className="hidden md:block" />
               <span className="mt-2 flex items-center gap-4 md:mt-4 md:ml-[15%] md:gap-8">
                 <span className="hidden h-[1px] w-24 bg-black md:block lg:w-48" />
                 <span className="bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text font-thin text-transparent lowercase italic">
-                  anything.
+                  with Cliste.
                 </span>
               </span>
             </h1>
           </div>
 
-          <div className="relative flex flex-col border border-zinc-200 bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:flex-row">
+          <div
+            id="find-venues"
+            className="relative flex flex-col border border-zinc-200 bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:flex-row"
+          >
             {/* Service — `dropdown-container` + onclick toggleDropdown (no pointer-events-none on whole cell: it ate clicks). */}
             <div
               className="dropdown-container group relative flex-1 cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
@@ -171,9 +173,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                   onClick={(e) => e.stopPropagation()}
                 >
                   {[
-                    "Creative Workspace",
-                    "Photography Studio",
-                    "Personal Training",
+                    "Hair & beauty",
+                    "Barbershop",
+                    "Garage or motors",
                   ].map((label) => (
                     <button
                       key={label}
@@ -192,7 +194,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     </button>
                   ))}
                   <div className="mt-2 border-t border-zinc-100 pt-4 text-base font-normal text-emerald-600">
-                    <span className="block px-6 py-4">View All Categories</span>
+                    <span className="block px-6 py-4">
+                      Then use Search to list venues
+                    </span>
                   </div>
                 </div>
               ) : null}
@@ -245,9 +249,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     Use Current Location
                   </button>
                   <div className="mt-2 px-6 py-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-                    Popular
+                    Ireland
                   </div>
-                  {["New York, NY", "London, UK", "Los Angeles, CA"].map((city) => (
+                  {["Dublin", "Cork", "Galway"].map((city) => (
                     <button
                       key={city}
                       type="button"
@@ -394,14 +398,14 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
         <div className="mx-auto max-w-[1400px] px-6">
           <div className="mb-12 flex flex-col items-start justify-between gap-6 border-b border-zinc-200 pb-8 md:flex-row md:items-end">
             <h2 className="text-4xl font-normal tracking-tighter text-black md:text-5xl lg:text-6xl">
-              Curated <br className="hidden md:block" />
-              <span className="font-thin text-zinc-400 italic">Experiences.</span>
+              What <br className="hidden md:block" />
+              <span className="font-thin text-zinc-400 italic">Cliste offers.</span>
             </h2>
             <a
-              href="#"
+              href="#find-venues"
               className="inline-flex items-center gap-2 border-b border-black pb-1 text-base font-normal tracking-widest text-black uppercase transition-colors hover:text-emerald-600"
             >
-              Explore Directory
+              Find a venue
               <ArrowUpRight strokeWidth={1.5} className="h-5 w-5" />
             </a>
           </div>
@@ -416,22 +420,16 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               <div
                 className={`pointer-events-none absolute inset-0 opacity-60 transition-opacity duration-500 group-hover:opacity-90 ${hoverReveal}`}
               />
-              <div className="absolute top-6 right-6 flex items-center gap-2 bg-white px-4 py-2">
-                <Star
-                  strokeWidth={1.5}
-                  className="h-4 w-4 fill-emerald-500 text-emerald-500"
-                />
-                <span className="text-sm font-normal tracking-wide text-black">
-                  4.9
-                </span>
+              <div className="absolute top-6 right-6 bg-white px-4 py-2 text-xs font-normal tracking-widest text-zinc-700 uppercase">
+                Native booking
               </div>
               <div className="absolute bottom-0 left-0 flex w-full translate-y-4 transform items-end justify-between p-8 transition-transform duration-500 group-hover:translate-y-0">
                 <div>
                   <p className="mb-3 text-sm font-normal tracking-widest text-white/70 uppercase">
-                    Workspace & Studios
+                    Your storefront
                   </p>
-                  <h3 className="text-4xl font-normal tracking-tighter text-white md:text-5xl lg:text-6xl">
-                    The Arch Studios
+                  <h3 className="max-w-[20ch] text-3xl font-normal tracking-tighter text-white md:text-4xl lg:text-5xl">
+                    Clients pick staff, services & times on your own link.
                   </h3>
                 </div>
                 <div className="flex h-16 w-16 items-center justify-center bg-emerald-400 text-black opacity-0 transition-opacity delay-100 duration-500 group-hover:opacity-100">
@@ -452,10 +450,11 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               <div className="absolute bottom-0 left-0 flex w-full items-end justify-between p-6">
                 <div>
                   <p className="mb-2 text-xs font-normal tracking-widest text-white/70 uppercase">
-                    Personal Training
+                    Irish AI voice
                   </p>
-                  <h3 className="text-3xl font-normal tracking-tight text-white">
-                    Iron & Flow
+                  <h3 className="max-w-[14ch] text-2xl font-normal tracking-tight text-white md:text-3xl">
+                    Natural agents for the ringing phone — so you stay with the
+                    client in the chair.
                   </h3>
                 </div>
                 <ArrowUpRight
@@ -474,16 +473,20 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                   />
                 </div>
                 <h3 className="mb-3 text-3xl font-normal tracking-tight text-white">
-                  Grooming & Style
+                  Team dashboard
                 </h3>
                 <p className="text-base font-thin leading-relaxed text-zinc-400">
-                  Top-rated barbers and stylists in your immediate area.
+                  One place for services, opening hours, staff, and appointments
+                  — built for salons, barbershops, and trades that run on trust.
                 </p>
               </div>
-              <div className="mt-8 flex items-center gap-3 text-sm font-normal tracking-wide text-white uppercase transition-all group-hover:gap-5 group-hover:text-emerald-400">
-                View Category
+              <Link
+                href={partnerHref}
+                className="mt-8 flex items-center gap-3 text-sm font-normal tracking-wide text-white uppercase transition-all group-hover:gap-5 group-hover:text-emerald-400"
+              >
+                Business sign-in
                 <ArrowRight strokeWidth={1.5} className="h-5 w-5" />
-              </div>
+              </Link>
             </div>
           </div>
         </div>
@@ -493,48 +496,41 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
         <div className="mx-auto flex max-w-[1400px] flex-col divide-y divide-zinc-200 md:flex-row md:divide-x md:divide-y-0">
           <div className="flex flex-1 flex-col justify-center p-10 transition-colors hover:bg-zinc-50 lg:p-16">
             <p className="mb-4 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-              Volume
+              Voice
             </p>
             <p className="text-5xl font-normal tracking-tighter text-black lg:text-7xl">
-              10M+
+              Irish
             </p>
             <p className="mt-3 text-base font-thin text-zinc-500">
-              Appointments successfully secured.
+              Hyper-realistic Irish voice agents for the front desk phone — not a
+              generic offshore robot.
             </p>
           </div>
           <div className="flex flex-1 flex-col justify-center p-10 transition-colors hover:bg-zinc-50 lg:p-16">
             <p className="mb-4 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-              Network
+              Booking
             </p>
             <p className="text-5xl font-normal tracking-tighter text-black lg:text-7xl">
-              45k
+              Native
             </p>
             <p className="mt-3 text-base font-thin text-zinc-500">
-              Verified professionals worldwide.
+              Public pages on your own link: services, staff, and live
+              availability — Connect tier can still hand off to Fresha when you
+              need it.
             </p>
           </div>
           <div className="flex flex-1 flex-col justify-center bg-zinc-50 p-10 lg:p-16">
             <p className="mb-4 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-              Trust Score
+              Control
             </p>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-1.5">
               <p className="text-5xl font-normal tracking-tighter text-black lg:text-7xl">
-                4.9
+                Yours
               </p>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex gap-1 text-emerald-500">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      strokeWidth={1.5}
-                      className="h-5 w-5 fill-emerald-500"
-                    />
-                  ))}
-                </div>
-                <p className="text-sm font-thin tracking-wide text-zinc-500">
-                  Based on reviews
-                </p>
-              </div>
+              <p className="text-sm font-thin tracking-wide text-zinc-500">
+                Dashboard for calendars, bookings, clients, and storefront — one
+                Cliste account for the team.
+              </p>
             </div>
           </div>
         </div>
@@ -543,9 +539,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
       <footer className="relative z-10 overflow-hidden bg-black pt-32 pb-16 text-white">
         <div className="relative z-20 mx-auto max-w-[1400px] px-6">
           <h2 className="mb-16 max-w-5xl text-5xl leading-[0.85] font-normal tracking-tighter uppercase md:text-7xl lg:text-9xl">
-            Operate <br />
+            Answer <br />
             <span className="font-thin text-zinc-500 lowercase italic">
-              efficiently.
+              the phone. Book online.
             </span>
           </h2>
 
@@ -554,14 +550,14 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               href={partnerHref}
               className="flex items-center gap-3 bg-emerald-400 px-8 py-5 text-base font-normal tracking-widest text-black uppercase transition-colors hover:bg-emerald-300"
             >
-              Start Platform
+              Business sign-in
               <ArrowRight strokeWidth={1.5} className="h-6 w-6" />
             </Link>
             <a
-              href="#"
+              href="#find-venues"
               className="border border-white/20 px-8 py-5 text-base font-normal tracking-widest text-white uppercase transition-colors hover:border-emerald-500 hover:bg-white/5"
             >
-              View Documentation
+              Find a venue
             </a>
           </div>
 

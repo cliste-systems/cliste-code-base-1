@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     return {
       title: "Cliste — Book",
       description:
-        "Online booking for salons, barbershops, and local businesses.",
+        "Irish AI voice reception and native online booking for salons, barbershops, and local businesses.",
     };
   }
   return {
