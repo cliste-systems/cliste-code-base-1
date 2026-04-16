@@ -25,6 +25,8 @@ import {
   searchPublicSalonsDirectory,
 } from "@/app/booking-directory-search";
 import { getPublicBookingPageUrl } from "@/lib/booking-site-origin";
+import { isPlausibleIrelandPoint } from "@/lib/geocode-ireland";
+import { loadGoogleMapsPlacesApi } from "@/lib/google-maps-places-loader";
 import type { OrganizationNiche } from "@/lib/organization-niche";
 
 export type BookingNetworkLandingProps = {
@@ -45,6 +47,7 @@ export function BookingNetworkLanding({
   directoryNicheOptions,
 }: BookingNetworkLandingProps) {
   const findVenuesRef = useRef<HTMLDivElement>(null);
+  const locationQueryInputRef = useRef<HTMLInputElement>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [service, setService] = useState("");
   const [serviceNiche, setServiceNiche] = useState<OrganizationNiche | null>(
@@ -63,6 +66,8 @@ export function BookingNetworkLanding({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, startTransition] = useTransition();
   const year = new Date().getFullYear();
+  const googleMapsBrowserKey =
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
 
   const partnerHref = appOrigin ? `${appOrigin}/authenticate` : "/authenticate";
 
@@ -111,12 +116,84 @@ export function BookingNetworkLanding({
     setOpenId(null);
   }, []);
 
-  const selectLocation = useCallback((value: string) => {
-    setLocation(value);
-    setViewerGeo(null);
-    setLocationGeoHint(null);
-    setOpenId(null);
-  }, []);
+  const applyLocationWithOptionalGeo = useCallback(
+    (label: string, geo: { lat: number; lng: number } | null) => {
+      const t = label.trim();
+      if (!t) return;
+      setLocation(t);
+      if (
+        geo &&
+        Number.isFinite(geo.lat) &&
+        Number.isFinite(geo.lng) &&
+        isPlausibleIrelandPoint(geo.lat, geo.lng)
+      ) {
+        setViewerGeo({ lat: geo.lat, lng: geo.lng });
+      } else {
+        setViewerGeo(null);
+      }
+      setLocationGeoHint(null);
+      setOpenId(null);
+    },
+    [],
+  );
+
+  const selectLocation = useCallback(
+    (value: string) => {
+      applyLocationWithOptionalGeo(value, null);
+    },
+    [applyLocationWithOptionalGeo],
+  );
+
+  useEffect(() => {
+    if (openId !== "location" || !googleMapsBrowserKey) return;
+    const input = locationQueryInputRef.current;
+    if (!input) return;
+
+    let ac: google.maps.places.Autocomplete | undefined;
+    let cancelled = false;
+
+    loadGoogleMapsPlacesApi(googleMapsBrowserKey)
+      .then(() => {
+        if (cancelled || !locationQueryInputRef.current) return;
+        try {
+          ac = new google.maps.places.Autocomplete(
+            locationQueryInputRef.current,
+            {
+              componentRestrictions: { country: "ie" },
+              fields: ["formatted_address", "geometry", "name"],
+            },
+          );
+          ac.addListener("place_changed", () => {
+            const place = ac?.getPlace();
+            if (!place) return;
+            const loc = place.geometry?.location;
+            const label =
+              place.formatted_address?.trim() ||
+              place.name?.trim() ||
+              locationQueryInputRef.current?.value.trim() ||
+              "";
+            if (!label) return;
+            if (loc) {
+              const lat = loc.lat();
+              const lng = loc.lng();
+              if (isPlausibleIrelandPoint(lat, lng)) {
+                applyLocationWithOptionalGeo(label, { lat, lng });
+                return;
+              }
+            }
+            applyLocationWithOptionalGeo(label, null);
+          });
+        } catch {
+          // Places API not enabled on the GCP project, etc.
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (ac) google.maps.event.clearInstanceListeners(ac);
+    };
+  }, [openId, googleMapsBrowserKey, applyLocationWithOptionalGeo]);
 
   const visibleSalons = useMemo(
     () => salons.slice(0, venueVisibleCount),
@@ -304,12 +381,12 @@ export function BookingNetworkLanding({
               {openId === "location" ? (
                 <div
                   id="dropdown-location"
-                  className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl md:-left-px"
+                  className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[min(100%,20rem)] w-[min(100vw-2rem,26rem)] max-w-[calc(100vw-2rem)] border border-zinc-200 bg-white py-1 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.18)] md:-left-px"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     type="button"
-                    className="flex w-full cursor-pointer items-center gap-3 px-6 py-4 text-left text-base font-normal text-emerald-600 transition-colors hover:bg-zinc-100"
+                    className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left text-sm font-normal text-emerald-700 transition-colors hover:bg-zinc-50"
                     onClick={(ev) => {
                       ev.stopPropagation();
                       setOpenId(null);
@@ -349,55 +426,103 @@ export function BookingNetworkLanding({
                       );
                     }}
                   >
-                    <Navigation strokeWidth={1.5} className="h-4 w-4" />
+                    <Navigation strokeWidth={1.5} className="h-4 w-4 shrink-0" />
                     Use current location
                   </button>
                   <div
-                    className="border-t border-zinc-100 px-6 py-4"
+                    className="border-t border-zinc-100 px-5 py-4"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <p className="mb-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-                      Town or Eircode
+                    {googleMapsBrowserKey ? (
+                      <>
+                        <p className="text-sm font-medium tracking-tight text-black">
+                          Where in Ireland?
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                          Type a town, address, or Eircode — pick a suggestion,
+                          or press Apply to use what you typed.
+                        </p>
+                        <form
+                          className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const v =
+                              locationQueryInputRef.current?.value.trim() ?? "";
+                            if (v) applyLocationWithOptionalGeo(v, null);
+                          }}
+                        >
+                          <input
+                            ref={locationQueryInputRef}
+                            type="text"
+                            defaultValue={location}
+                            placeholder="e.g. Bruckless, D07 E5Y3"
+                            autoComplete="off"
+                            className="min-h-11 min-w-0 flex-1 rounded-md border border-zinc-200 px-3 py-2.5 text-base text-black outline-none placeholder:text-zinc-400 focus:border-emerald-500 sm:rounded-r-none sm:border-r-0"
+                          />
+                          <button
+                            type="submit"
+                            className="min-h-11 shrink-0 rounded-md bg-zinc-900 px-4 py-2.5 text-xs font-normal tracking-wide text-white uppercase transition-colors hover:bg-emerald-600 sm:rounded-l-none sm:rounded-r-md"
+                          >
+                            Apply
+                          </button>
+                        </form>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium tracking-tight text-black">
+                          Town or Eircode
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                          Type a town or Eircode, then press Apply to search
+                          nearby salons.
+                        </p>
+                        <form
+                          className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const v =
+                              locationQueryInputRef.current?.value.trim() ?? "";
+                            if (v) applyLocationWithOptionalGeo(v, null);
+                          }}
+                        >
+                          <input
+                            ref={locationQueryInputRef}
+                            type="text"
+                            defaultValue={location}
+                            placeholder="Town or Eircode"
+                            autoComplete="postal-code"
+                            className="min-h-11 min-w-0 flex-1 rounded-md border border-zinc-200 px-3 py-2.5 text-base text-black outline-none placeholder:text-zinc-400 focus:border-emerald-500 sm:rounded-r-none sm:border-r-0"
+                          />
+                          <button
+                            type="submit"
+                            className="min-h-11 shrink-0 rounded-md bg-zinc-900 px-4 py-2.5 text-xs font-normal tracking-wide text-white uppercase transition-colors hover:bg-emerald-600 sm:rounded-l-none sm:rounded-r-md"
+                          >
+                            Apply
+                          </button>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                  <div className="border-t border-zinc-100 px-5 py-3">
+                    <p className="mb-2 text-[10px] font-normal tracking-widest text-zinc-400 uppercase">
+                      Popular cities
                     </p>
-                    <form
-                      className="flex gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const fd = new FormData(e.currentTarget);
-                        const v = String(fd.get("customLoc") ?? "").trim();
-                        if (v) selectLocation(v);
-                      }}
-                    >
-                      <input
-                        name="customLoc"
-                        placeholder="Eircode"
-                        autoComplete="postal-code"
-                        className="min-w-0 flex-1 border border-zinc-200 px-3 py-2 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-emerald-500"
-                      />
-                      <button
-                        type="submit"
-                        className="shrink-0 bg-zinc-900 px-3 py-2 text-xs font-normal tracking-wide text-white uppercase transition-colors hover:bg-emerald-600"
-                      >
-                        Apply
-                      </button>
-                    </form>
+                    <div className="flex flex-wrap gap-2">
+                      {["Dublin", "Cork", "Galway", "Limerick"].map((city) => (
+                        <button
+                          key={city}
+                          type="button"
+                          className="rounded-full border border-zinc-200 bg-zinc-50/80 px-3.5 py-1.5 text-sm font-normal text-black transition-colors hover:border-emerald-400 hover:bg-emerald-50"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            selectLocation(city);
+                          }}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="mt-2 px-6 py-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-                    Ireland
-                  </div>
-                  {["Dublin", "Cork", "Galway"].map((city) => (
-                    <button
-                      key={city}
-                      type="button"
-                      className="w-full cursor-pointer px-6 py-3 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        selectLocation(city);
-                      }}
-                    >
-                      {city}
-                    </button>
-                  ))}
                 </div>
               ) : null}
             </div>
