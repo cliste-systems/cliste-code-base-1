@@ -64,6 +64,13 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
   const toggleDropdownKb = useCallback((e: React.KeyboardEvent, id: string) => {
     if (e.key !== "Enter" && e.key !== " ") return;
+    const t = e.target as HTMLElement;
+    if (
+      t !== e.currentTarget &&
+      t.closest?.("input, textarea, select, button, a")
+    ) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     setOpenId((prev) => (prev === id ? null : id));
@@ -293,7 +300,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="mb-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-                      Eircode or address
+                      Town or Eircode
                     </p>
                     <form
                       className="flex gap-2"
@@ -306,7 +313,8 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     >
                       <input
                         name="customLoc"
-                        placeholder="e.g. F94 H002"
+                        placeholder="D02 AF30"
+                        autoComplete="postal-code"
                         className="min-w-0 flex-1 border border-zinc-200 px-3 py-2 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-emerald-500"
                       />
                       <button
@@ -316,10 +324,6 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                         Apply
                       </button>
                     </form>
-                    <p className="mt-2 text-xs font-normal text-zinc-500">
-                      Uses OpenStreetMap (free) to place you in Ireland, then
-                      lists nearest venues with a map pin.
-                    </p>
                   </div>
                   <div className="mt-2 px-6 py-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
                     Ireland
@@ -337,16 +341,6 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       {city}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    className="w-full cursor-pointer border-t border-zinc-100 px-6 py-3 text-left text-base font-normal text-emerald-700 transition-colors hover:bg-zinc-100"
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      selectOption("location", "F94 H002");
-                    }}
-                  >
-                    Try F94 H002 (demo Eircode)
-                  </button>
                 </div>
               ) : null}
             </div>
@@ -461,8 +455,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                           ) : null}
                           {s.distanceKm !== null ? (
                             <p className="text-sm font-normal text-emerald-700">
-                              About{" "}
-                              {Math.round(s.distanceKm * 10) / 10} km away
+                              {s.distanceKm === 0
+                                ? "Same Eircode as your search"
+                                : `About ${Math.round(s.distanceKm * 10) / 10} km away`}
                             </p>
                           ) : null}
                           <p className="mt-1 font-mono text-xs text-zinc-400">

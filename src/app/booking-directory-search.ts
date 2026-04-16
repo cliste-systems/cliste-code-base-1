@@ -3,7 +3,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { haversineDistanceKm } from "@/lib/distance-km";
 import {
+  compactEircode,
   geocodeIrelandLocation,
+  isPlausibleIrelandPoint,
   normalizeIrelandLocationQuery,
 } from "@/lib/geocode-ireland";
 
@@ -102,14 +104,20 @@ export async function searchPublicSalonsDirectory(input: {
       const row = r as OrgRow;
       const lat = Number(row.storefront_map_lat);
       const lng = Number(row.storefront_map_lng);
+      const mapLat = Number.isFinite(lat) ? lat : null;
+      const mapLng = Number.isFinite(lng) ? lng : null;
+      const pinOk =
+        mapLat !== null &&
+        mapLng !== null &&
+        isPlausibleIrelandPoint(mapLat, mapLng);
       return {
         slug: String(row.slug).trim(),
         name: String(row.name).trim(),
         address: row.address?.trim() ?? null,
         bio_text: row.bio_text?.trim() ?? null,
         storefront_eircode: row.storefront_eircode?.trim() ?? null,
-        mapLat: Number.isFinite(lat) ? lat : null,
-        mapLng: Number.isFinite(lng) ? lng : null,
+        mapLat: pinOk ? mapLat : null,
+        mapLng: pinOk ? mapLng : null,
       };
     });
 
@@ -121,12 +129,21 @@ export async function searchPublicSalonsDirectory(input: {
 
   let userPoint: { lat: number; lng: number } | null = null;
   if (hasViewerPoint) {
-    userPoint = { lat: input.viewerLat!, lng: input.viewerLng! };
+    const lat = input.viewerLat!;
+    const lng = input.viewerLng!;
+    if (isPlausibleIrelandPoint(lat, lng)) {
+      userPoint = { lat, lng };
+    }
   } else if (locationTrim) {
-    userPoint = await geocodeIrelandLocation(
+    const g = await geocodeIrelandLocation(
       normalizeIrelandLocationQuery(locationTrim),
     );
+    if (g && isPlausibleIrelandPoint(g.lat, g.lng)) {
+      userPoint = g;
+    }
   }
+
+  const visitorEir = compactEircode(normalizeIrelandLocationQuery(locationTrim));
 
   const pickRows = () => {
     if (tokens.length === 0) {
@@ -142,11 +159,10 @@ export async function searchPublicSalonsDirectory(input: {
 
   const withDistance = picked.map((r) => {
     let distanceKm: number | null = null;
-    if (
-      userPoint &&
-      r.mapLat !== null &&
-      r.mapLng !== null
-    ) {
+    const salonEir = compactEircode(r.storefront_eircode);
+    if (visitorEir && salonEir && visitorEir === salonEir) {
+      distanceKm = 0;
+    } else if (userPoint && r.mapLat !== null && r.mapLng !== null) {
       distanceKm = haversineDistanceKm(
         userPoint.lat,
         userPoint.lng,
@@ -157,7 +173,7 @@ export async function searchPublicSalonsDirectory(input: {
     return { ...r, distanceKm };
   });
 
-  if (userPoint) {
+  if (userPoint || visitorEir) {
     withDistance.sort((a, b) => {
       if (a.distanceKm === null && b.distanceKm === null) return 0;
       if (a.distanceKm === null) return 1;
