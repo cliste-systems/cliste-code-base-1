@@ -26,6 +26,18 @@ function requestHostname(request: NextRequest): string | null {
   return host || null;
 }
 
+/** Staff / internal paths on `book.*` that must be served from `app.*`. */
+function pathIsStaffRouteRedirectingToApp(path: string): boolean {
+  if (path === "/login" || path.startsWith("/login/")) return true;
+  if (path === "/dashboard" || path.startsWith("/dashboard/")) return true;
+  if (path === "/admin" || path.startsWith("/admin/")) return true;
+  if (path === "/dashboard-unlock" || path.startsWith("/dashboard-unlock/"))
+    return true;
+  if (path === "/admin-unlock" || path.startsWith("/admin-unlock/"))
+    return true;
+  return false;
+}
+
 /**
  * Keep customer storefront on `book.*` and staff routes on `app.*` when both
  * hosts are configured (production). No-op on other hosts (e.g. preview, localhost).
@@ -55,14 +67,7 @@ export function clisteHostRoutingRedirect(
     return NextResponse.redirect(new URL(pathAndQuery, bookingOrigin));
   }
 
-  if (
-    path.startsWith("/dashboard") ||
-    path.startsWith("/admin") ||
-    path === "/login" ||
-    path.startsWith("/login/") ||
-    path.startsWith("/dashboard-unlock") ||
-    path.startsWith("/admin-unlock")
-  ) {
+  if (pathIsStaffRouteRedirectingToApp(path)) {
     return NextResponse.redirect(new URL(pathAndQuery, appOrigin));
   }
 
