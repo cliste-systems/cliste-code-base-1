@@ -34,6 +34,8 @@ export type BookingNetworkLandingProps = {
   appOrigin: string | null;
   /** Niches that have at least one active venue (drives the Service list). */
   directoryNicheOptions: PublicDirectoryNicheOption[];
+  /** Resolved server-side; swaps the Login link for a My account link. */
+  clientIsSignedIn?: boolean;
 };
 
 const hoverReveal =
@@ -45,6 +47,7 @@ const VENUE_PAGE_SIZE = 12;
 export function BookingNetworkLanding({
   appOrigin,
   directoryNicheOptions,
+  clientIsSignedIn = false,
 }: BookingNetworkLandingProps) {
   const findVenuesRef = useRef<HTMLDivElement>(null);
   const locationQueryInputRef = useRef<HTMLInputElement>(null);
@@ -239,12 +242,21 @@ export function BookingNetworkLanding({
           </Link>
 
           <div className="flex items-center gap-6">
-            <Link
-              href="/authenticate"
-              className="hidden text-base font-normal tracking-wide text-black uppercase transition-colors hover:text-emerald-500 md:block"
-            >
-              Login
-            </Link>
+            {clientIsSignedIn ? (
+              <Link
+                href="/account"
+                className="hidden text-base font-normal tracking-wide text-black uppercase transition-colors hover:text-emerald-500 md:block"
+              >
+                My account
+              </Link>
+            ) : (
+              <Link
+                href="/account/sign-in"
+                className="hidden text-base font-normal tracking-wide text-black uppercase transition-colors hover:text-emerald-500 md:block"
+              >
+                Login
+              </Link>
+            )}
             <Link
               href={partnerHref}
               className="flex items-center gap-2 bg-emerald-400 px-6 py-3 text-base font-normal tracking-wide text-black uppercase transition-colors hover:bg-emerald-300"

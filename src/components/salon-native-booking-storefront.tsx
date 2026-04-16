@@ -13,7 +13,6 @@ import {
   Minus,
   Plus,
   Route,
-  Scissors,
   Sparkles,
   Star,
   Sun,
@@ -21,6 +20,7 @@ import {
   Wifi,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -31,6 +31,7 @@ import {
 } from "react";
 
 import { Turnstile } from "@marsidev/react-turnstile";
+import { toggleSalonFavorite } from "@/app/account/actions";
 import {
   getPublicBookingSlotsRange,
   requestPublicBookingOtp,
@@ -77,16 +78,14 @@ function slotTimeLabel(iso: string, tz: string): string {
   return formatInTimeZone(new Date(iso), tz, "HH:mm");
 }
 
-const FALLBACK_GALLERY = [
-  "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=1600&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?q=80&w=800&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?q=80&w=800&auto=format&fit=crop",
-] as const;
-
-function gallerySrc(urls: string[], index: number): string {
+/**
+ * Public storefronts no longer ship stock imagery. If a salon hasn't uploaded
+ * photos yet we render soft monogram placeholders instead of someone else's
+ * salon — per AGENTS.md: "no demo niches / fake filters / stock fillers".
+ */
+function gallerySrc(urls: string[], index: number): string | null {
   const u = urls[index]?.trim();
-  if (u) return u;
-  return FALLBACK_GALLERY[index] ?? FALLBACK_GALLERY[0];
+  return u && u.length > 0 ? u : null;
 }
 
 /** Default seed copy; real salons should replace it in Storefront. */
@@ -104,6 +103,8 @@ type SalonNativeBookingStorefrontProps = {
   services: SalonStorefrontService[];
   /** Up to 3 public image URLs for the hero gallery. */
   galleryUrls: string[];
+  /** Optional public URL for the salon's logo (used in the header badge). */
+  logoUrl?: string | null;
   /** Optional rating/reviews line (e.g. from Google). */
   ratingLine: string | null;
   eircode?: string | null;
@@ -115,6 +116,13 @@ type SalonNativeBookingStorefrontProps = {
   showTeamSection?: boolean;
   showMapSection?: boolean;
   showReviewsSection?: boolean;
+  /** Client auth state (resolved server-side). */
+  viewer: {
+    isSignedIn: boolean;
+    email: string | null;
+  };
+  /** Whether THIS salon is in the signed-in visitor's favourites. */
+  initialIsFavorite: boolean;
 };
 
 export function SalonNativeBookingStorefront({
@@ -125,6 +133,7 @@ export function SalonNativeBookingStorefront({
   salonSlug,
   services,
   galleryUrls,
+  logoUrl = null,
   ratingLine,
   eircode = null,
   mapLat = null,
@@ -135,6 +144,8 @@ export function SalonNativeBookingStorefront({
   showTeamSection = true,
   showMapSection = true,
   showReviewsSection = true,
+  viewer,
+  initialIsFavorite,
 }: SalonNativeBookingStorefrontProps) {
   const nameId = useId();
   const phoneId = useId();
@@ -661,6 +672,7 @@ export function SalonNativeBookingStorefront({
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
+                defaultValue={viewer.email ?? ""}
               />
               <p className="text-[11px] leading-snug text-gray-500">
                 Optional — we&apos;ll email you a booking summary if you add your address.
@@ -696,70 +708,52 @@ export function SalonNativeBookingStorefront({
       <div className="antialiased text-gray-900 bg-gray-50 flex min-h-screen flex-col">
         <header className="sticky top-0 z-40 w-full border-b border-gray-200/80 bg-white shadow-sm">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-900 text-white shadow-sm">
-                  <Scissors className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <h1 className="mb-0.5 text-base font-medium leading-none">
-                    {salonName}
-                  </h1>
-                  <p className="text-xs leading-none text-gray-500">
-                    {addressText}
-                  </p>
-                </div>
-            </div>
-            <div className="hidden items-center gap-4 sm:flex">
-              <Link
-                href="/authenticate"
-                className="text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
-              >
-                Log in
-              </Link>
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 transition-colors hover:bg-gray-50"
-                aria-label="Favorites"
-              >
-                <Heart className="h-5 w-5" strokeWidth={1.5} />
-              </button>
+            <Link
+              href="/"
+              className="flex items-center gap-3 focus-visible:outline-none"
+            >
+              <SalonLogoBadge name={salonName} logoUrl={logoUrl} />
+              <div>
+                <h1 className="mb-0.5 text-base font-medium leading-none">
+                  {salonName}
+                </h1>
+                <p className="text-xs leading-none text-gray-500">
+                  {addressText}
+                </p>
+              </div>
+            </Link>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {viewer.isSignedIn ? (
+                <Link
+                  href="/account"
+                  className="hidden rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium tracking-wide text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 sm:inline-flex"
+                >
+                  My account
+                </Link>
+              ) : (
+                <Link
+                  href={`/account/sign-in?next=${encodeURIComponent(`/${salonSlug}`)}`}
+                  className="hidden rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium tracking-wide text-white transition-colors hover:bg-emerald-600 sm:inline-flex"
+                >
+                  Login
+                </Link>
+              )}
+              <FavoriteHeartButton
+                organizationId={organizationId}
+                salonSlug={salonSlug}
+                isSignedIn={viewer.isSignedIn}
+                initialIsFavorite={initialIsFavorite}
+              />
             </div>
           </div>
         </header>
 
         <main className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-6 pb-40 sm:px-6 lg:px-8 lg:py-8 lg:pb-10">
           <section className="flex flex-col gap-6">
-            <div className="grid h-56 grid-cols-4 gap-2 overflow-hidden rounded-[24px] sm:h-72 lg:h-[360px]">
-              <div className="relative col-span-4 cursor-pointer bg-gray-200 group sm:col-span-3">
-                <img
-                  src={gallerySrc(galleryUrls, 0)}
-                  alt="Salon Interior"
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/10" />
-              </div>
-              <div className="col-span-1 hidden flex-col gap-2 sm:flex">
-                <div className="relative h-full flex-1 cursor-pointer overflow-hidden bg-gray-200 group">
-                  <img
-                    src={gallerySrc(galleryUrls, 1)}
-                    alt="Salon Detail"
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                </div>
-                <div className="relative h-full flex-1 cursor-pointer overflow-hidden bg-gray-200 group">
-                  <img
-                    src={gallerySrc(galleryUrls, 2)}
-                    alt="Products"
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <span className="rounded-full border border-white/30 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
-                      View gallery
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <GalleryHero
+              salonName={salonName}
+              galleryUrls={galleryUrls}
+            />
 
             <div className="flex flex-col justify-between gap-6 border-b border-gray-200/80 pb-6 md:flex-row md:items-end">
               <div className="flex max-w-2xl flex-col gap-3">
@@ -1439,5 +1433,200 @@ export function SalonNativeBookingStorefront({
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Small rounded badge in the header. Shows the salon's uploaded logo when
+ * available, otherwise a monogram of the salon's initials on a dark background.
+ * Purposefully NOT a generic icon (scissors/camera/etc.) — operators flagged
+ * that as feeling unfinished and un-branded.
+ */
+function SalonLogoBadge({
+  name,
+  logoUrl,
+}: {
+  name: string;
+  logoUrl: string | null;
+}) {
+  const initials = (name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+  const trimmed = logoUrl?.trim() ?? "";
+  const hasValid =
+    trimmed && (/^https?:\/\//i.test(trimmed) || /^data:image\//i.test(trimmed));
+
+  if (hasValid) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={trimmed}
+        alt=""
+        className="h-9 w-9 shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-gray-200"
+      />
+    );
+  }
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-900 text-xs font-medium tracking-wide text-white shadow-sm ring-1 ring-gray-900/10">
+      {initials}
+    </div>
+  );
+}
+
+/**
+ * Hero gallery. If the salon hasn't uploaded photos, we show soft monogram
+ * tiles instead of stock imagery — so customers never see someone else's
+ * salon on another salon's storefront.
+ */
+function renderGalleryTile(
+  src: string | null,
+  alt: string,
+  initials: string,
+  salonName: string,
+) {
+  if (src) {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-gray-200 group">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200"
+      aria-label={`${salonName} — no photos yet`}
+    >
+      <span className="text-3xl font-light tracking-[0.25em] text-gray-400 sm:text-4xl">
+        {initials}
+      </span>
+    </div>
+  );
+}
+
+function GalleryHero({
+  salonName,
+  galleryUrls,
+}: {
+  salonName: string;
+  galleryUrls: string[];
+}) {
+  const hero = gallerySrc(galleryUrls, 0);
+  const thumb1 = gallerySrc(galleryUrls, 1);
+  const thumb2 = gallerySrc(galleryUrls, 2);
+  const hasAnyImage = Boolean(hero || thumb1 || thumb2);
+
+  const initials =
+    (salonName || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+
+  return (
+    <div
+      className={cn(
+        "grid h-56 grid-cols-4 gap-2 overflow-hidden rounded-[24px] sm:h-72 lg:h-[360px]",
+        !hasAnyImage && "border border-gray-200/80",
+      )}
+    >
+      <div className="relative col-span-4 sm:col-span-3">
+        {renderGalleryTile(
+          hero,
+          `${salonName} cover photo`,
+          initials,
+          salonName,
+        )}
+        {hero ? <div className="absolute inset-0 bg-black/10" /> : null}
+      </div>
+      <div className="col-span-1 hidden flex-col gap-2 sm:flex">
+        <div className="relative h-full flex-1">
+          {renderGalleryTile(
+            thumb1,
+            `${salonName} detail photo`,
+            initials,
+            salonName,
+          )}
+        </div>
+        <div className="relative h-full flex-1">
+          {renderGalleryTile(
+            thumb2,
+            `${salonName} products photo`,
+            initials,
+            salonName,
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Heart button in the storefront header — toggles favourite for the signed-in
+ * client. Sends them to sign-in with a deep-link back if not signed in.
+ * Optimistically updates the UI and rolls back on failure.
+ */
+function FavoriteHeartButton({
+  organizationId,
+  salonSlug,
+  isSignedIn,
+  initialIsFavorite,
+}: {
+  organizationId: string;
+  salonSlug: string;
+  isSignedIn: boolean;
+  initialIsFavorite: boolean;
+}) {
+  const router = useRouter();
+  const [liked, setLiked] = useState<boolean>(initialIsFavorite);
+  const [pending, startTransition] = useTransition();
+
+  function onClick() {
+    if (!isSignedIn) {
+      const next = encodeURIComponent(`/${salonSlug}`);
+      router.push(`/account/sign-in?next=${next}`);
+      return;
+    }
+    const optimistic = !liked;
+    setLiked(optimistic);
+    startTransition(async () => {
+      const res = await toggleSalonFavorite(organizationId);
+      if (!res.ok) {
+        setLiked(!optimistic);
+        return;
+      }
+      setLiked(res.liked);
+      router.refresh();
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      aria-pressed={liked}
+      aria-label={liked ? "Remove from favourites" : "Save to favourites"}
+      className={cn(
+        "flex h-10 w-10 items-center justify-center rounded-full border transition-colors disabled:opacity-60",
+        liked
+          ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+          : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900",
+      )}
+    >
+      <Heart
+        className="h-5 w-5"
+        strokeWidth={1.5}
+        fill={liked ? "currentColor" : "none"}
+      />
+    </button>
   );
 }

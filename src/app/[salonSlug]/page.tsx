@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { SalonNativeBookingStorefront } from "@/components/salon-native-booking-storefront";
 import { SalonStorefrontUI } from "@/components/salon-storefront-ui";
+import { getClientAccountSession } from "@/lib/client-account-session";
 import {
   facebookStoredToHref,
   instagramStoredToHref,
@@ -158,6 +159,18 @@ export default async function PublicSalonPage({ params }: PublicSalonPageProps) 
   });
 
   if (isNativeSalon) {
+    const clientSession = await getClientAccountSession();
+    let initialIsFavorite = false;
+    if (clientSession) {
+      const { data: favRow } = await supabase
+        .from("client_favorite_salons")
+        .select("organization_id")
+        .eq("user_id", clientSession.user.id)
+        .eq("organization_id", org.id)
+        .maybeSingle();
+      initialIsFavorite = Boolean(favRow);
+    }
+
     return (
       <SalonNativeBookingStorefront
         salonName={salonDisplayName}
@@ -167,6 +180,7 @@ export default async function PublicSalonPage({ params }: PublicSalonPageProps) 
         salonSlug={salonSlug}
         services={storefrontServices}
         galleryUrls={storefrontGalleryUrls}
+        logoUrl={logoUrl}
         ratingLine={storefrontRatingLine}
         eircode={storefrontEircode}
         mapLat={mapLat}
@@ -177,6 +191,11 @@ export default async function PublicSalonPage({ params }: PublicSalonPageProps) 
         showTeamSection={showStorefrontTeam}
         showMapSection={showStorefrontMap}
         showReviewsSection={showStorefrontReviews}
+        viewer={{
+          isSignedIn: Boolean(clientSession),
+          email: clientSession?.user.email ?? null,
+        }}
+        initialIsFavorite={initialIsFavorite}
       />
     );
   }
