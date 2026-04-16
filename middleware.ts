@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { clisteHostRoutingRedirect } from "./src/lib/cliste-host-routing";
 import {
   isValidSupportDashboardCookieValue,
   SUPPORT_DASHBOARD_COOKIE,
@@ -103,6 +104,9 @@ async function adminGate(
 }
 
 export async function middleware(request: NextRequest) {
+  const hostRedirect = clisteHostRoutingRedirect(request);
+  if (hostRedirect) return hostRedirect;
+
   const response = await updateSession(request);
   const maybeRootRedirect = rootToLoginRedirect(request, response);
   if (maybeRootRedirect !== response) return maybeRootRedirect;
