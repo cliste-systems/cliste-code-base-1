@@ -11,7 +11,10 @@ import {
   Scissors,
   Star,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+
+import { searchPublicSalonsDirectory } from "@/app/booking-directory-search";
+import { getPublicBookingPageUrl } from "@/lib/booking-site-origin";
 
 export type BookingNetworkLandingProps = {
   /** e.g. https://app.clistesystems.ie — for Workspace / partner CTAs */
@@ -26,6 +29,12 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
   const [service, setService] = useState("");
   const [location, setLocation] = useState("");
   const [date, setDate] = useState("");
+  const [salons, setSalons] = useState<
+    { slug: string; name: string; address: string | null }[]
+  >([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [isSearching, startTransition] = useTransition();
   const year = new Date().getFullYear();
 
   const partnerHref = appOrigin ? `${appOrigin}/authenticate` : "/authenticate";
@@ -60,6 +69,25 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
     },
     [],
   );
+
+  const runDirectorySearch = useCallback(() => {
+    setSearchError(null);
+    setHasSearched(true);
+    setSalons([]);
+    startTransition(async () => {
+      const res = await searchPublicSalonsDirectory({
+        service,
+        location,
+        date,
+      });
+      if (!res.ok) {
+        setSalons([]);
+        setSearchError(res.message);
+        return;
+      }
+      setSalons(res.salons);
+    });
+  }, [service, location, date]);
 
   return (
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
@@ -295,17 +323,70 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
             <button
               type="button"
-              className="group flex flex-col items-start justify-between bg-black p-6 text-white transition-colors duration-300 hover:bg-emerald-400 hover:text-black md:w-48 lg:w-64 lg:p-8"
-              onClick={(e) => e.stopPropagation()}
+              className="group flex flex-col items-start justify-between bg-black p-6 text-white transition-colors duration-300 hover:bg-emerald-400 hover:text-black disabled:opacity-60 md:w-48 lg:w-64 lg:p-8"
+              disabled={isSearching}
+              onClick={(e) => {
+                e.stopPropagation();
+                runDirectorySearch();
+              }}
             >
               <span className="text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-black/60">
-                Search
+                {isSearching ? "Searching…" : "Search"}
               </span>
               <div className="flex w-full justify-end transition-transform group-hover:translate-x-2">
                 <ArrowRight strokeWidth={1.5} className="h-12 w-12 lg:h-14 lg:w-14" />
               </div>
             </button>
           </div>
+
+          {hasSearched ? (
+            <div
+              className="mt-12 border border-zinc-200 bg-white p-6 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:p-10"
+              role="region"
+              aria-label="Search results"
+            >
+              <h2 className="mb-6 text-xl font-normal tracking-tight text-black md:text-2xl">
+                Venues
+              </h2>
+              {searchError ? (
+                <p className="text-sm text-red-600">{searchError}</p>
+              ) : isSearching ? (
+                <p className="text-sm text-zinc-500">Loading venues…</p>
+              ) : salons.length === 0 ? (
+                <p className="text-sm text-zinc-600">
+                  No active venues are listed yet. Ask a business to publish
+                  theirs, or open the link they sent you directly.
+                </p>
+              ) : (
+                <ul className="divide-y divide-zinc-100">
+                  {salons.map((s) => (
+                    <li key={s.slug}>
+                      <Link
+                        href={getPublicBookingPageUrl(`/${s.slug}`)}
+                        className="flex flex-col gap-1 py-5 transition-colors hover:bg-zinc-50 md:flex-row md:items-center md:justify-between md:px-4"
+                      >
+                        <div>
+                          <p className="text-lg font-medium text-black">
+                            {s.name}
+                          </p>
+                          {s.address ? (
+                            <p className="text-sm text-zinc-500">{s.address}</p>
+                          ) : null}
+                          <p className="mt-1 font-mono text-xs text-zinc-400">
+                            {getPublicBookingPageUrl(`/${s.slug}`)}
+                          </p>
+                        </div>
+                        <span className="mt-2 inline-flex shrink-0 items-center gap-2 text-sm font-normal tracking-wide text-emerald-700 uppercase md:mt-0">
+                          Book
+                          <ArrowUpRight strokeWidth={1.5} className="h-4 w-4" />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
         </div>
       </main>
 
