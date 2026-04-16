@@ -51,6 +51,7 @@ export function PublicBookingDialog({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
+  const [toastEmailLine, setToastEmailLine] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setError(null);
@@ -68,9 +69,13 @@ export function PublicBookingDialog({
 
   useEffect(() => {
     if (!toast) return;
-    const t = window.setTimeout(() => setToast(false), 5000);
+    const ms = toastEmailLine ? 12_000 : 5000;
+    const t = window.setTimeout(() => {
+      setToast(false);
+      setToastEmailLine(null);
+    }, ms);
     return () => window.clearTimeout(t);
-  }, [toast]);
+  }, [toast, toastEmailLine]);
 
   return (
     <>
@@ -82,7 +87,12 @@ export function PublicBookingDialog({
             "dark:border-emerald-900/50 dark:bg-emerald-950 dark:text-emerald-100"
           )}
         >
-          Booking confirmed!
+          <p>Booking confirmed!</p>
+          {toastEmailLine ? (
+            <p className="mt-2 text-xs font-normal leading-snug text-emerald-950/90 dark:text-emerald-100/90">
+              {toastEmailLine}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -156,6 +166,7 @@ export function PublicBookingDialog({
                     setError(result.message);
                     return;
                   }
+                  setToastEmailLine(result.emailNotice ?? null);
                   form.reset();
                   handleOpenChange(false);
                   setToast(true);

@@ -560,7 +560,7 @@ export async function requestPublicBookingOtp(payload: {
 }
 
 export type SubmitPublicBookingResult =
-  | { success: true }
+  | { success: true; emailNotice?: string }
   | { success: false; message: string };
 
 /**
@@ -804,28 +804,37 @@ export async function submitPublicBooking(
       .eq("organization_id", organizationId);
   }
 
-  if (customerEmailNorm && isSendGridConfigured()) {
-    const emailBodies = buildBookingConfirmationEmailBodies({
-      customerName,
-      salonName,
-      serviceName,
-      startTimeIso: start.toISOString(),
-      bookingReference: bookingRef,
-    });
-    const er = await sendTransactionalEmail({
-      to: customerEmailNorm,
-      subject: emailBodies.subject,
-      text: emailBodies.text,
-      html: emailBodies.html,
-    });
-    if (er.ok) {
-      await admin
-        .from("appointments")
-        .update({ confirmation_email_sent_at: new Date().toISOString() })
-        .eq("id", insertedId)
-        .eq("organization_id", organizationId);
+  let emailNotice: string | undefined;
+  if (customerEmailNorm) {
+    if (!isSendGridConfigured()) {
+      emailNotice =
+        "Your booking is saved, but confirmation email is off on this server (add SENDGRID_API_KEY and SENDGRID_FROM_EMAIL in hosting env, e.g. Vercel).";
     } else {
-      console.warn("Public booking confirmation email failed", er.message);
+      const emailBodies = buildBookingConfirmationEmailBodies({
+        customerName,
+        salonName,
+        serviceName,
+        startTimeIso: start.toISOString(),
+        bookingReference: bookingRef,
+      });
+      const er = await sendTransactionalEmail({
+        to: customerEmailNorm,
+        subject: emailBodies.subject,
+        text: emailBodies.text,
+        html: emailBodies.html,
+      });
+      if (er.ok) {
+        await admin
+          .from("appointments")
+          .update({ confirmation_email_sent_at: new Date().toISOString() })
+          .eq("id", insertedId)
+          .eq("organization_id", organizationId);
+        emailNotice =
+          "We sent a confirmation email — check inbox and spam in a few minutes.";
+      } else {
+        console.warn("Public booking confirmation email failed", er.message);
+        emailNotice = `Confirmation email did not send: ${er.message}`;
+      }
     }
   }
 
@@ -843,5 +852,8 @@ export async function submitPublicBooking(
   if (slug && /^[a-z0-9-]+$/.test(slug)) {
     revalidatePath(`/${slug}`);
   }
-  return { success: true };
+  return {
+    success: true,
+    ...(emailNotice ? { emailNotice } : {}),
+  };
 }

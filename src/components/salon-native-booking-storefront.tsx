@@ -335,6 +335,7 @@ export function SalonNativeBookingStorefront({
   const [otpSendPending, startOtpSendTransition] = useTransition();
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
+  const [toastEmailLine, setToastEmailLine] = useState<string | null>(null);
   const [dialogName, setDialogName] = useState("");
   const [dialogPhone, setDialogPhone] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -342,9 +343,13 @@ export function SalonNativeBookingStorefront({
 
   useEffect(() => {
     if (!toast) return;
-    const t = window.setTimeout(() => setToast(false), 5000);
+    const ms = toastEmailLine ? 12_000 : 5000;
+    const t = window.setTimeout(() => {
+      setToast(false);
+      setToastEmailLine(null);
+    }, ms);
     return () => window.clearTimeout(t);
-  }, [toast]);
+  }, [toast, toastEmailLine]);
 
   const totalPrice = selectedService?.price ?? 0;
 
@@ -433,6 +438,7 @@ export function SalonNativeBookingStorefront({
             setBookingError(res.message);
             return;
           }
+          setToastEmailLine(res.emailNotice ?? null);
           setConfirmOpen(false);
           setDialogName("");
           setDialogPhone("");
@@ -509,7 +515,12 @@ export function SalonNativeBookingStorefront({
           role="status"
           className="fixed bottom-24 left-1/2 z-[100] max-w-sm -translate-x-1/2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-900 shadow-lg lg:bottom-6"
         >
-          Booking confirmed!
+          <p>Booking confirmed!</p>
+          {toastEmailLine ? (
+            <p className="mt-2 text-xs font-normal leading-snug text-emerald-950/90">
+              {toastEmailLine}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -638,8 +649,8 @@ export function SalonNativeBookingStorefront({
                 placeholder="you@example.com"
               />
               <p className="text-[11px] leading-snug text-gray-500">
-                If you add an email, we&apos;ll send a booking confirmation there too
-                (when email is enabled for this site).
+                Optional confirmation email uses SendGrid on the server (e.g. Vercel
+                env vars), not just your local .env.
               </p>
             </div>
             {bookingError ? (
