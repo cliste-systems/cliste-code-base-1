@@ -17,9 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = h.get("x-forwarded-host") ?? h.get("host");
   if (hostMatchesConfiguredBookingHost(host)) {
     return {
-      title: "Cliste — Online booking",
+      title: "Book an appointment",
       description:
-        "Online booking for salons, barbershops, and other local businesses. Use the link your business sent you to pick a time.",
+        "Book an appointment: choose a service, location, and time.",
     };
   }
   return {

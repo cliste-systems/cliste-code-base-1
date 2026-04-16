@@ -95,20 +95,12 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
       <main className="relative z-50 pt-16 pb-12 md:pt-24">
         <div className="mx-auto max-w-[1400px] px-6">
-          <div className="mb-16 max-w-4xl">
-            <p className="mb-6 flex items-center gap-4 text-sm font-normal tracking-widest text-zinc-500 uppercase">
-              <span className="h-px w-12 bg-zinc-300" />
-              Online booking
-            </p>
-            <h1 className="text-4xl leading-[1.05] font-normal tracking-tight text-zinc-900 md:text-5xl lg:text-6xl">
-              Calm scheduling for{" "}
-              <span className="text-black">salons, barbershops</span>, and other
-              local businesses clients rely on every day.
+          <div className="mb-10 max-w-2xl md:mb-12">
+            <h1 className="text-4xl font-semibold tracking-tight text-zinc-900 md:text-5xl">
+              Book an appointment
             </h1>
-            <p className="mt-6 max-w-2xl text-lg font-light leading-relaxed text-zinc-600 md:text-xl">
-              If you already have a booking link from a business, open it to
-              choose a time. This page is only a short introduction to Cliste —
-              not a public directory of every venue.
+            <p className="mt-3 text-base leading-relaxed text-zinc-600 md:text-lg">
+              Choose a service, location, and time — then search.
             </p>
           </div>
 
@@ -122,7 +114,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
             >
               <div className="h-full w-full p-6 lg:p-8">
                 <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
-                  01 / Type of business
+                  01 / Service
                 </label>
                 <div className="flex items-center gap-3">
                   <input
@@ -131,7 +123,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     readOnly
                     tabIndex={-1}
                     value={service}
-                    placeholder="Examples below"
+                    placeholder="What do you need?"
                     className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
                   />
                 </div>
@@ -163,11 +155,8 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       />
                     </button>
                   ))}
-                  <div className="mt-2 border-t border-zinc-100 pt-4 text-base font-normal text-emerald-700">
-                    <span className="block px-6 py-4">
-                      Illustrative only — real menus live on each business&apos;s
-                      page.
-                    </span>
+                  <div className="mt-2 border-t border-zinc-100 pt-4 text-sm font-normal text-zinc-500">
+                    <span className="block px-6 py-3">More services after search</span>
                   </div>
                 </div>
               ) : null}
@@ -183,7 +172,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               <div className="flex h-full w-full items-center justify-between p-6 lg:p-8">
                 <div className="w-full">
                   <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
-                    02 / Area (example)
+                    02 / Location
                   </label>
                   <div className="flex items-center gap-3">
                     <input
