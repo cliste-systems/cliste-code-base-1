@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { hostMatchesConfiguredBookingHost } from "./src/lib/booking-site-origin";
 import { clisteHostRoutingRedirect } from "./src/lib/cliste-host-routing";
 import {
   isValidSupportDashboardCookieValue,
@@ -21,6 +22,9 @@ function rootToLoginRedirect(
   response: NextResponse
 ): NextResponse {
   if (request.nextUrl.pathname !== "/") return response;
+  const reqHost = request.headers.get("host");
+  if (hostMatchesConfiguredBookingHost(reqHost)) return response;
+
   const redirectRes = NextResponse.redirect(new URL("/authenticate", request.url));
   copySessionCookies(response, redirectRes);
   return redirectRes;

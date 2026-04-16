@@ -30,6 +30,16 @@ export function resolveBookingSiteOrigin(): URL | null {
   return u;
 }
 
+/** True when the request `Host` header is the configured public booking hostname. */
+export function hostMatchesConfiguredBookingHost(
+  requestHost: string | null | undefined,
+): boolean {
+  const booking = resolveBookingSiteOrigin();
+  if (!booking || !requestHost) return false;
+  const h = requestHost.split(":")[0]!.toLowerCase();
+  return h === booking.hostname.toLowerCase();
+}
+
 /** Absolute booking URL when booking host is configured; otherwise same-path on current host. */
 export function getPublicBookingPageUrl(pathFromRoot: string): string {
   const path = pathFromRoot.startsWith("/") ? pathFromRoot : `/${pathFromRoot}`;
