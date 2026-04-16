@@ -46,6 +46,8 @@ export function BookingNetworkLanding({
     lat: number;
     lng: number;
   } | null>(null);
+  /** Shown when “Use current location” fails or is unavailable (not a search error). */
+  const [locationGeoHint, setLocationGeoHint] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, startTransition] = useTransition();
@@ -101,6 +103,7 @@ export function BookingNetworkLanding({
   const selectLocation = useCallback((value: string) => {
     setLocation(value);
     setViewerGeo(null);
+    setLocationGeoHint(null);
     setOpenId(null);
   }, []);
 
@@ -292,9 +295,13 @@ export function BookingNetworkLanding({
                     onClick={(ev) => {
                       ev.stopPropagation();
                       setOpenId(null);
+                      setLocationGeoHint(null);
                       if (!navigator.geolocation) {
-                        setLocation("Current Location");
+                        setLocation("");
                         setViewerGeo(null);
+                        setLocationGeoHint(
+                          "This browser cannot use your location. Pick a town or enter an Eircode.",
+                        );
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
@@ -304,10 +311,17 @@ export function BookingNetworkLanding({
                             lat: pos.coords.latitude,
                             lng: pos.coords.longitude,
                           });
+                          setLocationGeoHint(null);
                         },
-                        () => {
-                          setLocation("Current Location");
+                        (geoErr: GeolocationPositionError) => {
+                          setLocation("");
                           setViewerGeo(null);
+                          const denied = geoErr.code === 1; // PERMISSION_DENIED
+                          setLocationGeoHint(
+                            denied
+                              ? "Location permission was denied. Pick a town or enter an Eircode."
+                              : "Could not read your location. Pick a town or enter an Eircode.",
+                          );
                         },
                         {
                           enableHighAccuracy: false,
@@ -387,6 +401,12 @@ export function BookingNetworkLanding({
               </div>
             </button>
           </div>
+
+          {locationGeoHint ? (
+            <p className="mt-4 text-sm text-amber-900" role="status">
+              {locationGeoHint}
+            </p>
+          ) : null}
 
           {hasSearched ? (
             <div
