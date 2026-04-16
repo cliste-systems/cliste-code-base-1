@@ -8,7 +8,6 @@ import {
   hostMatchesConfiguredBookingHost,
   resolveAppSiteOrigin,
 } from "@/lib/booking-site-origin";
-import { getClientAccountSession } from "@/lib/client-account-session";
 import { cn } from "@/lib/utils";
 
 const linkButton =
@@ -80,15 +79,11 @@ export default async function Home() {
   const host = h.get("x-forwarded-host") ?? h.get("host");
   if (hostMatchesConfiguredBookingHost(host)) {
     const appOrigin = resolveAppSiteOrigin()?.origin ?? null;
-    const [directoryNicheOptions, clientSession] = await Promise.all([
-      listPublicBookingDirectoryNiches(),
-      getClientAccountSession(),
-    ]);
+    const directoryNicheOptions = await listPublicBookingDirectoryNiches();
     return (
       <BookingNetworkLanding
         appOrigin={appOrigin}
         directoryNicheOptions={directoryNicheOptions}
-        clientIsSignedIn={Boolean(clientSession)}
       />
     );
   }

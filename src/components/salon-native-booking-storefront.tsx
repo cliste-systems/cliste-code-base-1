@@ -8,7 +8,6 @@ import {
   Clock,
   CloudSun,
   Coffee,
-  Heart,
   MapPin,
   Minus,
   Plus,
@@ -20,7 +19,6 @@ import {
   Wifi,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -31,7 +29,6 @@ import {
 } from "react";
 
 import { Turnstile } from "@marsidev/react-turnstile";
-import { toggleSalonFavorite } from "@/app/account/actions";
 import {
   getPublicBookingSlotsRange,
   requestPublicBookingOtp,
@@ -116,13 +113,6 @@ type SalonNativeBookingStorefrontProps = {
   showTeamSection?: boolean;
   showMapSection?: boolean;
   showReviewsSection?: boolean;
-  /** Client auth state (resolved server-side). */
-  viewer: {
-    isSignedIn: boolean;
-    email: string | null;
-  };
-  /** Whether THIS salon is in the signed-in visitor's favourites. */
-  initialIsFavorite: boolean;
 };
 
 export function SalonNativeBookingStorefront({
@@ -144,8 +134,6 @@ export function SalonNativeBookingStorefront({
   showTeamSection = true,
   showMapSection = true,
   showReviewsSection = true,
-  viewer,
-  initialIsFavorite,
 }: SalonNativeBookingStorefrontProps) {
   const nameId = useId();
   const phoneId = useId();
@@ -672,7 +660,6 @@ export function SalonNativeBookingStorefront({
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
-                defaultValue={viewer.email ?? ""}
               />
               <p className="text-[11px] leading-snug text-gray-500">
                 Optional — we&apos;ll email you a booking summary if you add your address.
@@ -722,29 +709,6 @@ export function SalonNativeBookingStorefront({
                 </p>
               </div>
             </Link>
-            <div className="flex items-center gap-2 sm:gap-3">
-              {viewer.isSignedIn ? (
-                <Link
-                  href="/account"
-                  className="hidden rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium tracking-wide text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 sm:inline-flex"
-                >
-                  My account
-                </Link>
-              ) : (
-                <Link
-                  href={`/account/sign-in?next=${encodeURIComponent(`/${salonSlug}`)}`}
-                  className="hidden rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium tracking-wide text-white transition-colors hover:bg-emerald-600 sm:inline-flex"
-                >
-                  Login
-                </Link>
-              )}
-              <FavoriteHeartButton
-                organizationId={organizationId}
-                salonSlug={salonSlug}
-                isSignedIn={viewer.isSignedIn}
-                initialIsFavorite={initialIsFavorite}
-              />
-            </div>
           </div>
         </header>
 
@@ -1569,64 +1533,3 @@ function GalleryHero({
   );
 }
 
-/**
- * Heart button in the storefront header — toggles favourite for the signed-in
- * client. Sends them to sign-in with a deep-link back if not signed in.
- * Optimistically updates the UI and rolls back on failure.
- */
-function FavoriteHeartButton({
-  organizationId,
-  salonSlug,
-  isSignedIn,
-  initialIsFavorite,
-}: {
-  organizationId: string;
-  salonSlug: string;
-  isSignedIn: boolean;
-  initialIsFavorite: boolean;
-}) {
-  const router = useRouter();
-  const [liked, setLiked] = useState<boolean>(initialIsFavorite);
-  const [pending, startTransition] = useTransition();
-
-  function onClick() {
-    if (!isSignedIn) {
-      const next = encodeURIComponent(`/${salonSlug}`);
-      router.push(`/account/sign-in?next=${next}`);
-      return;
-    }
-    const optimistic = !liked;
-    setLiked(optimistic);
-    startTransition(async () => {
-      const res = await toggleSalonFavorite(organizationId);
-      if (!res.ok) {
-        setLiked(!optimistic);
-        return;
-      }
-      setLiked(res.liked);
-      router.refresh();
-    });
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={pending}
-      aria-pressed={liked}
-      aria-label={liked ? "Remove from favourites" : "Save to favourites"}
-      className={cn(
-        "flex h-10 w-10 items-center justify-center rounded-full border transition-colors disabled:opacity-60",
-        liked
-          ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
-          : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900",
-      )}
-    >
-      <Heart
-        className="h-5 w-5"
-        strokeWidth={1.5}
-        fill={liked ? "currentColor" : "none"}
-      />
-    </button>
-  );
-}
