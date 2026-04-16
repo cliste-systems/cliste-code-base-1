@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
+  Calendar,
   MapPin,
   Navigation,
   Scissors,
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   type PublicDirectoryNicheOption,
+  type PublicSalonDirectoryRow,
   searchPublicSalonsDirectory,
 } from "@/app/booking-directory-search";
 import { getPublicBookingPageUrl } from "@/lib/booking-site-origin";
@@ -39,9 +41,7 @@ export function BookingNetworkLanding({
     null,
   );
   const [location, setLocation] = useState("");
-  const [salons, setSalons] = useState<
-    { slug: string; name: string; address: string | null; distanceKm: number | null }[]
-  >([]);
+  const [salons, setSalons] = useState<PublicSalonDirectoryRow[]>([]);
   const [viewerGeo, setViewerGeo] = useState<{
     lat: number;
     lng: number;
@@ -414,9 +414,22 @@ export function BookingNetworkLanding({
               role="region"
               aria-label="Search results"
             >
-              <h2 className="mb-6 text-xl font-normal tracking-tight text-black md:text-2xl">
-                Venues
-              </h2>
+              <div className="mb-8 flex flex-col gap-1 border-b border-zinc-100 pb-6 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
+                    Places you can book
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Live storefronts on Cliste — pick a venue, then choose
+                    services and a time.
+                  </p>
+                </div>
+                <p className="text-sm font-medium text-zinc-400 tabular-nums">
+                  {isSearching
+                    ? "Searching…"
+                    : `${salons.length} ${salons.length === 1 ? "venue" : "venues"}`}
+                </p>
+              </div>
               {searchError ? (
                 <p className="text-sm text-red-600">{searchError}</p>
               ) : isSearching ? (
@@ -428,35 +441,104 @@ export function BookingNetworkLanding({
                   sent you.
                 </p>
               ) : (
-                <ul className="divide-y divide-zinc-100">
+                <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   {salons.map((s) => (
-                    <li key={s.slug}>
+                    <li key={s.slug} className="list-none">
                       <Link
                         href={getPublicBookingPageUrl(`/${s.slug}`)}
-                        className="flex flex-col gap-1 py-5 transition-colors hover:bg-zinc-50 md:flex-row md:items-center md:justify-between md:px-4"
+                        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-zinc-200/60 transition-all hover:-translate-y-0.5 hover:border-emerald-200/80 hover:shadow-[0_12px_40px_-12px_rgba(16,185,129,0.25)]"
                       >
-                        <div>
-                          <p className="text-lg font-medium text-black">
-                            {s.name}
-                          </p>
-                          {s.address ? (
-                            <p className="text-sm text-zinc-500">{s.address}</p>
-                          ) : null}
+                        <div className="relative h-36 bg-zinc-100 md:h-40">
+                          {s.coverImageUrl ? (
+                            <img
+                              src={s.coverImageUrl}
+                              alt=""
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-100 via-zinc-50 to-emerald-50/40">
+                              <span className="text-4xl font-light tracking-tight text-zinc-300">
+                                {s.name.slice(0, 1).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
                           {s.distanceKm !== null ? (
-                            <p className="text-sm font-normal text-emerald-700">
+                            <span className="absolute top-3 right-3 rounded-full bg-black/75 px-3 py-1 text-xs font-medium tracking-wide text-white uppercase backdrop-blur-sm">
                               {s.distanceKm === 0
-                                ? "Same Eircode as your search"
-                                : `About ${Math.round(s.distanceKm * 10) / 10} km away`}
-                            </p>
+                                ? "Same area"
+                                : `${Math.round(s.distanceKm * 10) / 10} km`}
+                            </span>
                           ) : null}
-                          <p className="mt-1 font-mono text-xs text-zinc-400">
-                            {getPublicBookingPageUrl(`/${s.slug}`)}
-                          </p>
+                          <div className="absolute -bottom-7 left-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-2xl border-[3px] border-white bg-white shadow-lg ring-1 ring-black/5">
+                            {s.logoUrl ? (
+                              <img
+                                src={s.logoUrl}
+                                alt={`${s.name} logo`}
+                                className="h-full w-full object-contain p-1.5"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <span className="text-2xl font-semibold text-zinc-400">
+                                {s.name.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className="mt-2 inline-flex shrink-0 items-center gap-2 text-sm font-normal tracking-wide text-emerald-700 uppercase md:mt-0">
-                          Book
-                          <ArrowUpRight strokeWidth={1.5} className="h-4 w-4" />
-                        </span>
+                        <div className="flex flex-1 flex-col px-5 pb-5 pt-10 md:px-6 md:pb-6 md:pt-11">
+                          <div className="flex flex-1 flex-col gap-3 md:flex-row md:justify-between md:gap-4">
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-lg font-semibold tracking-tight text-black transition-colors group-hover:text-emerald-900 md:text-xl">
+                                  {s.name}
+                                </h3>
+                                <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                                  {s.nicheLabel}
+                                </span>
+                              </div>
+                              {s.ratingLine ? (
+                                <p className="text-sm font-medium text-amber-900/90">
+                                  {s.ratingLine}
+                                </p>
+                              ) : null}
+                              {s.address ? (
+                                <p className="flex items-start gap-1.5 text-sm leading-snug text-zinc-600">
+                                  <MapPin
+                                    strokeWidth={1.5}
+                                    className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400"
+                                    aria-hidden
+                                  />
+                                  <span>{s.address}</span>
+                                </p>
+                              ) : null}
+                              {s.bioSnippet ? (
+                                <p className="line-clamp-2 text-sm leading-relaxed text-zinc-500">
+                                  {s.bioSnippet}
+                                </p>
+                              ) : null}
+                              <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+                                <Calendar
+                                  strokeWidth={1.5}
+                                  className="h-3.5 w-3.5 shrink-0"
+                                  aria-hidden
+                                />
+                                Native online booking on Cliste
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col justify-end md:items-end">
+                              <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold tracking-wide text-black shadow-sm transition-colors group-hover:bg-emerald-400">
+                                Book now
+                                <ArrowUpRight
+                                  strokeWidth={2}
+                                  className="h-4 w-4"
+                                />
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </Link>
                     </li>
                   ))}

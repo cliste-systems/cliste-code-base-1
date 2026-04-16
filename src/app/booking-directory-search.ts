@@ -14,6 +14,32 @@ import {
   isOrganizationNiche,
 } from "@/lib/organization-niche";
 
+function firstHttpsFromGallery(raw: unknown): string | null {
+  if (!Array.isArray(raw)) return null;
+  for (const u of raw) {
+    if (typeof u !== "string") continue;
+    const t = u.trim();
+    if (/^https?:\/\//i.test(t)) return t;
+  }
+  return null;
+}
+
+function normalizePublicLogoUrl(raw: string | null | undefined): string | null {
+  const t = raw?.trim() ?? "";
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t) || /^data:image\//i.test(t)) return t;
+  return null;
+}
+
+function bioSnippet(raw: string | null, maxLen: number): string | null {
+  const t = raw?.trim() ?? "";
+  if (!t) return null;
+  if (t.length <= maxLen) return t;
+  const cut = t.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd() + "…";
+}
+
 export type PublicDirectoryNicheOption = {
   niche: OrganizationNiche;
   label: string;
@@ -55,6 +81,12 @@ export type PublicSalonDirectoryRow = {
   address: string | null;
   /** Set when the search resolved a map point for the visitor */
   distanceKm: number | null;
+  niche: OrganizationNiche;
+  nicheLabel: string;
+  bioSnippet: string | null;
+  logoUrl: string | null;
+  coverImageUrl: string | null;
+  ratingLine: string | null;
 };
 
 type OrgRow = {
@@ -63,7 +95,10 @@ type OrgRow = {
   address: string | null;
   bio_text: string | null;
   niche: string | null;
+  logo_url: string | null;
   storefront_eircode: string | null;
+  storefront_gallery_urls: unknown;
+  storefront_rating_text: string | null;
   storefront_map_lat: number | string | null;
   storefront_map_lng: number | string | null;
 };
@@ -135,7 +170,7 @@ export async function searchPublicSalonsDirectory(input: {
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "slug, name, address, bio_text, niche, storefront_eircode, storefront_map_lat, storefront_map_lng",
+      "slug, name, address, bio_text, niche, logo_url, storefront_eircode, storefront_gallery_urls, storefront_rating_text, storefront_map_lat, storefront_map_lng",
     )
     .eq("is_active", true)
     .order("name");
@@ -157,13 +192,18 @@ export async function searchPublicSalonsDirectory(input: {
         mapLng !== null &&
         isPlausibleIrelandPoint(mapLat, mapLng);
       const nicheRaw = (row.niche ?? "").trim();
-      const niche = isOrganizationNiche(nicheRaw) ? nicheRaw : "hair_salon";
+      const niche: OrganizationNiche = isOrganizationNiche(nicheRaw)
+        ? nicheRaw
+        : "hair_salon";
       return {
         slug: String(row.slug).trim(),
         name: String(row.name).trim(),
         address: row.address?.trim() ?? null,
         bio_text: row.bio_text?.trim() ?? null,
         niche,
+        logoUrl: normalizePublicLogoUrl(row.logo_url),
+        coverImageUrl: firstHttpsFromGallery(row.storefront_gallery_urls),
+        ratingLine: row.storefront_rating_text?.trim() || null,
         storefront_eircode: row.storefront_eircode?.trim() ?? null,
         mapLat: pinOk ? mapLat : null,
         mapLng: pinOk ? mapLng : null,
@@ -267,11 +307,17 @@ export async function searchPublicSalonsDirectory(input: {
 
   return {
     ok: true,
-    salons: withDistance.map(({ slug, name, address, distanceKm }) => ({
-      slug,
-      name,
-      address,
-      distanceKm,
+    salons: withDistance.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      address: r.address,
+      distanceKm: r.distanceKm,
+      niche: r.niche,
+      nicheLabel: ORGANIZATION_NICHE_ADMIN_LABELS[r.niche],
+      bioSnippet: bioSnippet(r.bio_text, 160),
+      logoUrl: r.logoUrl,
+      coverImageUrl: r.coverImageUrl,
+      ratingLine: r.ratingLine,
     })),
   };
 }
