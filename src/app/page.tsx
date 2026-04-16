@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 
+import { listPublicBookingDirectoryNiches } from "@/app/booking-directory-search";
 import { BookingNetworkLanding } from "@/components/booking-network-landing";
 import {
   hostMatchesConfiguredBookingHost,
@@ -78,7 +79,13 @@ export default async function Home() {
   const host = h.get("x-forwarded-host") ?? h.get("host");
   if (hostMatchesConfiguredBookingHost(host)) {
     const appOrigin = resolveAppSiteOrigin()?.origin ?? null;
-    return <BookingNetworkLanding appOrigin={appOrigin} />;
+    const directoryNicheOptions = await listPublicBookingDirectoryNiches();
+    return (
+      <BookingNetworkLanding
+        appOrigin={appOrigin}
+        directoryNicheOptions={directoryNicheOptions}
+      />
+    );
   }
   return <AppHome />;
 }

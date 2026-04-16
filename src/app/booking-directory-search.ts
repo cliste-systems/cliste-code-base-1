@@ -8,6 +8,46 @@ import {
   isPlausibleIrelandPoint,
   normalizeIrelandLocationQuery,
 } from "@/lib/geocode-ireland";
+import {
+  ORGANIZATION_NICHE_ADMIN_LABELS,
+  type OrganizationNiche,
+  isOrganizationNiche,
+} from "@/lib/organization-niche";
+
+export type PublicDirectoryNicheOption = {
+  niche: OrganizationNiche;
+  label: string;
+};
+
+/** Distinct niches among active organizations (anon RLS). */
+export async function listPublicBookingDirectoryNiches(): Promise<
+  PublicDirectoryNicheOption[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("niche")
+    .eq("is_active", true);
+
+  if (error) {
+    return [];
+  }
+
+  const seen = new Set<OrganizationNiche>();
+  for (const row of data ?? []) {
+    const raw = (row as { niche?: string | null }).niche;
+    if (raw && isOrganizationNiche(raw)) {
+      seen.add(raw);
+    }
+  }
+
+  return [...seen]
+    .sort()
+    .map((niche) => ({
+      niche,
+      label: ORGANIZATION_NICHE_ADMIN_LABELS[niche],
+    }));
+}
 
 export type PublicSalonDirectoryRow = {
   slug: string;
@@ -22,6 +62,7 @@ type OrgRow = {
   name: string;
   address: string | null;
   bio_text: string | null;
+  niche: string | null;
   storefront_eircode: string | null;
   storefront_map_lat: number | string | null;
   storefront_map_lng: number | string | null;
@@ -31,10 +72,12 @@ function tokenize(input: {
   service: string;
   location: string;
   skipLocationTokens: boolean;
+  skipServiceTokens: boolean;
 }): string[] {
+  const servicePart = input.skipServiceTokens ? "" : input.service;
   const raw = input.skipLocationTokens
-    ? input.service
-    : [input.service, input.location].join(" ");
+    ? servicePart
+    : [servicePart, input.location].join(" ");
   return raw
     .toLowerCase()
     .split(/\s+/)
@@ -47,9 +90,10 @@ function haystack(r: {
   address: string | null;
   slug: string;
   bio_text: string | null;
+  niche: string;
   storefront_eircode: string | null;
 }) {
-  return [r.name, r.address, r.slug, r.bio_text, r.storefront_eircode]
+  return [r.name, r.address, r.slug, r.bio_text, r.niche, r.storefront_eircode]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -63,6 +107,8 @@ function haystack(r: {
  */
 export async function searchPublicSalonsDirectory(input: {
   service: string;
+  /** When set, results are limited to this organization niche (matches dashboard). */
+  serviceNiche?: OrganizationNiche | null;
   location: string;
   date: string;
   viewerLat?: number | null;
@@ -89,7 +135,7 @@ export async function searchPublicSalonsDirectory(input: {
   const { data, error } = await supabase
     .from("organizations")
     .select(
-      "slug, name, address, bio_text, storefront_eircode, storefront_map_lat, storefront_map_lng",
+      "slug, name, address, bio_text, niche, storefront_eircode, storefront_map_lat, storefront_map_lng",
     )
     .eq("is_active", true)
     .order("name");
@@ -110,21 +156,34 @@ export async function searchPublicSalonsDirectory(input: {
         mapLat !== null &&
         mapLng !== null &&
         isPlausibleIrelandPoint(mapLat, mapLng);
+      const nicheRaw = (row.niche ?? "").trim();
+      const niche = isOrganizationNiche(nicheRaw) ? nicheRaw : "hair_salon";
       return {
         slug: String(row.slug).trim(),
         name: String(row.name).trim(),
         address: row.address?.trim() ?? null,
         bio_text: row.bio_text?.trim() ?? null,
+        niche,
         storefront_eircode: row.storefront_eircode?.trim() ?? null,
         mapLat: pinOk ? mapLat : null,
         mapLng: pinOk ? mapLng : null,
       };
     });
 
+  const serviceNiche =
+    input.serviceNiche && isOrganizationNiche(input.serviceNiche)
+      ? input.serviceNiche
+      : null;
+  const pool =
+    serviceNiche !== null
+      ? normalized.filter((r) => r.niche === serviceNiche)
+      : normalized;
+
   const tokens = tokenize({
     service: input.service,
     location: input.location,
     skipLocationTokens,
+    skipServiceTokens: serviceNiche !== null,
   });
 
   let userPoint: { lat: number; lng: number } | null = null;
@@ -147,12 +206,12 @@ export async function searchPublicSalonsDirectory(input: {
 
   const pickRows = () => {
     if (tokens.length === 0) {
-      return normalized;
+      return pool;
     }
-    const strict = normalized.filter((r) =>
+    const strict = pool.filter((r) =>
       tokens.every((t) => haystack(r).includes(t)),
     );
-    return strict.length > 0 ? strict : normalized;
+    return strict.length > 0 ? strict : pool;
   };
 
   const picked = pickRows();

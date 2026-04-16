@@ -12,21 +12,33 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
-import { searchPublicSalonsDirectory } from "@/app/booking-directory-search";
+import {
+  type PublicDirectoryNicheOption,
+  searchPublicSalonsDirectory,
+} from "@/app/booking-directory-search";
 import { getPublicBookingPageUrl } from "@/lib/booking-site-origin";
+import type { OrganizationNiche } from "@/lib/organization-niche";
 
 export type BookingNetworkLandingProps = {
   /** e.g. https://app.clistesystems.ie — for Workspace / partner CTAs */
   appOrigin: string | null;
+  /** Niches that have at least one active venue (drives the Service list). */
+  directoryNicheOptions: PublicDirectoryNicheOption[];
 };
 
 const hoverReveal =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0)_100%)]";
 
-export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps) {
+export function BookingNetworkLanding({
+  appOrigin,
+  directoryNicheOptions,
+}: BookingNetworkLandingProps) {
   const findVenuesRef = useRef<HTMLDivElement>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [service, setService] = useState("");
+  const [serviceNiche, setServiceNiche] = useState<OrganizationNiche | null>(
+    null,
+  );
   const [location, setLocation] = useState("");
   const [date, setDate] = useState("");
   const [salons, setSalons] = useState<
@@ -76,10 +88,21 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
     setOpenId((prev) => (prev === id ? null : id));
   }, []);
 
-  /** `selectOption(inputId, value, dropdownId)` — set field value and hide menu. */
+  const selectServiceOption = useCallback((opt: PublicDirectoryNicheOption) => {
+    setService(opt.label);
+    setServiceNiche(opt.niche);
+    setOpenId(null);
+  }, []);
+
+  const clearServiceOption = useCallback(() => {
+    setService("");
+    setServiceNiche(null);
+    setOpenId(null);
+  }, []);
+
+  /** `selectOption` — location / date only (service uses niche helpers above). */
   const selectOption = useCallback(
-    (input: "service" | "location" | "date", value: string) => {
-      if (input === "service") setService(value);
+    (input: "location" | "date", value: string) => {
       if (input === "location") {
         setLocation(value);
         setViewerGeo(null);
@@ -97,6 +120,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
     startTransition(async () => {
       const res = await searchPublicSalonsDirectory({
         service,
+        serviceNiche,
         location,
         date,
         viewerLat: viewerGeo?.lat ?? null,
@@ -109,7 +133,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
       }
       setSalons(res.salons);
     });
-  }, [service, location, date, viewerGeo]);
+  }, [service, serviceNiche, location, date, viewerGeo]);
 
   return (
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
@@ -185,7 +209,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     readOnly
                     tabIndex={-1}
                     value={service}
-                    placeholder="What do you need?"
+                    placeholder="Service type"
                     className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
                   />
                 </div>
@@ -196,27 +220,43 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                   className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {[
-                    "Hair & beauty",
-                    "Barbershop",
-                    "Garage or motors",
-                  ].map((label) => (
-                    <button
-                      key={label}
-                      type="button"
-                      className="group/item flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        selectOption("service", label);
-                      }}
-                    >
-                      {label}
-                      <ArrowRight
-                        strokeWidth={1.5}
-                        className="h-4 w-4 -translate-x-2 text-zinc-300 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:text-emerald-500 group-hover/item:opacity-100"
-                      />
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    className="group/item flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left text-base font-normal text-zinc-600 transition-colors hover:bg-zinc-100"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      clearServiceOption();
+                    }}
+                  >
+                    All types
+                    <ArrowRight
+                      strokeWidth={1.5}
+                      className="h-4 w-4 -translate-x-2 text-zinc-300 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:text-emerald-500 group-hover/item:opacity-100"
+                    />
+                  </button>
+                  {directoryNicheOptions.length === 0 ? (
+                    <p className="px-6 py-4 text-sm text-zinc-500">
+                      No published venues yet.
+                    </p>
+                  ) : (
+                    directoryNicheOptions.map((opt) => (
+                      <button
+                        key={opt.niche}
+                        type="button"
+                        className="group/item flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          selectServiceOption(opt);
+                        }}
+                      >
+                        {opt.label}
+                        <ArrowRight
+                          strokeWidth={1.5}
+                          className="h-4 w-4 -translate-x-2 text-zinc-300 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:text-emerald-500 group-hover/item:opacity-100"
+                        />
+                      </button>
+                    ))
+                  )}
                   <div className="mt-2 border-t border-zinc-100 pt-4 text-base font-normal text-emerald-600">
                     <span className="block px-6 py-4">
                       Then use Search to list venues
