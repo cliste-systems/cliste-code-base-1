@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
-  Calendar,
   MapPin,
   Navigation,
   Scissors,
@@ -40,7 +39,6 @@ export function BookingNetworkLanding({
     null,
   );
   const [location, setLocation] = useState("");
-  const [date, setDate] = useState("");
   const [salons, setSalons] = useState<
     { slug: string; name: string; address: string | null; distanceKm: number | null }[]
   >([]);
@@ -100,18 +98,11 @@ export function BookingNetworkLanding({
     setOpenId(null);
   }, []);
 
-  /** `selectOption` — location / date only (service uses niche helpers above). */
-  const selectOption = useCallback(
-    (input: "location" | "date", value: string) => {
-      if (input === "location") {
-        setLocation(value);
-        setViewerGeo(null);
-      }
-      if (input === "date") setDate(value);
-      setOpenId(null);
-    },
-    [],
-  );
+  const selectLocation = useCallback((value: string) => {
+    setLocation(value);
+    setViewerGeo(null);
+    setOpenId(null);
+  }, []);
 
   const runDirectorySearch = useCallback(() => {
     setSearchError(null);
@@ -122,7 +113,6 @@ export function BookingNetworkLanding({
         service,
         serviceNiche,
         location,
-        date,
         viewerLat: viewerGeo?.lat ?? null,
         viewerLng: viewerGeo?.lng ?? null,
       });
@@ -133,7 +123,7 @@ export function BookingNetworkLanding({
       }
       setSalons(res.salons);
     });
-  }, [service, serviceNiche, location, date, viewerGeo]);
+  }, [service, serviceNiche, location, viewerGeo]);
 
   return (
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
@@ -257,11 +247,6 @@ export function BookingNetworkLanding({
                       </button>
                     ))
                   )}
-                  <div className="mt-2 border-t border-zinc-100 pt-4 text-base font-normal text-emerald-600">
-                    <span className="block px-6 py-4">
-                      Then use Search to list venues
-                    </span>
-                  </div>
                 </div>
               ) : null}
             </div>
@@ -276,7 +261,7 @@ export function BookingNetworkLanding({
               <div className="flex h-full w-full items-center justify-between p-6 lg:p-8">
                 <div className="w-full">
                   <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
-                    02 / Location
+                    02 / Where
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -348,12 +333,12 @@ export function BookingNetworkLanding({
                         e.preventDefault();
                         const fd = new FormData(e.currentTarget);
                         const v = String(fd.get("customLoc") ?? "").trim();
-                        if (v) selectOption("location", v);
+                        if (v) selectLocation(v);
                       }}
                     >
                       <input
                         name="customLoc"
-                        placeholder="D02 AF30"
+                        placeholder="Eircode"
                         autoComplete="postal-code"
                         className="min-w-0 flex-1 border border-zinc-200 px-3 py-2 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-emerald-500"
                       />
@@ -375,69 +360,12 @@ export function BookingNetworkLanding({
                       className="w-full cursor-pointer px-6 py-3 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
                       onClick={(ev) => {
                         ev.stopPropagation();
-                        selectOption("location", city);
+                        selectLocation(city);
                       }}
                     >
                       {city}
                     </button>
                   ))}
-                </div>
-              ) : null}
-            </div>
-
-            {/* Date */}
-            <div
-              className="dropdown-container group relative flex-1 cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
-              onClick={(e) => toggleDropdown(e, "date")}
-              onKeyDown={(e) => toggleDropdownKb(e, "date")}
-              tabIndex={0}
-            >
-              <div className="flex h-full w-full items-center justify-between p-6 lg:p-8">
-                <div className="w-full">
-                  <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
-                    03 / Date
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      id="input-date"
-                      readOnly
-                      tabIndex={-1}
-                      value={date}
-                      placeholder="Anytime"
-                      className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
-                    />
-                  </div>
-                </div>
-                <Calendar
-                  strokeWidth={1.5}
-                  className="pointer-events-none h-7 w-7 shrink-0 text-zinc-300 transition-colors group-hover:text-emerald-500"
-                />
-              </div>
-              {openId === "date" ? (
-                <div
-                  id="dropdown-date"
-                  className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl md:-left-px"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {["Anytime", "Today", "Tomorrow", "This Weekend"].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      className="w-full cursor-pointer px-6 py-3 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        selectOption("date", d);
-                      }}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                  <div className="mt-2 border-t border-zinc-100 p-4">
-                    <div className="w-full cursor-not-allowed bg-zinc-100 py-2 text-center text-sm font-normal text-zinc-500">
-                      Custom calendar picker…
-                    </div>
-                  </div>
                 </div>
               ) : null}
             </div>

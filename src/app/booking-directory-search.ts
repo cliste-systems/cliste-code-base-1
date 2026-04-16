@@ -110,15 +110,12 @@ export async function searchPublicSalonsDirectory(input: {
   /** When set, results are limited to this organization niche (matches dashboard). */
   serviceNiche?: OrganizationNiche | null;
   location: string;
-  date: string;
   viewerLat?: number | null;
   viewerLng?: number | null;
 }): Promise<
   | { ok: true; salons: PublicSalonDirectoryRow[] }
   | { ok: false; message: string }
 > {
-  void input.date;
-
   const hasViewerPoint =
     typeof input.viewerLat === "number" &&
     typeof input.viewerLng === "number" &&
