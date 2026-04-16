@@ -6,10 +6,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   Calendar,
+  Car,
   MapPin,
   Navigation,
-  Scissors,
-  Star,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -28,7 +27,6 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
   const [date, setDate] = useState("");
   const year = new Date().getFullYear();
 
-  const workspaceHref = appOrigin ? `${appOrigin}/dashboard` : "/dashboard";
   const partnerHref = appOrigin ? `${appOrigin}/authenticate` : "/authenticate";
 
   /** Close all dropdowns when clicking outside (matches `document.addEventListener('click', …)` in your snippet). */
@@ -83,21 +81,6 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
             </span>
           </Link>
 
-          <div className="hidden items-center gap-10 md:flex">
-            <span className="text-base font-normal tracking-wide text-zinc-500 uppercase">
-              Directory
-            </span>
-            <span className="text-base font-normal tracking-wide text-zinc-500 uppercase">
-              Professionals
-            </span>
-            <Link
-              href={workspaceHref}
-              className="text-base font-normal tracking-wide text-zinc-500 uppercase transition-colors hover:text-black"
-            >
-              Workspace
-            </Link>
-          </div>
-
           <div className="flex items-center gap-6">
             <Link
               href="/authenticate"
@@ -109,7 +92,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               href={partnerHref}
               className="flex items-center gap-2 bg-emerald-400 px-6 py-3 text-base font-normal tracking-wide text-black uppercase transition-colors hover:bg-emerald-300"
             >
-              Partner with us
+              For businesses
               <ArrowUpRight strokeWidth={1.5} className="h-5 w-5" />
             </Link>
           </div>
@@ -118,20 +101,21 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
       <main className="relative z-50 pt-16 pb-12 md:pt-24">
         <div className="mx-auto max-w-[1400px] px-6">
-          <div className="mb-16">
-            <p className="mb-8 flex items-center gap-4 text-sm font-normal tracking-widest text-zinc-400 uppercase">
+          <div className="mb-16 max-w-4xl">
+            <p className="mb-6 flex items-center gap-4 text-sm font-normal tracking-widest text-zinc-500 uppercase">
               <span className="h-px w-12 bg-zinc-300" />
-              Global Booking Network
+              Online booking
             </p>
-            <h1 className="text-6xl leading-[0.85] font-normal tracking-tighter text-black uppercase md:text-8xl lg:text-9xl">
-              Reserve <br className="hidden md:block" />
-              <span className="mt-2 flex items-center gap-4 md:mt-4 md:ml-[15%] md:gap-8">
-                <span className="hidden h-[1px] w-24 bg-black md:block lg:w-48" />
-                <span className="bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text font-thin text-transparent lowercase italic">
-                  anything.
-                </span>
-              </span>
+            <h1 className="text-4xl leading-[1.05] font-normal tracking-tight text-zinc-900 md:text-5xl lg:text-6xl">
+              Calm scheduling for{" "}
+              <span className="text-black">salons, barbershops</span>, and other
+              local businesses clients rely on every day.
             </h1>
+            <p className="mt-6 max-w-2xl text-lg font-light leading-relaxed text-zinc-600 md:text-xl">
+              If you already have a booking link from a business, open it to
+              choose a time. This page is only a short introduction to Cliste —
+              not a public directory of every venue.
+            </p>
           </div>
 
           <div className="relative flex flex-col border border-zinc-200 bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:flex-row">
@@ -144,7 +128,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
             >
               <div className="h-full w-full p-6 lg:p-8">
                 <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
-                  01 / Service
+                  01 / Type of business
                 </label>
                 <div className="flex items-center gap-3">
                   <input
@@ -153,7 +137,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     readOnly
                     tabIndex={-1}
                     value={service}
-                    placeholder="What do you need?"
+                    placeholder="Examples below"
                     className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
                   />
                 </div>
@@ -165,9 +149,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                   onClick={(e) => e.stopPropagation()}
                 >
                   {[
-                    "Creative Workspace",
-                    "Photography Studio",
-                    "Personal Training",
+                    "Hair salon & colour",
+                    "Barbershop",
+                    "Garage or dealership",
                   ].map((label) => (
                     <button
                       key={label}
@@ -185,8 +169,11 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       />
                     </button>
                   ))}
-                  <div className="mt-2 border-t border-zinc-100 pt-4 text-base font-normal text-emerald-600">
-                    <span className="block px-6 py-4">View All Categories</span>
+                  <div className="mt-2 border-t border-zinc-100 pt-4 text-base font-normal text-emerald-700">
+                    <span className="block px-6 py-4">
+                      Illustrative only — real menus live on each business&apos;s
+                      page.
+                    </span>
                   </div>
                 </div>
               ) : null}
@@ -202,7 +189,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               <div className="flex h-full w-full items-center justify-between p-6 lg:p-8">
                 <div className="w-full">
                   <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
-                    02 / Location
+                    02 / Area (example)
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -211,7 +198,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       readOnly
                       tabIndex={-1}
                       value={location}
-                      placeholder="Where at?"
+                      placeholder="Near you"
                       className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
                     />
                   </div>
@@ -239,9 +226,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     Use Current Location
                   </button>
                   <div className="mt-2 px-6 py-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-                    Popular
+                    Examples
                   </div>
-                  {["New York, NY", "London, UK", "Los Angeles, CA"].map((city) => (
+                  {["Dublin", "Cork", "Galway"].map((city) => (
                     <button
                       key={city}
                       type="button"
@@ -335,41 +322,38 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
         <div className="mx-auto max-w-[1400px] px-6">
           <div className="mb-12 flex flex-col items-start justify-between gap-6 border-b border-zinc-200 pb-8 md:flex-row md:items-end">
             <h2 className="text-4xl font-normal tracking-tighter text-black md:text-5xl lg:text-6xl">
-              Curated <br className="hidden md:block" />
-              <span className="font-thin text-zinc-400 italic">Experiences.</span>
+              Who it&apos;s <br className="hidden md:block" />
+              <span className="font-thin text-zinc-500">for.</span>
             </h2>
-            <span className="inline-flex items-center gap-2 border-b border-black pb-1 text-base font-normal tracking-widest text-black uppercase">
-              Explore Directory
+            <Link
+              href={partnerHref}
+              className="inline-flex items-center gap-2 border-b border-black pb-1 text-base font-normal tracking-widest text-black uppercase transition-colors hover:border-emerald-600 hover:text-emerald-700"
+            >
+              Business sign-in
               <ArrowUpRight strokeWidth={1.5} className="h-5 w-5" />
-            </span>
+            </Link>
           </div>
 
           <div className="grid auto-rows-[300px] grid-cols-1 gap-4 md:grid-cols-12 lg:auto-rows-[400px]">
-            <div className="group relative min-h-[320px] cursor-pointer overflow-hidden bg-zinc-100 md:col-span-8 md:row-span-2 md:min-h-[520px] lg:min-h-[640px]">
+            <div className="group relative min-h-[320px] cursor-default overflow-hidden bg-zinc-100 md:col-span-8 md:row-span-2 md:min-h-[520px] lg:min-h-[640px]">
               <img
-                src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=1600&q=80"
-                alt="Creative workspace interior"
+                src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1600&q=80"
+                alt="Hair salon interior"
                 className="absolute inset-0 h-full w-full object-cover grayscale opacity-90 transition-all duration-700 ease-in-out group-hover:scale-105 group-hover:grayscale-0"
               />
               <div
                 className={`pointer-events-none absolute inset-0 opacity-60 transition-opacity duration-500 group-hover:opacity-90 ${hoverReveal}`}
               />
-              <div className="absolute top-6 right-6 flex items-center gap-2 bg-white px-4 py-2">
-                <Star
-                  strokeWidth={1.5}
-                  className="h-4 w-4 fill-emerald-500 text-emerald-500"
-                />
-                <span className="text-sm font-normal tracking-wide text-black">
-                  4.9
-                </span>
+              <div className="absolute top-6 right-6 bg-white/95 px-4 py-2 text-xs font-normal tracking-widest text-zinc-600 uppercase backdrop-blur-sm">
+                Salons & hair
               </div>
               <div className="absolute bottom-0 left-0 flex w-full translate-y-4 transform items-end justify-between p-8 transition-transform duration-500 group-hover:translate-y-0">
                 <div>
-                  <p className="mb-3 text-sm font-normal tracking-widest text-white/70 uppercase">
-                    Workspace & Studios
+                  <p className="mb-3 text-sm font-normal tracking-widest text-white/75 uppercase">
+                    Hair & beauty
                   </p>
-                  <h3 className="text-4xl font-normal tracking-tighter text-white md:text-5xl lg:text-6xl">
-                    The Arch Studios
+                  <h3 className="text-3xl font-normal tracking-tighter text-white md:text-4xl lg:text-5xl">
+                    Cuts, colour & care — clients pick a time that fits.
                   </h3>
                 </div>
                 <div className="flex h-16 w-16 items-center justify-center bg-emerald-400 text-black opacity-0 transition-opacity delay-100 duration-500 group-hover:opacity-100">
@@ -378,10 +362,10 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               </div>
             </div>
 
-            <div className="group relative min-h-[280px] cursor-pointer overflow-hidden bg-zinc-100 md:col-span-4 md:row-span-1 md:min-h-0">
+            <div className="group relative min-h-[280px] cursor-default overflow-hidden bg-zinc-100 md:col-span-4 md:row-span-1 md:min-h-0">
               <img
-                src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=800&q=80"
-                alt="Fitness training space"
+                src="https://images.unsplash.com/photo-1621605815971-fbcc98df01d0?auto=format&fit=crop&w=800&q=80"
+                alt="Barbershop interior"
                 className="absolute inset-0 h-full w-full object-cover grayscale opacity-90 transition-all duration-700 ease-in-out group-hover:scale-105 group-hover:grayscale-0"
               />
               <div
@@ -389,11 +373,11 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               />
               <div className="absolute bottom-0 left-0 flex w-full items-end justify-between p-6">
                 <div>
-                  <p className="mb-2 text-xs font-normal tracking-widest text-white/70 uppercase">
-                    Personal Training
+                  <p className="mb-2 text-xs font-normal tracking-widest text-white/75 uppercase">
+                    Barbershops
                   </p>
-                  <h3 className="text-3xl font-normal tracking-tight text-white">
-                    Iron & Flow
+                  <h3 className="text-2xl font-normal tracking-tight text-white md:text-3xl">
+                    Tidier queue, fewer missed calls.
                   </h3>
                 </div>
                 <ArrowUpRight
@@ -403,25 +387,27 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               </div>
             </div>
 
-            <div className="group relative flex cursor-pointer flex-col justify-between overflow-hidden bg-black p-8 md:col-span-4 md:row-span-1">
+            <div className="group relative flex cursor-default flex-col justify-between overflow-hidden bg-black p-8 md:col-span-4 md:row-span-1">
               <div>
                 <div className="mb-6 flex h-14 w-14 items-center justify-center bg-white/10 transition-colors duration-500 group-hover:bg-emerald-500">
-                  <Scissors
+                  <Car
                     strokeWidth={1.5}
                     className="h-7 w-7 text-white transition-colors duration-500 group-hover:text-black"
                   />
                 </div>
                 <h3 className="mb-3 text-3xl font-normal tracking-tight text-white">
-                  Grooming & Style
+                  Garages & dealers
                 </h3>
                 <p className="text-base font-thin leading-relaxed text-zinc-400">
-                  Top-rated barbers and stylists in your immediate area.
+                  Service slots, diagnostics, or handovers — same idea: the
+                  customer books; you stay in control.
                 </p>
               </div>
-              <div className="mt-8 flex items-center gap-3 text-sm font-normal tracking-wide text-white uppercase transition-all group-hover:gap-5 group-hover:text-emerald-400">
-                View Category
-                <ArrowRight strokeWidth={1.5} className="h-5 w-5" />
-              </div>
+              <p className="mt-8 text-sm font-light leading-relaxed tracking-wide text-zinc-500">
+                Salons and trades share the same idea: a private booking link for
+                people who already chose you — not a public list of every
+                competitor.
+              </p>
             </div>
           </div>
         </div>
@@ -430,60 +416,41 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
       <section className="relative z-10 border-y border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-col divide-y divide-zinc-200 md:flex-row md:divide-x md:divide-y-0">
           <div className="flex flex-1 flex-col justify-center p-10 transition-colors hover:bg-zinc-50 lg:p-16">
-            <p className="mb-4 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-              Volume
+            <p className="mb-3 text-xs font-normal tracking-widest text-zinc-400 uppercase">
+              Your link
             </p>
-            <p className="text-5xl font-normal tracking-tighter text-black lg:text-7xl">
-              10M+
-            </p>
-            <p className="mt-3 text-base font-thin text-zinc-500">
-              Appointments successfully secured.
+            <p className="text-xl font-normal tracking-tight text-black md:text-2xl">
+              Each business gets its own address — you share it like any other
+              link. No noisy marketplace layer on top.
             </p>
           </div>
           <div className="flex flex-1 flex-col justify-center p-10 transition-colors hover:bg-zinc-50 lg:p-16">
-            <p className="mb-4 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-              Network
+            <p className="mb-3 text-xs font-normal tracking-widest text-zinc-400 uppercase">
+              Your day
             </p>
-            <p className="text-5xl font-normal tracking-tighter text-black lg:text-7xl">
-              45k
-            </p>
-            <p className="mt-3 text-base font-thin text-zinc-500">
-              Verified professionals worldwide.
+            <p className="text-xl font-normal tracking-tight text-black md:text-2xl">
+              Services, staff, and hours stay yours to edit. Clients only see what
+              you choose to offer online.
             </p>
           </div>
           <div className="flex flex-1 flex-col justify-center bg-zinc-50 p-10 lg:p-16">
-            <p className="mb-4 text-xs font-normal tracking-widest text-zinc-400 uppercase">
-              Trust Score
+            <p className="mb-3 text-xs font-normal tracking-widest text-zinc-400 uppercase">
+              Your front desk
             </p>
-            <div className="flex items-center gap-6">
-              <p className="text-5xl font-normal tracking-tighter text-black lg:text-7xl">
-                4.9
-              </p>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex gap-1 text-emerald-500">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      strokeWidth={1.5}
-                      className="h-5 w-5 fill-emerald-500"
-                    />
-                  ))}
-                </div>
-                <p className="text-sm font-thin tracking-wide text-zinc-500">
-                  Based on reviews
-                </p>
-              </div>
-            </div>
+            <p className="text-xl font-normal tracking-tight text-black md:text-2xl">
+              Phone and walk-ins still matter — online booking is an extra lane,
+              not a replacement for how you already work.
+            </p>
           </div>
         </div>
       </section>
 
       <footer className="relative z-10 overflow-hidden bg-black pt-32 pb-16 text-white">
         <div className="relative z-20 mx-auto max-w-[1400px] px-6">
-          <h2 className="mb-16 max-w-5xl text-5xl leading-[0.85] font-normal tracking-tighter uppercase md:text-7xl lg:text-9xl">
-            Operate <br />
-            <span className="font-thin text-zinc-500 lowercase italic">
-              efficiently.
+          <h2 className="mb-16 max-w-5xl text-4xl leading-[1.05] font-normal tracking-tight text-white md:text-5xl lg:text-6xl">
+            Ready when you are — <br className="hidden sm:block" />
+            <span className="font-thin text-zinc-500">
+              whether you cut hair, turn wrenches, or run the front desk.
             </span>
           </h2>
 
@@ -492,7 +459,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
               href={partnerHref}
               className="flex items-center gap-3 bg-emerald-400 px-8 py-5 text-base font-normal tracking-widest text-black uppercase transition-colors hover:bg-emerald-300"
             >
-              Start Platform
+              Business sign-in
               <ArrowRight strokeWidth={1.5} className="h-6 w-6" />
             </Link>
             <Link
