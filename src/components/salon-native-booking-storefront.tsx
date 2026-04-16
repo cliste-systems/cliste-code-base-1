@@ -556,9 +556,10 @@ export function SalonNativeBookingStorefront({
                   />
                 ) : (
                   <p className="text-xs text-amber-800">
-                    Security check not configured (add{" "}
+                    Optional: add{" "}
                     <code className="rounded bg-amber-100 px-1">NEXT_PUBLIC_TURNSTILE_SITE_KEY</code>{" "}
-                    and <code className="rounded bg-amber-100 px-1">TURNSTILE_SECRET_KEY</code>).
+                    and <code className="rounded bg-amber-100 px-1">TURNSTILE_SECRET_KEY</code>{" "}
+                    together to show Cloudflare Turnstile here. SMS codes still send without it.
                   </p>
                 )}
                 <Button

@@ -29,27 +29,31 @@ export function isSuspiciousPhonePattern(phoneE164: string): boolean {
 }
 
 /**
- * Verify Cloudflare Turnstile token (server). If secret is unset, returns ok only when
- * token is empty (dev); with secret set, empty token fails.
+ * Verify Cloudflare Turnstile token (server).
+ *
+ * Turnstile is enforced only when **both** `TURNSTILE_SECRET_KEY` and
+ * `NEXT_PUBLIC_TURNSTILE_SITE_KEY` are set. Otherwise we skip verification so
+ * public booking still works in dev or when only one side is configured by mistake.
  */
 export async function verifyTurnstileToken(
   token: string | null | undefined,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
-  if (!secret) {
-    if (!token?.trim()) return { ok: true };
-    return {
-      ok: false,
-      message: "Verification is not configured. Please try again later.",
-    };
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
+  const turnstileEnabled = Boolean(secret && siteKey);
+
+  if (!turnstileEnabled) {
+    return { ok: true };
   }
+
   const t = token?.trim();
   if (!t) {
     return { ok: false, message: "Please complete the security check." };
   }
+  const secretKey = secret!;
   try {
     const body = new URLSearchParams();
-    body.set("secret", secret);
+    body.set("secret", secretKey);
     body.set("response", t);
     const res = await fetch(
       "https://challenges.cloudflare.com/turnstile/v0/siteverify",

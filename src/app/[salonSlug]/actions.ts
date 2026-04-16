@@ -478,9 +478,23 @@ export async function requestPublicBookingOtp(payload: {
   });
 
   if (insErr) {
+    console.error(
+      "public_booking_otp_challenges insert failed",
+      insErr.code,
+      insErr.message,
+      insErr.details,
+    );
+    const hint =
+      insErr.message?.includes("relation") ||
+      insErr.message?.includes("does not exist")
+        ? " Database table may be missing — run Supabase migration 019_public_booking_security.sql."
+        : "";
     return {
       success: false,
-      message: "Could not send a code right now. Try again shortly.",
+      message:
+        process.env.NODE_ENV === "development"
+          ? `Could not send a code: ${insErr.message}`
+          : `Could not send a code right now. Try again shortly.${hint}`,
     };
   }
 
