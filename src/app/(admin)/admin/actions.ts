@@ -14,6 +14,7 @@ import {
   SUPPORT_DASHBOARD_COOKIE,
   supportDashboardCookieOptions,
 } from "@/lib/support-dashboard-cookie";
+import { geocodeIrelandLocation } from "@/lib/geocode-ireland";
 import {
   type OrganizationNiche,
   isOrganizationNiche,
@@ -176,6 +177,10 @@ export async function createOrganization(payload: {
   ownerEmail: string;
   ownerName: string;
   niche?: OrganizationNiche;
+  /** Optional; shown on the public book directory and used for distance search */
+  address?: string | null;
+  /** Optional; geocoded with address via OpenStreetMap Nominatim (Ireland) */
+  storefrontEircode?: string | null;
   /** From `window.location.origin` so invite redirect matches this app */
   clientOrigin?: string | null;
 }): Promise<CreateOrganizationResult> {
@@ -207,6 +212,19 @@ export async function createOrganization(payload: {
       ? payload.niche
       : "hair_salon";
 
+  const addressTrim = (payload.address ?? "").trim();
+  const eircodeTrim = (payload.storefrontEircode ?? "").trim();
+  let mapLat: number | null = null;
+  let mapLng: number | null = null;
+  const geoQuery = [addressTrim, eircodeTrim].filter(Boolean).join(", ");
+  if (geoQuery) {
+    const g = await geocodeIrelandLocation(geoQuery);
+    if (g) {
+      mapLat = g.lat;
+      mapLng = g.lng;
+    }
+  }
+
   let admin;
   try {
     admin = createAdminClient();
@@ -229,6 +247,10 @@ export async function createOrganization(payload: {
         tier,
         niche,
         is_active: true,
+        address: addressTrim || null,
+        storefront_eircode: eircodeTrim || null,
+        storefront_map_lat: mapLat,
+        storefront_map_lng: mapLng,
       })
       .select("id")
       .single();

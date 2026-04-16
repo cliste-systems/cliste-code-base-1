@@ -40,6 +40,8 @@ export function NewSalonDialog() {
   const nicheId = useId();
   const ownerEmailId = useId();
   const ownerNameId = useId();
+  const addressId = useId();
+  const eircodeId = useId();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -48,6 +50,8 @@ export function NewSalonDialog() {
   const [niche, setNiche] = useState<OrganizationNiche>("hair_salon");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerName, setOwnerName] = useState("");
+  const [address, setAddress] = useState("");
+  const [storefrontEircode, setStorefrontEircode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -66,6 +70,8 @@ export function NewSalonDialog() {
     setNiche("hair_salon");
     setOwnerEmail("");
     setOwnerName("");
+    setAddress("");
+    setStorefrontEircode("");
     setError(null);
   }, []);
 
@@ -83,6 +89,8 @@ export function NewSalonDialog() {
         niche,
         ownerEmail,
         ownerName,
+        address: address.trim() || null,
+        storefrontEircode: storefrontEircode.trim() || null,
         clientOrigin:
           typeof window !== "undefined" ? window.location.origin : null,
       });
@@ -93,7 +101,7 @@ export function NewSalonDialog() {
       setOpen(false);
       reset();
     });
-  }, [name, slug, tier, niche, ownerEmail, ownerName, reset]);
+  }, [name, slug, tier, niche, ownerEmail, ownerName, address, storefrontEircode, reset]);
 
   return (
     <Dialog
@@ -159,6 +167,34 @@ export function NewSalonDialog() {
               <option value="native">Native</option>
               <option value="connect">Connect</option>
             </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={addressId}>Address (optional)</Label>
+            <Input
+              id={addressId}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street, town"
+              autoComplete="street-address"
+            />
+            <p className="text-muted-foreground text-xs">
+              Shown on the public book directory; combined with Eircode for
+              &quot;nearest salon&quot; search.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={eircodeId}>Eircode (optional)</Label>
+            <Input
+              id={eircodeId}
+              value={storefrontEircode}
+              onChange={(e) => setStorefrontEircode(e.target.value.toUpperCase())}
+              placeholder="D02 X285"
+              className="font-mono text-sm tracking-wide"
+              autoComplete="postal-code"
+            />
+            <p className="text-muted-foreground text-xs">
+              Resolved with OpenStreetMap (free) to pin the salon on the map.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor={nicheId}>Niche</Label>

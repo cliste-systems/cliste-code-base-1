@@ -1,33 +1,94 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { haversineDistanceKm } from "@/lib/distance-km";
+import {
+  geocodeIrelandLocation,
+  normalizeIrelandLocationQuery,
+} from "@/lib/geocode-ireland";
 
 export type PublicSalonDirectoryRow = {
   slug: string;
   name: string;
   address: string | null;
+  /** Set when the search resolved a map point for the visitor */
+  distanceKm: number | null;
 };
+
+type OrgRow = {
+  slug: string;
+  name: string;
+  address: string | null;
+  bio_text: string | null;
+  storefront_eircode: string | null;
+  storefront_map_lat: number | string | null;
+  storefront_map_lng: number | string | null;
+};
+
+function tokenize(input: {
+  service: string;
+  location: string;
+  skipLocationTokens: boolean;
+}): string[] {
+  const raw = input.skipLocationTokens
+    ? input.service
+    : [input.service, input.location].join(" ");
+  return raw
+    .toLowerCase()
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 1);
+}
+
+function haystack(r: {
+  name: string;
+  address: string | null;
+  slug: string;
+  bio_text: string | null;
+  storefront_eircode: string | null;
+}) {
+  return [r.name, r.address, r.slug, r.bio_text, r.storefront_eircode]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
 
 /**
  * Public directory search (anon RLS: active organizations only).
- * When service/location text is set, keeps venues whose name, slug, address,
- * or bio contains every token. If that would hide everyone, falls back to
- * all active venues so a first deploy with one salon still shows it.
+ * Uses OpenStreetMap Nominatim (same as dashboard) to turn an Eircode or
+ * address into coordinates, then sorts by distance. Text tokens still narrow
+ * the list when they match; otherwise falls back to all active venues.
  */
 export async function searchPublicSalonsDirectory(input: {
   service: string;
   location: string;
   date: string;
+  viewerLat?: number | null;
+  viewerLng?: number | null;
 }): Promise<
   | { ok: true; salons: PublicSalonDirectoryRow[] }
   | { ok: false; message: string }
 > {
   void input.date;
 
+  const hasViewerPoint =
+    typeof input.viewerLat === "number" &&
+    typeof input.viewerLng === "number" &&
+    Number.isFinite(input.viewerLat) &&
+    Number.isFinite(input.viewerLng);
+
+  const locationTrim = input.location.trim();
+  const skipLocationTokens =
+    hasViewerPoint &&
+    (locationTrim === "" ||
+      /^(near you|current location)$/i.test(locationTrim));
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizations")
-    .select("slug, name, address, bio_text")
+    .select(
+      "slug, name, address, bio_text, storefront_eircode, storefront_map_lat, storefront_map_lng",
+    )
     .eq("is_active", true)
     .order("name");
 
@@ -37,45 +98,81 @@ export async function searchPublicSalonsDirectory(input: {
 
   const normalized = (data ?? [])
     .filter((r) => Boolean(r.slug?.trim()) && Boolean(r.name?.trim()))
-    .map((r) => ({
-      slug: String(r.slug).trim(),
-      name: String(r.name).trim(),
-      address: r.address?.trim() ?? null,
-      bio_text: r.bio_text?.trim() ?? null,
-    }));
+    .map((r) => {
+      const row = r as OrgRow;
+      const lat = Number(row.storefront_map_lat);
+      const lng = Number(row.storefront_map_lng);
+      return {
+        slug: String(row.slug).trim(),
+        name: String(row.name).trim(),
+        address: row.address?.trim() ?? null,
+        bio_text: row.bio_text?.trim() ?? null,
+        storefront_eircode: row.storefront_eircode?.trim() ?? null,
+        mapLat: Number.isFinite(lat) ? lat : null,
+        mapLng: Number.isFinite(lng) ? lng : null,
+      };
+    });
 
-  const tokens = [input.service, input.location]
-    .join(" ")
-    .toLowerCase()
-    .split(/\s+/)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 1);
+  const tokens = tokenize({
+    service: input.service,
+    location: input.location,
+    skipLocationTokens,
+  });
 
-  if (tokens.length === 0) {
-    return {
-      ok: true,
-      salons: normalized.map(({ slug, name, address }) => ({
-        slug,
-        name,
-        address,
-      })),
-    };
+  let userPoint: { lat: number; lng: number } | null = null;
+  if (hasViewerPoint) {
+    userPoint = { lat: input.viewerLat!, lng: input.viewerLng! };
+  } else if (locationTrim) {
+    userPoint = await geocodeIrelandLocation(
+      normalizeIrelandLocationQuery(locationTrim),
+    );
   }
 
-  const haystack = (r: (typeof normalized)[0]) =>
-    [r.name, r.address, r.slug, r.bio_text]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
+  const pickRows = () => {
+    if (tokens.length === 0) {
+      return normalized;
+    }
+    const strict = normalized.filter((r) =>
+      tokens.every((t) => haystack(r).includes(t)),
+    );
+    return strict.length > 0 ? strict : normalized;
+  };
 
-  const strict = normalized.filter((r) =>
-    tokens.every((t) => haystack(r).includes(t)),
-  );
+  const picked = pickRows();
 
-  const picked = strict.length > 0 ? strict : normalized;
+  const withDistance = picked.map((r) => {
+    let distanceKm: number | null = null;
+    if (
+      userPoint &&
+      r.mapLat !== null &&
+      r.mapLng !== null
+    ) {
+      distanceKm = haversineDistanceKm(
+        userPoint.lat,
+        userPoint.lng,
+        r.mapLat,
+        r.mapLng,
+      );
+    }
+    return { ...r, distanceKm };
+  });
+
+  if (userPoint) {
+    withDistance.sort((a, b) => {
+      if (a.distanceKm === null && b.distanceKm === null) return 0;
+      if (a.distanceKm === null) return 1;
+      if (b.distanceKm === null) return -1;
+      return a.distanceKm - b.distanceKm;
+    });
+  }
 
   return {
     ok: true,
-    salons: picked.map(({ slug, name, address }) => ({ slug, name, address })),
+    salons: withDistance.map(({ slug, name, address, distanceKm }) => ({
+      slug,
+      name,
+      address,
+      distanceKm,
+    })),
   };
 }

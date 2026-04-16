@@ -29,8 +29,12 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
   const [location, setLocation] = useState("");
   const [date, setDate] = useState("");
   const [salons, setSalons] = useState<
-    { slug: string; name: string; address: string | null }[]
+    { slug: string; name: string; address: string | null; distanceKm: number | null }[]
   >([]);
+  const [viewerGeo, setViewerGeo] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, startTransition] = useTransition();
@@ -62,7 +66,10 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
   const selectOption = useCallback(
     (input: "service" | "location" | "date", value: string) => {
       if (input === "service") setService(value);
-      if (input === "location") setLocation(value);
+      if (input === "location") {
+        setLocation(value);
+        setViewerGeo(null);
+      }
       if (input === "date") setDate(value);
       setOpenId(null);
     },
@@ -78,6 +85,8 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
         service,
         location,
         date,
+        viewerLat: viewerGeo?.lat ?? null,
+        viewerLng: viewerGeo?.lng ?? null,
       });
       if (!res.ok) {
         setSalons([]);
@@ -86,7 +95,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
       }
       setSalons(res.salons);
     });
-  }, [service, location, date]);
+  }, [service, location, date, viewerGeo]);
 
   return (
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
@@ -221,7 +230,7 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       readOnly
                       tabIndex={-1}
                       value={location}
-                      placeholder="Where at?"
+                      placeholder="Town or Eircode"
                       className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
                     />
                   </div>
@@ -242,12 +251,68 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                     className="flex w-full cursor-pointer items-center gap-3 px-6 py-4 text-left text-base font-normal text-emerald-600 transition-colors hover:bg-zinc-100"
                     onClick={(ev) => {
                       ev.stopPropagation();
-                      selectOption("location", "Current Location");
+                      setOpenId(null);
+                      if (!navigator.geolocation) {
+                        setLocation("Current Location");
+                        setViewerGeo(null);
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setLocation("Near you");
+                          setViewerGeo({
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                          });
+                        },
+                        () => {
+                          setLocation("Current Location");
+                          setViewerGeo(null);
+                        },
+                        {
+                          enableHighAccuracy: false,
+                          maximumAge: 60_000,
+                          timeout: 12_000,
+                        },
+                      );
                     }}
                   >
                     <Navigation strokeWidth={1.5} className="h-4 w-4" />
-                    Use Current Location
+                    Use current location
                   </button>
+                  <div
+                    className="border-t border-zinc-100 px-6 py-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="mb-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
+                      Eircode or address
+                    </p>
+                    <form
+                      className="flex gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.currentTarget);
+                        const v = String(fd.get("customLoc") ?? "").trim();
+                        if (v) selectOption("location", v);
+                      }}
+                    >
+                      <input
+                        name="customLoc"
+                        placeholder="e.g. F94 H002"
+                        className="min-w-0 flex-1 border border-zinc-200 px-3 py-2 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-emerald-500"
+                      />
+                      <button
+                        type="submit"
+                        className="shrink-0 bg-zinc-900 px-3 py-2 text-xs font-normal tracking-wide text-white uppercase transition-colors hover:bg-emerald-600"
+                      >
+                        Apply
+                      </button>
+                    </form>
+                    <p className="mt-2 text-xs font-normal text-zinc-500">
+                      Uses OpenStreetMap (free) to place you in Ireland, then
+                      lists nearest venues with a map pin.
+                    </p>
+                  </div>
                   <div className="mt-2 px-6 py-2 text-xs font-normal tracking-widest text-zinc-400 uppercase">
                     Ireland
                   </div>
@@ -264,6 +329,16 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       {city}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    className="w-full cursor-pointer border-t border-zinc-100 px-6 py-3 text-left text-base font-normal text-emerald-700 transition-colors hover:bg-zinc-100"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      selectOption("location", "F94 H002");
+                    }}
+                  >
+                    Try F94 H002 (demo Eircode)
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -375,6 +450,12 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                           </p>
                           {s.address ? (
                             <p className="text-sm text-zinc-500">{s.address}</p>
+                          ) : null}
+                          {s.distanceKm !== null ? (
+                            <p className="text-sm font-normal text-emerald-700">
+                              About{" "}
+                              {Math.round(s.distanceKm * 10) / 10} km away
+                            </p>
                           ) : null}
                           <p className="mt-1 font-mono text-xs text-zinc-400">
                             {getPublicBookingPageUrl(`/${s.slug}`)}
