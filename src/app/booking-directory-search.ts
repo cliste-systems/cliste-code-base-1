@@ -99,11 +99,14 @@ function haystack(r: {
     .toLowerCase();
 }
 
+/** Venues farther than this from a resolved “where” point are excluded (county / city search). */
+const DIRECTORY_LOCATION_RADIUS_KM = 100;
+
 /**
  * Public directory search (anon RLS: active organizations only).
- * Uses OpenStreetMap Nominatim (same as dashboard) to turn an Eircode or
- * address into coordinates, then sorts by distance. Text tokens still narrow
- * the list when they match; otherwise falls back to all active venues.
+ * Geocoded or GPS locations filter by distance; text tokens filter when no
+ * map point. There is no “show everything” fallback when the visitor asked
+ * for a specific place that does not match.
  */
 export async function searchPublicSalonsDirectory(input: {
   service: string;
@@ -202,13 +205,37 @@ export async function searchPublicSalonsDirectory(input: {
   const visitorEir = compactEircode(normalizeIrelandLocationQuery(locationTrim));
 
   const pickRows = () => {
+    if (userPoint) {
+      return pool.filter((r) => {
+        const salonEir = compactEircode(r.storefront_eircode);
+        if (visitorEir && salonEir && visitorEir === salonEir) {
+          return true;
+        }
+        if (r.mapLat === null || r.mapLng === null) {
+          return false;
+        }
+        const d = haversineDistanceKm(
+          userPoint.lat,
+          userPoint.lng,
+          r.mapLat,
+          r.mapLng,
+        );
+        return d <= DIRECTORY_LOCATION_RADIUS_KM;
+      });
+    }
+
+    if (visitorEir) {
+      return pool.filter((r) => {
+        const salonEir = compactEircode(r.storefront_eircode);
+        return salonEir === visitorEir;
+      });
+    }
+
     if (tokens.length === 0) {
       return pool;
     }
-    const strict = pool.filter((r) =>
-      tokens.every((t) => haystack(r).includes(t)),
-    );
-    return strict.length > 0 ? strict : pool;
+
+    return pool.filter((r) => tokens.every((t) => haystack(r).includes(t)));
   };
 
   const picked = pickRows();

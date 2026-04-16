@@ -403,8 +403,9 @@ export function BookingNetworkLanding({
                 <p className="text-sm text-zinc-500">Loading venues…</p>
               ) : salons.length === 0 ? (
                 <p className="text-sm text-zinc-600">
-                  No active venues are listed yet. Ask a business to publish
-                  theirs, or open the link they sent you directly.
+                  No venues match this search (service, area, and distance). Try
+                  a different area or service, or use a booking link the business
+                  sent you.
                 </p>
               ) : (
                 <ul className="divide-y divide-zinc-100">
