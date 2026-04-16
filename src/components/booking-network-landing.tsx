@@ -30,23 +30,36 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
   const workspaceHref = appOrigin ? `${appOrigin}/dashboard` : "/dashboard";
   const partnerHref = appOrigin ? `${appOrigin}/authenticate` : "/authenticate";
 
+  /** Close all dropdowns when clicking outside (matches `document.addEventListener('click', …)` in your snippet). */
   useEffect(() => {
     const close = () => setOpenId(null);
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, []);
 
-  const toggle = useCallback((e: React.MouseEvent, id: string) => {
+  /** `toggleDropdown(event, id)` from your HTML: stopPropagation + toggle this menu. */
+  const toggleDropdown = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setOpenId((prev) => (prev === id ? null : id));
   }, []);
 
-  const select = useCallback((input: "service" | "location" | "date", value: string) => {
-    if (input === "service") setService(value);
-    if (input === "location") setLocation(value);
-    if (input === "date") setDate(value);
-    setOpenId(null);
+  const toggleDropdownKb = useCallback((e: React.KeyboardEvent, id: string) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenId((prev) => (prev === id ? null : id));
   }, []);
+
+  /** `selectOption(inputId, value, dropdownId)` — set field value and hide menu. */
+  const selectOption = useCallback(
+    (input: "service" | "location" | "date", value: string) => {
+      if (input === "service") setService(value);
+      if (input === "location") setLocation(value);
+      if (input === "date") setDate(value);
+      setOpenId(null);
+    },
+    [],
+  );
 
   return (
     <div className="selection:bg-emerald-400 selection:text-black flex min-h-screen flex-col bg-white text-black antialiased [background-image:radial-gradient(#e4e4e7_1px,transparent_1px)] [background-size:32px_32px]">
@@ -111,27 +124,33 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
           </div>
 
           <div className="relative flex flex-col border border-zinc-200 bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:flex-row">
-            {/* Service */}
+            {/* Service — `dropdown-container` + onclick toggleDropdown (no pointer-events-none on whole cell: it ate clicks). */}
             <div
-              className="group relative flex-1 border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
-              onClick={(e) => toggle(e, "service")}
-              role="presentation"
+              className="dropdown-container group relative flex-1 cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
+              onClick={(e) => toggleDropdown(e, "service")}
+              onKeyDown={(e) => toggleDropdownKb(e, "service")}
+              tabIndex={0}
             >
-              <div className="pointer-events-none h-full w-full cursor-pointer p-6 lg:p-8">
+              <div className="h-full w-full p-6 lg:p-8">
                 <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
                   01 / Service
                 </label>
-                <input
-                  type="text"
-                  readOnly
-                  value={service}
-                  placeholder="What do you need?"
-                  className="w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
-                />
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    id="input-service"
+                    readOnly
+                    tabIndex={-1}
+                    value={service}
+                    placeholder="What do you need?"
+                    className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
+                  />
+                </div>
               </div>
               {openId === "service" ? (
                 <div
-                  className="absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl"
+                  id="dropdown-service"
+                  className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {[
@@ -143,7 +162,10 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       key={label}
                       type="button"
                       className="group/item flex w-full cursor-pointer items-center justify-between px-6 py-4 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
-                      onClick={() => select("service", label)}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        selectOption("service", label);
+                      }}
                     >
                       {label}
                       <ArrowRight
@@ -161,37 +183,46 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
             {/* Location */}
             <div
-              className="group relative flex-1 border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
-              onClick={(e) => toggle(e, "location")}
-              role="presentation"
+              className="dropdown-container group relative flex-1 cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
+              onClick={(e) => toggleDropdown(e, "location")}
+              onKeyDown={(e) => toggleDropdownKb(e, "location")}
+              tabIndex={0}
             >
-              <div className="flex h-full w-full cursor-pointer items-center justify-between p-6 lg:p-8">
-                <div className="pointer-events-none w-full">
+              <div className="flex h-full w-full items-center justify-between p-6 lg:p-8">
+                <div className="w-full">
                   <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
                     02 / Location
                   </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={location}
-                    placeholder="Where at?"
-                    className="w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
-                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      id="input-location"
+                      readOnly
+                      tabIndex={-1}
+                      value={location}
+                      placeholder="Where at?"
+                      className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
+                    />
+                  </div>
                 </div>
                 <MapPin
                   strokeWidth={1.5}
-                  className="pointer-events-none h-7 w-7 text-zinc-300 transition-colors group-hover:text-emerald-500"
+                  className="pointer-events-none h-7 w-7 shrink-0 text-zinc-300 transition-colors group-hover:text-emerald-500"
                 />
               </div>
               {openId === "location" ? (
                 <div
-                  className="absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl md:-left-px"
+                  id="dropdown-location"
+                  className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl md:-left-px"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     type="button"
                     className="flex w-full cursor-pointer items-center gap-3 px-6 py-4 text-left text-base font-normal text-emerald-600 transition-colors hover:bg-zinc-100"
-                    onClick={() => select("location", "Current Location")}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      selectOption("location", "Current Location");
+                    }}
                   >
                     <Navigation strokeWidth={1.5} className="h-4 w-4" />
                     Use Current Location
@@ -204,7 +235,10 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       key={city}
                       type="button"
                       className="w-full cursor-pointer px-6 py-3 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
-                      onClick={() => select("location", city)}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        selectOption("location", city);
+                      }}
                     >
                       {city}
                     </button>
@@ -215,31 +249,37 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
             {/* Date */}
             <div
-              className="group relative flex-1 border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
-              onClick={(e) => toggle(e, "date")}
-              role="presentation"
+              className="dropdown-container group relative flex-1 cursor-pointer border-b border-zinc-200 transition-colors hover:bg-zinc-50 md:border-b-0 md:border-r"
+              onClick={(e) => toggleDropdown(e, "date")}
+              onKeyDown={(e) => toggleDropdownKb(e, "date")}
+              tabIndex={0}
             >
-              <div className="flex h-full w-full cursor-pointer items-center justify-between p-6 lg:p-8">
-                <div className="pointer-events-none w-full">
+              <div className="flex h-full w-full items-center justify-between p-6 lg:p-8">
+                <div className="w-full">
                   <label className="mb-3 block text-xs font-normal tracking-widest text-zinc-400 uppercase transition-colors group-hover:text-emerald-500">
                     03 / Date
                   </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={date}
-                    placeholder="Anytime"
-                    className="w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
-                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      id="input-date"
+                      readOnly
+                      tabIndex={-1}
+                      value={date}
+                      placeholder="Anytime"
+                      className="pointer-events-none w-full cursor-pointer truncate bg-transparent text-2xl font-thin tracking-tight text-black outline-none placeholder:text-zinc-300 md:text-3xl"
+                    />
+                  </div>
                 </div>
                 <Calendar
                   strokeWidth={1.5}
-                  className="pointer-events-none h-7 w-7 text-zinc-300 transition-colors group-hover:text-emerald-500"
+                  className="pointer-events-none h-7 w-7 shrink-0 text-zinc-300 transition-colors group-hover:text-emerald-500"
                 />
               </div>
               {openId === "date" ? (
                 <div
-                  className="absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl md:-left-px"
+                  id="dropdown-date"
+                  className="dropdown-menu absolute top-[calc(100%+1px)] left-0 z-[100] min-w-[280px] w-full border border-zinc-200 bg-white py-2 shadow-2xl md:-left-px"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {["Anytime", "Today", "Tomorrow", "This Weekend"].map((d) => (
@@ -247,7 +287,10 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
                       key={d}
                       type="button"
                       className="w-full cursor-pointer px-6 py-3 text-left text-base font-normal text-black transition-colors hover:bg-zinc-100"
-                      onClick={() => select("date", d)}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        selectOption("date", d);
+                      }}
                     >
                       {d}
                     </button>
