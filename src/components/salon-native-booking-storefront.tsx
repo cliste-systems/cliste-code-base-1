@@ -340,6 +340,8 @@ export function SalonNativeBookingStorefront({
   const [dialogPhone, setDialogPhone] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(publicOtpDisabled);
+  /** Bump after each successful OTP send so the code input remounts empty. */
+  const [otpInputMountKey, setOtpInputMountKey] = useState(0);
 
   useEffect(() => {
     if (!toast) return;
@@ -384,6 +386,7 @@ export function SalonNativeBookingStorefront({
         return;
       }
       setOtpSent(true);
+      setOtpInputMountKey((k) => k + 1);
     });
   }, [organizationId, dialogPhone, turnstileToken]);
 
@@ -534,6 +537,7 @@ export function SalonNativeBookingStorefront({
             setDialogPhone("");
             setOtpSent(publicOtpDisabled);
             setTurnstileToken(null);
+            setOtpInputMountKey(0);
           }
         }}
       >
@@ -592,38 +596,48 @@ export function SalonNativeBookingStorefront({
                     onSuccess={(t) => setTurnstileToken(t)}
                     onExpire={() => setTurnstileToken(null)}
                   />
+                ) : null}
+                {!otpSent ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    disabled={
+                      otpSendPending ||
+                      !dialogPhone.trim() ||
+                      (!!turnstileSiteKey && !turnstileToken)
+                    }
+                    onClick={handleSendVerificationCode}
+                  >
+                    {otpSendPending ? "Sending…" : "Text me a code"}
+                  </Button>
                 ) : (
-                  <p className="text-xs text-amber-800">
-                    Optional: add{" "}
-                    <code className="rounded bg-amber-100 px-1">NEXT_PUBLIC_TURNSTILE_SITE_KEY</code>{" "}
-                    and <code className="rounded bg-amber-100 px-1">TURNSTILE_SECRET_KEY</code>{" "}
-                    together to show Cloudflare Turnstile here. SMS codes still send without it.
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-center text-xs font-medium text-gray-700">
+                      Code sent — check your phone
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={
+                        otpSendPending ||
+                        !dialogPhone.trim() ||
+                        (!!turnstileSiteKey && !turnstileToken)
+                      }
+                      onClick={handleSendVerificationCode}
+                    >
+                      {otpSendPending ? "Sending…" : "Resend code"}
+                    </Button>
+                  </div>
                 )}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  disabled={
-                    otpSendPending ||
-                    !dialogPhone.trim() ||
-                    (!!turnstileSiteKey && !turnstileToken) ||
-                    otpSent
-                  }
-                  onClick={handleSendVerificationCode}
-                >
-                  {otpSent
-                    ? "Code sent — check your phone"
-                    : otpSendPending
-                      ? "Sending…"
-                      : "Text me a code"}
-                </Button>
               </div>
             ) : null}
             {!publicOtpDisabled ? (
               <div className="space-y-2">
                 <Label htmlFor={otpId}>Verification code</Label>
                 <Input
+                  key={otpInputMountKey}
                   id={otpId}
                   name="booking_otp_code"
                   inputMode="numeric"
@@ -649,8 +663,7 @@ export function SalonNativeBookingStorefront({
                 placeholder="you@example.com"
               />
               <p className="text-[11px] leading-snug text-gray-500">
-                Optional confirmation email uses SendGrid on the server (e.g. Vercel
-                env vars), not just your local .env.
+                Optional confirmation email when SendGrid is configured on the server.
               </p>
             </div>
             {bookingError ? (
