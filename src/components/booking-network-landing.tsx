@@ -10,7 +10,7 @@ import {
   Navigation,
   Scissors,
 } from "lucide-react";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { searchPublicSalonsDirectory } from "@/app/booking-directory-search";
 import { getPublicBookingPageUrl } from "@/lib/booking-site-origin";
@@ -24,6 +24,7 @@ const hoverReveal =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0)_100%)]";
 
 export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps) {
+  const findVenuesRef = useRef<HTMLDivElement>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [service, setService] = useState("");
   const [location, setLocation] = useState("");
@@ -42,11 +43,17 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
 
   const partnerHref = appOrigin ? `${appOrigin}/authenticate` : "/authenticate";
 
-  /** Close all dropdowns when clicking outside (matches `document.addEventListener('click', …)` in your snippet). */
+  /** Close menus on outside pointer-down (not document `click`, which can race the row toggle). */
   useEffect(() => {
-    const close = () => setOpenId(null);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
+    const closeIfOutside = (e: PointerEvent) => {
+      const root = findVenuesRef.current;
+      if (!root) return;
+      const t = e.target;
+      if (t instanceof Node && root.contains(t)) return;
+      setOpenId(null);
+    };
+    document.addEventListener("pointerdown", closeIfOutside);
+    return () => document.removeEventListener("pointerdown", closeIfOutside);
   }, []);
 
   /** `toggleDropdown(event, id)` from your HTML: stopPropagation + toggle this menu. */
@@ -149,8 +156,9 @@ export function BookingNetworkLanding({ appOrigin }: BookingNetworkLandingProps)
           </div>
 
           <div
+            ref={findVenuesRef}
             id="find-venues"
-            className="relative flex flex-col border border-zinc-200 bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:flex-row"
+            className="relative z-[60] isolate flex flex-col border border-zinc-200 bg-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] md:flex-row"
           >
             {/* Service — `dropdown-container` + onclick toggleDropdown (no pointer-events-none on whole cell: it ate clicks). */}
             <div
