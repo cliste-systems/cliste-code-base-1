@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 
-type Scope = "authenticate" | "admin_unlock";
+type Scope = "authenticate" | "admin_unlock" | "dashboard_unlock";
 
 type Bucket = {
   firstFailureMs: number;
@@ -36,6 +36,12 @@ const CONFIG: Record<Scope, ScopeConfig> = {
     maxFailures: 5,
     lockMs: 30 * 60 * 1000,
     captchaAfterFailures: 1,
+  },
+  dashboard_unlock: {
+    windowMs: 15 * 60 * 1000,
+    maxFailures: 8,
+    lockMs: 15 * 60 * 1000,
+    captchaAfterFailures: 3,
   },
 };
 

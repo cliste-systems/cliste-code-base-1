@@ -10,6 +10,11 @@ import {
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
 import {
+  ADMIN_GATE_COOKIE_PREFIX,
+  createGateCookieValue,
+  DEFAULT_GATE_TTL_SECONDS,
+} from "@/lib/gate-cookie";
+import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
@@ -85,11 +90,16 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
   }
 
   clearRateLimit("admin_unlock", fingerprint);
-  (await cookies()).set(ADMIN_GATE_COOKIE, secret, {
+  const cookieValue = await createGateCookieValue(
+    ADMIN_GATE_COOKIE_PREFIX,
+    secret,
+    DEFAULT_GATE_TTL_SECONDS
+  );
+  (await cookies()).set(ADMIN_GATE_COOKIE, cookieValue, {
     httpOnly: true,
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-    sameSite: "lax",
+    maxAge: DEFAULT_GATE_TTL_SECONDS,
+    sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
   });
 

@@ -1,0 +1,41 @@
+# Cliste — search engine directives
+#
+# Public booking pages are served from the booking-site host and are allowed by
+# default. Internal surfaces (tenant dashboard, agency admin, auth flows, API
+# routes) must never be indexed. They're also gated server-side, but we still
+# tell crawlers to keep out.
+
+User-agent: *
+Disallow: /admin
+Disallow: /admin-unlock
+Disallow: /dashboard
+Disallow: /dashboard-unlock
+Disallow: /authenticate
+Disallow: /api/
+Disallow: /auth/
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password
+Disallow: /update-password
+
+# Block known scraping / LLM-training crawlers wholesale. Add more as needed.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /

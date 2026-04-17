@@ -3,6 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { hostMatchesConfiguredBookingHost } from "./src/lib/booking-site-origin";
 import { clisteHostRoutingRedirect } from "./src/lib/cliste-host-routing";
 import {
+  ADMIN_GATE_COOKIE_PREFIX,
+  DASHBOARD_GATE_COOKIE_PREFIX,
+  isValidGateCookieValue,
+} from "./src/lib/gate-cookie";
+import {
   pathIsAgencyAdminSection,
   pathIsTenantDashboardSection,
 } from "./src/lib/staff-route-paths";
@@ -10,7 +15,6 @@ import {
   isValidSupportDashboardCookieValue,
   SUPPORT_DASHBOARD_COOKIE,
 } from "./src/lib/support-dashboard-cookie";
-import { timingSafeEqualUtf8 } from "./src/lib/timing-safe-equal";
 import { updateSession } from "./src/utils/supabase/middleware";
 
 const ADMIN_GATE_COOKIE = "cliste_admin_gate";
@@ -65,7 +69,12 @@ async function dashboardGate(
   if (supportView) return response;
 
   const cookie = request.cookies.get("cliste_dashboard_gate")?.value ?? "";
-  if (!(await timingSafeEqualUtf8(cookie, secret))) {
+  const ok = await isValidGateCookieValue(
+    cookie,
+    DASHBOARD_GATE_COOKIE_PREFIX,
+    secret
+  );
+  if (!ok) {
     const redirectRes = NextResponse.redirect(
       new URL("/dashboard-unlock", request.url)
     );
@@ -100,7 +109,12 @@ async function adminGate(
   if (path === "/admin-unlock") return response;
 
   const cookie = request.cookies.get(ADMIN_GATE_COOKIE)?.value ?? "";
-  if (!(await timingSafeEqualUtf8(cookie, secret))) {
+  const ok = await isValidGateCookieValue(
+    cookie,
+    ADMIN_GATE_COOKIE_PREFIX,
+    secret
+  );
+  if (!ok) {
     const redirectRes = NextResponse.redirect(
       new URL("/admin-unlock", request.url)
     );

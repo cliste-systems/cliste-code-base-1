@@ -7,6 +7,7 @@ import {
   normalizeOptionalCustomerEmail,
 } from "@/lib/booking-transactional-email";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ function embedName(
   return o?.name;
 }
 
-function authorize(request: Request): boolean {
+async function authorize(request: Request): Promise<boolean> {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) {
     return false;
@@ -43,7 +44,9 @@ function authorize(request: Request): boolean {
   const bearer =
     auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
   const header = request.headers.get("x-cron-secret");
-  return bearer === secret || header === secret;
+  const candidate = bearer ?? header ?? "";
+  if (!candidate) return false;
+  return timingSafeEqualUtf8(candidate, secret);
 }
 
 export async function GET(request: Request) {
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
 }
 
 async function runReminders(request: Request) {
-  if (!authorize(request)) {
+  if (!(await authorize(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
