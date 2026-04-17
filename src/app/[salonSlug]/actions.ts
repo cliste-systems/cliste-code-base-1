@@ -797,14 +797,19 @@ export async function submitPublicBooking(
     return { success: false, message: APPOINTMENT_OVERLAP_MESSAGE };
   }
 
-  const otpOk = await verifyPublicBookingOtp(
-    admin,
-    organizationId,
-    phoneE164,
-    otpCode,
-  );
-  if (!otpOk.ok) {
-    return { success: false, message: otpOk.message };
+  // When the booking will be charged via Stripe (requiresPayment), we skip
+  // SMS OTP. Stripe (3DS, AVS/CVV, Radar) provides stronger anti-fraud than
+  // a one-shot text code, and the OTP step is a meaningful drop-off point.
+  if (!requiresPayment) {
+    const otpOk = await verifyPublicBookingOtp(
+      admin,
+      organizationId,
+      phoneE164,
+      otpCode,
+    );
+    if (!otpOk.ok) {
+      return { success: false, message: otpOk.message };
+    }
   }
 
   let insertedId: string | null = null;

@@ -126,6 +126,8 @@ type PublicStorefrontOrgRow = {
   instagram_url: string | null;
   facebook_url: string | null;
   tier: string | null;
+  stripe_account_id: string | null;
+  stripe_charges_enabled: boolean | null;
   storefront_gallery_urls: unknown;
   storefront_rating_text: string | null;
   storefront_eircode: string | null;
@@ -140,7 +142,7 @@ type PublicStorefrontOrgRow = {
 };
 
 const PUBLIC_STOREFRONT_SELECT_BASE =
-  "id, name, slug, address, bio_text, logo_url, fresha_url, instagram_url, facebook_url, tier";
+  "id, name, slug, address, bio_text, logo_url, fresha_url, instagram_url, facebook_url, tier, stripe_account_id, stripe_charges_enabled";
 
 const PUBLIC_STOREFRONT_SELECT_FULL = `${PUBLIC_STOREFRONT_SELECT_BASE}, storefront_gallery_urls, storefront_rating_text, storefront_eircode, storefront_map_lat, storefront_map_lng, storefront_amenities, storefront_team_members, storefront_reviews_block, storefront_show_team, storefront_show_map, storefront_show_reviews`;
 

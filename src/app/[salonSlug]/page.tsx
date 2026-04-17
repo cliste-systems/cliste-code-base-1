@@ -144,6 +144,9 @@ export default async function PublicSalonPage({ params }: PublicSalonPageProps) 
   const showStorefrontTeam = org.storefront_show_team !== false;
   const showStorefrontMap = org.storefront_show_map !== false;
   const showStorefrontReviews = org.storefront_show_reviews !== false;
+  const acceptsOnlinePayments = Boolean(
+    org.stripe_account_id?.trim() && org.stripe_charges_enabled,
+  );
 
   const storefrontServices = visibleServices.map((row) => {
     const s = row as typeof row & { description?: string | null };
@@ -178,6 +181,7 @@ export default async function PublicSalonPage({ params }: PublicSalonPageProps) 
         showTeamSection={showStorefrontTeam}
         showMapSection={showStorefrontMap}
         showReviewsSection={showStorefrontReviews}
+        acceptsOnlinePayments={acceptsOnlinePayments}
       />
     );
   }

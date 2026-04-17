@@ -12,17 +12,21 @@ import type {
   StripeElementsOptions,
 } from "@stripe/stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-
 /**
- * Second step of the public booking dialog: customer fills their card details
- * using Stripe's hosted Payment Element (PCI-safe — the card never touches our
- * server). We call `stripe.confirmPayment` with a `return_url` that points at
- * our own success page so the UX stays on the salon's branded storefront even
- * when 3-D Secure forces a redirect.
+ * Step 2 of the public booking dialog. The customer fills card details (or
+ * picks Apple Pay / Google Pay / Link / Revolut Pay / Bancontact / Klarna)
+ * via Stripe's hosted Payment Element — the card data never touches our DOM,
+ * so we keep PCI SAQ-A scope and inherit Stripe's wallet UX, 3DS, and Radar
+ * fraud signals.
+ *
+ * Visual style is modelled on the modern payment card / sheet pattern (clean
+ * white card, prominent total at top, single dark CTA at the bottom). We can
+ * not literally swap in `RuixenPaymentCard` from 21st.dev because that is a
+ * plain-HTML card form — using it would break PCI compliance and remove every
+ * wallet method.
  */
 export type BookingPaymentStepProps = {
   clientSecret: string;
@@ -51,11 +55,37 @@ export function BookingPaymentStep(props: BookingPaymentStepProps) {
       colorPrimary: "#111827",
       colorBackground: "#ffffff",
       colorText: "#111827",
+      colorTextSecondary: "#6b7280",
+      colorTextPlaceholder: "#9ca3af",
       colorDanger: "#dc2626",
       fontFamily:
         '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      borderRadius: "10px",
+      fontSizeBase: "15px",
+      borderRadius: "12px",
       spacingUnit: "4px",
+    },
+    rules: {
+      ".Tab": {
+        border: "1px solid #e5e7eb",
+        boxShadow: "none",
+      },
+      ".Tab--selected": {
+        borderColor: "#111827",
+        boxShadow: "0 0 0 1px #111827",
+      },
+      ".Input": {
+        border: "1px solid #e5e7eb",
+        boxShadow: "none",
+        padding: "12px 14px",
+      },
+      ".Input:focus": {
+        borderColor: "#111827",
+        boxShadow: "0 0 0 1px #111827",
+      },
+      ".Label": {
+        fontWeight: "500",
+        color: "#374151",
+      },
     },
   };
 
@@ -106,9 +136,6 @@ function InnerPaymentForm({
     setPending(true);
     setError(null);
 
-    // Build an absolute return URL for Stripe's redirect flow (3DS, some
-    // wallets). Falls back to a sensible default in SSR but this only runs on
-    // the client.
     const origin =
       typeof window !== "undefined" ? window.location.origin : "";
     const returnUrl = `${origin}${returnPath}`;
@@ -116,7 +143,6 @@ function InnerPaymentForm({
     const { error: submitError, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: { return_url: returnUrl },
-      // Stay on-page when no redirect is needed (typical card, no 3DS).
       redirect: "if_required",
     });
 
@@ -126,7 +152,6 @@ function InnerPaymentForm({
       return;
     }
 
-    // No-redirect success: navigate ourselves to the booking success page.
     if (
       paymentIntent &&
       (paymentIntent.status === "succeeded" ||
@@ -137,54 +162,86 @@ function InnerPaymentForm({
       return;
     }
 
-    // Shouldn't reach here normally; keep the button re-clickable.
     setPending(false);
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <div className="rounded-xl border border-gray-200 bg-gray-50/60 px-3.5 py-3 text-sm">
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="font-medium text-gray-900">{serviceName}</div>
-          <div className="font-semibold text-gray-900">{amountLabel}</div>
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+      {/* Order summary — stacked total like the modern payment modal pattern */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          Total
         </div>
-        <div className="mt-0.5 text-[12px] text-gray-500">
-          {salonName} · {timeLabel}
+        <div className="mt-1 flex items-baseline gap-2">
+          <div className="text-3xl font-semibold tracking-tight text-gray-900">
+            {amountLabel}
+          </div>
         </div>
-        <div className="mt-0.5 text-[11px] uppercase tracking-wide text-gray-400">
-          Booking #{bookingReference}
+        <div className="mt-3 flex items-start justify-between gap-3 border-t border-gray-100 pt-3 text-sm">
+          <div className="min-w-0">
+            <div className="truncate font-medium text-gray-900">
+              {serviceName}
+            </div>
+            <div className="mt-0.5 truncate text-[12px] text-gray-500">
+              {salonName} · {timeLabel}
+            </div>
+          </div>
+          <div className="shrink-0 rounded-md bg-gray-50 px-2 py-1 font-mono text-[11px] uppercase tracking-wide text-gray-500">
+            #{bookingReference}
+          </div>
         </div>
       </div>
 
-      <PaymentElement options={{ layout: "tabs" }} />
+      {/* Payment Element — Stripe owns the card / wallet inputs */}
+      <PaymentElement
+        options={{
+          layout: "tabs",
+          wallets: { applePay: "auto", googlePay: "auto" },
+        }}
+      />
 
       {error ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
 
-      <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-        <Lock className="h-3 w-3" aria-hidden />
-        Payments are processed securely by Stripe. Card details never touch our
-        servers.
-      </div>
+      {/* Trust strip + dark Checkout CTA */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+          <span className="inline-flex items-center gap-1.5">
+            <Lock className="h-3 w-3" aria-hidden />
+            Encrypted by Stripe
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="h-3 w-3" aria-hidden />
+            Card details never touch our servers
+          </span>
+        </div>
 
-      <div className="flex items-center gap-2">
-        {onBack ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onBack}
-            disabled={pending}
+        <div className="flex items-center gap-2">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={pending}
+              className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Back
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            disabled={pending || !stripe}
+            className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <ArrowLeft className="mr-1 h-4 w-4" aria-hidden />
-            Back
-          </Button>
-        ) : null}
-        <Button type="submit" className="flex-1" disabled={pending || !stripe}>
-          {pending ? "Processing…" : `Pay ${amountLabel}`}
-        </Button>
+            {pending ? "Processing…" : `Pay ${amountLabel}`}
+          </button>
+        </div>
       </div>
     </form>
   );

@@ -114,6 +114,13 @@ type SalonNativeBookingStorefrontProps = {
   showTeamSection?: boolean;
   showMapSection?: boolean;
   showReviewsSection?: boolean;
+  /**
+   * True iff this salon has a Stripe Connect account with charges enabled.
+   * When true and the selected service has a price > 0, the booking flow
+   * skips SMS OTP — Stripe (with 3DS + fraud signals) is a stronger
+   * verification than a one-shot text code, so OTP would just add friction.
+   */
+  acceptsOnlinePayments?: boolean;
 };
 
 export function SalonNativeBookingStorefront({
@@ -135,6 +142,7 @@ export function SalonNativeBookingStorefront({
   showTeamSection = true,
   showMapSection = true,
   showReviewsSection = true,
+  acceptsOnlinePayments = false,
 }: SalonNativeBookingStorefrontProps) {
   const nameId = useId();
   const phoneId = useId();
@@ -144,7 +152,7 @@ export function SalonNativeBookingStorefront({
 
   const turnstileSiteKey =
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
-  const publicOtpDisabled =
+  const publicOtpDisabledEnv =
     process.env.NEXT_PUBLIC_PUBLIC_BOOKING_OTP_DISABLED === "true";
 
   const visible = useMemo(
@@ -188,6 +196,18 @@ export function SalonNativeBookingStorefront({
     () => visible.find((s) => s.id === selectedServiceId) ?? null,
     [visible, selectedServiceId],
   );
+
+  /**
+   * If the salon takes online payments and the chosen service has a price,
+   * the booking flow will jump into the Stripe payment step. Stripe's checks
+   * (3DS, AVS/CVV, Radar fraud signals) are stronger anti-spam than SMS OTP,
+   * so we drop the OTP step entirely in that case to remove a friction point.
+   */
+  const willChargeOnline =
+    acceptsOnlinePayments && (selectedService?.price ?? 0) > 0;
+
+  /** Effective OTP-disabled flag: env override OR Stripe will verify the user. */
+  const publicOtpDisabled = publicOtpDisabledEnv || willChargeOnline;
 
   const [timeZone, setTimeZone] = useState(() => getSalonTimeZone());
 
