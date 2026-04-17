@@ -52,71 +52,87 @@ export async function fetchDashboardNavBadges(
 ): Promise<DashboardNavBadgeMap> {
   const s = seen ?? EMPTY_SEEN_AT;
   const actionInboxSince = sinceOrFallback(s.actionInbox);
-  const openRes = await supabase
-    .from("action_tickets")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("status", "open")
-    .gt("created_at", actionInboxSince);
-
   const callHistorySince = sinceOrFallback(s.callHistory);
-  const callHistoryRes = await supabase
-    .from("call_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .gt("created_at", callHistorySince);
+
+  // PostgREST query builders are thenable but not real Promises — type the
+  // batches as PromiseLike so we can fan them out via Promise.all().
+  type CountResult = {
+    count: number | null;
+    error: { message: string } | null;
+  };
+
+  // Build the always-on badge queries.
+  const baseQueries: PromiseLike<CountResult>[] = [
+    supabase
+      .from("action_tickets")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "open")
+      .gt("created_at", actionInboxSince),
+    supabase
+      .from("call_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .gt("created_at", callHistorySince),
+  ];
+
+  // Tier-gated extras for native salons (calendar + bookings counts).
+  let appointmentExtras: PromiseLike<CountResult>[] = [];
+  if (includeNativeAppointmentBadges) {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const startOfUtcDay = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
+    const endOfUtcDay = new Date(startOfUtcDay);
+    endOfUtcDay.setUTCDate(endOfUtcDay.getUTCDate() + 1);
+
+    const calendarSince = sinceOrFallback(s.calendar);
+    const bookingsSince = sinceOrFallback(s.bookings);
+
+    appointmentExtras = [
+      supabase
+        .from("appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("status", "confirmed")
+        .gte("start_time", nowIso)
+        .lt("start_time", weekEnd.toISOString())
+        .gt("created_at", calendarSince),
+      supabase
+        .from("appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("status", "confirmed")
+        .gte("start_time", startOfUtcDay.toISOString())
+        .lt("start_time", endOfUtcDay.toISOString())
+        .gt("created_at", bookingsSince),
+    ];
+  }
+
+  // Single round of fan-out — all badge counts in parallel.
+  const results = await Promise.all([...baseQueries, ...appointmentExtras]);
+  const [openRes, callHistoryRes, weekRes, todayRes] = results;
 
   const badges: DashboardNavBadgeMap = {
     "/dashboard/action-inbox": countHead(openRes),
     "/dashboard/call-history": countHead(callHistoryRes),
   };
 
-  if (!includeNativeAppointmentBadges) {
-    return badges;
+  if (includeNativeAppointmentBadges && weekRes && todayRes) {
+    badges["/dashboard/calendar"] = countHead(weekRes);
+    badges["/dashboard/bookings"] = countHead(todayRes);
   }
-
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-  const startOfUtcDay = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      0,
-      0,
-      0,
-      0,
-    ),
-  );
-  const endOfUtcDay = new Date(startOfUtcDay);
-  endOfUtcDay.setUTCDate(endOfUtcDay.getUTCDate() + 1);
-
-  const calendarSince = sinceOrFallback(s.calendar);
-  const bookingsSince = sinceOrFallback(s.bookings);
-
-  const [weekRes, todayRes] = await Promise.all([
-    supabase
-      .from("appointments")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gte("start_time", nowIso)
-      .lt("start_time", weekEnd.toISOString())
-      .gt("created_at", calendarSince),
-    supabase
-      .from("appointments")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("status", "confirmed")
-      .gte("start_time", startOfUtcDay.toISOString())
-      .lt("start_time", endOfUtcDay.toISOString())
-      .gt("created_at", bookingsSince),
-  ]);
-
-  badges["/dashboard/calendar"] = countHead(weekRes);
-  badges["/dashboard/bookings"] = countHead(todayRes);
 
   return badges;
 }

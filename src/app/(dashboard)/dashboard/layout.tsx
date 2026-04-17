@@ -75,17 +75,47 @@ export default async function DashboardLayout({
 }>) {
   const { supabase, organizationId, user } = await requireDashboardSession();
 
+  const cookieStore = await cookies();
+  const navSeenAt = {
+    callHistory: parseSeenAtCookie(
+      cookieStore.get(DASHBOARD_CALL_HISTORY_SEEN_COOKIE)?.value,
+    ),
+    actionInbox: parseSeenAtCookie(
+      cookieStore.get(DASHBOARD_ACTION_INBOX_SEEN_COOKIE)?.value,
+    ),
+    calendar: parseSeenAtCookie(
+      cookieStore.get(DASHBOARD_CALENDAR_SEEN_COOKIE)?.value,
+    ),
+    bookings: parseSeenAtCookie(
+      cookieStore.get(DASHBOARD_BOOKINGS_SEEN_COOKIE)?.value,
+    ),
+  };
+
+  // We can't filter badges by tier (native vs connect) until we know the
+  // tier — but we don't want to wait two sequential round trips. Fetch the
+  // org row first (single combined query), then run badges + profile in
+  // parallel afterwards.
+  const orgRowRes = await supabase
+    .from("organizations")
+    .select("name, tier, slug, niche, status")
+    .eq("id", organizationId)
+    .maybeSingle();
+  const orgRow = orgRowRes.data as
+    | {
+        name: string | null;
+        tier: string | null;
+        slug: string | null;
+        niche: string | null;
+        status: string | null;
+      }
+    | null;
+
   // Gate the dashboard on SaaS lifecycle status. Newly-signed-up salons
   // still in the wizard (or suspended ones) should not see live bookings.
   // Legacy rows created before migration 027 default to status='active' so
   // existing dashboards are unaffected.
-  const { data: lifecycleRow } = await supabase
-    .from("organizations")
-    .select("status")
-    .eq("id", organizationId)
-    .maybeSingle();
   const lifecycleStatus =
-    (lifecycleRow?.status as string | undefined) ?? "active";
+    (orgRow?.status as string | undefined) ?? "active";
   if (
     lifecycleStatus === "pending_verification" ||
     lifecycleStatus === "onboarding"
@@ -96,16 +126,27 @@ export default async function DashboardLayout({
     redirect("/dashboard/billing?suspended=1");
   }
 
-  const { data: profileRow } = await supabase
-    .from("profiles")
-    .select("name, role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const effectiveTier = await getEffectiveProductTier(orgRow?.tier);
+  const showNativeNav = effectiveTier === "native";
 
-  const cookieStore = await cookies();
-  const supportView = await isValidSupportDashboardCookieValue(
-    cookieStore.get(SUPPORT_DASHBOARD_COOKIE)?.value
-  );
+  // Fan-out: profile, support cookie, and nav badges all in parallel.
+  const [profileRowRes, supportView, navBadges] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("name, role")
+      .eq("id", user.id)
+      .maybeSingle(),
+    isValidSupportDashboardCookieValue(
+      cookieStore.get(SUPPORT_DASHBOARD_COOKIE)?.value,
+    ),
+    fetchDashboardNavBadges(
+      supabase,
+      organizationId,
+      showNativeNav,
+      navSeenAt,
+    ),
+  ]);
+  const profileRow = profileRowRes.data;
 
   let loggedInAs: string;
   if (supportView) {
@@ -123,14 +164,6 @@ export default async function DashboardLayout({
   const userMeta = user.user_metadata as Record<string, unknown> | undefined;
   const needsPassword =
     userMeta?.needs_password === true || userMeta?.needs_password === "true";
-
-  const { data: orgRow } = await supabase
-    .from("organizations")
-    .select("name, tier, slug, niche")
-    .eq("id", organizationId)
-    .maybeSingle();
-
-  const effectiveTier = await getEffectiveProductTier(orgRow?.tier);
 
   let salonName = orgRow?.name?.trim() ?? null;
   let nicheForProduct = orgRow?.niche;
@@ -158,32 +191,9 @@ export default async function DashboardLayout({
   const orgSlug = orgRow?.slug?.trim() || null;
   const productName = productNameForNiche(nicheForProduct);
 
-  const showNativeNav = effectiveTier === "native";
   const visibleNav = showNativeNav
     ? navItems
     : navItems.filter((item) => !item.nativeOnly);
-
-  const navSeenAt = {
-    callHistory: parseSeenAtCookie(
-      cookieStore.get(DASHBOARD_CALL_HISTORY_SEEN_COOKIE)?.value,
-    ),
-    actionInbox: parseSeenAtCookie(
-      cookieStore.get(DASHBOARD_ACTION_INBOX_SEEN_COOKIE)?.value,
-    ),
-    calendar: parseSeenAtCookie(
-      cookieStore.get(DASHBOARD_CALENDAR_SEEN_COOKIE)?.value,
-    ),
-    bookings: parseSeenAtCookie(
-      cookieStore.get(DASHBOARD_BOOKINGS_SEEN_COOKIE)?.value,
-    ),
-  };
-
-  const navBadges = await fetchDashboardNavBadges(
-    supabase,
-    organizationId,
-    showNativeNav,
-    navSeenAt,
-  );
 
   const mainNav = visibleNav
     .filter((i) => !i.footer)

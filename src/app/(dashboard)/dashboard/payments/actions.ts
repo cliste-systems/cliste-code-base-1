@@ -229,3 +229,29 @@ export async function openStripeExpressDashboard(): Promise<never> {
   const link = await stripe.accounts.createLoginLink(org.stripe_account_id);
   redirect(link.url);
 }
+
+/**
+ * Pull the live status of every still-pending PaymentIntent for the salon
+ * from Stripe and flip our DB row if it has actually settled. Used both
+ * automatically on Payments page load (best-effort, swallow errors) and via
+ * a manual "Sync with Stripe" button if the operator wants to double-check.
+ */
+export async function syncPendingPayments(): Promise<{
+  checked: number;
+  flippedToPaid: number;
+  flippedToFailed: number;
+}> {
+  const { organizationId } = await requireDashboardSession();
+  const { reconcilePendingAppointmentPayments } = await import(
+    "@/lib/booking-payment-reconcile"
+  );
+  const result = await reconcilePendingAppointmentPayments({
+    organizationId,
+  });
+  if (result.flippedToPaid > 0 || result.flippedToFailed > 0) {
+    revalidatePath("/dashboard/payments");
+    revalidatePath("/dashboard/bookings");
+    revalidatePath("/dashboard/calendar");
+  }
+  return result;
+}

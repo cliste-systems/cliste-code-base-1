@@ -10,6 +10,8 @@ import {
 } from "./connect-buttons";
 import { syncStripeConnectStatus } from "./actions";
 import { PaymentRowActions } from "./payment-row-actions";
+import { SyncPendingButton } from "./sync-pending-button";
+import { reconcilePendingAppointmentPayments } from "@/lib/booking-payment-reconcile";
 
 /** Payments dashboard: operator sees Connect status + recent paid bookings. */
 export const dynamic = "force-dynamic";
@@ -49,6 +51,16 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
     } catch (err) {
       console.warn("syncStripeConnectStatus failed", err);
     }
+  }
+
+  // Best-effort: reconcile any still-pending payments with Stripe so the
+  // operator never sees a stale "pending" row when the webhook missed an
+  // event. Errors here are swallowed; the row just stays pending and the
+  // operator can hit the manual Sync button.
+  try {
+    await reconcilePendingAppointmentPayments({ organizationId });
+  } catch (err) {
+    console.warn("reconcilePendingAppointmentPayments failed", err);
   }
 
   const { data: org } = await supabase
@@ -182,7 +194,10 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
           <h2 className="text-sm font-semibold tracking-tight text-gray-900">
             Recent payments
           </h2>
-          <p className="text-xs text-gray-400">Last 50</p>
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            <SyncPendingButton />
+            <span>Last 50</span>
+          </div>
         </div>
 
         {rows.length === 0 ? (
