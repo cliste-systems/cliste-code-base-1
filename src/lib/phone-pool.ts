@@ -183,7 +183,23 @@ export async function purchaseIrishDids(count: number): Promise<PurchaseResult> 
         areaCode,
         err instanceof Error ? err.message : err,
       );
-      continue;
+    }
+
+    // Ireland has patchy DID stock by area code. If the preferred code has no
+    // inventory right now, fall back to a country-wide search so we still buy
+    // *an* IE number (better than failing the refill).
+    if (availableNumbers.length === 0) {
+      try {
+        availableNumbers = await client
+          .availablePhoneNumbers("IE")
+          .local.list({ limit: 1 });
+      } catch (err) {
+        console.warn(
+          "[phone-pool] Twilio nationwide search failed",
+          err instanceof Error ? err.message : err,
+        );
+        continue;
+      }
     }
 
     const pick = availableNumbers[0]?.phoneNumber;
@@ -192,6 +208,12 @@ export async function purchaseIrishDids(count: number): Promise<PurchaseResult> 
     }
 
     try {
+      // Ireland requires a postal Address and a Regulatory Bundle on every
+      // locally-purchased DID. Twilio rejects the purchase with
+      // "AddressSid empty" otherwise. We reuse the founder's existing
+      // compliance records via env vars so we don't have to re-register.
+      const addressSid = process.env.TWILIO_IE_ADDRESS_SID?.trim() || undefined;
+      const bundleSid = process.env.TWILIO_IE_BUNDLE_SID?.trim() || undefined;
       const bought = await client.incomingPhoneNumbers.create({
         phoneNumber: pick,
         voiceUrl,
@@ -199,6 +221,8 @@ export async function purchaseIrishDids(count: number): Promise<PurchaseResult> 
         smsUrl: process.env.TWILIO_IE_SMS_URL?.trim() || undefined,
         smsMethod: "POST",
         friendlyName: `Cliste pool (${areaCode})`,
+        ...(addressSid ? { addressSid } : {}),
+        ...(bundleSid ? { bundleSid } : {}),
       });
 
       const { error: insertErr } = await admin.from("phone_numbers").insert({
