@@ -125,6 +125,92 @@ export async function syncStripeConnectStatus(): Promise<void> {
   revalidatePath("/dashboard/payments");
 }
 
+export type RefundAppointmentResult =
+  | { ok: true; refundedCents: number; currency: string }
+  | { ok: false; message: string };
+
+/**
+ * Full refund for a paid appointment. Uses `reverse_transfer` + `refund_application_fee`
+ * so the salon's connected account *and* Cliste's platform fee are refunded
+ * proportionally — the customer gets their money back in one hit.
+ *
+ * Security posture:
+ * - `requireDashboardSession` enforces the caller is an authenticated operator.
+ * - We re-scope the appointment lookup by `organization_id` from the session,
+ *   so a crafted `appointmentId` belonging to another salon cannot be refunded.
+ * - The refund is created on the platform Stripe account using our server-side
+ *   secret key only; the client is never trusted with amounts.
+ * - The DB row is flipped optimistically; the webhook confirms the refund
+ *   landed (authoritative state).
+ */
+export async function refundAppointmentPayment(
+  appointmentId: string,
+): Promise<RefundAppointmentResult> {
+  const id = appointmentId?.trim();
+  if (!id) return { ok: false, message: "Missing appointment id." };
+
+  const { supabase, organizationId } = await requireDashboardSession();
+  const { data: appt, error } = await supabase
+    .from("appointments")
+    .select(
+      "id, organization_id, payment_status, amount_cents, currency, stripe_payment_intent_id",
+    )
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error) return { ok: false, message: error.message };
+  if (!appt) return { ok: false, message: "Appointment not found." };
+  if (!appt.stripe_payment_intent_id) {
+    return {
+      ok: false,
+      message: "No Stripe charge on this booking to refund.",
+    };
+  }
+  if (appt.payment_status !== "paid") {
+    return {
+      ok: false,
+      message:
+        appt.payment_status === "refunded"
+          ? "Already refunded."
+          : "Only paid bookings can be refunded.",
+    };
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const refund = await stripe.refunds.create({
+      payment_intent: appt.stripe_payment_intent_id,
+      reverse_transfer: true,
+      refund_application_fee: true,
+      metadata: {
+        appointment_id: appt.id,
+        organization_id: appt.organization_id,
+      },
+    });
+
+    // Optimistic flip; webhook will re-confirm from the signed event.
+    const admin = createAdminClient();
+    await admin
+      .from("appointments")
+      .update({ payment_status: "refunded" })
+      .eq("id", appt.id)
+      .eq("organization_id", organizationId);
+
+    revalidatePath("/dashboard/payments");
+    revalidatePath("/dashboard/bookings");
+
+    return {
+      ok: true,
+      refundedCents: refund.amount ?? appt.amount_cents ?? 0,
+      currency: (refund.currency ?? appt.currency ?? "eur").toLowerCase(),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Refund failed.";
+    console.error("refundAppointmentPayment failed", err);
+    return { ok: false, message };
+  }
+}
+
 /**
  * Returns a signed Stripe Express dashboard login link for the connected
  * account so the operator can manage payouts / payments directly on Stripe.

@@ -9,6 +9,7 @@ import {
   OpenStripeDashboardButton,
 } from "./connect-buttons";
 import { syncStripeConnectStatus } from "./actions";
+import { PaymentRowActions } from "./payment-row-actions";
 
 /** Payments dashboard: operator sees Connect status + recent paid bookings. */
 export const dynamic = "force-dynamic";
@@ -20,13 +21,17 @@ type PageProps = {
 type PaidAppointmentRow = {
   id: string;
   customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
   start_time: string;
   amount_cents: number | null;
   currency: string | null;
   platform_fee_cents: number | null;
   payment_status: string | null;
   paid_at: string | null;
+  booking_reference: string | null;
   stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
   services: { name: string | null } | null;
 };
 
@@ -79,7 +84,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   const { data: payments } = await supabase
     .from("appointments")
     .select(
-      `id, customer_name, start_time, amount_cents, currency, platform_fee_cents, payment_status, paid_at, stripe_payment_intent_id, services ( name )`,
+      `id, customer_name, customer_phone, customer_email, start_time, amount_cents, currency, platform_fee_cents, payment_status, paid_at, booking_reference, stripe_payment_intent_id, stripe_charge_id, services ( name )`,
     )
     .eq("organization_id", organizationId)
     .not("payment_status", "is", null)
@@ -194,6 +199,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                   <th className="px-4 py-3 text-right">Cliste fee</th>
                   <th className="px-4 py-3 text-right">Your payout</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -240,6 +246,24 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                       </td>
                       <td className="px-4 py-3">
                         <PaymentStatusBadge value={row.payment_status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <PaymentRowActions
+                          appointmentId={row.id}
+                          customerName={row.customer_name}
+                          customerEmail={row.customer_email}
+                          customerPhone={row.customer_phone}
+                          serviceName={row.services?.name ?? null}
+                          startTimeIso={row.start_time}
+                          amountCents={row.amount_cents}
+                          platformFeeCents={row.platform_fee_cents}
+                          currency={row.currency}
+                          paymentStatus={row.payment_status}
+                          paidAtIso={row.paid_at}
+                          bookingReference={row.booking_reference}
+                          stripePaymentIntentId={row.stripe_payment_intent_id}
+                          stripeChargeId={row.stripe_charge_id}
+                        />
                       </td>
                     </tr>
                   );

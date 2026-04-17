@@ -61,10 +61,6 @@ import { servicesTableHasExtendedColumns } from "@/lib/services-schema";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import {
-  resolveAppSiteOrigin,
-  resolveBookingSiteOrigin,
-} from "@/lib/booking-site-origin";
-import {
   computeApplicationFeeCents,
   getDefaultCurrency,
   getStripeClient,
@@ -570,17 +566,42 @@ export async function requestPublicBookingOtp(payload: {
   return { success: true };
 }
 
+/**
+ * Everything the client needs to render the embedded Stripe Payment Element
+ * and finalise the charge. Returned when the booking requires payment.
+ *
+ * We deliberately DO NOT send raw price math or the application fee to the
+ * client — those are computed on the server from the `service` row before we
+ * create the PaymentIntent, so the browser can't tamper with them.
+ */
+export type SubmitPublicBookingPayment = {
+  clientSecret: string;
+  publishableKey: string;
+  amountCents: number;
+  currency: string;
+  bookingReference: string;
+  salonName: string;
+  serviceName: string;
+  startTimeIso: string;
+  returnPath: string;
+};
+
 export type SubmitPublicBookingResult =
   | {
       success: true;
       emailNotice?: string;
       /**
-       * Set when the salon has Stripe Connect enabled and the service has a
-       * price > 0. The client must be redirected to this URL to complete
-       * payment; the appointment is held with `payment_status='pending'` until
-       * the Stripe webhook confirms.
+       * Free booking path — appointment is confirmed immediately. Only set
+       * when the salon has not enabled Stripe Connect OR the service is free.
        */
-      checkoutUrl?: string;
+      booked?: true;
+      /**
+       * Paid booking path — the storefront should render the Payment Element
+       * using these values and ask the customer to pay. The appointment row is
+       * held with `payment_status='pending'` until the webhook flips it to
+       * `paid`.
+       */
+      payment?: SubmitPublicBookingPayment;
     }
   | { success: false; message: string };
 
@@ -840,12 +861,28 @@ export async function submitPublicBooking(
   const salonName = org?.name?.trim() || "Salon";
   const serviceName = typeof svc.name === "string" ? svc.name : "Appointment";
 
-  // If a Stripe payment is required, create a Checkout Session and short-circuit
-  // the SMS/email confirmations — those should fire from the webhook once the
-  // payment actually succeeds. The appointment row is held with
-  // `payment_status='pending'` until then.
+  // If a Stripe payment is required, create a PaymentIntent for the held
+  // appointment and short-circuit the SMS/email confirmations — those fire
+  // from the webhook once the payment actually succeeds. The appointment row
+  // stays in `payment_status='pending'` until then.
   if (requiresPayment) {
-    const checkoutResult = await createBookingCheckoutSession({
+    const publishableKey = (
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
+    ).trim();
+    if (!publishableKey) {
+      await admin
+        .from("appointments")
+        .delete()
+        .eq("id", insertedId)
+        .eq("organization_id", organizationId);
+      return {
+        success: false,
+        message:
+          "Payments are not fully configured yet. Please try again in a moment.",
+      };
+    }
+
+    const intentResult = await createBookingPaymentIntent({
       organizationId,
       appointmentId: insertedId,
       stripeAccountId: stripeAccountId!,
@@ -854,12 +891,11 @@ export async function submitPublicBooking(
       currency,
       serviceName,
       salonName,
-      salonSlug,
       customerEmail: customerEmailNorm,
       bookingReference: bookingRef,
     });
 
-    if (!checkoutResult.ok) {
+    if (!intentResult.ok) {
       // Payment provisioning failed — roll the booking back so the slot isn't
       // held in a pending state nobody can clear.
       await admin
@@ -870,7 +906,7 @@ export async function submitPublicBooking(
       return {
         success: false,
         message:
-          checkoutResult.message ||
+          intentResult.message ||
           "We couldn't start the payment. Please try again.",
       };
     }
@@ -878,8 +914,7 @@ export async function submitPublicBooking(
     await admin
       .from("appointments")
       .update({
-        stripe_checkout_session_id: checkoutResult.sessionId,
-        stripe_payment_intent_id: checkoutResult.paymentIntentId,
+        stripe_payment_intent_id: intentResult.paymentIntentId,
       })
       .eq("id", insertedId)
       .eq("organization_id", organizationId);
@@ -891,7 +926,26 @@ export async function submitPublicBooking(
       phoneE164,
     });
 
-    return { success: true, checkoutUrl: checkoutResult.url };
+    const slug = (salonSlug ?? "").trim().toLowerCase();
+    const safeSlug = /^[a-z0-9-]+$/.test(slug) ? slug : "";
+    const returnPath = safeSlug
+      ? `/${safeSlug}/booking/success?ref=${encodeURIComponent(bookingRef)}`
+      : `/?ref=${encodeURIComponent(bookingRef)}`;
+
+    return {
+      success: true,
+      payment: {
+        clientSecret: intentResult.clientSecret,
+        publishableKey,
+        amountCents,
+        currency,
+        bookingReference: bookingRef,
+        salonName,
+        serviceName,
+        startTimeIso: start.toISOString(),
+        returnPath,
+      },
+    };
   }
 
   const body = buildBookingConfirmationSmsBody({
@@ -961,11 +1015,12 @@ export async function submitPublicBooking(
   }
   return {
     success: true,
+    booked: true,
     ...(emailNotice ? { emailNotice } : {}),
   };
 }
 
-type CreateCheckoutArgs = {
+type CreatePaymentIntentArgs = {
   organizationId: string;
   appointmentId: string;
   stripeAccountId: string;
@@ -974,111 +1029,58 @@ type CreateCheckoutArgs = {
   currency: string;
   serviceName: string;
   salonName: string;
-  salonSlug?: string;
   customerEmail: string | null;
   bookingReference: string;
 };
 
-type CreateCheckoutResult =
-  | {
-      ok: true;
-      url: string;
-      sessionId: string;
-      paymentIntentId: string | null;
-    }
+type CreatePaymentIntentResult =
+  | { ok: true; clientSecret: string; paymentIntentId: string }
   | { ok: false; message: string };
 
 /**
- * Creates a Stripe Checkout Session for a booking using **destination charges**:
+ * Creates a Stripe PaymentIntent for a held booking using **destination charges**:
  * the charge lives on the Cliste platform account and Stripe transfers the net
  * amount to the salon's connected Express account. Cliste keeps
  * `platformFeeCents` as an application fee.
  *
- * The session's `metadata.appointment_id` is what the webhook uses to flip the
+ * The intent's `metadata.appointment_id` is what the webhook uses to flip the
  * appointment to `payment_status='paid'`.
  */
-async function createBookingCheckoutSession(
-  args: CreateCheckoutArgs,
-): Promise<CreateCheckoutResult> {
-  const appOrigin = resolveAppSiteOrigin()?.origin;
-  const bookingOrigin = resolveBookingSiteOrigin()?.origin;
-  const fallbackOrigin =
-    (await headers()).get("origin") ??
-    (await headers()).get("referer") ??
-    "";
-  const origin =
-    bookingOrigin ||
-    appOrigin ||
-    (fallbackOrigin ? new URL(fallbackOrigin).origin : "");
-
-  const slug = args.salonSlug?.trim().toLowerCase();
-  const returnPath =
-    slug && /^[a-z0-9-]+$/.test(slug)
-      ? `/${slug}?payment={STATUS}&ref=${encodeURIComponent(args.bookingReference)}`
-      : `/?payment={STATUS}&ref=${encodeURIComponent(args.bookingReference)}`;
-  const successUrl = `${origin}${returnPath.replace("{STATUS}", "success")}&sid={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${origin}${returnPath.replace("{STATUS}", "cancelled")}`;
-
+async function createBookingPaymentIntent(
+  args: CreatePaymentIntentArgs,
+): Promise<CreatePaymentIntentResult> {
   try {
     const stripe = getStripeClient();
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: args.currency,
-            unit_amount: args.amountCents,
-            product_data: {
-              name: args.serviceName,
-              description: `Booking at ${args.salonName} (ref ${args.bookingReference})`,
-            },
-          },
-        },
-      ],
-      payment_intent_data: {
-        application_fee_amount: args.platformFeeCents,
-        transfer_data: { destination: args.stripeAccountId },
-        // Per-merchant descriptor (Stripe enforces length/charset).
-        statement_descriptor_suffix: args.salonName
-          .replace(/[^a-z0-9 ]/gi, "")
-          .slice(0, 22) || "CLISTE",
-        metadata: {
-          appointment_id: args.appointmentId,
-          organization_id: args.organizationId,
-          booking_reference: args.bookingReference,
-        },
-      },
-      customer_email: args.customerEmail ?? undefined,
+    const pi = await stripe.paymentIntents.create({
+      amount: args.amountCents,
+      currency: args.currency,
+      application_fee_amount: args.platformFeeCents,
+      transfer_data: { destination: args.stripeAccountId },
+      // Let Stripe pick the best method for the customer's locale and device
+      // (cards, Apple Pay, Google Pay if configured on the account).
+      automatic_payment_methods: { enabled: true },
+      receipt_email: args.customerEmail ?? undefined,
+      description: `${args.serviceName} at ${args.salonName} (ref ${args.bookingReference})`,
+      statement_descriptor_suffix:
+        args.salonName.replace(/[^a-z0-9 ]/gi, "").slice(0, 22) || "CLISTE",
       metadata: {
         appointment_id: args.appointmentId,
         organization_id: args.organizationId,
         booking_reference: args.bookingReference,
       },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      // Bookings are time-sensitive; expire Checkout after 30 min so the slot
-      // frees up via `checkout.session.expired` if the customer walks away.
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
     });
-
-    if (!session.url) {
-      return { ok: false, message: "Stripe did not return a checkout URL." };
+    if (!pi.client_secret) {
+      return { ok: false, message: "Stripe did not return a client secret." };
     }
-    const paymentIntentId =
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent?.id ?? null;
     return {
       ok: true,
-      url: session.url,
-      sessionId: session.id,
-      paymentIntentId,
+      clientSecret: pi.client_secret,
+      paymentIntentId: pi.id,
     };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Could not start payment.";
-    console.error("createBookingCheckoutSession failed", err);
+    console.error("createBookingPaymentIntent failed", err);
     return { ok: false, message };
   }
 }

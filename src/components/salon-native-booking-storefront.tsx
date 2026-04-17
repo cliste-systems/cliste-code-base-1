@@ -34,6 +34,7 @@ import {
   requestPublicBookingOtp,
   submitPublicBooking,
 } from "@/app/[salonSlug]/actions";
+import { BookingPaymentStep } from "@/components/booking-payment-step";
 import type { SalonStorefrontService } from "@/components/salon-storefront-ui";
 import { Button } from "@/components/ui/button";
 import {
@@ -339,6 +340,22 @@ export function SalonNativeBookingStorefront({
   const [dialogPhone, setDialogPhone] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(publicOtpDisabled);
+  /**
+   * When the booking action returns `payment`, we switch the dialog from the
+   * details form to the Stripe Payment Element step. Cleared when the dialog
+   * closes.
+   */
+  const [paymentStep, setPaymentStep] = useState<null | {
+    clientSecret: string;
+    publishableKey: string;
+    amountCents: number;
+    currency: string;
+    bookingReference: string;
+    salonName: string;
+    serviceName: string;
+    startTimeIso: string;
+    returnPath: string;
+  }>(null);
   /** Bump after each successful OTP send so the code input remounts empty. */
   const [otpInputMountKey, setOtpInputMountKey] = useState(0);
 
@@ -440,10 +457,11 @@ export function SalonNativeBookingStorefront({
             setBookingError(res.message);
             return;
           }
-          // Stripe flow: booking is held as `pending` — hand the customer off
-          // to Stripe Checkout. Webhook flips the booking to `paid` on success.
-          if (res.checkoutUrl) {
-            window.location.assign(res.checkoutUrl);
+          // Paid booking: appointment is held as `pending`. Switch the dialog
+          // to the embedded Stripe Payment Element step — the webhook flips
+          // the booking to `paid` when the PaymentIntent succeeds.
+          if (res.payment) {
+            setPaymentStep(res.payment);
             return;
           }
           setToastEmailLine(res.emailNotice ?? null);
@@ -452,6 +470,7 @@ export function SalonNativeBookingStorefront({
           setDialogPhone("");
           setOtpSent(publicOtpDisabled);
           setTurnstileToken(null);
+          setPaymentStep(null);
           setToast(true);
         })();
       });
@@ -543,18 +562,36 @@ export function SalonNativeBookingStorefront({
             setOtpSent(publicOtpDisabled);
             setTurnstileToken(null);
             setOtpInputMountKey(0);
+            setPaymentStep(null);
           }
         }}
       >
         <DialogContent className="sm:max-w-md" showCloseButton>
           <DialogHeader>
-            <DialogTitle>Confirm booking</DialogTitle>
+            <DialogTitle>
+              {paymentStep ? "Pay to confirm" : "Confirm booking"}
+            </DialogTitle>
             <DialogDescription>
               {selectedService
                 ? `${selectedService.name} · ${formatEur(selectedService.price)}`
                 : null}
             </DialogDescription>
           </DialogHeader>
+          {paymentStep ? (
+            <div className="py-1">
+              <BookingPaymentStep
+                clientSecret={paymentStep.clientSecret}
+                publishableKey={paymentStep.publishableKey}
+                amountCents={paymentStep.amountCents}
+                currency={paymentStep.currency}
+                bookingReference={paymentStep.bookingReference}
+                salonName={paymentStep.salonName}
+                serviceName={paymentStep.serviceName}
+                startTimeIso={paymentStep.startTimeIso}
+                returnPath={paymentStep.returnPath}
+              />
+            </div>
+          ) : (
           <form className="space-y-4 py-1" onSubmit={handleConfirmBooking}>
             <input
               type="text"
@@ -695,6 +732,7 @@ export function SalonNativeBookingStorefront({
               </Button>
             </DialogFooter>
           </form>
+          )}
         </DialogContent>
       </Dialog>
 
