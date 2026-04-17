@@ -1,256 +1,122 @@
-# Cloudflare hardening playbook
+# Cloudflare hardening — status
 
-This file tells you **exactly what to turn on in the Cloudflare dashboard**
-(and optionally via the API) to lock down the Cliste production zones. It is
-tuned for the current stack:
+Zone: `clistesystems.ie`
+Last applied: 2026-04-17 via `scripts/cloudflare-harden.py`.
 
-- `cliste-code-base-1` → Vercel (Next.js) behind Cloudflare DNS.
-- `cliste-code-base-2` → Railway (LiveKit voice agent) behind Cloudflare DNS
-  for any inbound HTTPS it exposes (telephony SIP goes via Twilio direct — not
-  Cloudflare's job).
+## What is applied (via API)
 
-Before you start:
+### Account IP list
 
-1. **Rotate any API token you have ever pasted into chat, a ticket, Slack, or
-   email.** Pasted tokens must be considered compromised immediately — go to
-   <https://dash.cloudflare.com/profile/api-tokens> and roll.
-2. When you mint a replacement, **scope it tightly**:
-   - Zone → your zone(s) only. Not "All zones".
-   - Permissions: `Zone:Read`, `Zone Settings:Edit`, `DNS:Edit`,
-     `Firewall Services:Edit`, `Page Rules:Edit`, `Workers Scripts:Edit`,
-     `Workers Routes:Edit`, `Cache Rules:Edit`.
-   - Set an expiry (6–12 months), client-IP filter if possible.
-3. Store the token in a local shell env (`CLOUDFLARE_API_TOKEN=…`) or a
-   password manager — never in chat, a git repo, or a shared doc.
+- `cliste_stripe_webhook_ips` — the 15 source IPs Stripe publishes at
+  <https://stripe.com/files/ips/ips_webhooks.json>. Re-run the script
+  quarterly to refresh.
 
----
+### WAF custom rules (phase `http_request_firewall_custom`)
 
-## 1. DNS & transport
+1. **Block `/api/stripe/webhook` from non-Stripe IPs** — belt-and-braces in
+   addition to the HMAC signature check inside the Next.js route.
+2. **Managed Challenge on `/admin…` and `/dashboard…` from outside IE/GB** —
+   set to Managed Challenge (not Block) so travel / mobile SIMs don't lock
+   you out. Tighten to Block once comfortable.
+3. **Block unusual HTTP methods** — anything other than
+   GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS gets dropped at the edge.
+4. **Block scraper + LLM-training bots by user-agent** — GPTBot, ClaudeBot,
+   anthropic-ai, CCBot, Google-Extended, PerplexityBot, Bytespider,
+   Amazonbot, ImagesiftBot, Omgili, DataForSeoBot, FacebookBot, AhrefsBot,
+   SemrushBot. robots.txt blocks polite bots; this blocks the impolite
+   ones too.
+5. **Managed Challenge for empty-user-agent hits on admin/dashboard/auth
+   paths** — common scanner fingerprint.
 
-| Setting | Value | Where |
-|---|---|---|
-| DNS records for `cliste…` hosts | Proxied (orange cloud) | DNS tab |
-| DNSSEC | **Enable** and copy the DS record to your registrar | DNS → Settings |
-| Always Use HTTPS | On | SSL/TLS → Edge Certificates |
-| Automatic HTTPS Rewrites | On | SSL/TLS → Edge Certificates |
-| SSL/TLS encryption mode | **Full (Strict)** | SSL/TLS → Overview |
-| Minimum TLS Version | **TLS 1.3** (fall back to 1.2 only if a partner breaks) | SSL/TLS → Edge Certificates |
-| TLS 1.3 | On | same page |
-| Opportunistic Encryption | On | same page |
-| HTTP/2, HTTP/3 (QUIC) | On | Network tab |
-| HSTS | Enabled, `max-age=63072000`, includeSubDomains, preload | SSL/TLS → Edge Certificates → HSTS |
+### Rate limit (phase `http_ratelimit`)
 
-Note: HSTS preload is also asserted by the app (`next.config.ts`). Once you've
-confirmed prod traffic works for 2 weeks, you can submit your apex domain to
-<https://hstspreload.org/>.
+1. **Brute-force lockout** for `/admin-unlock`, `/dashboard-unlock`, and
+   `/authenticate` POSTs: 5 hits in 10 s per IP → 429 for 10 s.
 
----
+   The free plan caps both `period` and `mitigation_timeout` at 10 s and
+   allows only 1 rule, so this rule only stops fast credential-stuffing.
+   **Slow brute-force is covered in-app** by `src/lib/auth-rate-limit.ts`
+   which locks for 15–30 minutes after a handful of failures.
 
-## 2. Bot & abuse controls
+## What the current token cannot do (needs dashboard or a wider token)
 
-| Setting | Value | Notes |
-|---|---|---|
-| Bot Fight Mode | On (free plan) or **Super Bot Fight Mode** (Pro) | Security → Bots |
-| Browser Integrity Check | On | Security → Settings |
-| Challenge Passage | 30 min | same page |
-| Privacy Pass support | On | same page |
-| Hotlink Protection | On | Scrape Shield |
-| Email Obfuscation | On | Scrape Shield |
-| Security Level | **High** (or **I'm Under Attack** if actively being DDoS'd) | Security → Settings |
+The token we used has these scopes: Zone:Read, WAF:Edit, Account Filter
+Lists:Edit, Account Rulesets:Read. That is enough for everything above but
+blocks the zone-settings category below.
 
----
+### Do these in the Cloudflare dashboard — 5 minutes
 
-## 3. WAF rules (Security → WAF → Custom rules)
+1. **SSL/TLS → Overview**: set encryption mode to **Full (Strict)**.
+2. **SSL/TLS → Edge Certificates**:
+   - Always Use HTTPS: On
+   - Automatic HTTPS Rewrites: On
+   - Opportunistic Encryption: On
+   - TLS 1.3: On
+   - Minimum TLS Version: **1.2** (move to 1.3 once confident)
+   - 0-RTT: On
+   - HSTS: enable, `max-age = 12 months`, Include Subdomains, Preload, No-Sniff.
+3. **Network**: HTTP/2: On, HTTP/3 (QUIC): On, 0-RTT: On, WebSockets: On.
+4. **Security → Settings**:
+   - Security Level: **High**
+   - Challenge Passage: 30 minutes
+   - Browser Integrity Check: On
+   - Privacy Pass Support: On
+5. **Security → Bots** → **Bot Fight Mode**: On.
+6. **Scrape Shield**: Email Obfuscation, Hotlink Protection, Server-Side
+   Excludes all On.
+7. **DNS → Settings → DNSSEC**: click Enable, then paste the DS record into
+   your registrar (webhostingireland.ie). Leave it until the registrar has
+   published, then come back and confirm "Active".
 
-Create these in order. `cliste.example` = your real zone.
+### Alternative — let me do it from the API
 
-### 3.1 Block known bad clients
+If you'd rather I apply steps 1–6 via the API too, add these permissions to
+the token or mint a new one and replace the value in `.env.local`:
 
-```
-(cf.client.bot) and not (cf.verified_bot_category in {"Search Engine Crawler" "Search Engine Optimization" "Monitoring & Analytics"})
-→ Managed Challenge
-```
+- Zone → Zone Settings → Edit
+- Zone → SSL and Certificates → Edit
+- Zone → DNS → Edit  *(only if you also want DNSSEC toggled via API)*
 
-### 3.2 Rate-limit authentication / unlock endpoints
+Then just say "re-run with the wider token" and I'll do the rest.
 
-Security → WAF → **Rate limiting rules**:
+## Stuff I deliberately didn't do
 
-| Rule | Path | Rate | Action |
-|---|---|---|---|
-| `unlock-brute-force` | `http.request.uri.path in {"/admin-unlock" "/dashboard-unlock"}` and `http.request.method eq "POST"` | 5 per 5 min per IP | Block 30 min |
-| `auth-brute-force`   | `starts_with(http.request.uri.path, "/authenticate")` and `http.request.method eq "POST"` | 10 per 5 min per IP | Managed Challenge |
-| `api-booking-flood`  | `starts_with(http.request.uri.path, "/api/")` | 60 per minute per IP | Block 10 min |
+- **Zero Trust / Access SSO** in front of `/admin` — replacing the current
+  password gate with Google-Workspace-backed Access is the strongest move,
+  but it requires an identity provider decision and a user listing. Happy
+  to wire it up when you're ready.
+- **Authenticated Origin Pulls (mTLS) to Vercel** — Vercel doesn't support
+  client-cert auth on Hobby/Team. The practical equivalent is a shared
+  secret header in a Cloudflare Transform Rule checked by the Next.js
+  middleware. Also available on request.
+- **DMARC/SPF/DKIM** — needs coordination with whichever provider sends
+  your outbound mail (SendGrid, Twilio, Google Workspace). A one-line
+  `v=DMARC1; p=reject; rua=mailto:dmarc@clistesystems.ie` is the goal, but
+  you want SPF/DKIM aligned first or legitimate mail gets rejected.
 
-These duplicate the in-app rate limits — that's intentional: Cloudflare is free
-and runs at the edge, the in-app limits are the ground truth.
-
-### 3.3 Geo-fence the admin surface
-
-If you only operate from Ireland (and very occasional travel):
-
-```
-(http.request.uri.path contains "/admin" or http.request.uri.path contains "/dashboard")
-and not (ip.geoip.country in {"IE" "GB"})
-→ Managed Challenge
-```
-
-Use **Managed Challenge** (not Block) so your phone on a foreign SIM isn't
-bricked. Swap to `Block` once you're confident.
-
-### 3.4 Lock the Stripe webhook to Stripe's IPs
-
-Stripe publishes the webhook source IP list at
-<https://stripe.com/docs/ips#webhook-notifications>. Copy the current list into
-a **Cloudflare IP List** (Account → Configurations → Lists), call it
-`stripe_webhook_ips`, then:
-
-```
-(http.request.uri.path eq "/api/stripe/webhook") and not (ip.src in $stripe_webhook_ips)
-→ Block
-```
-
-Revisit the list every quarter. The HMAC signature check in the webhook itself
-still runs — this is belt-and-braces.
-
-### 3.5 Hide the cron endpoint from the internet
-
-`/api/cron/*` should only be called by your scheduler (Vercel Cron / Railway
-cron). If you know its egress IPs, allowlist them. Otherwise:
-
-```
-(starts_with(http.request.uri.path, "/api/cron/")) and not (http.request.headers["x-cron-secret"][0] ne "")
-→ Block
-```
-
-This blocks anyone hitting it without the header at all. The app also requires
-a constant-time match of the secret value, so this is cheap defence in depth.
-
-### 3.6 Deny request methods the app never uses
-
-```
-not (http.request.method in {"GET" "POST" "HEAD" "OPTIONS" "PUT" "PATCH" "DELETE"})
-→ Block
-```
-
-Blocks legacy method-based probes (`PROPFIND`, `TRACE`, etc.).
-
----
-
-## 4. Cache & page rules
-
-The app already sends `Cache-Control: no-store` on the Stripe webhook. Add a
-cache rule so nothing on `/api/*` gets cached, ever:
-
-```
-(starts_with(http.request.uri.path, "/api/"))
-→ Cache eligibility: Bypass cache
-```
-
----
-
-## 5. Authenticated Origin Pulls (mTLS from CF → origin)
-
-Prevents anyone who guesses your Vercel/Railway origin host from bypassing
-Cloudflare entirely.
-
-- Vercel: **not supported** on hobby/team tiers — skip there. Instead, set a
-  custom `x-cf-shared-secret` header at Cloudflare (Transform Rules → Modify
-  Request Header) and have Next.js middleware reject requests without it in
-  production. The direct `*.vercel.app` URL should redirect to the canonical
-  host anyway.
-- Railway: set `x-cf-shared-secret` the same way and check it in `agent.ts` /
-  any inbound HTTP handler.
-
-Transform rule example:
-
-```
-when: any request
-action: Set static → Header name: x-cf-shared-secret, value: <long random>
-```
-
-Then in code:
-
-```ts
-if (req.headers.get("x-cf-shared-secret") !== process.env.CF_SHARED_SECRET) {
-  return new Response("forbidden", { status: 403 });
-}
-```
-
----
-
-## 6. Zero Trust (optional, strongest gate)
-
-If you want real 2FA on `/admin` and `/dashboard` instead of a shared
-password:
-
-1. Cloudflare Zero Trust → Access → Applications → **Add application** →
-   Self-hosted.
-2. App domain: `app.cliste.example` path `/admin` (one app) and `/dashboard`
-   (second app).
-3. Policy: **Emails ending in** `@clistesystems.ie` (or an explicit list),
-   identity provider = One-time PIN or Google Workspace.
-4. Session 8 hours, require purpose justification.
-
-This replaces the `CLISTE_ADMIN_SECRET` / `CLISTE_DASHBOARD_GATE_SECRET` cookie
-gate with a proper SSO flow. Keep the in-app gate as a second factor for now.
-
----
-
-## 7. Email & DNS hygiene
-
-In the zone DNS tab, make sure you have:
-
-| Record | Purpose |
-|---|---|
-| `TXT _dmarc` with `v=DMARC1; p=reject; rua=mailto:dmarc@…` | Stop spoofed outbound email |
-| `TXT @` with SPF, e.g. `v=spf1 include:sendgrid.net include:_spf.twilio.com ~all` | Only your senders can send as you |
-| DKIM CNAMEs from SendGrid & Twilio | Signed mail |
-| `TXT @` with `v=spf1 -all` on any domain you don't send from | Null SPF |
-| MTA-STS + TLS-RPT | Enforce TLS on inbound mail |
-
-Cloudflare Email Routing can handle catch-all + alias forwarding if you want;
-it's free and saves running a real MX.
-
----
-
-## 8. Secrets & audit log
-
-- Account → Audit log: review weekly for 2 months, then monthly.
-- Members: enforce **Hardware key 2FA** on all users. Remove any member who
-  doesn't need access.
-- Any API token you aren't actively using → **Delete**, don't just expire.
-
----
-
-## 9. Driving it from code (optional)
-
-If you'd rather I apply most of these with your **new** token, export it in
-your local shell (never paste it in chat):
+## Verification
 
 ```bash
-# ~/.zshrc or a local .env.local that's gitignored
-export CLOUDFLARE_API_TOKEN='<fresh token you just minted>'
-export CLOUDFLARE_ACCOUNT_ID='<your account id>'
-export CLOUDFLARE_ZONE_ID='<zone id for your root domain>'
+# should return 403 / Stripe-IP block
+curl -I https://clistesystems.ie/api/stripe/webhook
+
+# should eventually 429 after 5 rapid hits
+for i in $(seq 1 10); do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://clistesystems.ie/dashboard-unlock
+done
 ```
 
-Then tell me, and I'll apply sections 1–4 via the Cloudflare REST API. The
-code never prints the token back. You still have to do sections 5–7 by hand
-because they require account-level settings or DNS coordination I can't safely
-guess at.
+After you do the 7 dashboard steps above, also check:
 
----
+- <https://securityheaders.com/?q=clistesystems.ie> — should be A+
+- <https://www.ssllabs.com/ssltest/analyze.html?d=clistesystems.ie> — should be A+
 
-## 10. Verification
-
-After applying, verify from outside Cloudflare:
+## Re-running the script
 
 ```bash
-curl -I https://<your host>/                         # expect HSTS, CSP, Referrer-Policy
-curl -I https://<your host>/robots.txt               # expect 200 with disallow list
-curl -I -X POST https://<your host>/dashboard-unlock # rate-limit from 6th hit
-curl https://<your host>/api/stripe/webhook           # expect 400 without Stripe sig
+# loads CLOUDFLARE_API_TOKEN etc. from .env.local
+set -a && source .env.local && set +a
+python3 scripts/cloudflare-harden.py
 ```
 
-Also run <https://securityheaders.com/?q=your-host> — should be A+.
-And <https://www.ssllabs.com/ssltest/> — should be A+.
+Do this quarterly, or after any Stripe IP update.
