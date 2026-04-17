@@ -17,14 +17,14 @@ export default async function OnboardingDonePage() {
 
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-          You're ready to go live
+          You&apos;re ready to go live
         </h1>
         <p className="max-w-prose text-sm text-gray-600">
           Test your Cliste number right now — ring{" "}
           <span className="font-mono text-gray-900">
             {session.phoneNumber ?? "(not assigned yet)"}
           </span>{" "}
-          from your personal mobile and book a test appointment. When you're
+          from your personal mobile and book a test appointment. When you&apos;re
           happy it sounds right, hit the button below to switch your salon to{" "}
           <strong>live</strong> and start accepting real bookings.
         </p>
@@ -34,16 +34,16 @@ export default async function OnboardingDonePage() {
         <h2 className="mb-2 font-semibold text-gray-900">Next step after Go Live</h2>
         {launch === "diy" ? (
           <p>
-            We'll email you per-carrier forwarding instructions right after you
+            We&apos;ll email you per-carrier forwarding instructions right after you
             go live. Forward your existing salon number to your Cliste number
             and your AI is on the job.
           </p>
         ) : (
           <p>
-            You've opted into{" "}
+            You&apos;ve opted into{" "}
             <strong>{launch}</strong>{" "}
             launch. Our team will reach out within 1 business day to schedule
-            — your subscription is already active, so there's no rush.
+            — your subscription is already active, so there&apos;s no rush.
           </p>
         )}
       </div>

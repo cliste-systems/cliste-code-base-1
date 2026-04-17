@@ -31,8 +31,6 @@ const DEFAULT_LOW_WATER_MARK = 20;
 const DEFAULT_REFILL_BATCH = 10;
 const COOLDOWN_DAYS = 30;
 
-type AdminClient = ReturnType<typeof createAdminClient>;
-
 export function twilioIsConfigured(): boolean {
   return (
     Boolean(process.env.TWILIO_ACCOUNT_SID?.trim()) &&

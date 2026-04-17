@@ -37,7 +37,7 @@ export default async function OnboardingPaymentsPage(props: { searchParams?: Sea
           Connect your Stripe account
         </h1>
         <p className="max-w-prose text-sm text-gray-600">
-          Cliste never holds your clients' money. We create a Stripe Connect
+          Cliste never holds your clients&apos; money. We create a Stripe Connect
           Express account in your name — payouts land in your bank, directly
           from Stripe. We take a small platform fee (see plan comparison next)
           on each booking.
@@ -51,9 +51,9 @@ export default async function OnboardingPaymentsPage(props: { searchParams?: Sea
       ) : (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <ol className="mb-5 list-decimal space-y-1 pl-4 text-sm text-gray-700">
-            <li>You'll be handed over to Stripe to verify your identity (IBAN, ID, VAT if applicable).</li>
-            <li>When Stripe confirms, you'll land back here automatically.</li>
-            <li>We'll never see your full bank or ID details — just whether charges are enabled.</li>
+            <li>You&apos;ll be handed over to Stripe to verify your identity (IBAN, ID, VAT if applicable).</li>
+            <li>When Stripe confirms, you&apos;ll land back here automatically.</li>
+            <li>We&apos;ll never see your full bank or ID details — just whether charges are enabled.</li>
           </ol>
 
           <form action={startStripeConnectFromOnboarding}>

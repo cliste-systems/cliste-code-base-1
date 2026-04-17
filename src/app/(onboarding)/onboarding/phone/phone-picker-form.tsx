@@ -41,7 +41,7 @@ export function PhonePickerForm({ existingNumber, availableIE }: Props) {
               <>Ready to claim one of {availableIE} Irish numbers from our pool.</>
             ) : (
               <>
-                Our pool is currently empty. Click below to try anyway — we'll
+                Our pool is currently empty. Click below to try anyway — we&apos;ll
                 auto-provision a new one from Twilio if configured.
               </>
             )}

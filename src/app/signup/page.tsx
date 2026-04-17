@@ -66,7 +66,7 @@ export default async function SignupPage() {
                 Create your Cliste account
               </h2>
               <p className="text-sm text-gray-600">
-                Just your name, email, and a password. We'll pick your Irish
+                Just your name, email, and a password. We&apos;ll pick your Irish
                 number and tune your AI in the next steps.
               </p>
             </div>

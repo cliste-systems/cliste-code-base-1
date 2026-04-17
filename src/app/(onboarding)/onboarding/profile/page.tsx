@@ -32,7 +32,7 @@ export default async function OnboardingProfilePage() {
         <p className="max-w-prose text-sm text-gray-600">
           Your AI will introduce itself using these details. Address is used
           for your public booking page and directory search ranking — we only
-          store what's on this form.
+          store what&apos;s on this form.
         </p>
       </header>
 

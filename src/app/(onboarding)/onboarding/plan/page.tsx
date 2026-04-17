@@ -70,7 +70,7 @@ export default async function OnboardingPlanPage(props: {
         <p className="max-w-prose text-sm text-gray-600">
           Plans compared below. Annual billing saves you two months. Setup is
           optional — most salons pick Remote Launch for an hour with a
-          specialist, or DIY if you're comfortable with the self-serve flow.
+          specialist, or DIY if you&apos;re comfortable with the self-serve flow.
         </p>
       </header>
 

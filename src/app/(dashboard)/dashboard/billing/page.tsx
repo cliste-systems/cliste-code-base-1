@@ -1,4 +1,5 @@
 import { AlertTriangle, Gauge } from "lucide-react";
+import Link from "next/link";
 
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { PLANS, isPlanTier, type PlanTier } from "@/lib/cliste-plans";
@@ -189,12 +190,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <p className="mt-1">
           Upgrading takes effect immediately; your next invoice pro-rates. The
           {" "}
-          <a
+          <Link
             href="/"
             className="font-semibold text-blue-600 underline-offset-2 hover:underline"
           >
             pricing page
-          </a>
+          </Link>
           {" "}
           compares all plans side-by-side.
         </p>

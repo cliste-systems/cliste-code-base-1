@@ -27,10 +27,10 @@ export default async function OnboardingPhonePage() {
           Pick your Cliste number
         </h1>
         <p className="max-w-prose text-sm text-gray-600">
-          We'll hand you an Irish mobile number from our pool. That number is
+          We&apos;ll hand you an Irish mobile number from our pool. That number is
           where your AI receptionist answers — forward your existing salon
-          line to it (we'll show you how in the last step) and your clients
-          won't notice a thing.
+          line to it (we&apos;ll show you how in the last step) and your clients
+          won&apos;t notice a thing.
         </p>
       </header>
 

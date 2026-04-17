@@ -1,4 +1,4 @@
-import { Phone, RefreshCw } from "lucide-react";
+import { Phone } from "lucide-react";
 
 import { poolHealthCheck, twilioIsConfigured } from "@/lib/phone-pool";
 import { createAdminClient } from "@/utils/supabase/admin";
