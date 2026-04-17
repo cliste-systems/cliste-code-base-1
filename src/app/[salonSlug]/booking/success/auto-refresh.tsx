@@ -14,9 +14,12 @@ import { useEffect, useRef } from "react";
  */
 export function BookingStatusAutoRefresh() {
   const router = useRouter();
-  const startRef = useRef<number>(Date.now());
+  // Start time is captured inside the effect — calling Date.now() during
+  // render would violate react-hooks/purity (impure function during render).
+  const startRef = useRef<number>(0);
 
   useEffect(() => {
+    startRef.current = Date.now();
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
