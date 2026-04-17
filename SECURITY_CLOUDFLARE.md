@@ -1,7 +1,29 @@
 # Cloudflare hardening — status
 
 Zone: `clistesystems.ie`
-Last applied: 2026-04-17 via `scripts/cloudflare-harden.py`.
+Last applied: 2026-04-17 via `scripts/cloudflare-harden.py` and direct API.
+
+## Zone settings (live)
+
+| Setting | Value |
+|---|---|
+| SSL mode | `strict` (Full Strict) |
+| Minimum TLS version | 1.2 |
+| TLS 1.3 | on (with 0-RTT) |
+| Always Use HTTPS | on |
+| Automatic HTTPS Rewrites | on |
+| Opportunistic Encryption | on |
+| HTTP/3 (QUIC) | on |
+| HSTS | enabled, `max-age=31536000`, includeSubDomains, preload |
+| Security Level | high |
+| Browser Integrity Check | on |
+| Challenge Passage | 1800s |
+| Privacy Pass | on |
+| Email Obfuscation | on |
+| Server-Side Excludes | on |
+| Brotli | on |
+| IPv6 | on |
+| WebSockets | on |
 
 ## What is applied (via API)
 
@@ -38,46 +60,24 @@ Last applied: 2026-04-17 via `scripts/cloudflare-harden.py`.
    **Slow brute-force is covered in-app** by `src/lib/auth-rate-limit.ts`
    which locks for 15–30 minutes after a handful of failures.
 
-## What the current token cannot do (needs dashboard or a wider token)
+## What still needs a human click (3 items)
 
-The token we used has these scopes: Zone:Read, WAF:Edit, Account Filter
-Lists:Edit, Account Rulesets:Read. That is enough for everything above but
-blocks the zone-settings category below.
+Three things can't be flipped via the current API token, either because the
+endpoint is enterprise-only (Bot Fight Mode), returned a Cloudflare-side 500
+(Hotlink Protection), or the token doesn't carry DNS:Edit (DNSSEC).
 
-### Do these in the Cloudflare dashboard — 5 minutes
+1. **Security → Bots → Bot Fight Mode** → turn on.
+   Stops most classic scrapers. Free-tier feature, dashboard only.
+2. **Scrape Shield → Hotlink Protection** → turn on.
+   Blocks other sites embedding images from `clistesystems.ie`. The API
+   returned a 500 when we tried — it's dashboard-only for now.
+3. **DNS → Settings → DNSSEC** → Enable.
+   Cloudflare will then display a DS record. Log into
+   **webhostingireland.ie** (the registrar), paste the DS record into the
+   DNSSEC section, save. Come back to Cloudflare after ~24h and confirm it
+   went **Active**.
 
-1. **SSL/TLS → Overview**: set encryption mode to **Full (Strict)**.
-2. **SSL/TLS → Edge Certificates**:
-   - Always Use HTTPS: On
-   - Automatic HTTPS Rewrites: On
-   - Opportunistic Encryption: On
-   - TLS 1.3: On
-   - Minimum TLS Version: **1.2** (move to 1.3 once confident)
-   - 0-RTT: On
-   - HSTS: enable, `max-age = 12 months`, Include Subdomains, Preload, No-Sniff.
-3. **Network**: HTTP/2: On, HTTP/3 (QUIC): On, 0-RTT: On, WebSockets: On.
-4. **Security → Settings**:
-   - Security Level: **High**
-   - Challenge Passage: 30 minutes
-   - Browser Integrity Check: On
-   - Privacy Pass Support: On
-5. **Security → Bots** → **Bot Fight Mode**: On.
-6. **Scrape Shield**: Email Obfuscation, Hotlink Protection, Server-Side
-   Excludes all On.
-7. **DNS → Settings → DNSSEC**: click Enable, then paste the DS record into
-   your registrar (webhostingireland.ie). Leave it until the registrar has
-   published, then come back and confirm "Active".
-
-### Alternative — let me do it from the API
-
-If you'd rather I apply steps 1–6 via the API too, add these permissions to
-the token or mint a new one and replace the value in `.env.local`:
-
-- Zone → Zone Settings → Edit
-- Zone → SSL and Certificates → Edit
-- Zone → DNS → Edit  *(only if you also want DNSSEC toggled via API)*
-
-Then just say "re-run with the wider token" and I'll do the rest.
+Everything else is already applied.
 
 ## Stuff I deliberately didn't do
 
