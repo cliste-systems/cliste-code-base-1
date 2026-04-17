@@ -49,6 +49,7 @@ const navItems: {
   { href: "/dashboard/clients", label: "Clients", nativeOnly: true },
   { href: "/dashboard/services", label: "Services & team", nativeOnly: true },
   { href: "/dashboard/storefront", label: "Storefront", nativeOnly: true },
+  { href: "/dashboard/payments", label: "Payments", nativeOnly: true },
   { href: "/dashboard/support", label: "Support", footer: true },
   { href: "/dashboard/settings", label: "Settings", footer: true },
 ];

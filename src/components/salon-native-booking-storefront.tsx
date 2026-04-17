@@ -440,6 +440,12 @@ export function SalonNativeBookingStorefront({
             setBookingError(res.message);
             return;
           }
+          // Stripe flow: booking is held as `pending` — hand the customer off
+          // to Stripe Checkout. Webhook flips the booking to `paid` on success.
+          if (res.checkoutUrl) {
+            window.location.assign(res.checkoutUrl);
+            return;
+          }
           setToastEmailLine(res.emailNotice ?? null);
           setConfirmOpen(false);
           setDialogName("");
