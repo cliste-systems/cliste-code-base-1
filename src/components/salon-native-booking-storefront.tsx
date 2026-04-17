@@ -566,8 +566,11 @@ export function SalonNativeBookingStorefront({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
+        <DialogContent
+          className="sm:max-w-md flex max-h-[calc(100dvh-2rem)] flex-col"
+          showCloseButton
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               {paymentStep ? "Pay to confirm" : "Confirm booking"}
             </DialogTitle>
@@ -577,6 +580,7 @@ export function SalonNativeBookingStorefront({
                 : null}
             </DialogDescription>
           </DialogHeader>
+          <div className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4">
           {paymentStep ? (
             <div className="py-1">
               <BookingPaymentStep
@@ -733,6 +737,7 @@ export function SalonNativeBookingStorefront({
             </DialogFooter>
           </form>
           )}
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -110,14 +110,18 @@ export function PublicBookingDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
+        <DialogContent
+          className="sm:max-w-md flex max-h-[calc(100dvh-2rem)] flex-col"
+          showCloseButton
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle>Book {service.name}</DialogTitle>
             <DialogDescription>
               {formatEur(service.price)} · {service.duration} min
             </DialogDescription>
           </DialogHeader>
 
+          <div className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4">
           <form
               className="space-y-4 py-1"
               onSubmit={(e) => {
@@ -237,6 +241,7 @@ export function PublicBookingDialog({
                 </Button>
               </DialogFooter>
             </form>
+          </div>
         </DialogContent>
       </Dialog>
     </>
