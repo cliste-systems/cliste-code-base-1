@@ -206,7 +206,7 @@ export function PublicBookingDialog({
                   placeholder="you@example.com"
                 />
                 <p className="text-muted-foreground text-xs leading-snug">
-                  Optional — we&apos;ll email you a booking summary if you add your address.
+                  Optional — we&apos;ll email you a booking summary if you leave your email address.
                 </p>
               </div>
               <div className="space-y-2">

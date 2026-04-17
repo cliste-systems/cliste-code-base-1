@@ -705,7 +705,7 @@ export function SalonNativeBookingStorefront({
                 placeholder="you@example.com"
               />
               <p className="text-[11px] leading-snug text-gray-500">
-                Optional — we&apos;ll email you a booking summary if you add your address.
+                Optional — we&apos;ll email you a booking summary if you leave your email address.
               </p>
             </div>
             {bookingError ? (
