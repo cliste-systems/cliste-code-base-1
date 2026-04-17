@@ -3,7 +3,38 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const OTP_SENDS_PER_PHONE_PER_HOUR = 5;
 const OTP_SENDS_PER_IP_PER_HOUR = 40;
 const BOOKING_SUBMITS_PER_IP_PER_15MIN = 25;
-const BOOKINGS_PER_PHONE_PER_DAY = 4;
+const DEFAULT_BOOKINGS_PER_PHONE_PER_DAY = 4;
+
+/**
+ * Per-phone daily booking cap. Override via env (e.g. set very high while
+ * testing the public booking flow against your own number). Setting it to
+ * 0 disables the check entirely — only do that on staging.
+ */
+function bookingsPerPhonePerDay(): number {
+  const raw = process.env.CLISTE_BOOKINGS_PER_PHONE_PER_DAY?.trim();
+  if (!raw) return DEFAULT_BOOKINGS_PER_PHONE_PER_DAY;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_BOOKINGS_PER_PHONE_PER_DAY;
+  }
+  return parsed;
+}
+
+/**
+ * Comma-separated list of E.164 numbers that bypass the per-phone daily cap
+ * (e.g. founder phone for QA). Stripping spaces and the leading "+" so
+ * matching is forgiving.
+ */
+function bypassPhoneSet(): Set<string> {
+  const raw = process.env.CLISTE_PUBLIC_BOOKING_BYPASS_PHONES?.trim();
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().replace(/^\+/, ""))
+      .filter(Boolean),
+  );
+}
 
 export async function recordPublicBookingRateEvent(
   admin: SupabaseClient,
@@ -118,6 +149,16 @@ export async function assertPhoneBookingsPerDayAllowed(
   organizationId: string,
   phoneE164: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const cap = bookingsPerPhonePerDay();
+  if (cap === 0) {
+    return { ok: true };
+  }
+
+  const bypass = bypassPhoneSet();
+  if (bypass.has(phoneE164.replace(/^\+/, ""))) {
+    return { ok: true };
+  }
+
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const { count, error } = await admin
@@ -131,7 +172,7 @@ export async function assertPhoneBookingsPerDayAllowed(
   if (error) {
     return { ok: false, message: "Please try again in a moment." };
   }
-  if ((count ?? 0) >= BOOKINGS_PER_PHONE_PER_DAY) {
+  if ((count ?? 0) >= cap) {
     return {
       ok: false,
       message:
