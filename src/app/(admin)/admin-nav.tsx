@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { LayoutGrid, LifeBuoy, Shield, Users } from "lucide-react";
+import {
+  Inbox,
+  LayoutGrid,
+  LifeBuoy,
+  Phone,
+  Shield,
+  Users,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,6 +18,18 @@ import { AdminSignOutButton } from "./admin-sign-out-button";
 
 const nav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
+  {
+    href: "/admin/onboarding",
+    label: "Onboarding queue",
+    icon: Inbox,
+    exact: false,
+  },
+  {
+    href: "/admin/phone-pool",
+    label: "Phone pool",
+    icon: Phone,
+    exact: false,
+  },
   { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },
   { href: "/admin/security", label: "Security", icon: Shield, exact: false },
   {

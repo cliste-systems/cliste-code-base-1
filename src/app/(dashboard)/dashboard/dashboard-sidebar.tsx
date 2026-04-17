@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Calendar,
   CreditCard,
+  Gauge,
   HelpCircle,
   Inbox,
   LayoutDashboard,
@@ -34,6 +35,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/services": ShoppingBag,
   "/dashboard/storefront": Store,
   "/dashboard/payments": CreditCard,
+  "/dashboard/billing": Gauge,
   "/dashboard/support": HelpCircle,
   "/dashboard/settings": Settings,
 };

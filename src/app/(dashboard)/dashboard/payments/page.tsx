@@ -62,6 +62,8 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
         "stripe_payouts_enabled",
         "stripe_details_submitted",
         "stripe_onboarded_at",
+        "application_fee_bps",
+        "plan_tier",
       ].join(", "),
     )
     .eq("id", organizationId)
@@ -73,6 +75,8 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
       stripe_payouts_enabled: boolean | null;
       stripe_details_submitted: boolean | null;
       stripe_onboarded_at: string | null;
+      application_fee_bps: number | null;
+      plan_tier: string | null;
     }>();
 
   const stripeOk = stripeIsConfigured();
@@ -95,7 +99,7 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
 
   const rows = payments ?? [];
 
-  const feeBps = getApplicationFeeBps();
+  const feeBps = getApplicationFeeBps(org?.application_fee_bps);
   const feePct = (feeBps / 100).toFixed(2).replace(/\.00$/, "");
 
   return (

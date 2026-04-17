@@ -97,12 +97,29 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
-        await markAppointmentPaidFromSession(admin, stripe, session);
+        if (session.mode === "subscription") {
+          await handlePlatformCheckoutCompleted(admin, session);
+        } else {
+          await markAppointmentPaidFromSession(admin, stripe, session);
+        }
         break;
       }
       case "checkout.session.expired": {
         const session = event.data.object as Stripe.Checkout.Session;
-        await markAppointmentExpiredFromSession(admin, session);
+        if (session.mode !== "subscription") {
+          await markAppointmentExpiredFromSession(admin, session);
+        }
+        break;
+      }
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const sub = event.data.object as Stripe.Subscription;
+        await handlePlatformSubscriptionChange(admin, sub);
+        break;
+      }
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        await handlePlatformSubscriptionDeleted(admin, sub);
         break;
       }
       case "account.updated": {
@@ -420,6 +437,103 @@ async function syncConnectedAccount(admin: AdminClient, acct: Stripe.Account) {
     .eq("id", existing.id);
 
   revalidatePath("/dashboard/payments");
+}
+
+/**
+ * Platform billing — Stripe Billing subscription that pays Cliste.
+ * Mirrors the subscription state onto organizations so the middleware can
+ * suspend the dashboard when the salon stops paying us.
+ */
+async function handlePlatformCheckoutCompleted(
+  admin: AdminClient,
+  session: Stripe.Checkout.Session,
+) {
+  const orgId =
+    (session.metadata?.cliste_organization_id ?? "").trim() || null;
+  if (!orgId) return;
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id ?? null;
+  const customerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id ?? null;
+
+  await admin
+    .from("organizations")
+    .update({
+      platform_subscription_id: subscriptionId,
+      platform_customer_id: customerId,
+      onboarding_step: 4,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orgId);
+}
+
+async function handlePlatformSubscriptionChange(
+  admin: AdminClient,
+  sub: Stripe.Subscription,
+) {
+  const orgId =
+    (sub.metadata?.cliste_organization_id ?? "").trim() || null;
+  if (!orgId) return;
+
+  const isHealthy =
+    sub.status === "active" ||
+    sub.status === "trialing" ||
+    sub.status === "past_due";
+  const shouldSuspend =
+    sub.status === "unpaid" ||
+    sub.status === "incomplete_expired" ||
+    sub.status === "canceled";
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("status")
+    .eq("id", orgId)
+    .maybeSingle();
+  const currentStatus = (org?.status as string | undefined) ?? "active";
+
+  const patch: Record<string, unknown> = {
+    platform_subscription_id: sub.id,
+    platform_customer_id:
+      typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (shouldSuspend && currentStatus === "active") {
+    patch.status = "suspended";
+    patch.is_active = false;
+    patch.suspended_reason = `stripe_subscription_${sub.status}`;
+    patch.suspended_at = new Date().toISOString();
+  } else if (isHealthy && currentStatus === "suspended") {
+    patch.status = "active";
+    patch.is_active = true;
+    patch.suspended_reason = null;
+    patch.suspended_at = null;
+  }
+
+  await admin.from("organizations").update(patch).eq("id", orgId);
+}
+
+async function handlePlatformSubscriptionDeleted(
+  admin: AdminClient,
+  sub: Stripe.Subscription,
+) {
+  const orgId =
+    (sub.metadata?.cliste_organization_id ?? "").trim() || null;
+  if (!orgId) return;
+  await admin
+    .from("organizations")
+    .update({
+      status: "churned",
+      is_active: false,
+      suspended_reason: "platform_subscription_cancelled",
+      suspended_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orgId);
 }
 
 /** Supabase-js can return joined rows as either an object or an array when

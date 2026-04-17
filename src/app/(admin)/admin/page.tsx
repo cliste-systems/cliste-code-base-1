@@ -344,7 +344,14 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
             Overview
           </h1>
         </div>
-        <NewSalonDialog />
+        {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
+          <NewSalonDialog />
+        ) : (
+          <div className="flex flex-col items-end gap-1 text-right text-xs text-gray-500">
+            <span>Self-serve signup is live at <code className="rounded bg-gray-100 px-1 py-0.5">/signup</code>.</span>
+            <span>Set <code className="rounded bg-gray-100 px-1 py-0.5">ADMIN_ALLOW_MANUAL_CREATE=1</code> to expose the manual form.</span>
+          </div>
+        )}
       </header>
 
       {loadError ? (

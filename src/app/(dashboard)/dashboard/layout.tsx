@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
@@ -50,6 +51,7 @@ const navItems: {
   { href: "/dashboard/services", label: "Services & team", nativeOnly: true },
   { href: "/dashboard/storefront", label: "Storefront", nativeOnly: true },
   { href: "/dashboard/payments", label: "Payments", nativeOnly: true },
+  { href: "/dashboard/billing", label: "Billing & usage", footer: true },
   { href: "/dashboard/support", label: "Support", footer: true },
   { href: "/dashboard/settings", label: "Settings", footer: true },
 ];
@@ -72,6 +74,27 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const { supabase, organizationId, user } = await requireDashboardSession();
+
+  // Gate the dashboard on SaaS lifecycle status. Newly-signed-up salons
+  // still in the wizard (or suspended ones) should not see live bookings.
+  // Legacy rows created before migration 027 default to status='active' so
+  // existing dashboards are unaffected.
+  const { data: lifecycleRow } = await supabase
+    .from("organizations")
+    .select("status")
+    .eq("id", organizationId)
+    .maybeSingle();
+  const lifecycleStatus =
+    (lifecycleRow?.status as string | undefined) ?? "active";
+  if (
+    lifecycleStatus === "pending_verification" ||
+    lifecycleStatus === "onboarding"
+  ) {
+    redirect("/onboarding");
+  }
+  if (lifecycleStatus === "suspended") {
+    redirect("/dashboard/billing?suspended=1");
+  }
 
   const { data: profileRow } = await supabase
     .from("profiles")

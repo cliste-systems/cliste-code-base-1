@@ -42,17 +42,57 @@ export function stripeIsConfigured(): boolean {
 }
 
 /**
- * Platform fee in basis points (500 = 5.00%). Can be overridden per
- * deployment via `CLISTE_STRIPE_APPLICATION_FEE_BPS`.
+ * Platform fee in basis points (100 = 1.00%). Sourced in this order:
+ *   1. Per-organisation `organizations.application_fee_bps` (set by tier
+ *      trigger on tier change; admin-overridable for enterprise deals).
+ *   2. Legacy env override `CLISTE_STRIPE_APPLICATION_FEE_BPS` (pre-SaaS
+ *      deployments where every org shared the same rate).
+ *   3. Hardcoded default (100 bps = 1.00% = the Professional tier rate).
+ *
+ * Callers that have already loaded the org row should pass `orgBps` so we
+ * don't re-query Supabase. Callers inside Checkout Session creators that
+ * haven't loaded the org should use `getApplicationFeeBpsForOrg(orgId)`.
  */
-export function getApplicationFeeBps(): number {
+const DEFAULT_APPLICATION_FEE_BPS = 100;
+
+export function getApplicationFeeBps(orgBps?: number | null): number {
+  if (
+    typeof orgBps === "number" &&
+    Number.isFinite(orgBps) &&
+    orgBps >= 0 &&
+    orgBps <= 5000
+  ) {
+    return orgBps;
+  }
   const raw = process.env.CLISTE_STRIPE_APPLICATION_FEE_BPS?.trim();
   const parsed = raw ? Number.parseInt(raw, 10) : NaN;
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 5000) {
-    // Sensible default + guard against absurd values (max 50%).
-    return 500;
+    return DEFAULT_APPLICATION_FEE_BPS;
   }
   return parsed;
+}
+
+/**
+ * Fee bps for a specific org by id. Reads the single column; if the row is
+ * missing or RLS hides it, falls back to env / default.
+ */
+export async function getApplicationFeeBpsForOrg(
+  organizationId: string,
+): Promise<number> {
+  try {
+    const { createAdminClient } = await import("@/utils/supabase/admin");
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("organizations")
+      .select("application_fee_bps")
+      .eq("id", organizationId)
+      .maybeSingle();
+    return getApplicationFeeBps(
+      (data as { application_fee_bps?: number | null } | null)?.application_fee_bps,
+    );
+  } catch {
+    return getApplicationFeeBps();
+  }
 }
 
 export function getDefaultCurrency(): string {
@@ -74,10 +114,13 @@ export function toMinorUnits(amount: number): number {
 
 export function computeApplicationFeeCents(
   amountCents: number,
-  feeBps: number = getApplicationFeeBps(),
+  feeBps?: number | null,
 ): number {
-  if (amountCents <= 0 || feeBps <= 0) return 0;
+  const bps = getApplicationFeeBps(
+    typeof feeBps === "number" ? feeBps : undefined,
+  );
+  if (amountCents <= 0 || bps <= 0) return 0;
   // Cap fee at the charge amount to avoid Stripe validation errors on tiny
   // charges; realistically the charge minimum (~€0.50) makes this a non-issue.
-  return Math.min(amountCents, Math.floor((amountCents * feeBps) / 10_000));
+  return Math.min(amountCents, Math.floor((amountCents * bps) / 10_000));
 }

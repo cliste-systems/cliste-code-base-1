@@ -717,7 +717,7 @@ export async function submitPublicBooking(
   const { data: org, error: orgErr } = await admin
     .from("organizations")
     .select(
-      "id, tier, is_active, name, stripe_account_id, stripe_charges_enabled",
+      "id, tier, is_active, name, stripe_account_id, stripe_charges_enabled, application_fee_bps",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -764,7 +764,10 @@ export async function submitPublicBooking(
     stripeAccountId != null &&
     Boolean(org.stripe_charges_enabled);
   const platformFeeCents = requiresPayment
-    ? computeApplicationFeeCents(amountCents)
+    ? computeApplicationFeeCents(
+        amountCents,
+        (org as { application_fee_bps?: number | null }).application_fee_bps,
+      )
     : 0;
 
   const staffIdRaw = String(formData.get("staff_id") ?? "").trim();
