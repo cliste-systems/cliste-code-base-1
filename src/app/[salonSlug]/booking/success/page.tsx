@@ -1,10 +1,12 @@
-import { CalendarClock, CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
+import { CalendarClock, Check, Loader2, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import { createAdminClient } from "@/utils/supabase/admin";
+
+import { BookingStatusAutoRefresh } from "./auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +37,7 @@ export default async function BookingSuccessPage({
   const admin = createAdminClient();
   const { data: org } = await admin
     .from("organizations")
-    .select("id, slug, name")
+    .select("id, slug, name, logo_url")
     .eq("slug", salonSlug)
     .eq("is_active", true)
     .maybeSingle();
@@ -43,9 +45,11 @@ export default async function BookingSuccessPage({
   if (!org) notFound();
 
   const salonName = resolveOrganizationDisplayName(org.name ?? null, org.slug);
+  const logoUrl: string | null = (org as { logo_url?: string | null })
+    .logo_url ?? null;
 
   // Fetch the held/paid appointment. We scope by organization_id so a crafted
-  // `?ref=` can't leak data across salons.
+  // `?ref=` cannot leak data across salons.
   let appointment: {
     id: string;
     start_time: string;
@@ -73,8 +77,6 @@ export default async function BookingSuccessPage({
         amount_cents: data.amount_cents ?? null,
         currency: data.currency ?? null,
         booking_reference: data.booking_reference ?? null,
-        // supabase-js returns joined rows as arrays when the FK is ambiguous;
-        // normalise to the shape we render.
         service: Array.isArray(data.service)
           ? (data.service[0] as { name: string | null } | undefined) ?? null
           : (data.service as { name: string | null } | null) ?? null,
@@ -88,22 +90,43 @@ export default async function BookingSuccessPage({
   });
 
   const storefrontHref = `/${org.slug}`;
+  const isPending = status === "processing" || status === "unknown";
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col items-center justify-center px-4 py-12 text-gray-900">
-      <StatusCard
-        status={status}
-        salonName={salonName}
-        appointment={appointment}
-      />
-      <div className="mt-6 flex items-center gap-3 text-sm">
-        <Link
-          href={storefrontHref}
-          className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-900 hover:bg-gray-50"
-        >
-          Back to {salonName}
-        </Link>
-      </div>
+    <main className="min-h-[100dvh] bg-gray-50 text-gray-900">
+      {/* Brand header bar — matches the booking storefront */}
+      <header className="border-b border-gray-200/80 bg-white">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3 sm:px-6">
+          <SalonLogoBadge name={salonName} logoUrl={logoUrl} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold tracking-tight text-gray-900">
+              {salonName}
+            </div>
+            <div className="truncate text-[11px] uppercase tracking-wide text-gray-500">
+              Booking
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto flex w-full max-w-xl flex-col items-stretch px-4 py-10 sm:py-14">
+        <StatusCard
+          status={status}
+          salonName={salonName}
+          appointment={appointment}
+        />
+
+        <div className="mt-6 flex items-center justify-center">
+          <Link
+            href={storefrontHref}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm transition hover:bg-gray-50"
+          >
+            Back to {salonName}
+          </Link>
+        </div>
+      </section>
+
+      {isPending ? <BookingStatusAutoRefresh /> : null}
     </main>
   );
 }
@@ -157,82 +180,79 @@ function StatusCard({
 
   const serviceName = appointment?.service?.name ?? "your appointment";
 
-  const base =
-    "w-full rounded-2xl border p-6 text-center shadow-sm sm:p-8";
-
-  if (status === "paid") {
-    return (
-      <section className={`${base} border-emerald-200 bg-emerald-50/70`}>
-        <CheckCircle2
-          className="mx-auto h-12 w-12 text-emerald-600"
-          aria-hidden
-        />
-        <h1 className="mt-3 text-xl font-semibold text-gray-900">
-          You&rsquo;re booked in!
-        </h1>
-        <p className="mt-1 text-sm text-gray-700">
-          Payment received — {salonName} will see you soon.
-        </p>
-        <BookingDetails
-          startLabel={startLabel}
-          amountLabel={amountLabel}
-          serviceName={serviceName}
-          reference={appointment?.booking_reference ?? null}
-        />
-      </section>
-    );
-  }
-
-  if (status === "processing") {
-    return (
-      <section className={`${base} border-amber-200 bg-amber-50/70`}>
-        <Loader2
-          className="mx-auto h-12 w-12 animate-spin text-amber-600"
-          aria-hidden
-        />
-        <h1 className="mt-3 text-xl font-semibold text-gray-900">
-          Finalising your booking…
-        </h1>
-        <p className="mt-1 text-sm text-gray-700">
-          Your payment is being confirmed by your bank. You&rsquo;ll get a text
-          when it&rsquo;s finalised — you can safely close this page.
-        </p>
-        <BookingDetails
-          startLabel={startLabel}
-          amountLabel={amountLabel}
-          serviceName={serviceName}
-          reference={appointment?.booking_reference ?? null}
-        />
-      </section>
-    );
-  }
-
-  if (status === "failed") {
-    return (
-      <section className={`${base} border-red-200 bg-red-50/70`}>
-        <XCircle className="mx-auto h-12 w-12 text-red-600" aria-hidden />
-        <h1 className="mt-3 text-xl font-semibold text-gray-900">
-          Payment didn&rsquo;t go through
-        </h1>
-        <p className="mt-1 text-sm text-gray-700">
-          No worries — your card wasn&rsquo;t charged. Head back to{" "}
-          {salonName} to try again.
-        </p>
-      </section>
-    );
-  }
+  const meta = STATUS_META[status];
 
   return (
-    <section className={`${base} border-gray-200 bg-white`}>
-      <Clock className="mx-auto h-12 w-12 text-gray-500" aria-hidden />
-      <h1 className="mt-3 text-xl font-semibold text-gray-900">
-        We&rsquo;re checking on your booking
-      </h1>
-      <p className="mt-1 text-sm text-gray-700">
-        Give us a moment. You&rsquo;ll get a text from {salonName} as soon as
-        the booking is confirmed.
-      </p>
-    </section>
+    <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6 text-center sm:px-8">
+        <StatusIcon status={status} />
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+          {meta.title}
+        </h1>
+        <p className="max-w-sm text-sm leading-relaxed text-gray-600">
+          {meta.copy(salonName)}
+        </p>
+      </div>
+
+      {appointment ? (
+        <div className="border-t border-gray-100 px-6 pb-6 pt-5 sm:px-8">
+          <BookingDetails
+            startLabel={startLabel}
+            amountLabel={amountLabel}
+            serviceName={serviceName}
+            reference={appointment.booking_reference ?? null}
+          />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+const STATUS_META: Record<
+  DisplayStatus,
+  { title: string; copy: (salonName: string) => string }
+> = {
+  paid: {
+    title: "You're booked in",
+    copy: (salonName) =>
+      `Payment received — we've sent your confirmation by text. ${salonName} will see you soon.`,
+  },
+  processing: {
+    title: "Confirming your booking",
+    copy: () =>
+      "Your bank is finalising the payment. We'll text you the moment it clears — you can close this page if you like.",
+  },
+  failed: {
+    title: "Payment didn't go through",
+    copy: (salonName) =>
+      `Your card wasn't charged. Head back to ${salonName} to try again.`,
+  },
+  unknown: {
+    title: "Just a moment",
+    copy: (salonName) =>
+      `Checking on your booking. You'll get a text from ${salonName} as soon as it's confirmed.`,
+  },
+};
+
+function StatusIcon({ status }: { status: DisplayStatus }) {
+  if (status === "paid") {
+    return (
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-white shadow-sm">
+        <Check className="h-6 w-6" aria-hidden />
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-900 bg-white text-gray-900 shadow-sm">
+        <X className="h-6 w-6" aria-hidden />
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-900 ring-1 ring-gray-200">
+      <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
+    </span>
   );
 }
 
@@ -248,44 +268,82 @@ function BookingDetails({
   reference: string | null;
 }) {
   return (
-    <dl className="mt-5 grid gap-3 rounded-xl bg-white/70 p-4 text-left text-sm text-gray-800">
+    <dl className="grid gap-3 text-left text-sm text-gray-800">
       <div className="flex items-start gap-3">
         <CalendarClock
           className="mt-0.5 h-4 w-4 flex-none text-gray-500"
           aria-hidden
         />
-        <div>
+        <div className="min-w-0">
           <dt className="text-[11px] uppercase tracking-wide text-gray-500">
             When
           </dt>
           <dd className="font-medium text-gray-900">
-            {startLabel ?? "We&rsquo;ll confirm the time shortly"}
+            {startLabel ?? "We'll confirm the time shortly"}
           </dd>
         </div>
       </div>
-      <div>
-        <dt className="text-[11px] uppercase tracking-wide text-gray-500">
-          Service
-        </dt>
-        <dd className="font-medium text-gray-900">{serviceName}</dd>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-gray-500">
+            Service
+          </dt>
+          <dd className="mt-0.5 font-medium text-gray-900">{serviceName}</dd>
+        </div>
+        {amountLabel ? (
+          <div>
+            <dt className="text-[11px] uppercase tracking-wide text-gray-500">
+              Paid
+            </dt>
+            <dd className="mt-0.5 font-medium text-gray-900">{amountLabel}</dd>
+          </div>
+        ) : null}
+        {reference ? (
+          <div>
+            <dt className="text-[11px] uppercase tracking-wide text-gray-500">
+              Reference
+            </dt>
+            <dd className="mt-0.5 font-mono text-gray-900">#{reference}</dd>
+          </div>
+        ) : null}
       </div>
-      {amountLabel ? (
-        <div>
-          <dt className="text-[11px] uppercase tracking-wide text-gray-500">
-            Paid
-          </dt>
-          <dd className="font-medium text-gray-900">{amountLabel}</dd>
-        </div>
-      ) : null}
-      {reference ? (
-        <div>
-          <dt className="text-[11px] uppercase tracking-wide text-gray-500">
-            Reference
-          </dt>
-          <dd className="font-mono text-gray-900">#{reference}</dd>
-        </div>
-      ) : null}
     </dl>
+  );
+}
+
+function SalonLogoBadge({
+  name,
+  logoUrl,
+}: {
+  name: string;
+  logoUrl: string | null;
+}) {
+  const initials =
+    (name || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+  const trimmed = logoUrl?.trim() ?? "";
+  const hasValid =
+    trimmed && (/^https?:\/\//i.test(trimmed) || /^data:image\//i.test(trimmed));
+
+  if (hasValid) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={trimmed}
+        alt=""
+        className="h-9 w-9 shrink-0 rounded-lg object-cover shadow-sm ring-1 ring-gray-200"
+      />
+    );
+  }
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-900 text-xs font-medium tracking-wide text-white shadow-sm ring-1 ring-gray-900/10">
+      {initials}
+    </div>
   );
 }
 
