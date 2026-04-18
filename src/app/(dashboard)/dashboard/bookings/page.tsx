@@ -46,6 +46,12 @@ export default async function BookingsPage() {
           reminder_sent_at,
           reminder_email_sent_at,
           customer_email,
+          payment_status,
+          amount_cents,
+          currency,
+          paid_at,
+          payment_link_sent_at,
+          stripe_checkout_session_id,
           services (
             name,
             price
@@ -97,6 +103,20 @@ export default async function BookingsPage() {
         confirmation_email_sent_at:
           (row as { confirmation_email_sent_at?: string | null })
             .confirmation_email_sent_at ?? null,
+        payment_status:
+          (row as { payment_status?: string | null }).payment_status ?? null,
+        amount_cents:
+          (row as { amount_cents?: number | null }).amount_cents ?? null,
+        currency:
+          (row as { currency?: string | null }).currency ?? null,
+        paid_at:
+          (row as { paid_at?: string | null }).paid_at ?? null,
+        payment_link_sent_at:
+          (row as { payment_link_sent_at?: string | null })
+            .payment_link_sent_at ?? null,
+        stripe_checkout_session_id:
+          (row as { stripe_checkout_session_id?: string | null })
+            .stripe_checkout_session_id ?? null,
         services: Array.isArray(row.services)
           ? row.services[0] ?? null
           : row.services ?? null,

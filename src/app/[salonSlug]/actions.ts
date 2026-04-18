@@ -923,6 +923,10 @@ export async function submitPublicBooking(
       .from("appointments")
       .update({
         stripe_payment_intent_id: intentResult.paymentIntentId,
+        // Stamp the moment the customer was first shown the inline pay
+        // form so the dashboard badge can say "Awaiting payment — link
+        // sent X min ago" instead of a vague "pending".
+        payment_link_sent_at: new Date().toISOString(),
       })
       .eq("id", insertedId)
       .eq("organization_id", organizationId);

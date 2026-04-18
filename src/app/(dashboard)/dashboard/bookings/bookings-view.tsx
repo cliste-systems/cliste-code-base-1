@@ -91,6 +91,21 @@ export type AppointmentListRow = {
   reminder_sent_at: string | null;
   /** 24h reminder email (SendGrid cron); null if not sent. */
   reminder_email_sent_at: string | null;
+  /**
+   * Payment fields drive the PAID / UNPAID badge.
+   * - null `payment_status` => no online payment was ever offered
+   *   (treat as pay-in-person).
+   * - 'pending' / 'unpaid' => awaiting payment; check
+   *   `payment_link_sent_at` to show how long ago.
+   * - 'paid' => use `paid_at`.
+   * - 'failed' / 'refunded' => terminal states.
+   */
+  payment_status: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+  paid_at: string | null;
+  payment_link_sent_at: string | null;
+  stripe_checkout_session_id: string | null;
 };
 
 function formatAppointmentDateLine(isoStart: string): string {
@@ -252,6 +267,113 @@ function BookingSourceBadge({ source }: { source: BookingSource }) {
     );
   }
   return null;
+}
+
+/**
+ * Compact "5 min ago" / "2 h ago" / "3 d ago" — used by PaymentBadge so
+ * the salon can see at a glance how stale an unpaid booking is. Falls
+ * back to a date for anything older than ~7 days.
+ */
+function shortRelativeTime(iso: string | null): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const diffMs = Date.now() - t;
+  const sec = Math.max(0, Math.round(diffMs / 1000));
+  if (sec < 60) return "just now";
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} h ago`;
+  const day = Math.round(hr / 24);
+  if (day <= 7) return `${day} d ago`;
+  return new Date(t).toLocaleDateString("en-IE", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/**
+ * Visible PAID / UNPAID indicator on every booking row. The "reason"
+ * line tells the salon WHY a booking is unpaid:
+ *   - paid_at set                            => "Paid · {time}"
+ *   - payment_status in (pending|unpaid)
+ *     and payment_link_sent_at set           => "Awaiting payment · link sent {ago}"
+ *   - payment_status in (pending|unpaid)
+ *     and no link timestamp                  => "Awaiting payment"
+ *   - payment_status = 'failed'              => "Payment failed"
+ *   - payment_status = 'refunded'            => "Refunded"
+ *   - payment_status null                    => "Pay in person"
+ */
+function PaymentBadge({
+  appt,
+  detailed,
+}: {
+  appt: Pick<
+    AppointmentListRow,
+    | "payment_status"
+    | "paid_at"
+    | "payment_link_sent_at"
+    | "stripe_checkout_session_id"
+    | "amount_cents"
+    | "currency"
+  >;
+  /** When true, render the second-line reason text. Used in the detail dialog. */
+  detailed?: boolean;
+}) {
+  const status = (appt.payment_status ?? "").toLowerCase();
+  let label = "Pay in person";
+  let reason: string | null = null;
+  let dot = "bg-gray-400";
+  let cls =
+    "inline-flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 shadow-sm";
+
+  if (status === "paid") {
+    label = "Paid";
+    reason = appt.paid_at ? `Paid ${shortRelativeTime(appt.paid_at)}` : null;
+    dot = "bg-emerald-500";
+    cls =
+      "inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 shadow-sm";
+  } else if (status === "pending" || status === "unpaid") {
+    label = "Unpaid";
+    reason = appt.payment_link_sent_at
+      ? `Payment link sent ${shortRelativeTime(appt.payment_link_sent_at)} — awaiting customer`
+      : "Awaiting payment";
+    dot = "bg-amber-500";
+    cls =
+      "inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 shadow-sm";
+  } else if (status === "failed") {
+    label = "Unpaid";
+    reason = "Payment attempt failed — resend link";
+    dot = "bg-red-500";
+    cls =
+      "inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 shadow-sm";
+  } else if (status === "refunded") {
+    label = "Refunded";
+    reason = appt.paid_at
+      ? `Originally paid ${shortRelativeTime(appt.paid_at)}`
+      : null;
+    dot = "bg-gray-400";
+    cls =
+      "inline-flex items-center gap-1.5 rounded-md border border-gray-200/80 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 shadow-sm";
+  } else {
+    // payment_status is null => no online payment was ever set up.
+    reason = "No online payment requested";
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className={cls}>
+        <span className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden />
+        {label}
+      </span>
+      {detailed && reason ? (
+        <span className="pl-0.5 text-[11px] leading-tight text-gray-500">
+          {reason}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function PhoneLine({
@@ -695,7 +817,10 @@ export function BookingsView({
                         <BookingSourceBadge source={row.source} />
                       </td>
                       <td className="px-6 py-4 align-top">
-                        <StatusPill status={row.status} />
+                        <div className="flex flex-col items-start gap-1.5">
+                          <StatusPill status={row.status} />
+                          <PaymentBadge appt={row} />
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right align-top">
                         <span onClick={(e) => e.stopPropagation()} className="inline-flex">
@@ -768,6 +893,9 @@ export function BookingsView({
                     <span onClick={(e) => e.stopPropagation()}>
                       {cancelButton(row)}
                     </span>
+                  </div>
+                  <div className="-mt-1">
+                    <PaymentBadge appt={row} detailed />
                   </div>
                   <p className="text-xs text-gray-400">
                     Tap for notes, call, texts &amp; email
@@ -858,6 +986,12 @@ export function BookingsView({
                     <div className="flex flex-wrap items-center gap-2">
                       <BookingSourceBadge source={detailRow.source} />
                       <StatusPill status={detailRow.status} />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-start justify-between gap-2 pt-1">
+                    <span className="text-gray-500">Payment</span>
+                    <div className="text-right">
+                      <PaymentBadge appt={detailRow} detailed />
                     </div>
                   </div>
                 </div>
