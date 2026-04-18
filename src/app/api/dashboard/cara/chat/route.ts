@@ -21,6 +21,8 @@ import { buildCaraSalonSnapshot } from "@/lib/cara-salon-context";
 import { createDashboardAppointment } from "@/lib/dashboard-appointment-create";
 import { refreshConversationTopicTitleAfterReply } from "@/lib/cara-conversation-topic";
 import { getOptionalDashboardSession } from "@/lib/dashboard-session";
+import { resolveOpenRouterBase } from "@/lib/llm-base";
+import { fixedWindowHit } from "@/lib/fixed-window-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -65,9 +67,7 @@ function pickChatCompletionBackend(): ChatCompletionBackend | null {
     return {
       kind: "openrouter",
       apiKey: openRouterKey,
-      url:
-        process.env.OPENROUTER_API_BASE?.trim() ||
-        "https://openrouter.ai/api/v1/chat/completions",
+      url: resolveOpenRouterBase(),
       model:
         process.env.CARA_OPENROUTER_MODEL?.trim() ||
         "google/gemini-2.5-flash-lite",
@@ -204,6 +204,29 @@ export async function POST(request: Request) {
   const session = await getOptionalDashboardSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Per-user rate limit on Cara chat. Each LLM call costs us OpenRouter
+  // tokens, so a stuck client / runaway script could rack up bills fast.
+  // 30 messages/min/user is well above any human typing speed and well
+  // under what would meaningfully drive cost.
+  const rl = fixedWindowHit({
+    scope: "cara-chat-user",
+    key: session.user.id,
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error:
+          "You are sending messages to Cara faster than the rate limit. Please wait a moment.",
+      },
+      {
+        status: 429,
+        headers: { "retry-after": String(rl.retryAfterSec) },
+      },
+    );
   }
 
   let body: unknown;

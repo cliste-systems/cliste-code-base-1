@@ -25,6 +25,8 @@ async function authorize(request: Request): Promise<boolean> {
   return timingSafeEqualUtf8(candidate, secret);
 }
 
+// Vercel cron invokes GET with `Authorization: Bearer ${CRON_SECRET}`. We
+// never accept the secret in a query string so GET is safe.
 export async function GET(request: Request) {
   return run(request);
 }
@@ -41,8 +43,10 @@ async function run(request: Request) {
     const result = await syncUsageToStripe();
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Usage sync failed.";
     console.error("[cron] usage-sync", err);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Usage sync failed." },
+      { status: 500 },
+    );
   }
 }

@@ -49,6 +49,10 @@ async function authorize(request: Request): Promise<boolean> {
   return timingSafeEqualUtf8(candidate, secret);
 }
 
+// Vercel scheduled crons invoke this path with GET + an `Authorization:
+// Bearer ${CRON_SECRET}` header (we never accept the secret in a query
+// string). Manual ops trigger via POST with the same header. Both methods
+// share the same handler.
 export async function GET(request: Request) {
   return runReminders(request);
 }
@@ -120,7 +124,7 @@ async function runReminders(request: Request) {
 
     if (qErr) {
       console.error("appointment-reminders SMS query", qErr);
-      return NextResponse.json({ error: qErr.message }, { status: 500 });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     const list = (rows ?? []) as AppointmentRow[];
@@ -128,6 +132,26 @@ async function runReminders(request: Request) {
     const client = twilio(sid!, token!);
 
     for (const row of list) {
+      // CLAIM FIRST: atomic conditional update sets reminder_sent_at while
+      // the row is still null. Only one cron worker / Vercel retry can win
+      // for a given appointment — the loser gets zero rows back and skips.
+      // If the SMS send below fails we roll the timestamp back so the next
+      // run can retry.
+      const claimedAt = new Date().toISOString();
+      const claim = await supabase
+        .from("appointments")
+        .update({ reminder_sent_at: claimedAt })
+        .eq("id", row.id)
+        .is("reminder_sent_at", null)
+        .select("id");
+      if (claim.error) {
+        smsFailed.push({ id: row.id, message: "claim failed" });
+        continue;
+      }
+      if (!claim.data || claim.data.length === 0) {
+        // Another worker already claimed this row; skip silently.
+        continue;
+      }
       const salonName =
         embedName(row.organizations)?.trim() || "the salon";
       const serviceName =
@@ -142,20 +166,17 @@ async function runReminders(request: Request) {
       const to = row.customer_phone.trim();
       try {
         await client.messages.create({ from: smsFrom!, to, body });
-        const { error: upErr } = await supabase
-          .from("appointments")
-          .update({ reminder_sent_at: new Date().toISOString() })
-          .eq("id", row.id)
-          .is("reminder_sent_at", null);
-        if (upErr) {
-          smsFailed.push({ id: row.id, message: upErr.message });
-          continue;
-        }
         smsSent.push(row.id);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         console.error("Twilio reminder failed", row.id, message);
-        smsFailed.push({ id: row.id, message });
+        // Roll back the claim so the next cron run picks it up again.
+        await supabase
+          .from("appointments")
+          .update({ reminder_sent_at: null })
+          .eq("id", row.id)
+          .eq("reminder_sent_at", claimedAt);
+        smsFailed.push({ id: row.id, message: "send failed" });
       }
     }
   }
@@ -186,7 +207,7 @@ async function runReminders(request: Request) {
 
     if (emailQErr) {
       console.error("appointment-reminders email query", emailQErr);
-      return NextResponse.json({ error: emailQErr.message }, { status: 500 });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     const elist = (emailRows ?? []) as AppointmentEmailRow[];
@@ -196,6 +217,20 @@ async function runReminders(request: Request) {
     emailMatched = withEmail.length;
 
     for (const row of withEmail) {
+      // Claim-first pattern (see SMS loop above).
+      const claimedAt = new Date().toISOString();
+      const claim = await supabase
+        .from("appointments")
+        .update({ reminder_email_sent_at: claimedAt })
+        .eq("id", row.id)
+        .is("reminder_email_sent_at", null)
+        .select("id");
+      if (claim.error) {
+        emailFailed.push({ id: row.id, message: "claim failed" });
+        continue;
+      }
+      if (!claim.data || claim.data.length === 0) continue;
+
       const to = normalizeOptionalCustomerEmail(row.customer_email)!;
       const salonName =
         embedName(row.organizations)?.trim() || "the salon";
@@ -215,16 +250,12 @@ async function runReminders(request: Request) {
         html: bodies.html,
       });
       if (!res.ok) {
-        emailFailed.push({ id: row.id, message: res.message });
-        continue;
-      }
-      const { error: upErr } = await supabase
-        .from("appointments")
-        .update({ reminder_email_sent_at: new Date().toISOString() })
-        .eq("id", row.id)
-        .is("reminder_email_sent_at", null);
-      if (upErr) {
-        emailFailed.push({ id: row.id, message: upErr.message });
+        await supabase
+          .from("appointments")
+          .update({ reminder_email_sent_at: null })
+          .eq("id", row.id)
+          .eq("reminder_email_sent_at", claimedAt);
+        emailFailed.push({ id: row.id, message: "send failed" });
         continue;
       }
       emailSent.push(row.id);

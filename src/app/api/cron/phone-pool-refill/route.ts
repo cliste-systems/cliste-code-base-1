@@ -24,6 +24,8 @@ async function authorize(request: Request): Promise<boolean> {
   return timingSafeEqualUtf8(candidate, secret);
 }
 
+// Vercel cron invokes GET with `Authorization: Bearer ${CRON_SECRET}`. We
+// never accept the secret in a query string so GET is safe.
 export async function GET(request: Request) {
   return run(request);
 }
@@ -49,8 +51,12 @@ async function run(request: Request) {
       skippedReason: result.skippedReason ?? null,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Pool refill failed.";
     console.error("[cron] phone-pool-refill", err);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    // Generic message — avoid surfacing Twilio / Supabase error text to a
+    // public endpoint (it's behind CRON_SECRET, but defence in depth).
+    return NextResponse.json(
+      { ok: false, error: "Pool refill failed." },
+      { status: 500 },
+    );
   }
 }

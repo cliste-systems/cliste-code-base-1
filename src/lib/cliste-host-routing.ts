@@ -46,6 +46,14 @@ export function clisteHostRoutingRedirect(
   if (!host || (host !== appHost && host !== bookHost)) return null;
 
   const path = request.nextUrl.pathname;
+  // Hardening: refuse to redirect a path that could resolve to a different
+  // host. `new URL("//evil.com/x", "https://app.example")` parses to
+  // `https://evil.com/x` because `//host` is a scheme-relative URL. We
+  // require a single leading slash followed by a non-slash byte before
+  // composing the target URL — otherwise any future caller that lets a
+  // user-supplied path reach this helper could be turned into an open
+  // redirect.
+  if (!/^\/(?:[^/]|$)/.test(path)) return null;
   const pathAndQuery = `${path}${request.nextUrl.search}`;
 
   if (host === appHost) {

@@ -275,29 +275,37 @@ export async function startPlanCheckout(
   }
 
   try {
-    const checkout = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      line_items: lineItems,
-      customer_email: session.user.email ?? undefined,
-      allow_promotion_codes: true,
-      subscription_data: {
+    const checkout = await stripe.checkout.sessions.create(
+      {
+        mode: "subscription",
+        line_items: lineItems,
+        customer_email: session.user.email ?? undefined,
+        allow_promotion_codes: true,
+        subscription_data: {
+          metadata: {
+            cliste_organization_id: session.organizationId,
+            cliste_plan_tier: planTier,
+            cliste_launch_tier: launchTier,
+          },
+          ...(addInvoiceItems.length > 0
+            ? { add_invoice_items: addInvoiceItems }
+            : {}),
+        },
         metadata: {
           cliste_organization_id: session.organizationId,
           cliste_plan_tier: planTier,
           cliste_launch_tier: launchTier,
         },
-        ...(addInvoiceItems.length > 0
-          ? { add_invoice_items: addInvoiceItems }
-          : {}),
+        success_url: `${origin}/onboarding/plan?status=return&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/onboarding/plan?status=cancel`,
       },
-      metadata: {
-        cliste_organization_id: session.organizationId,
-        cliste_plan_tier: planTier,
-        cliste_launch_tier: launchTier,
+      {
+        // Idempotent across retries / double-submit. Key includes the
+        // chosen tier so a customer who picks Pro, cancels, then picks
+        // Business gets a NEW session instead of the cached Pro one.
+        idempotencyKey: `onboarding-checkout-${session.organizationId}-${planTier}-${launchTier}`,
       },
-      success_url: `${origin}/onboarding/plan?status=return&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/onboarding/plan?status=cancel`,
-    });
+    );
 
     if (checkout.url) {
       redirect(checkout.url);

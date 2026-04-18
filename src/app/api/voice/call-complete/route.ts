@@ -8,6 +8,7 @@ import {
 } from "@/lib/appointments-overlap";
 import { generateBookingReference, normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
+import { redactCallText } from "@/lib/transcript-redaction";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -173,8 +174,9 @@ export async function POST(request: Request) {
       .eq("e164", calledE164)
       .maybeSingle();
     if (phoneErr) {
+      console.error("[voice/call-complete] phone lookup", phoneErr);
       return NextResponse.json(
-        { ok: false, error: phoneErr.message },
+        { ok: false, error: "Database error" },
         { status: 500 },
       );
     }
@@ -218,8 +220,9 @@ export async function POST(request: Request) {
       .eq("id", claimedOrgId)
       .maybeSingle();
     if (orgErr) {
+      console.error("[voice/call-complete] org lookup", orgErr);
       return NextResponse.json(
-        { ok: false, error: orgErr.message },
+        { ok: false, error: "Database error" },
         { status: 500 },
       );
     }
@@ -238,6 +241,27 @@ export async function POST(request: Request) {
     );
   }
 
+  // Server-side redaction. The agent prompt already discourages reading
+  // back card / PPS / DOB; this is the belt-and-braces step that runs
+  // even if the agent slips. Hits are logged (without the matched text)
+  // so we can spot patterns of callers volunteering sensitive data.
+  const transcriptRedacted = redactCallText(body.transcript ?? null);
+  const reviewRedacted = redactCallText(body.transcript_review ?? null);
+  const summaryRedacted = redactCallText(body.ai_summary ?? null);
+  const allHits = [
+    ...transcriptRedacted.hits,
+    ...reviewRedacted.hits,
+    ...summaryRedacted.hits,
+  ];
+  if (allHits.length > 0) {
+    console.warn(
+      "[voice/call-complete] redacted sensitive tokens",
+      Array.from(new Set(allHits)),
+      "org",
+      orgId,
+    );
+  }
+
   const { data: insertedCall, error: callErr } = await admin
     .from("call_logs")
     .insert({
@@ -245,16 +269,17 @@ export async function POST(request: Request) {
       caller_number: callerNumber,
       duration_seconds: durationSeconds,
       outcome,
-      transcript: body.transcript ?? null,
-      transcript_review: body.transcript_review ?? null,
-      ai_summary: body.ai_summary ?? null,
+      transcript: transcriptRedacted.text,
+      transcript_review: reviewRedacted.text,
+      ai_summary: summaryRedacted.text,
     })
     .select("id")
     .single();
 
   if (callErr || !insertedCall?.id) {
+    console.error("[voice/call-complete] call_logs insert", callErr);
     return NextResponse.json(
-      { ok: false, error: callErr?.message ?? "Failed to save call log" },
+      { ok: false, error: "Failed to save call log" },
       { status: 500 },
     );
   }
@@ -400,7 +425,7 @@ export async function POST(request: Request) {
           call_log_id: callLogId,
           warning: isDatabaseOverlapConstraintError(apptErr.message)
             ? `Call saved; booking skipped (${APPOINTMENT_OVERLAP_MESSAGE})`
-            : `Call saved; booking failed: ${apptErr.message}`,
+            : `Call saved; booking failed.`,
         },
         { status: 200 },
       );

@@ -12,6 +12,7 @@ import { sendAppointmentCancellationSms } from "@/lib/appointment-cancellation-s
 import { sendAppointmentCancellationEmailBestEffort } from "@/lib/booking-transactional-email";
 import { cancelConfirmedAppointmentForOrganization } from "@/lib/dashboard-appointment-cancel";
 import { getOptionalDashboardSession } from "@/lib/dashboard-session";
+import { fixedWindowHit } from "@/lib/fixed-window-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,20 @@ export async function POST(request: Request) {
   const session = await getOptionalDashboardSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // 60 confirms / cancels per minute is well above any human reasonable
+  // pace and slows automated replay attacks against pending-action ids.
+  const rl = fixedWindowHit({
+    scope: "cara-pending-confirm",
+    key: session.user.id,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
   }
 
   let body: unknown;
@@ -64,7 +79,10 @@ export async function POST(request: Request) {
       );
     }
     console.error("Cara pending load", loadErr);
-    return NextResponse.json({ error: loadErr.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Could not load that confirmation." },
+      { status: 500 },
+    );
   }
 
   if (!row) {

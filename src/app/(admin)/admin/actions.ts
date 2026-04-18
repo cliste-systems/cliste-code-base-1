@@ -33,6 +33,37 @@ async function assertAdminOperator(): Promise<User> {
   return requireAdminSessionUser();
 }
 
+/**
+ * Best-effort wrapper around `logSecurityEvent` for admin actions. Always
+ * resolves; never throws — audit-log gaps are noisy in dev but should not
+ * cascade-fail the admin action that produced them.
+ */
+async function recordAdminEvent(
+  actor: User,
+  payload: {
+    eventType: string;
+    outcome: "success" | "failure";
+    targetUserId?: string | null;
+    targetEmail?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  try {
+    const ctx = buildSecurityEventContext(await headers());
+    await logSecurityEvent(ctx, {
+      eventType: payload.eventType,
+      outcome: payload.outcome,
+      actorUserId: actor.id,
+      actorEmail: actor.email ?? null,
+      targetUserId: payload.targetUserId ?? null,
+      targetEmail: payload.targetEmail ?? null,
+      metadata: payload.metadata ?? {},
+    });
+  } catch (err) {
+    console.warn("[admin] failed to record security event", payload.eventType, err);
+  }
+}
+
 function parseRefererOrigin(referer: string | null): string | null {
   if (!referer) return null;
   try {
@@ -185,7 +216,7 @@ export async function createOrganization(payload: {
   /** From `window.location.origin` so invite redirect matches this app */
   clientOrigin?: string | null;
 }): Promise<CreateOrganizationResult> {
-  await assertAdminOperator();
+  const operator = await assertAdminOperator();
   const name = payload.name.trim();
   const slug = payload.slug.trim().toLowerCase();
   const tier = payload.tier;
@@ -307,6 +338,18 @@ export async function createOrganization(payload: {
     }
 
     revalidatePath("/admin");
+    await recordAdminEvent(operator, {
+      eventType: "admin_organization_created",
+      outcome: "success",
+      targetUserId: userId,
+      targetEmail: ownerEmail,
+      metadata: {
+        organization_id: organizationId,
+        slug,
+        tier,
+        niche,
+      },
+    });
     return { ok: true };
   } catch (e) {
     if (userId) {
@@ -323,6 +366,12 @@ export async function createOrganization(payload: {
         /* best effort */
       }
     }
+    await recordAdminEvent(operator, {
+      eventType: "admin_organization_create_failed",
+      outcome: "failure",
+      targetEmail: ownerEmail,
+      metadata: { slug, tier, niche, reason: e instanceof Error ? e.message : "unknown" },
+    });
     return {
       ok: false,
       message:
@@ -389,7 +438,7 @@ export type DeleteOrganizationResult =
 export async function deleteOrganization(
   organizationId: string
 ): Promise<DeleteOrganizationResult> {
-  await assertAdminOperator();
+  const operator = await assertAdminOperator();
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -437,8 +486,21 @@ export async function deleteOrganization(
     }
 
     revalidatePath("/admin");
+    await recordAdminEvent(operator, {
+      eventType: "admin_organization_deleted",
+      outcome: "success",
+      metadata: {
+        organization_id: id,
+        deleted_user_count: members?.length ?? 0,
+      },
+    });
     return { ok: true };
   } catch (e) {
+    await recordAdminEvent(operator, {
+      eventType: "admin_organization_delete_failed",
+      outcome: "failure",
+      metadata: { organization_id: id, reason: e instanceof Error ? e.message : "unknown" },
+    });
     return {
       ok: false,
       message:
@@ -554,7 +616,7 @@ export async function adminSendPasswordRecoveryLink(
   userEmail: string,
   clientOrigin?: string | null
 ): Promise<AdminRecoveryLinkResult> {
-  await assertAdminOperator();
+  const operator = await assertAdminOperator();
   const id = userId.trim();
   const email = userEmail.trim().toLowerCase();
   if (!UUID_RE.test(id)) {
@@ -606,6 +668,12 @@ export async function adminSendPasswordRecoveryLink(
     };
   }
 
+  await recordAdminEvent(operator, {
+    eventType: "admin_password_recovery_link_generated",
+    outcome: "success",
+    targetUserId: id,
+    targetEmail: email,
+  });
   return { ok: true, url: linkData.properties.action_link };
 }
 
@@ -692,7 +760,7 @@ export async function adminRevokeConsoleAccess(
 export async function adminSuspendUser(
   userId: string
 ): Promise<AdminSuspendUserResult> {
-  await assertAdminOperator();
+  const operator = await assertAdminOperator();
   const id = userId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid user id." };
@@ -716,13 +784,18 @@ export async function adminSuspendUser(
   }
 
   revalidatePath("/admin/users");
+  await recordAdminEvent(operator, {
+    eventType: "admin_user_suspended",
+    outcome: "success",
+    targetUserId: id,
+  });
   return { ok: true };
 }
 
 export async function adminUnsuspendUser(
   userId: string
 ): Promise<AdminSuspendUserResult> {
-  await assertAdminOperator();
+  const operator = await assertAdminOperator();
   const id = userId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid user id." };
@@ -746,6 +819,11 @@ export async function adminUnsuspendUser(
   }
 
   revalidatePath("/admin/users");
+  await recordAdminEvent(operator, {
+    eventType: "admin_user_unsuspended",
+    outcome: "success",
+    targetUserId: id,
+  });
   return { ok: true };
 }
 

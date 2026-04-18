@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { buildSecurityEventContext, logSecurityEvent } from "@/lib/security-events";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -178,26 +179,80 @@ export async function refundAppointmentPayment(
 
   try {
     const stripe = getStripeClient();
-    const refund = await stripe.refunds.create({
-      payment_intent: appt.stripe_payment_intent_id,
-      reverse_transfer: true,
-      refund_application_fee: true,
-      metadata: {
-        appointment_id: appt.id,
-        organization_id: appt.organization_id,
-      },
-    });
-
-    // Optimistic flip; webhook will re-confirm from the signed event.
     const admin = createAdminClient();
-    await admin
+    // Atomic claim BEFORE calling Stripe — guarantees only one operator
+    // click wins when the button is double-tapped. If another request
+    // already flipped the row, `eq("payment_status","paid")` returns zero
+    // rows and we abort before hitting Stripe.
+    const claim = await admin
       .from("appointments")
       .update({ payment_status: "refunded" })
       .eq("id", appt.id)
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      .eq("payment_status", "paid")
+      .select("id");
+    if (claim.error) {
+      return { ok: false, message: "Could not start refund." };
+    }
+    if (!claim.data || claim.data.length === 0) {
+      return {
+        ok: false,
+        message: "Refund already in progress or completed.",
+      };
+    }
+    let refund;
+    try {
+      refund = await stripe.refunds.create(
+        {
+          payment_intent: appt.stripe_payment_intent_id,
+          reverse_transfer: true,
+          refund_application_fee: true,
+          metadata: {
+            appointment_id: appt.id,
+            organization_id: appt.organization_id,
+          },
+        },
+        {
+          // Deterministic key keyed by appointment id — Stripe rejects a
+          // second call with the same key + different params, and silently
+          // returns the original refund object on the same key + same
+          // params. Safe retries on network blips / Vercel timeouts.
+          idempotencyKey: `refund-appointment-${appt.id}`,
+        },
+      );
+    } catch (stripeErr) {
+      // Roll the DB row back to `paid` so the operator can retry — the
+      // refund didn't actually happen on Stripe's side.
+      await admin
+        .from("appointments")
+        .update({ payment_status: "paid" })
+        .eq("id", appt.id)
+        .eq("organization_id", organizationId)
+        .eq("payment_status", "refunded");
+      throw stripeErr;
+    }
 
     revalidatePath("/dashboard/payments");
     revalidatePath("/dashboard/bookings");
+
+    // Audit trail — refunds are money-moving and must be reconstructable
+    // long after the operator has logged out / left the company.
+    try {
+      const ctx = buildSecurityEventContext(await headers());
+      await logSecurityEvent(ctx, {
+        eventType: "appointment_refund_issued",
+        outcome: "success",
+        metadata: {
+          appointment_id: appt.id,
+          organization_id: appt.organization_id,
+          stripe_refund_id: refund.id,
+          amount_cents: refund.amount ?? appt.amount_cents ?? 0,
+          currency: (refund.currency ?? appt.currency ?? "eur").toLowerCase(),
+        },
+      });
+    } catch (logErr) {
+      console.warn("[refund] failed to log security event", logErr);
+    }
 
     return {
       ok: true,

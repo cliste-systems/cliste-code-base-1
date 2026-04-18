@@ -10,8 +10,18 @@ import {
   rowsToClientPayload,
 } from "@/lib/cara-chat-persistence";
 import { getOptionalDashboardSession } from "@/lib/dashboard-session";
+import { fixedWindowHit } from "@/lib/fixed-window-rate-limit";
 
 export const runtime = "nodejs";
+
+function rateLimit(userId: string, scope: string, limit: number) {
+  const rl = fixedWindowHit({ scope, key: userId, limit, windowMs: 60_000 });
+  if (rl.allowed) return null;
+  return NextResponse.json(
+    { error: "Too many requests" },
+    { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+  );
+}
 
 export async function GET() {
   const session = await getOptionalDashboardSession();
@@ -33,6 +43,10 @@ export async function POST() {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // 20 new chats / minute / user is comfortably above human use and stops
+  // a runaway script from spamming Cara message rows in Postgres.
+  const rl = rateLimit(session.user.id, "cara-conv-create", 20);
+  if (rl) return rl;
 
   try {
     const { conversationId } = await createConversationWithWelcome(
@@ -59,7 +73,7 @@ export async function POST() {
     }
     console.error("Cara new conversation", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Failed to create chat" },
+      { error: "Failed to create chat" },
       { status: 500 },
     );
   }
@@ -74,6 +88,8 @@ export async function DELETE(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const rl = rateLimit(session.user.id, "cara-conv-delete", 30);
+  if (rl) return rl;
 
   const { searchParams } = new URL(request.url);
   const all =
@@ -110,7 +126,11 @@ export async function DELETE(request: Request) {
       session.user.id,
     );
     if (error) {
-      return NextResponse.json({ error }, { status: 500 });
+      console.error("Cara delete-all", error);
+      return NextResponse.json(
+        { error: "Could not reset chats" },
+        { status: 500 },
+      );
     }
     try {
       return await respondWithFreshThread();
@@ -128,7 +148,7 @@ export async function DELETE(request: Request) {
       }
       console.error("Cara delete all / recreate", e);
       return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Could not reset chats" },
+        { error: "Could not reset chats" },
         { status: 500 },
       );
     }
@@ -185,7 +205,7 @@ export async function DELETE(request: Request) {
       }
       console.error("Cara delete / switch thread", e);
       return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Could not open the next chat" },
+        { error: "Could not open the next chat" },
         { status: 500 },
       );
     }

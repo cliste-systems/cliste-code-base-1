@@ -1059,24 +1059,34 @@ async function createBookingPaymentIntent(
 ): Promise<CreatePaymentIntentResult> {
   try {
     const stripe = getStripeClient();
-    const pi = await stripe.paymentIntents.create({
-      amount: args.amountCents,
-      currency: args.currency,
-      application_fee_amount: args.platformFeeCents,
-      transfer_data: { destination: args.stripeAccountId },
-      // Let Stripe pick the best method for the customer's locale and device
-      // (cards, Apple Pay, Google Pay if configured on the account).
-      automatic_payment_methods: { enabled: true },
-      receipt_email: args.customerEmail ?? undefined,
-      description: `${args.serviceName} at ${args.salonName} (ref ${args.bookingReference})`,
-      statement_descriptor_suffix:
-        args.salonName.replace(/[^a-z0-9 ]/gi, "").slice(0, 22) || "CLISTE",
-      metadata: {
-        appointment_id: args.appointmentId,
-        organization_id: args.organizationId,
-        booking_reference: args.bookingReference,
+    const pi = await stripe.paymentIntents.create(
+      {
+        amount: args.amountCents,
+        currency: args.currency,
+        application_fee_amount: args.platformFeeCents,
+        transfer_data: { destination: args.stripeAccountId },
+        // Let Stripe pick the best method for the customer's locale and device
+        // (cards, Apple Pay, Google Pay if configured on the account).
+        automatic_payment_methods: { enabled: true },
+        receipt_email: args.customerEmail ?? undefined,
+        description: `${args.serviceName} at ${args.salonName} (ref ${args.bookingReference})`,
+        statement_descriptor_suffix:
+          args.salonName.replace(/[^a-z0-9 ]/gi, "").slice(0, 22) || "CLISTE",
+        metadata: {
+          appointment_id: args.appointmentId,
+          organization_id: args.organizationId,
+          booking_reference: args.bookingReference,
+        },
       },
-    });
+      {
+        // Deterministic key per appointment — a duplicate POST (e.g. user
+        // double-tapping the "Pay" button or a Vercel retry) returns the
+        // SAME PaymentIntent instead of creating a second hold on the
+        // customer's card. Stripe keeps idempotency keys for 24h, which
+        // is well over the booking-creation window.
+        idempotencyKey: `pi-appointment-${args.appointmentId}`,
+      },
+    );
     if (!pi.client_secret) {
       return { ok: false, message: "Stripe did not return a client secret." };
     }

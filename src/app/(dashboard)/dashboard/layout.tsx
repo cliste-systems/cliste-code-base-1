@@ -54,6 +54,7 @@ const navItems: {
   { href: "/dashboard/billing", label: "Billing & usage", footer: true },
   { href: "/dashboard/support", label: "Support", footer: true },
   { href: "/dashboard/settings", label: "Settings", footer: true },
+  { href: "/dashboard/privacy", label: "Privacy tools", footer: true },
 ];
 
 function toNavItem(

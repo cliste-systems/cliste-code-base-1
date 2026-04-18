@@ -146,6 +146,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Don't advertise we're a Next.js app to every visitor. Trivial change but
+  // removes a fingerprinting datapoint that helps attackers pick exploits.
+  poweredByHeader: false,
   async headers() {
     return [
       {
@@ -159,6 +162,46 @@ const nextConfig: NextConfig = {
         source: "/api/stripe/webhook",
         headers: [
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+        ],
+      },
+      {
+        // Authenticated surfaces should never be cached by intermediaries
+        // or by the browser back/forward navigation cache. Without this, a
+        // user logging out on a shared device can press Back and see the
+        // last rendered HTML (with their salon's customer list etc.).
+        source: "/dashboard/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, no-cache, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/admin/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, no-cache, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/authenticate",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, no-cache, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/login",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, no-cache, must-revalidate",
+          },
         ],
       },
     ];

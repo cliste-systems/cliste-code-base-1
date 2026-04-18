@@ -17,6 +17,12 @@ Disallow: /login
 Disallow: /signup
 Disallow: /reset-password
 Disallow: /update-password
+# Pay-link short URLs are personal and should never be indexed.
+Disallow: /p/
+# Sub-processors / cookies / privacy / terms are linked from product copy
+# and are public, so we *do* allow them to be crawled (see sitemap.xml).
+
+Sitemap: /sitemap.xml
 
 # Block known scraping / LLM-training crawlers wholesale. Add more as needed.
 User-agent: GPTBot

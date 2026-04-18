@@ -68,7 +68,9 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "invalid signature";
       console.warn("[stripe webhook] signature verification failed", msg);
-      return new NextResponse(`Webhook Error: ${msg}`, { status: 400 });
+      // Constant body: don't echo raw crypto error text back to the
+      // (unauthenticated) caller. Detail stays in server logs.
+      return new NextResponse("invalid signature", { status: 400 });
     }
   } else {
     // No secret configured. Refuse outright in production — silently parsing
@@ -206,9 +208,15 @@ async function handlePaymentIntentSucceeded(
     return;
   }
 
-  const alreadyPaid = existing.payment_status === "paid";
-
-  const { error: updErr } = await admin
+  // ATOMIC FLIP — the conditional `payment_status <> 'paid'` clause makes
+  // this the single point where a new `paid` event "wins". Stripe can
+  // (and does) deliver `payment_intent.succeeded` more than once: webhook
+  // retries, replays from the dashboard, multiple endpoints subscribed,
+  // etc. By gating side effects (receipt SMS, revalidation) on whether
+  // we *actually* flipped the row, we prevent duplicate confirmations
+  // even under concurrent webhook deliveries. `select("id")` lets us read
+  // affected-rows count via the returned array length.
+  const flip = await admin
     .from("appointments")
     .update({
       payment_status: "paid",
@@ -218,8 +226,23 @@ async function handlePaymentIntentSucceeded(
       ...(amountCents != null ? { amount_cents: amountCents } : {}),
       ...(currency ? { currency } : {}),
     })
-    .eq("id", appointmentId);
-  if (updErr) throw new Error(`update appointment paid: ${updErr.message}`);
+    .eq("id", appointmentId)
+    .neq("payment_status", "paid")
+    .select("id");
+  if (flip.error) throw new Error(`update appointment paid: ${flip.error.message}`);
+  const wonRace = (flip.data?.length ?? 0) > 0;
+  // Some metadata still needs to land even on replays (Stripe charge id
+  // can change on partial captures) so write those without the gate.
+  if (!wonRace) {
+    await admin
+      .from("appointments")
+      .update({
+        stripe_payment_intent_id: pi.id,
+        ...(chargeId ? { stripe_charge_id: chargeId } : {}),
+      })
+      .eq("id", appointmentId);
+  }
+  const alreadyPaid = !wonRace;
 
   // Send SMS/email confirmations only once per booking. Both channels are
   // gated by their own `*_sent_at` column so a replayed event never

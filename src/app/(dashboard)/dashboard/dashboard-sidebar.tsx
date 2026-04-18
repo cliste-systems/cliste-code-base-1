@@ -12,6 +12,7 @@ import {
   Phone,
   Scissors,
   Settings,
+  ShieldCheck,
   ShoppingBag,
   Store,
   Users,
@@ -38,6 +39,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/billing": Gauge,
   "/dashboard/support": HelpCircle,
   "/dashboard/settings": Settings,
+  "/dashboard/privacy": ShieldCheck,
 };
 
 export type DashboardSidebarNavItem = {

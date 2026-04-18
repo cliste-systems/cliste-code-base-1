@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveOpenRouterBase } from "@/lib/llm-base";
+
 const MAX_TITLE_LEN = 72;
 
 /** Openers that shouldn’t become the sidebar label (e.g. “hi”). */
@@ -82,8 +84,7 @@ async function fetchTopicLabelFromLlm(
 
   const useOpenRouter = Boolean(orKey);
   const url = useOpenRouter
-    ? process.env.OPENROUTER_API_BASE?.trim() ||
-      "https://openrouter.ai/api/v1/chat/completions"
+    ? resolveOpenRouterBase()
     : "https://api.openai.com/v1/chat/completions";
   const model = useOpenRouter
     ? process.env.CARA_OPENROUTER_MODEL?.trim() ||
