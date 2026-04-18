@@ -5,6 +5,7 @@ import type Stripe from "stripe";
 
 import {
   buildBookingConfirmationSmsBody,
+  buildPaymentReceiptSmsBody,
   sendTwilioBookingSms,
 } from "@/lib/booking-confirmation-sms";
 import { buildBookingConfirmationEmailBodies } from "@/lib/booking-transactional-email";
@@ -263,6 +264,30 @@ async function handlePaymentIntentSucceeded(
         "[stripe webhook] confirmation email failed",
         appointmentId,
         er.message,
+      );
+    }
+  }
+
+  // Separate "payment received, see you then" SMS. The earlier SMS went out
+  // at booking time with a pay link — that's a call-to-action, not a receipt.
+  // This fires exactly once per successful payment (`!alreadyPaid` gate =
+  // idempotent on webhook replays).
+  if (!alreadyPaid && customerPhone) {
+    const receiptBody = buildPaymentReceiptSmsBody({
+      customerName,
+      salonName,
+      serviceName,
+      startTimeIso: startIso,
+      bookingReference: bookingRef,
+      amountCents: amountCents ?? 0,
+      currency: currency ?? "eur",
+    });
+    const receiptSms = await sendTwilioBookingSms(customerPhone, receiptBody);
+    if (!receiptSms.ok) {
+      console.warn(
+        "[stripe webhook] payment receipt SMS failed",
+        appointmentId,
+        receiptSms.message,
       );
     }
   }

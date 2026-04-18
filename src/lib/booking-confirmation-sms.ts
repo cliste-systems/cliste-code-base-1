@@ -30,6 +30,50 @@ export function buildBookingConfirmationSmsBody(input: {
   return `Hi ${first}, your booking at ${input.salonName} is confirmed: ${input.serviceName} on ${when}. Ref: ${ref}. To change or cancel, call this number and quote your reference. — ${input.salonName}`;
 }
 
+/**
+ * "Payment received, see you then" SMS sent after Stripe confirms the
+ * PaymentIntent. Intentionally short (1 segment) so it reads as a clean
+ * receipt in the customer's message list, not a second call-to-action.
+ */
+export function buildPaymentReceiptSmsBody(input: {
+  customerName: string;
+  salonName: string;
+  serviceName: string;
+  startTimeIso: string;
+  bookingReference: string;
+  amountCents: number;
+  currency: string;
+}): string {
+  const first = input.customerName.trim().split(/\s+/)[0] || "there";
+  const tz = getReminderTimezone();
+  const start = new Date(input.startTimeIso);
+  let when: string;
+  try {
+    when = start.toLocaleString("en-IE", {
+      timeZone: tz,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    when = start.toLocaleString("en-IE", { hour12: true });
+  }
+  let price: string;
+  try {
+    price = new Intl.NumberFormat("en-IE", {
+      style: "currency",
+      currency: (input.currency || "eur").toUpperCase(),
+    }).format(input.amountCents / 100);
+  } catch {
+    price = `${(input.amountCents / 100).toFixed(2)} ${(input.currency || "EUR").toUpperCase()}`;
+  }
+  const ref = input.bookingReference.trim();
+  return `${input.salonName}: payment of ${price} received — see you ${when} (ref ${ref}). Thanks ${first}!`;
+}
+
 /** Customer-facing SMS after the salon cancels their confirmed visit (dashboard or Cara). */
 export function buildBookingCancellationSmsBody(input: {
   customerName: string;

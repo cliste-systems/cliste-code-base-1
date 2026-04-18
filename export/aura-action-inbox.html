@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cliste — Action Inbox (static export)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+          },
+        },
+      };
+    </script>
+    <style>
+      html {
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .icon-ms {
+        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+      }
+      /* Hide radios (tabs controlled by labels) */
+      .inbox-tab-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .tab-row label {
+        cursor: pointer;
+      }
+      #inbox-tab-open:checked ~ .tab-row label[for="inbox-tab-open"],
+      #inbox-tab-resolved:checked ~ .tab-row label[for="inbox-tab-resolved"] {
+        background-color: rgb(17 24 39);
+        color: white;
+      }
+      .panel-open,
+      .panel-resolved {
+        display: none;
+      }
+      #inbox-tab-open:checked ~ .panel-wrap .panel-open {
+        display: flex;
+      }
+      #inbox-tab-resolved:checked ~ .panel-wrap .panel-resolved {
+        display: flex;
+      }
+    </style>
+  </head>
+  <body class="bg-[#FAFAFA] text-gray-900 antialiased">
+    <!-- Mirrors action-inbox/page.tsx + action-inbox-view.tsx (content column only; no app shell). -->
+    <div
+      class="-mx-6 -mt-8 flex min-h-dvh flex-1 flex-col bg-[#FAFAFA] px-6 pb-12 pt-8 lg:-mx-12 lg:px-12 lg:pt-10"
+    >
+      <div class="mx-auto w-full max-w-[1000px]">
+        <header class="mb-8">
+          <div
+            class="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-gray-500"
+          >
+            <span class="material-symbols-outlined icon-ms text-base text-gray-500"
+              >inbox</span
+            >
+            Operations
+          </div>
+          <h1 class="mb-4 text-3xl font-semibold tracking-tight text-gray-900">
+            Action Inbox
+          </h1>
+          <p
+            class="max-w-2xl text-sm font-medium leading-relaxed text-gray-500"
+          >
+            Edge cases the AI could not close on the call — patch tests,
+            medical questions, and complex requests land here for your team. Use
+            the tabs below to switch between open items and history.
+          </p>
+        </header>
+
+        <div class="relative w-full space-y-6">
+          <input
+            class="inbox-tab-input"
+            type="radio"
+            name="inbox-tab"
+            id="inbox-tab-open"
+            checked
+          />
+          <input
+            class="inbox-tab-input"
+            type="radio"
+            name="inbox-tab"
+            id="inbox-tab-resolved"
+          />
+
+          <div
+            class="tab-row flex h-auto min-h-11 w-full gap-1 rounded-xl border border-gray-200/80 bg-gray-50/80 p-1 shadow-sm"
+          >
+            <label
+              for="inbox-tab-open"
+              class="flex min-h-10 flex-1 items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors sm:min-h-9"
+              >Open (2)</label
+            >
+            <label
+              for="inbox-tab-resolved"
+              class="flex min-h-10 flex-1 items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors sm:min-h-9"
+              >Resolved (1)</label
+            >
+          </div>
+
+          <div class="panel-wrap mt-4 sm:mt-5">
+            <!-- Open tab: matches TAB_PANEL_CLASS + TicketCard open variant -->
+            <div
+              class="panel-open h-[min(32rem,calc(100vh-14rem))] min-h-[22rem] w-full min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl border border-gray-200/80 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] [scrollbar-gutter:stable]"
+            >
+              <article
+                class="w-full rounded-xl border border-gray-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-shadow hover:border-gray-300 hover:shadow-md"
+              >
+                <div class="space-y-3 px-4 pt-4 pb-2 md:px-6 md:pt-6">
+                  <div class="flex items-start gap-3">
+                    <span
+                      class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-800 ring-1 ring-amber-500/15"
+                    >
+                      <span class="material-symbols-outlined icon-ms text-xl"
+                        >error</span
+                      >
+                    </span>
+                    <div class="min-w-0 flex-1 space-y-1">
+                      <p class="truncate text-base font-semibold text-gray-900">
+                        +353 87 123 4567
+                      </p>
+                      <p class="text-xs font-normal text-gray-500">2h ago</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="px-4 pb-2 md:px-6">
+                  <p class="text-sm leading-relaxed text-gray-800">
+                    Caller asked for a patch test before full colour — they
+                    cannot book online until someone confirms eligibility.
+                  </p>
+                </div>
+                <div
+                  class="flex flex-col gap-3 px-4 pt-2 pb-4 sm:flex-row sm:items-center sm:justify-between md:px-6 md:pb-6"
+                >
+                  <a
+                    href="tel:+353871234567"
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-lg text-sm font-medium text-gray-900 underline-offset-4 hover:underline sm:min-h-0 sm:w-auto sm:justify-start"
+                    >Call +353 87 123 4567</a
+                  >
+                  <button
+                    type="button"
+                    class="h-10 w-full min-w-[10rem] rounded-lg border border-gray-200/80 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50 sm:h-9 sm:w-auto"
+                  >
+                    Mark as Resolved
+                  </button>
+                </div>
+              </article>
+
+              <article
+                class="w-full rounded-xl border border-gray-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-shadow hover:border-gray-300 hover:shadow-md"
+              >
+                <div class="space-y-3 px-4 pt-4 pb-2 md:px-6 md:pt-6">
+                  <div class="flex items-start gap-3">
+                    <span
+                      class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-800 ring-1 ring-amber-500/15"
+                    >
+                      <span class="material-symbols-outlined icon-ms text-xl"
+                        >error</span
+                      >
+                    </span>
+                    <div class="min-w-0 flex-1 space-y-1">
+                      <p class="truncate text-base font-semibold text-gray-900">
+                        Unknown caller
+                      </p>
+                      <p class="text-xs font-normal text-gray-500">Yesterday</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="px-4 pb-2 md:px-6">
+                  <p class="text-sm leading-relaxed text-gray-800">
+                    Wants to speak to a senior stylist only; AI offered next
+                    available slot but they declined.
+                  </p>
+                </div>
+                <div
+                  class="flex flex-col gap-3 px-4 pt-2 pb-4 sm:flex-row sm:items-center sm:justify-between md:px-6 md:pb-6"
+                >
+                  <span
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-lg text-sm font-medium text-gray-400 sm:min-h-0 sm:w-auto sm:justify-start"
+                    >Call —</span
+                  >
+                  <button
+                    type="button"
+                    class="h-10 w-full min-w-[10rem] rounded-lg border border-gray-200/80 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50 sm:h-9 sm:w-auto"
+                  >
+                    Mark as Resolved
+                  </button>
+                </div>
+              </article>
+            </div>
+
+            <!-- Resolved tab -->
+            <div
+              class="panel-resolved h-[min(32rem,calc(100vh-14rem))] min-h-[22rem] w-full min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl border border-gray-200/80 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] [scrollbar-gutter:stable]"
+            >
+              <article
+                class="w-full rounded-xl border border-gray-200/80 bg-gray-50/40 opacity-[0.98] shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+              >
+                <div class="space-y-3 px-4 pt-4 pb-2 md:px-6 md:pt-6">
+                  <div class="flex items-start gap-3">
+                    <span
+                      class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 ring-1 ring-gray-200/80"
+                    >
+                      <span class="material-symbols-outlined icon-ms text-xl"
+                        >phone_forwarded</span
+                      >
+                    </span>
+                    <div class="min-w-0 flex-1 space-y-1">
+                      <p class="truncate text-base font-semibold text-gray-900">
+                        +353 1 234 5678
+                      </p>
+                      <p class="text-xs font-normal text-gray-500">3d ago</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="px-4 pb-2 md:px-6">
+                  <p class="text-sm leading-relaxed text-gray-600">
+                    Asked to reschedule existing appointment; staff confirmed new
+                    time by phone.
+                  </p>
+                </div>
+                <div
+                  class="flex flex-col gap-3 px-4 pt-2 pb-4 sm:flex-row sm:items-center sm:justify-between md:px-6 md:pb-6"
+                >
+                  <a
+                    href="tel:+35312345678"
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-lg text-sm font-medium text-gray-900 underline-offset-4 hover:underline sm:min-h-0 sm:w-auto sm:justify-start"
+                    >Call +353 1 234 5678</a
+                  >
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
