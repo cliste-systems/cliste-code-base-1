@@ -1,9 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { fixedWindowHit } from "@/lib/fixed-window-rate-limit";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function clientIp(req: NextRequest): string {
+  const xff = req.headers.get("x-forwarded-for");
+  return (
+    xff?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("cf-connecting-ip")?.trim() ||
+    "0.0.0.0"
+  );
+}
 
 /**
  * Short pay-link redirector.
@@ -30,6 +41,37 @@ export async function GET(
 
   if (!/^[A-Z0-9-]{4,32}$/.test(bookingRef)) {
     return new NextResponse("Invalid link", { status: 400 });
+  }
+
+  // Defence in depth: this route hits the DB and (if pending) Stripe on
+  // every call. Cap each source IP to 30 lookups per minute so a scanner
+  // can't grind through booking references or DoS the Stripe API.
+  const ipLimit = fixedWindowHit({
+    scope: "p-ref-ip",
+    key: clientIp(_req),
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!ipLimit.allowed) {
+    return new NextResponse("Too many requests", {
+      status: 429,
+      headers: { "retry-after": String(ipLimit.retryAfterSec) },
+    });
+  }
+  // And cap *per booking reference* — even if attackers rotate IPs, a
+  // single ref shouldn't be hit more than a handful of times in a window
+  // (legit users tap the SMS link once or twice).
+  const refLimit = fixedWindowHit({
+    scope: "p-ref-ref",
+    key: bookingRef,
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!refLimit.allowed) {
+    return new NextResponse("Too many requests", {
+      status: 429,
+      headers: { "retry-after": String(refLimit.retryAfterSec) },
+    });
   }
 
   const admin = createAdminClient();

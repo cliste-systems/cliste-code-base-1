@@ -32,8 +32,11 @@ export function isSuspiciousPhonePattern(phoneE164: string): boolean {
  * Verify Cloudflare Turnstile token (server).
  *
  * Turnstile is enforced only when **both** `TURNSTILE_SECRET_KEY` and
- * `NEXT_PUBLIC_TURNSTILE_SITE_KEY` are set. Otherwise we skip verification so
- * public booking still works in dev or when only one side is configured by mistake.
+ * `NEXT_PUBLIC_TURNSTILE_SITE_KEY` are set. In **production** we additionally
+ * require both to be present — silently skipping bot challenge when env
+ * vars are misconfigured opens an unsupervised public booking endpoint to
+ * scripted abuse (toll/SMS pumping, slot squatting). In dev we still allow
+ * skipping so local development isn't blocked by Turnstile setup.
  */
 export async function verifyTurnstileToken(
   token: string | null | undefined,
@@ -43,6 +46,18 @@ export async function verifyTurnstileToken(
   const turnstileEnabled = Boolean(secret && siteKey);
 
   if (!turnstileEnabled) {
+    if (process.env.NODE_ENV === "production") {
+      // Fail closed in prod: refuse the booking rather than silently
+      // bypassing the bot challenge. Surface a generic message — never
+      // leak that Turnstile is misconfigured.
+      console.error(
+        "[turnstile] production request but TURNSTILE_SECRET_KEY / NEXT_PUBLIC_TURNSTILE_SITE_KEY not configured — refusing.",
+      );
+      return {
+        ok: false,
+        message: "Booking is temporarily unavailable. Please try again shortly.",
+      };
+    }
     return { ok: true };
   }
 
@@ -101,6 +116,21 @@ export function assertBookingStartTimeAllowed(
   return { ok: true };
 }
 
+/**
+ * Local-dev escape hatch to skip phone OTP verification on public bookings.
+ *
+ * Hard refuse in production: if this env var is left on by accident in a
+ * prod deploy, the public booking endpoint stops requiring SMS OTP and a
+ * scripted client can spam confirmed bookings under any made-up number.
+ * Better to crash loud at startup than silently serve a no-OTP endpoint.
+ */
 export function isOtpBypassEnabled(): boolean {
-  return process.env.PUBLIC_BOOKING_OTP_DISABLED?.trim() === "true";
+  const enabled = process.env.PUBLIC_BOOKING_OTP_DISABLED?.trim() === "true";
+  if (enabled && process.env.NODE_ENV === "production") {
+    console.error(
+      "[public-booking] PUBLIC_BOOKING_OTP_DISABLED=true is forbidden in production — ignoring.",
+    );
+    return false;
+  }
+  return enabled;
 }

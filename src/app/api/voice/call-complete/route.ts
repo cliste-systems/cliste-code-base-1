@@ -26,7 +26,15 @@ type BookingPayload = {
 };
 
 type VoiceCallCompleteBody = {
-  organization_id: string;
+  /**
+   * @deprecated The org id is now derived server-side from `called_number` →
+   * `phone_numbers.organization_id`. Still accepted for compat with older
+   * worker builds; if both are sent and they disagree, we trust the lookup
+   * and reject the request (defends against shared-secret-only forgery).
+   */
+  organization_id?: string;
+  /** E.164 of the SIP DID the call landed on. REQUIRED — used to look up the tenant. */
+  called_number?: string;
   caller_number: string;
   duration_seconds?: number;
   outcome: string;
@@ -92,10 +100,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const orgId = String(body.organization_id ?? "").trim();
-  if (!UUID_RE.test(orgId)) {
+  const calledNumberRaw = String(body.called_number ?? "").trim();
+  const claimedOrgId = String(body.organization_id ?? "").trim();
+  // Accept legacy worker builds that only send organization_id while we roll
+  // out called_number. Once every worker is updated, flip
+  // CLISTE_VOICE_REQUIRE_CALLED_NUMBER=1 in env to reject org-id-only writes.
+  const requireCalledNumber =
+    process.env.CLISTE_VOICE_REQUIRE_CALLED_NUMBER?.trim().toLowerCase() ===
+      "1" ||
+    process.env.CLISTE_VOICE_REQUIRE_CALLED_NUMBER?.trim().toLowerCase() ===
+      "true";
+  if (!calledNumberRaw && !claimedOrgId) {
     return NextResponse.json(
-      { ok: false, error: "organization_id must be a valid UUID" },
+      { ok: false, error: "called_number (or legacy organization_id) is required" },
+      { status: 400 },
+    );
+  }
+  if (!calledNumberRaw && requireCalledNumber) {
+    return NextResponse.json(
+      { ok: false, error: "called_number is required (organization_id-only writes are disabled)" },
       { status: 400 },
     );
   }
@@ -135,22 +158,83 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: orgRow, error: orgErr } = await admin
-    .from("organizations")
-    .select("id")
-    .eq("id", orgId)
-    .maybeSingle();
-
-  if (orgErr) {
-    return NextResponse.json(
-      { ok: false, error: orgErr.message },
-      { status: 500 },
-    );
+  // Derive the tenant from the called number (the SIP DID the caller dialled).
+  // The shared webhook secret only proves "the call came from a worker we
+  // trust" — it must NOT decide which tenant to bill / write into. Trusting
+  // organization_id from the body would mean a leaked secret = cross-tenant
+  // write capability. The phone_numbers table is the source of truth: each
+  // assigned DID belongs to exactly one org.
+  let orgId: string | null = null;
+  if (calledNumberRaw) {
+    const calledE164 = normalizeCustomerPhoneE164(calledNumberRaw) || calledNumberRaw;
+    const { data: phoneRow, error: phoneErr } = await admin
+      .from("phone_numbers")
+      .select("organization_id, status")
+      .eq("e164", calledE164)
+      .maybeSingle();
+    if (phoneErr) {
+      return NextResponse.json(
+        { ok: false, error: phoneErr.message },
+        { status: 500 },
+      );
+    }
+    if (!phoneRow?.organization_id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `called_number ${calledE164} is not assigned to any organization`,
+        },
+        { status: 404 },
+      );
+    }
+    orgId = phoneRow.organization_id as string;
+    // If the worker also sent organization_id, it MUST match the lookup —
+    // a mismatch is either a worker bug or an exploit attempt.
+    if (claimedOrgId && claimedOrgId !== orgId) {
+      console.warn(
+        "[voice/call-complete] called_number resolved to org",
+        orgId,
+        "but body.organization_id was",
+        claimedOrgId,
+        "- rejecting",
+      );
+      return NextResponse.json(
+        { ok: false, error: "organization_id does not match called_number" },
+        { status: 403 },
+      );
+    }
+  } else {
+    // Legacy path (compat). Validate UUID, then verify org exists. This
+    // branch will be removed once CLISTE_VOICE_REQUIRE_CALLED_NUMBER=1.
+    if (!UUID_RE.test(claimedOrgId)) {
+      return NextResponse.json(
+        { ok: false, error: "organization_id must be a valid UUID" },
+        { status: 400 },
+      );
+    }
+    const { data: orgRow, error: orgErr } = await admin
+      .from("organizations")
+      .select("id")
+      .eq("id", claimedOrgId)
+      .maybeSingle();
+    if (orgErr) {
+      return NextResponse.json(
+        { ok: false, error: orgErr.message },
+        { status: 500 },
+      );
+    }
+    if (!orgRow) {
+      return NextResponse.json(
+        { ok: false, error: "Organization not found" },
+        { status: 404 },
+      );
+    }
+    orgId = claimedOrgId;
   }
-  if (!orgRow) {
+  if (!orgId) {
     return NextResponse.json(
-      { ok: false, error: "Organization not found" },
-      { status: 404 },
+      { ok: false, error: "Could not resolve organization for this call" },
+      { status: 400 },
     );
   }
 

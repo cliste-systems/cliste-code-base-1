@@ -51,7 +51,18 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event;
   const stripe = getStripeClient();
-  if (secret && sig) {
+  if (secret) {
+    // If the webhook secret is configured, ALWAYS verify — regardless of
+    // NODE_ENV. Otherwise an attacker who knows the URL could simply drop
+    // the `stripe-signature` header and trigger the dev-fallback "parse any
+    // JSON" branch — which would let them mark arbitrary appointments as
+    // paid/refunded and trigger SMS/email confirmations.
+    if (!sig) {
+      console.warn(
+        "[stripe webhook] STRIPE_WEBHOOK_SECRET set but stripe-signature header missing — rejecting.",
+      );
+      return new NextResponse("missing stripe-signature", { status: 400 });
+    }
     try {
       event = stripe.webhooks.constructEvent(rawBody, sig, secret);
     } catch (err) {
@@ -60,13 +71,16 @@ export async function POST(req: NextRequest) {
       return new NextResponse(`Webhook Error: ${msg}`, { status: 400 });
     }
   } else {
-    // Dev convenience when STRIPE_WEBHOOK_SECRET is not configured locally.
+    // No secret configured. Refuse outright in production — silently parsing
+    // unsigned payloads is a paid-status forgery primitive.
     if (process.env.NODE_ENV === "production") {
       console.error(
         "[stripe webhook] STRIPE_WEBHOOK_SECRET not set in production — rejecting.",
       );
       return new NextResponse("webhook secret not configured", { status: 500 });
     }
+    // Dev-only convenience: parse without verifying so `stripe trigger` /
+    // local fixtures work without a CLI listener.
     try {
       event = JSON.parse(rawBody) as Stripe.Event;
     } catch {

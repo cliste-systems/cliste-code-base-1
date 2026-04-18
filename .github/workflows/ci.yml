@@ -6,19 +6,42 @@ on:
   pull_request:
     branches: [main]
 
+# Default to read-only token. Individual jobs that need write access (e.g.
+# pushing back to the repo) must opt in explicitly. Reduces blast radius if
+# a compromised dependency or action calls the GitHub API.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # Pin third-party actions to a full commit SHA (with the moving tag in
+      # a comment) so a compromised tag cannot quietly inject code into CI.
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
 
+      # `--ignore-scripts` blocks any postinstall/preinstall hooks from running
+      # during install — a recurring supply-chain vector. We do not rely on
+      # native build steps in CI; if a future dep needs them, we can scope a
+      # second install with --ignore-scripts=false in a sandboxed step.
       - name: Install
-        run: npm ci
+        run: npm ci --ignore-scripts
+        env:
+          # Defence in depth: even if scripts ran, this hides any token from
+          # children that read process env directly.
+          npm_config_ignore_scripts: "true"
 
       - name: Lint
         run: npm run lint

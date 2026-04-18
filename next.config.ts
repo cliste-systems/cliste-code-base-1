@@ -25,18 +25,50 @@ function buildContentSecurityPolicy(): string {
       .join(" ") ?? "";
 
   // In dev, Next needs 'unsafe-eval' for fast refresh & React DevTools.
+  // In prod we additionally allow Cloudflare Turnstile (bot challenge on the
+  // public booking forms) and Google Maps JS (storefront map embed).
+  const stripeScript = "https://js.stripe.com https://*.stripe.com";
+  const turnstileScript = "https://challenges.cloudflare.com";
+  const mapsScript =
+    "https://maps.googleapis.com https://maps.gstatic.com";
   const scriptSrc = isProd
-    ? "'self' 'unsafe-inline' https://js.stripe.com https://*.stripe.com"
-    : "'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.stripe.com";
+    ? `'self' 'unsafe-inline' ${stripeScript} ${turnstileScript} ${mapsScript}`
+    : `'self' 'unsafe-inline' 'unsafe-eval' ${stripeScript} ${turnstileScript} ${mapsScript}`;
 
   const directives = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
-    "style-src 'self' 'unsafe-inline'",
+    // Maps loads webfonts/CSS from gstatic; allow as a style source.
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.gstatic.com",
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data:",
-    `connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.supabase.in wss://*.supabase.co ${extraConnect}`.trim(),
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://*.stripe.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://*.gstatic.com",
+    [
+      "connect-src 'self'",
+      "https://api.stripe.com",
+      "https://*.supabase.co",
+      "https://*.supabase.in",
+      "wss://*.supabase.co",
+      // Turnstile siteverify + telemetry beacons.
+      "https://challenges.cloudflare.com",
+      // Maps tile/route XHRs.
+      "https://maps.googleapis.com",
+      "https://*.googleapis.com",
+      "https://*.gstatic.com",
+      extraConnect,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    [
+      "frame-src 'self'",
+      "https://js.stripe.com",
+      "https://hooks.stripe.com",
+      "https://*.stripe.com",
+      // Turnstile renders an iframe for the bot challenge.
+      "https://challenges.cloudflare.com",
+      // Embedded Google Maps iframe (storefront directions widget).
+      "https://www.google.com",
+      "https://maps.google.com",
+    ].join(" "),
     "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
