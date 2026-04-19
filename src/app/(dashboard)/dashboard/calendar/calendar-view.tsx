@@ -3,11 +3,12 @@
 import Link from "next/link";
 import {
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type ChangeEvent,
-  type DragEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -426,10 +427,38 @@ export function CalendarView({
     null,
   );
   const router = useRouter();
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragHoverColumn, setDragHoverColumn] = useState<string | null>(null);
   const [dragMessage, setDragMessage] = useState<string | null>(null);
   const [, startDragSaveTransition] = useTransition();
+
+  // Mouse-tracking drag state. Replaces HTML5 drag-and-drop for instant
+  // response (HTML5 DnD has a built-in start delay) and to support a live
+  // snap-target preview + cursor tooltip.
+  //
+  // The "live" mutable copy lives in a ref so mousemove updates 60×/sec
+  // don't tear down + re-attach window listeners; the snapshot in state is
+  // only used to drive UI rendering (ghost + tooltip).
+  type DragState = {
+    id: string;
+    durationMin: number;
+    originStaffId: string | null;
+    originStartIso: string;
+    cursorX: number;
+    cursorY: number;
+    targetColumnId: string | null;
+    snappedMinutesFromGridStart: number | null;
+    blockWidthPx: number;
+  };
+  const dragRef = useRef<DragState | null>(null);
+  const [dragSnapshot, setDragSnapshot] = useState<DragState | null>(null);
+  const gridBodyRef = useRef<HTMLDivElement | null>(null);
+  const columnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const setColumnRef = useCallback(
+    (id: string) => (node: HTMLDivElement | null) => {
+      if (node) columnRefs.current.set(id, node);
+      else columnRefs.current.delete(id);
+    },
+    [],
+  );
 
   const onMonthYearChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -546,29 +575,213 @@ export function CalendarView({
     return m;
   }, [appointments]);
 
-  const onDragStartBlock = useCallback(
-    (e: DragEvent<HTMLElement>, apptId: string) => {
-      const a = appointmentsById.get(apptId);
-      if (!a || a.status !== "confirmed") {
-        e.preventDefault();
-        return;
+  // Pre-flight overlap check against in-memory appointments. Mirrors the DB
+  // exclusion constraint (per-staff bucket; null staff_id share the
+  // unassigned pool) so we can show a precise message about WHICH booking
+  // would clash before round-tripping to the server.
+  const findOverlapBlocker = useCallback(
+    (
+      apptId: string,
+      newStartMs: number,
+      newEndMs: number,
+      newStaffId: string | null,
+    ): CalendarAppointment | null => {
+      for (const other of appointments) {
+        if (other.id === apptId) continue;
+        if (other.status !== "confirmed") continue;
+        const otherStaff = other.staff_id ?? null;
+        if (otherStaff !== newStaffId) continue;
+        const otherStart = new Date(other.start_time).getTime();
+        const otherEnd = new Date(other.end_time).getTime();
+        if (Number.isNaN(otherStart) || Number.isNaN(otherEnd)) continue;
+        if (otherStart < newEndMs && otherEnd > newStartMs) {
+          return other;
+        }
       }
-      e.dataTransfer.effectAllowed = "move";
-      try {
-        e.dataTransfer.setData("text/plain", apptId);
-      } catch {
-        // Some browsers throw if data is set on the same drag — ignore.
-      }
-      setDraggingId(apptId);
+      return null;
+    },
+    [appointments],
+  );
+
+  const onMouseDownBlock = useCallback(
+    (e: ReactMouseEvent<HTMLElement>, apptId: string) => {
+      // Ignore non-primary clicks and modifier-clicks; let the click handler
+      // open the quick-look popover for plain clicks (the global mouseup
+      // handler decides whether the gesture became a drag).
+      if (e.button !== 0) return;
+      const appt = appointmentsById.get(apptId);
+      if (!appt || appt.status !== "confirmed") return;
+      const start = new Date(appt.start_time);
+      const end = new Date(appt.end_time);
+      const durationMin = Math.max(
+        5,
+        Math.round((end.getTime() - start.getTime()) / 60_000),
+      );
+      const target = e.currentTarget as HTMLElement;
+      const rect = target.getBoundingClientRect();
+      e.preventDefault();
       setDragMessage(null);
+      const initial: DragState = {
+        id: apptId,
+        durationMin,
+        originStaffId: appt.staff_id ?? null,
+        originStartIso: appt.start_time,
+        cursorX: e.clientX,
+        cursorY: e.clientY,
+        targetColumnId: null,
+        snappedMinutesFromGridStart: null,
+        blockWidthPx: rect.width,
+      };
+      dragRef.current = initial;
+      setDragSnapshot(initial);
     },
     [appointmentsById],
   );
 
-  const onDragEndBlock = useCallback(() => {
-    setDraggingId(null);
-    setDragHoverColumn(null);
-  }, []);
+  // Global mouse listeners while dragging. The effect only re-runs when a
+  // drag starts or ends (not on every cursor move), so listeners stay
+  // attached for the full gesture.
+  const dragActiveId = dragSnapshot?.id ?? null;
+  useEffect(() => {
+    if (!dragActiveId) return;
+    const SNAP_MIN = 15;
+    const remPx =
+      Number.parseFloat(getComputedStyle(document.documentElement).fontSize) ||
+      16;
+    const minutesPerPx = 60 / (HOUR_REM * remPx);
+
+    const computeFromCursor = (
+      clientX: number,
+      clientY: number,
+    ): { columnId: string | null; snappedMin: number | null } => {
+      let columnId: string | null = null;
+      for (const [id, node] of columnRefs.current) {
+        const r = node.getBoundingClientRect();
+        if (
+          clientX >= r.left &&
+          clientX <= r.right &&
+          clientY >= r.top &&
+          clientY <= r.bottom
+        ) {
+          columnId = id;
+          break;
+        }
+      }
+      const grid = gridBodyRef.current;
+      if (!grid) return { columnId, snappedMin: null };
+      const gridRect = grid.getBoundingClientRect();
+      const offsetY = clientY - gridRect.top;
+      const minsRaw = offsetY * minutesPerPx;
+      const snapped = Math.max(0, Math.round(minsRaw / SNAP_MIN) * SNAP_MIN);
+      return { columnId, snappedMin: snapped };
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      const live = dragRef.current;
+      if (!live) return;
+      const { columnId, snappedMin } = computeFromCursor(ev.clientX, ev.clientY);
+      const next: DragState = {
+        ...live,
+        cursorX: ev.clientX,
+        cursorY: ev.clientY,
+        targetColumnId: columnId,
+        snappedMinutesFromGridStart: snappedMin,
+      };
+      dragRef.current = next;
+      setDragSnapshot(next);
+    };
+
+    const onUp = (ev: MouseEvent) => {
+      const live = dragRef.current;
+      dragRef.current = null;
+      setDragSnapshot(null);
+      if (!live) return;
+      const { columnId, snappedMin } = computeFromCursor(ev.clientX, ev.clientY);
+      if (columnId === null || snappedMin === null) return; // drop outside
+      const newLocalMinutes = startHour * 60 + snappedMin;
+      const dayEndMinutes = endHour * 60;
+      if (
+        newLocalMinutes < startHour * 60 ||
+        newLocalMinutes + live.durationMin > dayEndMinutes
+      ) {
+        setDragMessage("That time is outside today's open hours.");
+        return;
+      }
+      const newStaffId = columnId === UNASSIGNED_STAFF_ID ? null : columnId;
+      const newStart = new Date(selectedDate);
+      newStart.setHours(
+        Math.floor(newLocalMinutes / 60),
+        newLocalMinutes % 60,
+        0,
+        0,
+      );
+      const newEnd = new Date(newStart.getTime() + live.durationMin * 60_000);
+      const oldStartMs = new Date(live.originStartIso).getTime();
+      if (
+        newStart.getTime() === oldStartMs &&
+        live.originStaffId === newStaffId
+      ) {
+        return; // no-op
+      }
+      // Pre-flight overlap check (mirrors the per-staff exclusion constraint;
+      // unassigned bookings share a single pool).
+      const blocker = findOverlapBlocker(
+        live.id,
+        newStart.getTime(),
+        newEnd.getTime(),
+        newStaffId,
+      );
+      if (blocker) {
+        const bs = new Date(blocker.start_time);
+        const be = new Date(blocker.end_time);
+        const stylistLabel =
+          newStaffId === null
+            ? "the unassigned column (it's a shared pool)"
+            : staffMembers.find((s) => s.id === newStaffId)?.name ?? "this stylist";
+        setDragMessage(
+          `That overlaps ${blocker.service_name} (${formatTimeLabel24(bs.getHours(), bs.getMinutes())}–${formatTimeLabel24(be.getHours(), be.getMinutes())}, ${blocker.customer_name}) on ${stylistLabel}.`,
+        );
+        return;
+      }
+      startDragSaveTransition(async () => {
+        const result = await rescheduleAppointment({
+          appointmentId: live.id,
+          newStartIso: newStart.toISOString(),
+          staffId: newStaffId,
+        });
+        if (!result.ok) {
+          setDragMessage(result.message);
+          return;
+        }
+        setDragMessage(null);
+        router.refresh();
+      });
+    };
+
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        dragRef.current = null;
+        setDragSnapshot(null);
+      }
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [
+    dragActiveId,
+    endHour,
+    findOverlapBlocker,
+    router,
+    selectedDate,
+    staffMembers,
+    startHour,
+  ]);
 
   // Resize: bottom-edge handle on a confirmed appointment block. We track the
   // mouse globally during the gesture, snap to 5-minute steps, and call the
@@ -635,100 +848,6 @@ export function CalendarView({
       window.addEventListener("mouseup", onUp);
     },
     [appointmentsById, router],
-  );
-
-  const handleColumnDragOver = useCallback(
-    (e: DragEvent<HTMLDivElement>, columnId: string) => {
-      if (!draggingId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      if (dragHoverColumn !== columnId) setDragHoverColumn(columnId);
-    },
-    [draggingId, dragHoverColumn],
-  );
-
-  const handleColumnDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>, columnId: string) => {
-      e.preventDefault();
-      const apptId = draggingId ?? e.dataTransfer.getData("text/plain");
-      setDraggingId(null);
-      setDragHoverColumn(null);
-      if (!apptId) return;
-      const appt = appointmentsById.get(apptId);
-      if (!appt || appt.status !== "confirmed") {
-        setDragMessage("Only confirmed bookings can be moved.");
-        return;
-      }
-
-      const target = e.currentTarget as HTMLDivElement;
-      const rect = target.getBoundingClientRect();
-      const offsetY = e.clientY - rect.top;
-      const remPx =
-        Number.parseFloat(
-          getComputedStyle(document.documentElement).fontSize,
-        ) || 16;
-      const minutesPerRem = 60 / HOUR_REM;
-      const minutesFromGridStartRaw = (offsetY / remPx) * minutesPerRem;
-      const SLOT_INTERVAL_MIN = 15;
-      const snappedFromStart =
-        Math.round(minutesFromGridStartRaw / SLOT_INTERVAL_MIN) *
-        SLOT_INTERVAL_MIN;
-      const newLocalMinutes =
-        startHour * 60 + Math.max(0, snappedFromStart);
-
-      const oldStart = new Date(appt.start_time);
-      const oldEnd = new Date(appt.end_time);
-      const durationMs = oldEnd.getTime() - oldStart.getTime();
-      const newStart = new Date(selectedDate);
-      newStart.setHours(
-        Math.floor(newLocalMinutes / 60),
-        newLocalMinutes % 60,
-        0,
-        0,
-      );
-      const newEnd = new Date(newStart.getTime() + durationMs);
-
-      const dayEndMinutes = endHour * 60;
-      const newEndMinutes =
-        newEnd.getHours() * 60 + newEnd.getMinutes() + (newEnd.getDate() === selectedDate.getDate() ? 0 : 24 * 60);
-      if (newLocalMinutes < startHour * 60 || newEndMinutes > dayEndMinutes) {
-        setDragMessage("That time is outside today's open hours.");
-        return;
-      }
-
-      const newStaffId =
-        columnId === UNASSIGNED_STAFF_ID ? null : columnId;
-
-      // Avoid no-op moves.
-      if (
-        newStart.getTime() === oldStart.getTime() &&
-        (appt.staff_id ?? null) === newStaffId
-      ) {
-        return;
-      }
-
-      startDragSaveTransition(async () => {
-        const result = await rescheduleAppointment({
-          appointmentId: apptId,
-          newStartIso: newStart.toISOString(),
-          staffId: newStaffId,
-        });
-        if (!result.ok) {
-          setDragMessage(result.message);
-          return;
-        }
-        setDragMessage(null);
-        router.refresh();
-      });
-    },
-    [
-      appointmentsById,
-      draggingId,
-      endHour,
-      router,
-      selectedDate,
-      startHour,
-    ],
   );
 
   const mobileFilteredBlocks = useMemo(() => {
@@ -921,7 +1040,10 @@ export function CalendarView({
               </div>
 
               {/* Staff columns */}
-              <div className="relative flex min-w-0 flex-1 bg-white">
+              <div
+                ref={gridBodyRef}
+                className="relative flex min-w-0 flex-1 bg-white"
+              >
                 {/* Hour lines */}
                 <div
                   className="pointer-events-none absolute inset-0 z-0 flex flex-col"
@@ -958,21 +1080,17 @@ export function CalendarView({
                         endHour,
                       )
                     : [];
+                  const isDragHover =
+                    dragSnapshot?.targetColumnId === cid;
                   return (
                     <div
                       key={cid}
+                      ref={setColumnRef(cid)}
+                      data-column-id={cid}
                       className={cn(
                         "group/col relative z-10 w-[240px] shrink-0 cursor-crosshair border-r border-gray-200",
-                        dragHoverColumn === cid &&
-                          "ring-2 ring-inset ring-blue-300/70",
+                        isDragHover && "ring-2 ring-inset ring-blue-300/70",
                       )}
-                      onDragOver={(e) => handleColumnDragOver(e, cid)}
-                      onDragLeave={() =>
-                        setDragHoverColumn((prev) =>
-                          prev === cid ? null : prev,
-                        )
-                      }
-                      onDrop={(e) => handleColumnDrop(e, cid)}
                     >
                       <div className="pointer-events-none absolute inset-y-0 left-0 right-0 hidden bg-gray-50/30 group-hover/col:block" />
                       {isStaffCol && workSegs.length > 0 ? (
@@ -1025,13 +1143,20 @@ export function CalendarView({
                               startHour={startHour}
                               onSelect={setActiveAppointmentId}
                               draggable={!appt.cancelled}
-                              dragging={draggingId === appt.id}
-                              onDragStartBlock={onDragStartBlock}
-                              onDragEndBlock={onDragEndBlock}
+                              dragging={dragSnapshot?.id === appt.id}
+                              onMouseDownBlock={onMouseDownBlock}
                               resizable={!appt.cancelled}
                               onResizeStart={onResizeStart}
                             />
                           ))}
+                        {isDragHover &&
+                        dragSnapshot &&
+                        dragSnapshot.snappedMinutesFromGridStart !== null ? (
+                          <DragSnapTarget
+                            snappedMin={dragSnapshot.snappedMinutesFromGridStart}
+                            durationMin={dragSnapshot.durationMin}
+                          />
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -1124,6 +1249,19 @@ export function CalendarView({
         staffMembers={staffMembers}
         onClose={() => setActiveAppointmentId(null)}
       />
+
+      {dragSnapshot &&
+      dragSnapshot.snappedMinutesFromGridStart !== null ? (
+        <DragCursorBadge
+          x={dragSnapshot.cursorX}
+          y={dragSnapshot.cursorY}
+          startHour={startHour}
+          snappedMin={dragSnapshot.snappedMinutesFromGridStart}
+          durationMin={dragSnapshot.durationMin}
+          targetColumnId={dragSnapshot.targetColumnId}
+          staffMembers={staffMembers}
+        />
+      ) : null}
 
       {dragMessage ? (
         <div
@@ -1247,8 +1385,7 @@ function DesktopAppointmentBlock({
   onSelect,
   draggable = false,
   dragging = false,
-  onDragStartBlock,
-  onDragEndBlock,
+  onMouseDownBlock,
   resizable = false,
   onResizeStart,
 }: {
@@ -1257,8 +1394,10 @@ function DesktopAppointmentBlock({
   onSelect?: (id: string) => void;
   draggable?: boolean;
   dragging?: boolean;
-  onDragStartBlock?: (e: DragEvent<HTMLElement>, apptId: string) => void;
-  onDragEndBlock?: () => void;
+  onMouseDownBlock?: (
+    e: ReactMouseEvent<HTMLElement>,
+    apptId: string,
+  ) => void;
   resizable?: boolean;
   onResizeStart?: (apptId: string, e: ReactMouseEvent<HTMLElement>) => void;
 }) {
@@ -1268,24 +1407,24 @@ function DesktopAppointmentBlock({
   return (
     <button
       type="button"
-      draggable={draggable}
-      onDragStart={
-        draggable && onDragStartBlock
-          ? (e) => onDragStartBlock(e, appt.id)
+      onMouseDown={
+        draggable && onMouseDownBlock
+          ? (e) => onMouseDownBlock(e, appt.id)
           : undefined
       }
-      onDragEnd={draggable && onDragEndBlock ? onDragEndBlock : undefined}
       onClick={(e) => {
         e.stopPropagation();
+        // If this came from a drag gesture the snapshot was already
+        // cleared, so a plain click still opens the quick-look.
         onSelect?.(appt.id);
       }}
       className={cn(
-        "pointer-events-auto absolute left-1 right-1.5 cursor-pointer overflow-hidden rounded-r-lg border-l-[3px] p-2.5 text-left shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900",
+        "pointer-events-auto absolute left-1 right-1.5 cursor-grab overflow-hidden rounded-r-lg border-l-[3px] p-2.5 text-left shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 active:cursor-grabbing",
         v.border,
         v.bg,
         appt.dimmed && "opacity-70",
         appt.cancelled && "opacity-80",
-        dragging && "opacity-40 ring-2 ring-blue-400",
+        dragging && "opacity-30 ring-2 ring-blue-400",
       )}
       style={{
         top: pos.top,
@@ -1430,6 +1569,75 @@ function EmptyDayMessage() {
       No appointments on this day. Add one under Bookings or when your AI agent
       confirms a slot, it will appear here.
     </p>
+  );
+}
+
+/**
+ * Translucent rectangle that shows where a dragged appointment will land
+ * inside its target column. Sized by the original duration; positioned by
+ * the snapped grid-relative minute offset.
+ */
+function DragSnapTarget({
+  snappedMin,
+  durationMin,
+}: {
+  snappedMin: number;
+  durationMin: number;
+}) {
+  const topRem = (snappedMin / 60) * HOUR_REM;
+  const heightRem = Math.max((durationMin / 60) * HOUR_REM, 1.25);
+  return (
+    <div
+      className="pointer-events-none absolute left-1 right-1.5 rounded-r-lg border-2 border-dashed border-blue-400 bg-blue-100/40"
+      style={{ top: `${topRem}rem`, height: `${heightRem}rem` }}
+      aria-hidden
+    />
+  );
+}
+
+/**
+ * Floating badge near the cursor showing the proposed start–end time and
+ * stylist for the drag in progress.
+ */
+function DragCursorBadge({
+  x,
+  y,
+  startHour,
+  snappedMin,
+  durationMin,
+  targetColumnId,
+  staffMembers,
+}: {
+  x: number;
+  y: number;
+  startHour: number;
+  snappedMin: number;
+  durationMin: number;
+  targetColumnId: string | null;
+  staffMembers: CalendarStaffMember[];
+}) {
+  const startTotal = startHour * 60 + snappedMin;
+  const startH = Math.floor(startTotal / 60);
+  const startM = startTotal % 60;
+  const endTotal = startTotal + durationMin;
+  const endH = Math.floor(endTotal / 60);
+  const endM = endTotal % 60;
+  const stylistLabel =
+    targetColumnId === null
+      ? "Drop on a column"
+      : targetColumnId === UNASSIGNED_STAFF_ID
+        ? "Unassigned"
+        : staffMembers.find((s) => s.id === targetColumnId)?.name ?? "Stylist";
+  return (
+    <div
+      className="pointer-events-none fixed z-[60] rounded-md border border-gray-900/10 bg-gray-900 px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg"
+      style={{ left: x + 14, top: y + 14 }}
+    >
+      <div className="tabular-nums">
+        {formatTimeLabel24(startH, startM)}–{formatTimeLabel24(endH, endM)}
+      </div>
+      <div className="text-[11px] font-normal text-white/70">{stylistLabel}</div>
+    </div>
   );
 }
 

@@ -508,8 +508,9 @@ export async function rescheduleAppointment(payload: {
     ) {
       return {
         ok: false,
-        message:
-          "That time clashes with another confirmed booking for this stylist.",
+        message: targetStaffId
+          ? "That time clashes with another booking for this stylist."
+          : "That time clashes with another unassigned booking. (Unassigned bookings share one pool — pick a stylist or a free slot.)",
       };
     }
     return { ok: false, message: m };
@@ -583,7 +584,9 @@ export async function resizeAppointment(payload: {
     ) {
       return {
         ok: false,
-        message: "Resize would clash with another booking for this stylist.",
+        message: row.staff_id
+          ? "Resize would clash with another booking for this stylist."
+          : "Resize would clash with another unassigned booking.",
       };
     }
     return { ok: false, message: m };
