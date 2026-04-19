@@ -76,7 +76,8 @@ export default async function DashboardLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { supabase, organizationId, user } = await requireDashboardSession();
+  const { supabase, organizationId, user, profile: sessionProfile } =
+    await requireDashboardSession();
 
   const cookieStore = await cookies();
   const navSeenAt = {
@@ -132,13 +133,10 @@ export default async function DashboardLayout({
   const effectiveTier = await getEffectiveProductTier(orgRow?.tier);
   const showNativeNav = effectiveTier === "native";
 
-  // Fan-out: profile, support cookie, and nav badges all in parallel.
-  const [profileRowRes, supportView, navBadges] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("name, role")
-      .eq("id", user.id)
-      .maybeSingle(),
+  // Fan-out: support cookie + nav badges in parallel. `sessionProfile`
+  // (name, role) was already loaded by `requireDashboardSession`, so we
+  // skip the duplicate `profiles` round-trip the layout used to do here.
+  const [supportView, navBadges] = await Promise.all([
     isValidSupportDashboardCookieValue(
       cookieStore.get(SUPPORT_DASHBOARD_COOKIE)?.value,
     ),
@@ -149,7 +147,7 @@ export default async function DashboardLayout({
       navSeenAt,
     ),
   ]);
-  const profileRow = profileRowRes.data;
+  const profileRow = sessionProfile;
 
   let loggedInAs: string;
   if (supportView) {

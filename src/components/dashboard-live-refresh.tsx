@@ -9,13 +9,18 @@ const IS_DEV = process.env.NODE_ENV === "development";
 
 /**
  * Fallback polling when Realtime is unavailable or tables aren’t in the
- * `supabase_realtime` publication. Prod: moderate cadence; dev: slower to avoid
- * racing Turbopack HMR (“Failed to fetch” on RSC refetch).
+ * `supabase_realtime` publication. Realtime is the primary path (events
+ * arrive in <1s); polling is a safety net only, so it can be slow.
+ *
+ * Why so infrequent? Each `router.refresh()` re-runs the dashboard layout
+ * + page server render — that's ~10+ Supabase queries on the home page
+ * alone. At a tight cadence the dashboard always *feels* like it's
+ * "loading" because a fresh re-fetch is permanently in flight.
  */
-const POLL_INTERVAL_MS = IS_DEV ? 15_000 : 12_000;
+const POLL_INTERVAL_MS = IS_DEV ? 60_000 : 45_000;
 
 /** Coalesce interval + focus refreshes so RSC fetches don’t overlap. */
-const MIN_MS_BETWEEN_POLL_REFRESH = IS_DEV ? 5_000 : 1_500;
+const MIN_MS_BETWEEN_POLL_REFRESH = 8_000;
 
 function shouldSoftRefresh(pathname: string | null): boolean {
   if (!pathname?.startsWith("/dashboard")) return false;
@@ -52,7 +57,8 @@ export function DashboardLiveRefresh({
 }: DashboardLiveRefreshProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const lastPollRefreshAt = useRef(0);
+  // Seed with mount time so focus-on-tab-back doesn't immediately re-fetch.
+  const lastPollRefreshAt = useRef(Date.now());
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -89,15 +95,23 @@ export function DashboardLiveRefresh({
 
   useEffect(() => {
     if (!shouldSoftRefresh(pathname)) return;
-    pollRefresh();
+    // Don't kick off an immediate refresh on mount — the page just rendered,
+    // any data older than the request itself is fine for the first 45-60s.
     const t = setInterval(pollRefresh, POLL_INTERVAL_MS);
     return () => clearInterval(t);
   }, [pathname, pollRefresh]);
 
   useEffect(() => {
     if (!shouldSoftRefresh(pathname)) return;
+    // Skip focus/visibility refreshes if the data is fresh enough. Avoids
+    // re-rendering the entire dashboard every time the user switches tabs.
+    const FOCUS_REFRESH_THRESHOLD_MS = 30_000;
     const onResume = () => {
-      if (document.visibilityState === "visible") pollRefresh();
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastPollRefreshAt.current < FOCUS_REFRESH_THRESHOLD_MS) {
+        return;
+      }
+      pollRefresh();
     };
     document.addEventListener("visibilitychange", onResume);
     window.addEventListener("focus", onResume);

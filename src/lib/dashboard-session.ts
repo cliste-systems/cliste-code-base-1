@@ -4,10 +4,21 @@ import type { User } from "@supabase/supabase-js";
 
 import { createClient } from "@/utils/supabase/server";
 
+export type DashboardSessionProfile = {
+  name: string | null;
+  role: string | null;
+};
+
 export type DashboardSession = {
   supabase: Awaited<ReturnType<typeof createClient>>;
   user: User;
   organizationId: string;
+  /**
+   * The caller's row from `public.profiles`. Loaded as part of the same
+   * round-trip as `organization_id` so callers (e.g. the dashboard layout)
+   * don't have to issue a second query for the user's display name/role.
+   */
+  profile: DashboardSessionProfile;
 };
 
 type ResolveDashboardAuth =
@@ -26,7 +37,7 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("organization_id")
+    .select("organization_id, name, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -40,6 +51,10 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
       supabase,
       user,
       organizationId: profile.organization_id,
+      profile: {
+        name: profile.name ?? null,
+        role: profile.role ?? null,
+      },
     },
   };
 }
