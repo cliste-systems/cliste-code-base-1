@@ -223,6 +223,12 @@ function minutesFromGridStart(h: number, m: number, startHour: number): number {
   return (h - startHour) * 60 + m;
 }
 
+// Visual minimum: 1.75rem (~28px) is the smallest height that still fits
+// a single line of "service · HH:MM-HH:MM · client" without clipping.
+// Short bookings get bumped to this height even if their real duration
+// would be smaller (so a 5-min booking still reads cleanly).
+const MIN_BLOCK_HEIGHT_REM = 1.75;
+
 function slotStyle(start: Clock, end: Clock, startHour: number) {
   const startMin = minutesFromGridStart(start.h, start.m, startHour);
   const endMin = minutesFromGridStart(end.h, end.m, startHour);
@@ -230,7 +236,7 @@ function slotStyle(start: Clock, end: Clock, startHour: number) {
   const heightRem = ((endMin - startMin) / 60) * HOUR_REM;
   return {
     top: `${topRem}rem`,
-    height: `${Math.max(heightRem, 1.25)}rem`,
+    height: `${Math.max(heightRem, MIN_BLOCK_HEIGHT_REM)}rem`,
   };
 }
 
@@ -1406,13 +1412,14 @@ function DesktopAppointmentBlock({
   const durationMin =
     minutesFromGridStart(appt.end.h, appt.end.m, startHour) -
     minutesFromGridStart(appt.start.h, appt.start.m, startHour);
-  // Anything under 25 mins can't fit our 3-line stacked layout (title +
-  // time row + client row), so collapse to a single inline line so the
-  // block stays informative instead of looking like a mystery yellow strip.
-  const isTiny = durationMin > 0 && durationMin < 25;
+  // Anything under ~35 mins can't fit our 3-row stacked layout (title +
+  // time row + client row) without clipping the bottom row, so collapse to
+  // a single inline line. The block visual height is also clamped to
+  // MIN_BLOCK_HEIGHT_REM (~28px) so even a 5-min booking is readable.
+  const isCompact = durationMin > 0 && durationMin < 35;
   const tooltip = `${appt.service} · ${formatRange24(appt.start, appt.end)} · ${appt.client}${appt.cancelled ? " (cancelled)" : ""}`;
 
-  if (isTiny) {
+  if (isCompact) {
     return (
       <button
         type="button"
@@ -1427,7 +1434,7 @@ function DesktopAppointmentBlock({
           onSelect?.(appt.id);
         }}
         className={cn(
-          "pointer-events-auto absolute left-1 right-1.5 flex cursor-grab items-center gap-1.5 overflow-hidden rounded-r-md border-l-[3px] px-1.5 py-0.5 text-left shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 active:cursor-grabbing",
+          "pointer-events-auto absolute left-1 right-1.5 flex cursor-grab items-center gap-1.5 overflow-hidden rounded-r-md border-l-[3px] px-2 text-left leading-none shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 active:cursor-grabbing",
           v.border,
           v.bg,
           appt.dimmed && "opacity-70",
@@ -1438,7 +1445,15 @@ function DesktopAppointmentBlock({
       >
         <span
           className={cn(
-            "shrink-0 truncate text-[11px] font-semibold leading-tight tracking-tight",
+            "shrink-0 text-[11px] font-semibold tracking-tight",
+            v.time,
+          )}
+        >
+          {formatTimeLabel24(appt.start.h, appt.start.m)}
+        </span>
+        <span
+          className={cn(
+            "shrink truncate text-[11px] font-semibold tracking-tight",
             v.title,
             appt.cancelled && "line-through decoration-red-800/50",
           )}
@@ -1447,20 +1462,11 @@ function DesktopAppointmentBlock({
         </span>
         <span
           className={cn(
-            "shrink-0 text-[10px] font-medium tabular-nums",
-            v.time,
-          )}
-        >
-          {formatTimeLabel24(appt.start.h, appt.start.m)}–
-          {formatTimeLabel24(appt.end.h, appt.end.m)}
-        </span>
-        <span
-          className={cn(
-            "min-w-0 truncate text-[10px] font-medium",
+            "min-w-0 shrink truncate text-[10px] font-medium",
             v.client,
           )}
         >
-          {appt.client}
+          · {appt.client}
         </span>
       </button>
     );
