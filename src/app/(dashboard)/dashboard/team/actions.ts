@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { isMissingStorefrontSchemaError } from "@/lib/organization-storefront-query";
+import { uploadSalonImageFromDataUrl } from "@/lib/salon-image-upload";
+import {
+  parseStorefrontTeamMembers,
+  type StorefrontTeamMember,
+} from "@/lib/storefront-blocks";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -229,5 +235,90 @@ export async function saveStaffServices(payload: {
   revalidatePath("/dashboard/team");
   revalidatePath("/dashboard/services");
   revalidatePath("/dashboard/bookings");
+  return { ok: true };
+}
+
+/**
+ * Replace the storefront "Our team" showcase (names + photos) shown on the
+ * public booking page and used by the AI receptionist when offering a
+ * stylist by name. This is intentionally separate from the auth-backed
+ * `profiles` rows that drive scheduling — a salon may want to show the
+ * face of a junior stylist who doesn't have their own login, etc.
+ */
+export type SaveTeamShowcaseResult =
+  | { ok: true; warning?: string }
+  | { ok: false; message: string };
+
+async function resolveShowcasePhotoUrls(
+  organizationId: string,
+  members: StorefrontTeamMember[],
+): Promise<StorefrontTeamMember[]> {
+  const out: StorefrontTeamMember[] = [];
+  for (const m of members) {
+    const name = m.name?.trim() ?? "";
+    if (!name) continue;
+    const raw = typeof m.imageUrl === "string" ? m.imageUrl.trim() : "";
+    if (!raw) {
+      out.push({ name });
+      continue;
+    }
+    if (raw.startsWith("data:")) {
+      // New upload encoded inline by the editor — push to storage and swap
+      // for the public URL before persisting.
+      const url = await uploadSalonImageFromDataUrl(
+        organizationId,
+        raw,
+        "team",
+      );
+      out.push({ name, imageUrl: url });
+    } else if (/^https?:\/\//i.test(raw)) {
+      out.push({ name, imageUrl: raw });
+    } else {
+      // Unknown / unsafe URL scheme — drop the photo, keep the name.
+      out.push({ name });
+    }
+  }
+  return out;
+}
+
+export async function saveTeamShowcase(
+  members: StorefrontTeamMember[],
+): Promise<SaveTeamShowcaseResult> {
+  const { supabase, organizationId } = await requireDashboardSession();
+
+  let resolved: StorefrontTeamMember[];
+  try {
+    resolved = await resolveShowcasePhotoUrls(organizationId, members);
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Could not save team photos.",
+    };
+  }
+
+  const normalized = parseStorefrontTeamMembers(resolved as unknown);
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      storefront_team_members: normalized,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", organizationId);
+
+  if (error && !isMissingStorefrontSchemaError(error.message)) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/dashboard/team");
+  revalidatePath("/dashboard/services");
+  revalidatePath("/dashboard/storefront");
+
+  if (error) {
+    return {
+      ok: true,
+      warning:
+        "Team showcase saved locally but the storefront column is missing — run the latest storefront migration.",
+    };
+  }
   return { ok: true };
 }

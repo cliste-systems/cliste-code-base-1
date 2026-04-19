@@ -902,7 +902,18 @@ export function CalendarView({
                       i === hours.length - 1 && "border-b-0",
                     )}
                   >
-                    <span className="absolute -top-2.5 right-3 z-10 bg-white px-1">
+                    {/*
+                      First label sits inside the row (top-1) so it isn't
+                      clipped by the sticky column header. Subsequent labels
+                      straddle the gridline (-top-2.5) for the canonical
+                      Fresha/Treatwell look.
+                    */}
+                    <span
+                      className={cn(
+                        "absolute right-3 z-10 bg-white px-1",
+                        i === 0 ? "top-1" : "-top-2.5",
+                      )}
+                    >
                       {formatTimeLabel24(h, 0)}
                     </span>
                   </div>

@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { isMissingStorefrontSchemaError } from "@/lib/organization-storefront-query";
-import { parseStorefrontTeamMembers } from "@/lib/storefront-blocks";
 import { servicesTableHasExtendedColumns } from "@/lib/services-schema";
 
 import { ServicesView, type DashboardServiceRow } from "./services-view";
@@ -11,28 +9,11 @@ import type { ServiceCategory } from "./categories-actions";
 export default async function DashboardServicesPage() {
   const { supabase, organizationId } = await requireDashboardSession();
 
-  const ORG_SELECT_WITH_TEAM =
-    "slug, tier, updated_at, storefront_team_members";
-  const ORG_SELECT_BASE = "slug, tier, updated_at";
-
-  let orgRes = await supabase
+  const { data: org, error: orgError } = await supabase
     .from("organizations")
-    .select(ORG_SELECT_WITH_TEAM)
+    .select("slug, tier, updated_at")
     .eq("id", organizationId)
     .maybeSingle();
-
-  if (
-    orgRes.error &&
-    isMissingStorefrontSchemaError(orgRes.error.message)
-  ) {
-    orgRes = await supabase
-      .from("organizations")
-      .select(ORG_SELECT_BASE)
-      .eq("id", organizationId)
-      .maybeSingle();
-  }
-
-  const { data: org, error: orgError } = orgRes;
 
   if (orgError || !org) {
     return (
@@ -86,12 +67,6 @@ export default async function DashboardServicesPage() {
         displayOrder: (r.display_order as number) ?? 0,
       }));
 
-  const initialTeamMembers = parseStorefrontTeamMembers(
-    "storefront_team_members" in org
-      ? (org as { storefront_team_members?: unknown }).storefront_team_members
-      : undefined,
-  );
-
   const initialServices: DashboardServiceRow[] =
     !svcError && svcRows
       ? svcRows.map((s) => {
@@ -138,9 +113,7 @@ export default async function DashboardServicesPage() {
           key={`${org.updated_at ?? "0"}-${initialServices.map((s) => s.id).sort().join("|")}`}
           extendedSchema={extendedSchema}
           initialServices={initialServices}
-          initialTeamMembers={initialTeamMembers}
           initialCategories={initialCategories}
-          teamSyncKey={org.updated_at ?? ""}
         />
       )}
     </div>

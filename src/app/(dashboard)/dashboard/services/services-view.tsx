@@ -6,8 +6,6 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  UserRound,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -40,7 +38,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { StorefrontTeamMember } from "@/lib/storefront-blocks";
 import { cn } from "@/lib/utils";
 
 export type DashboardServiceRow = {
@@ -100,31 +97,16 @@ function serviceSummaryLine(s: DashboardServiceRow): string {
 const fieldClass =
   "block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-none placeholder:text-gray-400 transition-colors focus-visible:border-gray-900 focus-visible:ring-1 focus-visible:ring-gray-900 focus-visible:outline-none";
 
-type TeamEditorRow = { id: string; name: string; imageUrl: string };
-
-function teamToEditorRows(members: StorefrontTeamMember[]): TeamEditorRow[] {
-  return members.map((m, i) => ({
-    id: `tm-${i}-${m.name.slice(0, 12)}`,
-    name: m.name,
-    imageUrl: typeof m.imageUrl === "string" ? m.imageUrl : "",
-  }));
-}
-
 type ServicesViewProps = {
   extendedSchema?: boolean;
   initialServices: DashboardServiceRow[];
-  initialTeamMembers: StorefrontTeamMember[];
   initialCategories?: ServiceCategory[];
-  /** Bumps when org row reloads so team editor syncs from the server. */
-  teamSyncKey: string;
 };
 
 export function ServicesView({
   extendedSchema = true,
   initialServices,
-  initialTeamMembers,
   initialCategories = [],
-  teamSyncKey,
 }: ServicesViewProps) {
   const router = useRouter();
   const [services, setServices] = useState<DashboardServiceRow[]>(
@@ -136,18 +118,10 @@ export function ServicesView({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveWarning, setSaveWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [teamRows, setTeamRows] = useState<TeamEditorRow[]>(() =>
-    teamToEditorRows(initialTeamMembers),
-  );
   const [categories, setCategories] =
     useState<ServiceCategory[]>(initialCategories);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [addonsOpen, setAddonsOpen] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTeamRows(teamToEditorRows(initialTeamMembers));
-  }, [teamSyncKey]);
 
   const handleSave = useCallback(() => {
     setSaveMsg(null);
@@ -174,14 +148,6 @@ export function ServicesView({
           processingMin: s.processingMin,
           processingAfterMin: s.processingAfterMin,
         })),
-        {
-          teamMembers: teamRows
-            .filter((r) => r.name.trim())
-            .map((r) => ({
-              name: r.name.trim(),
-              imageUrl: r.imageUrl.trim() || null,
-            })),
-        },
       );
       if (result.ok) {
         setSaveMsg("Saved.");
@@ -192,7 +158,7 @@ export function ServicesView({
         setSaveWarning(null);
       }
     });
-  }, [router, services, teamRows, categories]);
+  }, [router, services, categories]);
 
   const updateService = useCallback(
     (id: string, patch: Partial<Omit<DashboardServiceRow, "id">>) => {
@@ -220,31 +186,6 @@ export function ServicesView({
     setOpenValues([row.id]);
   }, []);
 
-  const onTeamPhotoFile = useCallback(
-    (rowId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      e.target.value = "";
-      if (!file || !file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== "string") return;
-        setTeamRows((prev) =>
-          prev.map((r) =>
-            r.id === rowId ? { ...r, imageUrl: reader.result as string } : r,
-          ),
-        );
-      };
-      reader.readAsDataURL(file);
-    },
-    [],
-  );
-
-  const clearTeamPhoto = useCallback((rowId: string) => {
-    setTeamRows((prev) =>
-      prev.map((r) => (r.id === rowId ? { ...r, imageUrl: "" } : r)),
-    );
-  }, []);
-
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-6 py-8 lg:px-12 lg:py-12">
       <header className="mb-8">
@@ -254,16 +195,22 @@ export function ServicesView({
         <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
           <div className="max-w-3xl">
             <h1 className="mb-3 text-3xl font-medium tracking-tight text-gray-900">
-              Services &amp; team
+              Services
             </h1>
             <p className="mb-1.5 text-base text-gray-500">
-              Your service menu, pricing, and the professionals clients can book
-              with. The AI receptionist and manual bookings use this list to
-              match services and team members.
+              Your service menu, pricing, and the rules the AI receptionist and
+              manual bookings use to offer slots.
             </p>
             <p className="text-sm text-gray-400">
-              Expand a service to edit details. Team names appear on your public
-              page when the team section is enabled on Storefront.
+              Expand a service to edit details. Stylists, photos, weekly hours,
+              and time off live on{" "}
+              <Link
+                href="/dashboard/team"
+                className="font-medium text-gray-700 underline-offset-2 hover:underline"
+              >
+                Team
+              </Link>
+              .
             </p>
           </div>
           <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:min-w-[12rem] sm:items-end">
@@ -287,7 +234,7 @@ export function ServicesView({
               disabled={pending}
               className="inline-flex items-center justify-center rounded-lg border border-transparent bg-gray-900 px-4 py-2 text-sm font-medium whitespace-nowrap text-white shadow-sm transition-colors hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pending ? "Saving…" : "Save services & team"}
+              {pending ? "Saving…" : "Save services"}
             </button>
             {saveMsg ? (
               <p
@@ -309,110 +256,6 @@ export function ServicesView({
           </div>
         </div>
       </header>
-
-      <section className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-4 flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-gray-50">
-            <Users className="size-5 text-gray-700" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">
-              Team showcase
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Optional names and photos for the &quot;Our team&quot; row on your
-              public booking page. Clients can still choose &quot;Any&quot;
-              available professional. The AI uses these names when asking who
-              they&apos;d like to book with.
-            </p>
-          </div>
-        </div>
-        <div className="space-y-3">
-          {teamRows.map((row) => (
-            <div
-              key={row.id}
-              className="flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50/80 p-3 sm:flex-row sm:items-center sm:gap-4"
-            >
-              <Input
-                value={row.name}
-                onChange={(e) =>
-                  setTeamRows((prev) =>
-                    prev.map((r) =>
-                      r.id === row.id ? { ...r, name: e.target.value } : r,
-                    ),
-                  )
-                }
-                placeholder="Name"
-                className={cn(fieldClass, "sm:min-w-0 sm:flex-1")}
-              />
-              <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
-                <input
-                  id={`team-photo-${row.id}`}
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                  className="sr-only"
-                  onChange={(e) => onTeamPhotoFile(row.id, e)}
-                />
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
-                  {row.imageUrl ? (
-                    <img
-                      src={row.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-full w-full items-center justify-center text-gray-300"
-                      aria-hidden
-                    >
-                      <UserRound className="size-7" strokeWidth={1.25} />
-                    </div>
-                  )}
-                </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <label
-                    htmlFor={`team-photo-${row.id}`}
-                    className="cursor-pointer text-sm font-medium text-gray-700 underline-offset-2 hover:underline"
-                  >
-                    {row.imageUrl ? "Change photo" : "Upload photo"}
-                  </label>
-                  {row.imageUrl ? (
-                    <button
-                      type="button"
-                      className="text-left text-sm font-medium text-gray-500 hover:text-red-600"
-                      onClick={() => clearTeamPhoto(row.id)}
-                    >
-                      Remove photo
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="shrink-0 self-start text-sm font-medium text-gray-500 hover:text-red-600 sm:ml-auto sm:self-center"
-                onClick={() =>
-                  setTeamRows((prev) => prev.filter((r) => r.id !== row.id))
-                }
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() =>
-              setTeamRows((prev) => [
-                ...prev,
-                { id: `tm-${Date.now()}`, name: "", imageUrl: "" },
-              ])
-            }
-            className="flex items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-          >
-            <Plus className="size-4 shrink-0" aria-hidden />
-            Add team member
-          </button>
-        </div>
-      </section>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6">
         {services.length === 0 ? (

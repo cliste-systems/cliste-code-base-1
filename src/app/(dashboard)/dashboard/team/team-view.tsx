@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   CalendarOff,
   CheckCircle2,
@@ -24,12 +24,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import type { StorefrontTeamMember } from "@/lib/storefront-blocks";
 
 import {
   addStaffTimeOff,
   deleteStaffTimeOff,
   saveStaffServices,
   saveStaffWeeklyHours,
+  saveTeamShowcase,
   type StaffWeeklyHoursInput,
 } from "./actions";
 
@@ -115,9 +117,10 @@ function compareWindows(
 type TeamViewProps = {
   team: TeamMemberRecord[];
   services: TeamServiceOption[];
+  showcase: StorefrontTeamMember[];
 };
 
-export function TeamView({ team, services }: TeamViewProps) {
+export function TeamView({ team, services, showcase }: TeamViewProps) {
   const [activeStaffId, setActiveStaffId] = useState(team[0]?.id ?? null);
 
   const activeStaff = useMemo(
@@ -132,20 +135,31 @@ export function TeamView({ team, services }: TeamViewProps) {
           Team
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-gray-500">
-          Set each stylist&rsquo;s weekly schedule, plan time off, and choose
-          which services they perform. The booking pages and AI receptionist
-          will only offer slots that fit.
+          Add the people clients can book with, set each stylist&rsquo;s weekly
+          schedule, plan time off, and choose which services they perform. The
+          booking pages and AI receptionist will only offer slots that fit.
         </p>
       </header>
 
+      <TeamShowcaseEditor initial={showcase} />
+
       {team.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm">
-          No team members yet. Invite a stylist from{" "}
-          <span className="font-medium text-gray-900">Settings → Identity</span>
-          .
+        <div className="mt-6 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center text-sm text-gray-500 shadow-sm">
+          <p className="font-medium text-gray-900">
+            No login-backed stylists yet
+          </p>
+          <p className="mx-auto mt-1 max-w-md">
+            The names + photos above appear on your booking page and the AI
+            uses them when offering a stylist. To give a stylist their own
+            login (so they can manage their own schedule), invite them from{" "}
+            <span className="font-medium text-gray-900">
+              Settings → Identity
+            </span>
+            .
+          </p>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-gray-200 bg-white p-2 shadow-sm">
             <p className="px-3 pt-2 pb-1 text-xs font-medium tracking-wider text-gray-500 uppercase">
               <Users className="mr-1.5 inline size-3.5 align-middle" />
@@ -670,5 +684,236 @@ function ServicesEligibilityEditor({
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * "Team showcase" — names + photos that appear on the public booking page
+ * and are referenced by the AI receptionist when offering a stylist by
+ * name. These rows are storefront-only; they do NOT need to map to a
+ * profiles row, so a salon can list a junior stylist who doesn't have
+ * their own dashboard login.
+ */
+type ShowcaseRow = { id: string; name: string; imageUrl: string };
+
+function showcaseToRows(members: StorefrontTeamMember[]): ShowcaseRow[] {
+  return members.map((m, i) => ({
+    id: `tm-${i}-${(m.name ?? "").slice(0, 12)}`,
+    name: m.name ?? "",
+    imageUrl: typeof m.imageUrl === "string" ? m.imageUrl : "",
+  }));
+}
+
+const showcaseFieldClass =
+  "block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-none placeholder:text-gray-400 transition-colors focus-visible:border-gray-900 focus-visible:ring-1 focus-visible:ring-gray-900 focus-visible:outline-none";
+
+function TeamShowcaseEditor({ initial }: { initial: StorefrontTeamMember[] }) {
+  const [rows, setRows] = useState<ShowcaseRow[]>(() => showcaseToRows(initial));
+  const [pending, startTransition] = useTransition();
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const nextIdRef = useRef(0);
+
+  const addRow = useCallback(() => {
+    nextIdRef.current += 1;
+    setRows((prev) => [
+      ...prev,
+      { id: `new-${nextIdRef.current}`, name: "", imageUrl: "" },
+    ]);
+    setSavedAt(null);
+  }, []);
+
+  const removeRow = useCallback((id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    setSavedAt(null);
+  }, []);
+
+  const updateName = useCallback((id: string, name: string) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, name } : r)));
+    setSavedAt(null);
+  }, []);
+
+  const onPhotoFile = useCallback(
+    (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || !file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string") return;
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === id ? { ...r, imageUrl: reader.result as string } : r,
+          ),
+        );
+        setSavedAt(null);
+      };
+      reader.readAsDataURL(file);
+    },
+    [],
+  );
+
+  const clearPhoto = useCallback((id: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, imageUrl: "" } : r)),
+    );
+    setSavedAt(null);
+  }, []);
+
+  const onSave = useCallback(() => {
+    setError(null);
+    setWarning(null);
+    startTransition(async () => {
+      const result = await saveTeamShowcase(
+        rows
+          .filter((r) => r.name.trim())
+          .map((r) => ({
+            name: r.name.trim(),
+            imageUrl: r.imageUrl.trim() || null,
+          })),
+      );
+      if (result.ok) {
+        setSavedAt(Date.now());
+        if ("warning" in result && result.warning) setWarning(result.warning);
+      } else {
+        setError(result.message);
+      }
+    });
+  }, [rows]);
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-gray-50">
+            <Users className="size-5 text-gray-700" strokeWidth={1.5} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              Team members
+            </h2>
+            <p className="mt-1 max-w-xl text-sm text-gray-500">
+              Names and photos clients see on your booking page. The AI uses
+              these names when asking who they&rsquo;d like to book with.
+              Clients can still pick &ldquo;Any&rdquo; available stylist.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-stretch gap-1.5 sm:items-end">
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={pending}
+            className="bg-gray-900 text-white hover:bg-gray-800"
+          >
+            {pending ? (
+              <>
+                <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
+                Saving…
+              </>
+            ) : (
+              "Save team"
+            )}
+          </Button>
+          {savedAt && !error ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <CheckCircle2 className="size-3.5" aria-hidden /> Saved
+            </span>
+          ) : null}
+          {error ? (
+            <span className="text-xs text-red-600">{error}</span>
+          ) : null}
+        </div>
+      </div>
+
+      {warning ? (
+        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {warning}
+        </p>
+      ) : null}
+
+      <div className="space-y-3">
+        {rows.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/60 px-4 py-6 text-center text-sm text-gray-500">
+            No team members added yet.
+          </p>
+        ) : null}
+        {rows.map((row) => (
+          <div
+            key={row.id}
+            className="flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50/80 p-3 sm:flex-row sm:items-center sm:gap-4"
+          >
+            <Input
+              value={row.name}
+              onChange={(e) => updateName(row.id, e.target.value)}
+              placeholder="Name (e.g. Mary)"
+              className={cn(showcaseFieldClass, "sm:min-w-0 sm:flex-1")}
+            />
+            <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
+              <input
+                id={`team-showcase-photo-${row.id}`}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => onPhotoFile(row.id, e)}
+              />
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
+                {row.imageUrl ? (
+                  // Avatars are user-uploaded headshots, not LCP critical;
+                  // plain <img> is fine here and keeps SSR simple.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={row.imageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="flex h-full w-full items-center justify-center text-gray-300"
+                    aria-hidden
+                  >
+                    <UserRound className="size-7" strokeWidth={1.25} />
+                  </div>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-col gap-1">
+                <label
+                  htmlFor={`team-showcase-photo-${row.id}`}
+                  className="cursor-pointer text-sm font-medium text-gray-700 underline-offset-2 hover:underline"
+                >
+                  {row.imageUrl ? "Change photo" : "Upload photo"}
+                </label>
+                {row.imageUrl ? (
+                  <button
+                    type="button"
+                    className="text-left text-sm font-medium text-gray-500 hover:text-red-600"
+                    onClick={() => clearPhoto(row.id)}
+                  >
+                    Remove photo
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 self-start text-sm font-medium text-gray-500 hover:text-red-600 sm:ml-auto sm:self-center"
+              onClick={() => removeRow(row.id)}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={addRow}
+          className="flex items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+        >
+          <Plus className="size-4 shrink-0" aria-hidden />
+          Add team member
+        </button>
+      </div>
+    </section>
   );
 }

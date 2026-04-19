@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { parseStorefrontTeamMembers, type StorefrontTeamMember } from "@/lib/storefront-blocks";
 
 import { TeamView, type TeamMemberRecord, type TeamServiceOption } from "./team-view";
 
@@ -20,12 +21,19 @@ export default async function DashboardTeamPage() {
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("tier")
+    .select("tier, storefront_team_members")
     .eq("id", organizationId)
     .maybeSingle();
   if (org?.tier !== "native") {
     redirect("/dashboard");
   }
+
+  // The storefront column may be missing on older databases — treat that as
+  // "no showcase yet" rather than crashing the whole team page.
+  const showcase: StorefrontTeamMember[] = parseStorefrontTeamMembers(
+    (org as { storefront_team_members?: unknown } | null)
+      ?.storefront_team_members ?? null,
+  );
 
   const [
     { data: staffRows, error: staffErr },
@@ -124,7 +132,7 @@ export default async function DashboardTeamPage() {
 
   return (
     <div className="-mx-6 -mt-8 flex h-full min-h-0 flex-1 flex-col bg-gray-50 lg:-mx-12">
-      <TeamView team={team} services={services} />
+      <TeamView team={team} services={services} showcase={showcase} />
     </div>
   );
 }

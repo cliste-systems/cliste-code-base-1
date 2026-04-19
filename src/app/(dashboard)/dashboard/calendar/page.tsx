@@ -46,11 +46,11 @@ export default async function CalendarPage() {
   const [staffHoursQuery, staffTimeOffQuery] = await Promise.all([
     supabase
       .from("staff_working_hours")
-      .select("staff_id, weekday, start_time, end_time")
+      .select("staff_id, weekday, opens_at, closes_at")
       .eq("organization_id", organizationId),
     supabase
       .from("staff_time_off")
-      .select("staff_id, starts_at, ends_at, note")
+      .select("staff_id, starts_at, ends_at, reason")
       .eq("organization_id", organizationId)
       .gte("ends_at", from.toISOString())
       .lte("starts_at", to.toISOString()),
@@ -182,8 +182,8 @@ export default async function CalendarPage() {
             (staffHoursQuery.data ?? []).map((r) => ({
               staffId: r.staff_id as string,
               weekday: r.weekday as number,
-              startTime: r.start_time as string,
-              endTime: r.end_time as string,
+              startTime: String(r.opens_at).slice(0, 5),
+              endTime: String(r.closes_at).slice(0, 5),
             }))
           }
           staffTimeOff={
@@ -191,7 +191,7 @@ export default async function CalendarPage() {
               staffId: r.staff_id as string,
               startsAt: r.starts_at as string,
               endsAt: r.ends_at as string,
-              note: (r.note as string | null) ?? null,
+              note: (r.reason as string | null) ?? null,
             }))
           }
         />
