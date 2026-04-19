@@ -7,10 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { Clock, Info, Link as LinkIcon, Mic, Settings2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Clock,
+  Info,
+  Link as LinkIcon,
+  Mic,
+  Settings2,
+  CalendarClock,
+} from "lucide-react";
 
 import { type DayKey, type WeekSchedule } from "./business-hours";
-import { saveOrganizationSettings } from "./actions";
+import {
+  saveOrganizationSettings,
+  saveBookingRules,
+  type BookingRules,
+} from "./actions";
+
+const SLOT_INTERVAL_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
 
 type DayBlock = {
   key: DayKey;
@@ -31,6 +45,7 @@ export type OrganizationSettingsInitial = {
   isActive: boolean;
   freshaUrl: string;
   week: WeekSchedule;
+  bookingRules: BookingRules;
 };
 
 type SettingsFormProps = {
@@ -161,6 +176,16 @@ export function SettingsForm({
   const [week, setWeek] = useState<WeekSchedule>(initial.week);
   const [pending, startTransition] = useTransition();
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [rules, setRules] = useState<BookingRules>(initial.bookingRules);
+  const [rulesPending, startRulesTransition] = useTransition();
+  const [rulesMsg, setRulesMsg] = useState<string | null>(null);
+
+  const updateRule = useCallback(
+    <K extends keyof BookingRules>(key: K, value: BookingRules[K]) => {
+      setRules((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const updateDay = useCallback(
     (key: DayKey, patch: Partial<WeekSchedule[DayKey]>) => {
@@ -328,6 +353,188 @@ export function SettingsForm({
                   updateDay={updateDay}
                 />
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Booking rules */}
+        <section className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+          <div className="p-6 sm:p-8">
+            <div className="mb-8 flex items-start gap-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-gray-50">
+                <CalendarClock
+                  className="size-5 text-gray-600"
+                  strokeWidth={1.5}
+                  aria-hidden
+                />
+              </div>
+              <div>
+                <h2 className="text-base font-medium text-gray-900">
+                  Booking rules
+                </h2>
+                <p className="mt-0.5 text-base text-gray-500">
+                  How clients can book online &mdash; slot grid, lead time,
+                  cancellation policy.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Slot interval
+                </Label>
+                <select
+                  value={rules.slotIntervalMin}
+                  onChange={(e) =>
+                    updateRule("slotIntervalMin", Number(e.target.value))
+                  }
+                  className={fieldClass}
+                >
+                  {SLOT_INTERVAL_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m} minutes
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">
+                  Public booking times are snapped to this grid.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Minimum notice (minutes)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={10080}
+                  value={rules.minNoticeMin}
+                  onChange={(e) =>
+                    updateRule("minNoticeMin", Math.max(0, Number(e.target.value) || 0))
+                  }
+                  className={fieldClass}
+                />
+                <p className="text-xs text-gray-500">
+                  Earliest a client can book online relative to now (e.g. 60 = 1
+                  hour).
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Booking horizon (days)
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={rules.maxAdvanceDays}
+                  onChange={(e) =>
+                    updateRule(
+                      "maxAdvanceDays",
+                      Math.max(1, Number(e.target.value) || 1),
+                    )
+                  }
+                  className={fieldClass}
+                />
+                <p className="text-xs text-gray-500">
+                  How far in advance clients can book online.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Free-cancel window (hours)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={336}
+                  value={rules.cancellationWindowHours}
+                  onChange={(e) =>
+                    updateRule(
+                      "cancellationWindowHours",
+                      Math.max(0, Number(e.target.value) || 0),
+                    )
+                  }
+                  className={fieldClass}
+                />
+                <p className="text-xs text-gray-500">
+                  Hours before the appointment that clients may cancel
+                  themselves without penalty.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <Label className="text-sm font-medium text-gray-700">
+                Cancellation policy (shown to clients)
+              </Label>
+              <Textarea
+                value={rules.cancellationPolicy}
+                onChange={(e) =>
+                  updateRule("cancellationPolicy", e.target.value.slice(0, 1000))
+                }
+                rows={3}
+                placeholder="e.g. Free cancellation up to 24h before. Late cancellations may be charged 50%."
+                className={fieldClass}
+              />
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-8">
+              <label className="flex items-center gap-3">
+                <Switch
+                  checked={rules.autoConfirmOnline}
+                  onCheckedChange={(v) => updateRule("autoConfirmOnline", v)}
+                  className="h-5 w-9 shrink-0 data-checked:bg-gray-900 data-unchecked:bg-gray-200 dark:data-unchecked:bg-gray-200"
+                />
+                <span className="text-sm text-gray-700">
+                  Auto-confirm online bookings
+                </span>
+              </label>
+              <label className="flex items-center gap-3">
+                <Switch
+                  checked={rules.allowDoubleBooking}
+                  onCheckedChange={(v) => updateRule("allowDoubleBooking", v)}
+                  className="h-5 w-9 shrink-0 data-checked:bg-gray-900 data-unchecked:bg-gray-200 dark:data-unchecked:bg-gray-200"
+                />
+                <span className="text-sm text-gray-700">
+                  Allow double-booking the same stylist
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-h-5 flex-1 text-sm">
+                {rulesMsg ? (
+                  <p
+                    className={cn(
+                      rulesMsg === "Saved."
+                        ? "font-medium text-emerald-600"
+                        : "text-destructive",
+                    )}
+                  >
+                    {rulesMsg}
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                disabled={rulesPending}
+                onClick={() => {
+                  setRulesMsg(null);
+                  startRulesTransition(async () => {
+                    const result = await saveBookingRules(rules);
+                    if (result.ok) setRulesMsg("Saved.");
+                    else setRulesMsg(result.message);
+                  });
+                }}
+                className="rounded-xl border border-transparent bg-gray-900 px-6 py-2.5 text-base font-medium text-white shadow-sm hover:bg-gray-800"
+              >
+                {rulesPending ? "Saving\u2026" : "Save booking rules"}
+              </Button>
             </div>
           </div>
         </section>

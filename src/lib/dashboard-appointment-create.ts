@@ -81,8 +81,29 @@ export async function createDashboardAppointment(params: {
   customerEmail?: string | null;
   serviceId: string;
   startTimeIso: string;
+  /** Optional staff id (null => unassigned pool). */
+  staffId?: string | null;
   diaryOrigin?: "bookings" | "cara";
-}): Promise<CreateAppointmentResult> {
+  /**
+   * When set, the appointment row is stamped with this `series_id` and the
+   * given `recurrence_rule` so it joins an existing recurring series.
+   * Used by the "create recurring booking" flow to group instances.
+   */
+  seriesId?: string | null;
+  recurrenceRule?: string | null;
+  /**
+   * If true, only insert the row + return; skip SMS, email, diary append,
+   * and revalidatePath. Used when generating bulk follow-on instances of a
+   * recurring series — only the first instance sends a confirmation.
+   */
+  silent?: boolean;
+  /**
+   * Optional service add-ons (UUIDs from `service_addons`) to attach as
+   * line items. Their durations extend the appointment end_time and their
+   * prices are summed alongside the primary service.
+   */
+  addonIds?: string[] | null;
+}): Promise<CreateAppointmentResult & { appointmentId?: string }> {
   const name = params.customerName.trim();
   const phone = params.customerPhone.trim();
   const serviceId = params.serviceId.trim();
@@ -115,7 +136,7 @@ export async function createDashboardAppointment(params: {
         .maybeSingle(),
       supabase
         .from("services")
-        .select("id, name, duration_minutes")
+        .select("id, name, duration_minutes, price")
         .eq("id", serviceId)
         .eq("organization_id", organizationId)
         .maybeSingle(),
@@ -131,7 +152,49 @@ export async function createDashboardAppointment(params: {
     };
   }
 
-  const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
+  const cleanAddonIds = Array.from(
+    new Set(
+      (params.addonIds ?? [])
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter((v) => UUID_RE.test(v)),
+    ),
+  );
+
+  let addons: Array<{
+    id: string;
+    name: string;
+    duration_minutes: number;
+    price_cents: number;
+  }> = [];
+  if (cleanAddonIds.length > 0) {
+    const { data: addonRows, error: addonErr } = await supabase
+      .from("service_addons")
+      .select("id, name, duration_minutes, price_cents, is_active, service_id")
+      .eq("organization_id", organizationId)
+      .in("id", cleanAddonIds);
+    if (addonErr) {
+      return { ok: false, message: addonErr.message };
+    }
+    addons = (addonRows ?? [])
+      .filter(
+        (r) =>
+          r.is_active !== false &&
+          (r.service_id === null || r.service_id === serviceId),
+      )
+      .map((r) => ({
+        id: r.id as string,
+        name: (r.name as string) ?? "Add-on",
+        duration_minutes: Number(r.duration_minutes ?? 0),
+        price_cents: Number(r.price_cents ?? 0),
+      }));
+  }
+
+  const addonDuration = addons.reduce(
+    (sum, a) => sum + (Number.isFinite(a.duration_minutes) ? a.duration_minutes : 0),
+    0,
+  );
+  const totalDuration = svc.duration_minutes + addonDuration;
+  const end = new Date(start.getTime() + totalDuration * 60_000);
 
   const tz = getSalonTimeZone();
   const dateYmd = formatInTimeZone(start, tz, "yyyy-MM-dd");
@@ -148,7 +211,7 @@ export async function createDashboardAppointment(params: {
 
   const slots = computeAvailableBookingSlots({
     dateYmd,
-    durationMinutes: svc.duration_minutes,
+    durationMinutes: totalDuration,
     weekSchedule: schedule,
     busy,
     now: new Date(),
@@ -194,6 +257,46 @@ export async function createDashboardAppointment(params: {
     };
   }
 
+  // Upsert canonical client record so appointments.client_id is always
+  // populated for new bookings (and the no-show / total-visits trigger
+  // can do its job).
+  let resolvedClientId: string | null = null;
+  {
+    const { data: existing } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("phone_e164", phoneE164)
+      .maybeSingle();
+
+    if (existing?.id) {
+      resolvedClientId = existing.id as string;
+      // Best-effort: update name + email to the most-recent value the
+      // client gave us. Ignore errors — this is purely a freshness pass.
+      await supabase
+        .from("clients")
+        .update({
+          name,
+          email: emailNorm ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", resolvedClientId)
+        .eq("organization_id", organizationId);
+    } else {
+      const { data: created } = await supabase
+        .from("clients")
+        .insert({
+          organization_id: organizationId,
+          name,
+          phone_e164: phoneE164,
+          email: emailNorm ?? null,
+        })
+        .select("id")
+        .maybeSingle();
+      if (created?.id) resolvedClientId = created.id as string;
+    }
+  }
+
   let insertedId: string | null = null;
   let bookingRef: string | null = null;
   for (let attempt = 0; attempt < 14; attempt++) {
@@ -211,6 +314,12 @@ export async function createDashboardAppointment(params: {
         status: "confirmed",
         source: "dashboard",
         booking_reference: ref,
+        ...(params.staffId !== undefined ? { staff_id: params.staffId } : {}),
+        ...(resolvedClientId ? { client_id: resolvedClientId } : {}),
+        ...(params.seriesId ? { series_id: params.seriesId } : {}),
+        ...(params.recurrenceRule
+          ? { recurrence_rule: params.recurrenceRule }
+          : {}),
       })
       .select("id")
       .single();
@@ -237,6 +346,48 @@ export async function createDashboardAppointment(params: {
       ok: false,
       message: "Could not save the booking. Please try again.",
     };
+  }
+
+  // Best-effort: write line items so the new multi-service UI has something
+  // to display. The DB-level backfill covers legacy rows, but new rows go
+  // through here. Failures don't roll the appointment back.
+  try {
+    const items: Array<Record<string, unknown>> = [
+      {
+        organization_id: organizationId,
+        appointment_id: insertedId,
+        service_id: serviceId,
+        addon_id: null,
+        staff_id: params.staffId ?? null,
+        name: typeof svc.name === "string" ? svc.name : "Service",
+        duration_minutes: svc.duration_minutes,
+        price_cents: Math.round(Number(svc.price ?? 0) * 100),
+        display_order: 0,
+      },
+    ];
+    addons.forEach((a, idx) => {
+      items.push({
+        organization_id: organizationId,
+        appointment_id: insertedId,
+        service_id: serviceId,
+        addon_id: a.id,
+        staff_id: params.staffId ?? null,
+        name: a.name,
+        duration_minutes: a.duration_minutes,
+        price_cents: a.price_cents,
+        display_order: idx + 1,
+      });
+    });
+    await supabase.from("appointment_items").insert(items);
+  } catch {
+    // ignore — items are decorative for now; primary service_id stays on row
+  }
+
+  if (params.silent) {
+    revalidatePath("/dashboard/bookings");
+    revalidatePath("/dashboard/calendar");
+    revalidatePath("/dashboard");
+    return { ok: true, appointmentId: insertedId };
   }
 
   const salonName = orgRow?.name?.trim() || "Salon";
@@ -306,6 +457,7 @@ export async function createDashboardAppointment(params: {
     revalidatePath("/dashboard");
     return {
       ok: true,
+      appointmentId: insertedId,
       ...(confirmationEmailFailed
         ? { confirmationEmailFailed }
         : {}),
@@ -322,6 +474,7 @@ export async function createDashboardAppointment(params: {
   revalidatePath("/dashboard");
   return {
     ok: true,
+    appointmentId: insertedId,
     confirmationSmsFailed: smsFailedReason,
     ...(confirmationEmailFailed ? { confirmationEmailFailed } : {}),
   };

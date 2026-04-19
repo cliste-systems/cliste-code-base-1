@@ -23,14 +23,22 @@ export default async function BookingsPage() {
     redirect("/dashboard");
   }
 
-  const nowIso = new Date().toISOString();
+  // Pull a wide window so the Upcoming / Today / Past / Cancelled tabs
+  // all have data to filter from. Cap at ~6 months back to keep the
+  // payload sane (history pages will paginate later).
+  const sixMonthsAgoIso = new Date(
+    Date.now() - 1000 * 60 * 60 * 24 * 180,
+  ).toISOString();
 
-  const [{ data: appointmentRows, error: apptError }, { data: serviceRows }] =
-    await Promise.all([
-      supabase
-        .from("appointments")
-        .select(
-          `
+  const [
+    { data: appointmentRows, error: apptError },
+    { data: serviceRows },
+    { data: staffRows },
+  ] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select(
+        `
           id,
           customer_name,
           customer_phone,
@@ -48,25 +56,41 @@ export default async function BookingsPage() {
           customer_email,
           payment_status,
           amount_cents,
+          service_total_cents,
+          deposit_cents,
+          balance_due_cents,
           currency,
           paid_at,
           payment_link_sent_at,
           stripe_checkout_session_id,
+          staff_id,
+          service_id,
+          cancel_reason,
+          cancelled_at,
+          series_id,
+          recurrence_rule,
           services (
             name,
             price
           )
         `
-        )
-        .eq("organization_id", organizationId)
-        .gte("end_time", nowIso)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("services")
-        .select("id, name, price, duration_minutes")
-        .eq("organization_id", organizationId)
-        .order("name"),
-    ]);
+      )
+      .eq("organization_id", organizationId)
+      .gte("end_time", sixMonthsAgoIso)
+      .order("start_time", { ascending: false })
+      .limit(500),
+    supabase
+      .from("services")
+      .select("id, name, price, duration_minutes")
+      .eq("organization_id", organizationId)
+      .order("name"),
+    supabase
+      .from("profiles")
+      .select("id, name, role")
+      .eq("organization_id", organizationId)
+      .in("role", ["staff", "admin"])
+      .order("name", { ascending: true }),
+  ]);
 
   const appointments: AppointmentListRow[] = (appointmentRows ?? []).map(
     (row) => {
@@ -80,6 +104,8 @@ export default async function BookingsPage() {
         id: row.id,
         customer_name: row.customer_name,
         customer_phone: row.customer_phone,
+        staff_id: (row as { staff_id?: string | null }).staff_id ?? null,
+        service_id: (row as { service_id?: string | null }).service_id ?? null,
         start_time: row.start_time,
         end_time: row.end_time,
         status: row.status,
@@ -107,6 +133,14 @@ export default async function BookingsPage() {
           (row as { payment_status?: string | null }).payment_status ?? null,
         amount_cents:
           (row as { amount_cents?: number | null }).amount_cents ?? null,
+        service_total_cents:
+          (row as { service_total_cents?: number | null })
+            .service_total_cents ?? null,
+        deposit_cents:
+          (row as { deposit_cents?: number | null }).deposit_cents ?? null,
+        balance_due_cents:
+          (row as { balance_due_cents?: number | null }).balance_due_cents ??
+          null,
         currency:
           (row as { currency?: string | null }).currency ?? null,
         paid_at:
@@ -117,6 +151,14 @@ export default async function BookingsPage() {
         stripe_checkout_session_id:
           (row as { stripe_checkout_session_id?: string | null })
             .stripe_checkout_session_id ?? null,
+        cancel_reason:
+          (row as { cancel_reason?: string | null }).cancel_reason ?? null,
+        cancelled_at:
+          (row as { cancelled_at?: string | null }).cancelled_at ?? null,
+        series_id:
+          (row as { series_id?: string | null }).series_id ?? null,
+        recurrence_rule:
+          (row as { recurrence_rule?: string | null }).recurrence_rule ?? null,
         services: Array.isArray(row.services)
           ? row.services[0] ?? null
           : row.services ?? null,
@@ -129,6 +171,11 @@ export default async function BookingsPage() {
     name: s.name,
     price: Number(s.price),
     duration_minutes: s.duration_minutes,
+  }));
+
+  const staff: { id: string; name: string }[] = (staffRows ?? []).map((r) => ({
+    id: r.id as string,
+    name: ((r.name as string | null) ?? "").trim() || "Staff",
   }));
 
   const minBookingDateYmd = formatInTimeZone(
@@ -152,6 +199,7 @@ export default async function BookingsPage() {
         <BookingsView
           appointments={appointments}
           services={services}
+          staff={staff}
           minBookingDateYmd={minBookingDateYmd}
         />
       )}

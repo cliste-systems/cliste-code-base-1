@@ -6,11 +6,13 @@ import type { MouseEvent } from "react";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   useTransition,
 } from "react";
 import {
   AlertTriangle,
+  Calendar as CalendarIcon,
   CalendarDays,
   CalendarPlus,
   CalendarX,
@@ -55,8 +57,12 @@ import type { DashboardBookingSlot } from "@/lib/booking-available-slots";
 import {
   cancelAppointment,
   createAppointment,
+  createRecurringAppointmentSeries,
   getBookingCallContext,
   getDashboardBookingSlots,
+  listAddonsForBookingService,
+  rescheduleAppointment,
+  setAppointmentStatus,
   type BookingCallContext,
 } from "./actions";
 
@@ -74,6 +80,8 @@ export type AppointmentListRow = {
   customer_name: string;
   customer_phone: string;
   customer_email: string | null;
+  staff_id: string | null;
+  service_id: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -102,10 +110,20 @@ export type AppointmentListRow = {
    */
   payment_status: string | null;
   amount_cents: number | null;
+  /** Snapshot of full service price at booking time. */
+  service_total_cents: number | null;
+  /** When non-null, the up-front deposit Stripe was asked to collect. */
+  deposit_cents: number | null;
+  /** Generated server-side: service_total - amount_cents (clamped to 0). */
+  balance_due_cents: number | null;
   currency: string | null;
   paid_at: string | null;
   payment_link_sent_at: string | null;
   stripe_checkout_session_id: string | null;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  series_id: string | null;
+  recurrence_rule: string | null;
 };
 
 function formatAppointmentDateLine(isoStart: string): string {
@@ -226,6 +244,8 @@ function customerInitial(name: string): string {
 
 function statusLabel(status: string): string {
   if (!status) return "";
+  const s = status.toLowerCase();
+  if (s === "no_show") return "No-show";
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
@@ -240,8 +260,10 @@ function StatusPill({ status }: { status: string }) {
         : s === "cancelled"
           ? "bg-red-500"
           : s === "completed"
-            ? "bg-gray-400"
-            : "bg-gray-400";
+            ? "bg-emerald-500"
+            : s === "no_show"
+              ? "bg-amber-500"
+              : "bg-gray-400";
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm">
       <div className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden />
@@ -316,6 +338,9 @@ function PaymentBadge({
     | "payment_link_sent_at"
     | "stripe_checkout_session_id"
     | "amount_cents"
+    | "service_total_cents"
+    | "deposit_cents"
+    | "balance_due_cents"
     | "currency"
   >;
   /** When true, render the second-line reason text. Used in the detail dialog. */
@@ -334,6 +359,18 @@ function PaymentBadge({
     dot = "bg-emerald-500";
     cls =
       "inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 shadow-sm";
+  } else if (status === "deposit_paid") {
+    label = "Deposit paid";
+    const balance =
+      typeof appt.balance_due_cents === "number" ? appt.balance_due_cents : 0;
+    if (balance > 0) {
+      reason = `${formatEur(balance / 100)} due in salon`;
+    } else if (appt.paid_at) {
+      reason = `Deposit received ${shortRelativeTime(appt.paid_at)}`;
+    }
+    dot = "bg-blue-500";
+    cls =
+      "inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 shadow-sm";
   } else if (status === "pending" || status === "unpaid") {
     label = "Unpaid";
     reason = appt.payment_link_sent_at
@@ -410,15 +447,88 @@ function PhoneLine({
 type BookingsViewProps = {
   appointments: AppointmentListRow[];
   services: ServiceOption[];
+  staff: { id: string; name: string }[];
   /** Salon calendar “today” (Europe/Dublin by default) for min date + default picker. */
   minBookingDateYmd: string;
 };
 
+type BookingTab = "upcoming" | "today" | "past" | "cancelled";
+
+const TABS: { id: BookingTab; label: string }[] = [
+  { id: "upcoming", label: "Upcoming" },
+  { id: "today", label: "Today" },
+  { id: "past", label: "Past" },
+  { id: "cancelled", label: "Cancelled" },
+];
+
+function inSameLocalDay(iso: string, ref: Date): boolean {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return (
+    d.getFullYear() === ref.getFullYear() &&
+    d.getMonth() === ref.getMonth() &&
+    d.getDate() === ref.getDate()
+  );
+}
+
+function filterAppointmentsForTab(
+  rows: AppointmentListRow[],
+  tab: BookingTab,
+): AppointmentListRow[] {
+  const now = new Date();
+  switch (tab) {
+    case "upcoming":
+      return rows.filter(
+        (r) =>
+          r.status !== "cancelled" &&
+          new Date(r.end_time).getTime() >= now.getTime(),
+      );
+    case "today":
+      return rows.filter(
+        (r) =>
+          r.status !== "cancelled" &&
+          inSameLocalDay(r.start_time, now),
+      );
+    case "past":
+      return rows.filter(
+        (r) =>
+          r.status !== "cancelled" &&
+          new Date(r.end_time).getTime() < now.getTime(),
+      );
+    case "cancelled":
+      return rows.filter((r) => r.status === "cancelled");
+    default:
+      return rows;
+  }
+}
+
 export function BookingsView({
   appointments,
   services,
+  staff,
   minBookingDateYmd,
 }: BookingsViewProps) {
+  const [activeTab, setActiveTab] = useState<BookingTab>("upcoming");
+  const [selectedStaffId, setSelectedStaffId] = useState<string | "">(
+    "",
+  );
+  const [statusPendingId, setStatusPendingId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] =
+    useState<AppointmentListRow | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<string>("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<DashboardBookingSlot[]>(
+    [],
+  );
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] =
+    useState<boolean>(false);
+  const [rescheduleSlotsError, setRescheduleSlotsError] = useState<string | null>(
+    null,
+  );
+  const [rescheduleSlotIso, setRescheduleSlotIso] = useState<string>("");
+  const [reschedulePending, startReschedule] = useTransition();
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [reschedulePickerOpen, setReschedulePickerOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [detailRow, setDetailRow] = useState<AppointmentListRow | null>(null);
   const [callDetail, setCallDetail] = useState<BookingCallContext | null>(null);
@@ -430,6 +540,9 @@ export function BookingsView({
     null
   );
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelReasonChoice, setCancelReasonChoice] = useState<string>("");
+  const [cancelScopeFollowing, setCancelScopeFollowing] = useState(false);
+  const [cancelReasonOther, setCancelReasonOther] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
   const [bookingChannelNotices, setBookingChannelNotices] = useState<{
     sms?: string;
@@ -447,6 +560,15 @@ export function BookingsView({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [availableAddons, setAvailableAddons] = useState<
+    Array<{ id: string; name: string; priceCents: number; durationMinutes: number }>
+  >([]);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatFrequency, setRepeatFrequency] = useState<
+    "weekly" | "fortnightly" | "monthly"
+  >("weekly");
+  const [repeatCount, setRepeatCount] = useState(6);
 
   const resetForm = useCallback(() => {
     setCustomerName("");
@@ -459,6 +581,11 @@ export function BookingsView({
     setSlotsError(null);
     setFormError(null);
     setDatePickerOpen(false);
+    setRepeatEnabled(false);
+    setRepeatFrequency("weekly");
+    setRepeatCount(6);
+    setAvailableAddons([]);
+    setSelectedAddonIds([]);
   }, [services]);
 
   const handleOpenChange = useCallback(
@@ -479,6 +606,35 @@ export function BookingsView({
   );
 
   useEffect(() => {
+    if (!open || !serviceId) {
+      setAvailableAddons([]);
+      setSelectedAddonIds([]);
+      return;
+    }
+    let cancelled = false;
+    setSelectedAddonIds([]);
+    void listAddonsForBookingService({ serviceId }).then((r) => {
+      if (cancelled) return;
+      if (r.ok) {
+        setAvailableAddons(r.addons);
+      } else {
+        setAvailableAddons([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, serviceId]);
+
+  const addonDurationTotal = useMemo(
+    () =>
+      availableAddons
+        .filter((a) => selectedAddonIds.includes(a.id))
+        .reduce((sum, a) => sum + (a.durationMinutes || 0), 0),
+    [availableAddons, selectedAddonIds],
+  );
+
+  useEffect(() => {
     if (!open || !date || !serviceId) {
       return;
     }
@@ -486,7 +642,11 @@ export function BookingsView({
     const timer = window.setTimeout(() => {
       setSlotsLoading(true);
       setSlotsError(null);
-      void getDashboardBookingSlots({ dateYmd: date, serviceId }).then(
+      void getDashboardBookingSlots({
+        dateYmd: date,
+        serviceId,
+        extraDurationMinutes: addonDurationTotal,
+      }).then(
         (r) => {
           if (cancelled) return;
           setSlotsLoading(false);
@@ -510,7 +670,7 @@ export function BookingsView({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open, date, serviceId]);
+  }, [open, date, serviceId, addonDurationTotal]);
 
   const submit = useCallback(() => {
     setFormError(null);
@@ -523,12 +683,40 @@ export function BookingsView({
       return;
     }
     startCreateTransition(async () => {
+      if (repeatEnabled) {
+        const seriesRes = await createRecurringAppointmentSeries({
+          customerName,
+          customerPhone,
+          customerEmail,
+          serviceId,
+          startTimeIso: slotIso,
+          frequency: repeatFrequency,
+          count: Math.max(2, Math.min(26, repeatCount || 2)),
+        });
+        if (!seriesRes.ok) {
+          setFormError(seriesRes.message);
+          return;
+        }
+        const skipped = seriesRes.skipped.length;
+        setBookingChannelNotices(
+          skipped > 0
+            ? {
+                sms: `Created ${seriesRes.created} of ${seriesRes.created + skipped} bookings. ${skipped} skipped (likely overlap or off-hours): pick those manually.`,
+              }
+            : null,
+        );
+        setOpen(false);
+        resetForm();
+        return;
+      }
+
       const result = await createAppointment({
         customerName,
         customerPhone,
         customerEmail,
         serviceId,
         startTimeIso: slotIso,
+        addonIds: selectedAddonIds,
       });
       if (!result.ok) {
         setFormError(result.message);
@@ -556,26 +744,65 @@ export function BookingsView({
     serviceId,
     date,
     slotIso,
+    repeatEnabled,
+    repeatFrequency,
+    repeatCount,
+    selectedAddonIds,
     resetForm,
   ]);
 
   const openCancelDialog = useCallback((row: AppointmentListRow) => {
     if (row.status.toLowerCase() !== "confirmed") return;
     setCancelError(null);
+    setCancelReasonChoice("");
+    setCancelReasonOther("");
+    setCancelScopeFollowing(false);
     setCancelTarget(row);
   }, []);
 
   const executeCancelBooking = useCallback(() => {
     if (!cancelTarget) return;
     const id = cancelTarget.id;
+    const seriesId = cancelTarget.series_id;
+    const startIso = cancelTarget.start_time;
+    const reason =
+      cancelReasonChoice === "other"
+        ? cancelReasonOther.trim()
+        : cancelReasonChoice.trim();
     startCancelTransition(async () => {
-      const result = await cancelAppointment(id);
+      if (cancelScopeFollowing && seriesId) {
+        const { cancelAppointmentSeriesFollowing } = await import("./actions");
+        const seriesRes = await cancelAppointmentSeriesFollowing({
+          seriesId,
+          fromIso: startIso,
+          reason: reason || null,
+        });
+        setCancelTarget(null);
+        setCancelReasonChoice("");
+        setCancelReasonOther("");
+        setCancelScopeFollowing(false);
+        if (!seriesRes.ok) {
+          setCancelError(seriesRes.message);
+        }
+        return;
+      }
+      const result = await cancelAppointment(id, {
+        reason: reason || null,
+      });
       setCancelTarget(null);
+      setCancelReasonChoice("");
+      setCancelReasonOther("");
+      setCancelScopeFollowing(false);
       if (!result.ok) {
         setCancelError(result.message);
       }
     });
-  }, [cancelTarget]);
+  }, [
+    cancelTarget,
+    cancelReasonChoice,
+    cancelReasonOther,
+    cancelScopeFollowing,
+  ]);
 
   const onCancelDialogOpenChange = useCallback(
     (next: boolean) => {
@@ -585,6 +812,77 @@ export function BookingsView({
     },
     [pendingCancel]
   );
+
+  useEffect(() => {
+    if (!rescheduleTarget) {
+      setRescheduleDate("");
+      setRescheduleSlots([]);
+      setRescheduleSlotIso("");
+      setRescheduleSlotsError(null);
+      setRescheduleError(null);
+      return;
+    }
+    const startTime = new Date(rescheduleTarget.start_time);
+    const ymd = `${startTime.getFullYear()}-${String(
+      startTime.getMonth() + 1,
+    ).padStart(2, "0")}-${String(startTime.getDate()).padStart(2, "0")}`;
+    setRescheduleDate(ymd);
+    setRescheduleSlotIso("");
+    setRescheduleError(null);
+  }, [rescheduleTarget]);
+
+  useEffect(() => {
+    if (!rescheduleTarget || !rescheduleDate) return;
+    const serviceId = rescheduleTarget.service_id;
+    if (!serviceId) return;
+    let cancelled = false;
+    setRescheduleSlotsLoading(true);
+    setRescheduleSlotsError(null);
+    void getDashboardBookingSlots({
+      dateYmd: rescheduleDate,
+      serviceId,
+      staffId: rescheduleTarget.staff_id ?? undefined,
+    }).then((r) => {
+      if (cancelled) return;
+      setRescheduleSlotsLoading(false);
+      if (!r.ok) {
+        setRescheduleSlotsError(r.message);
+        setRescheduleSlots([]);
+        return;
+      }
+      setRescheduleSlots(r.slots);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rescheduleTarget, rescheduleDate]);
+
+  const submitReschedule = useCallback(() => {
+    if (!rescheduleTarget || !rescheduleSlotIso) {
+      setRescheduleError("Pick a new time.");
+      return;
+    }
+    setRescheduleError(null);
+    const id = rescheduleTarget.id;
+    const slot = rescheduleSlots.find((s) => s.startIso === rescheduleSlotIso);
+    if (!slot) {
+      setRescheduleError("Pick a new time.");
+      return;
+    }
+    startReschedule(async () => {
+      const result = await rescheduleAppointment({
+        appointmentId: id,
+        newStartIso: slot.startIso,
+        staffId: rescheduleTarget.staff_id ?? null,
+      });
+      if (!result.ok) {
+        setRescheduleError(result.message);
+        return;
+      }
+      setRescheduleTarget(null);
+      setDetailRow(null);
+    });
+  }, [rescheduleTarget, rescheduleSlotIso, rescheduleSlots]);
 
   useEffect(() => {
     if (!detailRow?.call_log_id) {
@@ -644,6 +942,40 @@ export function BookingsView({
         —
       </span>
     );
+
+  const filteredAppointments = useMemo(
+    () => filterAppointmentsForTab(appointments, activeTab),
+    [appointments, activeTab],
+  );
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<BookingTab, number> = {
+      upcoming: 0,
+      today: 0,
+      past: 0,
+      cancelled: 0,
+    };
+    for (const t of TABS) {
+      counts[t.id] = filterAppointmentsForTab(appointments, t.id).length;
+    }
+    return counts;
+  }, [appointments]);
+
+  const updateBookingStatus = useCallback(
+    (row: AppointmentListRow, status: "completed" | "no_show") => {
+      setStatusError(null);
+      setStatusPendingId(row.id);
+      void setAppointmentStatus({
+        appointmentId: row.id,
+        status,
+      })
+        .then((res) => {
+          if (!res.ok) setStatusError(res.message);
+        })
+        .finally(() => setStatusPendingId(null));
+    },
+    [],
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col px-6 py-8 lg:px-12 lg:py-12">
@@ -716,9 +1048,53 @@ export function BookingsView({
         </Alert>
       ) : null}
 
-      {appointments.length === 0 ? (
+      <div className="mb-4 flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+        {TABS.map((t) => {
+          const isActive = t.id === activeTab;
+          const count = tabCounts[t.id];
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-gray-900 text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-100",
+              )}
+            >
+              {t.label}
+              <span
+                className={cn(
+                  "ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] tabular-nums",
+                  isActive
+                    ? "bg-white/15 text-white"
+                    : "bg-gray-100 text-gray-500",
+                )}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {statusError ? (
+        <p className="mb-4 text-sm text-red-600" role="alert">
+          {statusError}
+        </p>
+      ) : null}
+
+      {filteredAppointments.length === 0 ? (
         <div className="rounded-2xl border border-gray-200 bg-white py-12 text-center text-sm text-gray-500 shadow-sm">
-          No upcoming appointments. Add one with New booking.
+          {activeTab === "upcoming"
+            ? "No upcoming appointments. Add one with New booking."
+            : activeTab === "today"
+              ? "Nothing scheduled today."
+              : activeTab === "past"
+                ? "No past appointments in the last 6 months."
+                : "No cancelled appointments."}
         </div>
       ) : (
         <>
@@ -745,7 +1121,7 @@ export function BookingsView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {appointments.map((row) => (
+                  {filteredAppointments.map((row) => (
                     <tr
                       key={row.id}
                       role="button"
@@ -835,7 +1211,7 @@ export function BookingsView({
           </div>
 
           <div className="flex flex-col gap-3 md:hidden">
-            {appointments.map((row) => (
+            {filteredAppointments.map((row) => (
               <div
                 key={row.id}
                 role="button"
@@ -995,6 +1371,87 @@ export function BookingsView({
                     </div>
                   </div>
                 </div>
+
+                {detailRow.status === "cancelled" ? (
+                  <div className="rounded-md border border-red-200 bg-red-50/60 p-3 text-sm">
+                    <p className="text-xs font-medium uppercase tracking-wider text-red-700">
+                      Cancelled
+                    </p>
+                    <p className="mt-1 text-gray-900">
+                      {detailRow.cancel_reason
+                        ? detailRow.cancel_reason
+                        : "No reason recorded"}
+                    </p>
+                    {detailRow.cancelled_at ? (
+                      <p className="mt-1 text-xs text-gray-500">
+                        on {formatAppointmentDateLine(detailRow.cancelled_at)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {detailRow.status === "confirmed" ||
+                detailRow.status === "completed" ||
+                detailRow.status === "no_show" ? (
+                  <div>
+                    <h3 className="mb-2 text-xs font-medium tracking-wider text-gray-500 uppercase">
+                      Quick actions
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          detailRow.status === "completed"
+                            ? "default"
+                            : "outline"
+                        }
+                        disabled={statusPendingId === detailRow.id}
+                        onClick={() =>
+                          updateBookingStatus(detailRow, "completed")
+                        }
+                      >
+                        Mark complete
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          detailRow.status === "no_show"
+                            ? "destructive"
+                            : "outline"
+                        }
+                        disabled={statusPendingId === detailRow.id}
+                        onClick={() =>
+                          updateBookingStatus(detailRow, "no_show")
+                        }
+                      >
+                        Mark no-show
+                      </Button>
+                      {detailRow.status === "confirmed" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setRescheduleTarget(detailRow)}
+                        >
+                          Reschedule
+                        </Button>
+                      ) : null}
+                      {detailRow.status === "confirmed" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="ml-auto text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => openCancelDialog(detailRow)}
+                        >
+                          Cancel booking
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div>
                   <h3 className="mb-2 text-xs font-medium tracking-wider text-gray-500 uppercase">
@@ -1165,6 +1622,83 @@ export function BookingsView({
               </div>
             ) : null}
           </DialogHeader>
+          <div className="space-y-3 px-1">
+            <Label className="text-sm font-medium text-gray-700">
+              Reason (optional, kept for your records)
+            </Label>
+            <select
+              value={cancelReasonChoice}
+              onChange={(e) => setCancelReasonChoice(e.target.value)}
+              disabled={pendingCancel}
+              className="block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus-visible:border-gray-900 focus-visible:ring-1 focus-visible:ring-gray-900 focus-visible:outline-none"
+            >
+              <option value="">No reason given</option>
+              <option value="Client requested">Client requested</option>
+              <option value="Client no longer needs">
+                Client no longer needs
+              </option>
+              <option value="Stylist unavailable">Stylist unavailable</option>
+              <option value="Salon closure">Salon closure</option>
+              <option value="Duplicate booking">Duplicate booking</option>
+              <option value="No-show risk">No-show risk</option>
+              <option value="other">Other (write below)…</option>
+            </select>
+            {cancelReasonChoice === "other" ? (
+              <Input
+                value={cancelReasonOther}
+                onChange={(e) =>
+                  setCancelReasonOther(e.target.value.slice(0, 200))
+                }
+                disabled={pendingCancel}
+                placeholder="Short reason (max 200 chars)"
+                className="border-gray-200 bg-white"
+              />
+            ) : null}
+
+            {cancelTarget?.series_id ? (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Recurring booking
+                </p>
+                <div className="mt-2 space-y-2 text-sm">
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="cancel-scope"
+                      checked={!cancelScopeFollowing}
+                      onChange={() => setCancelScopeFollowing(false)}
+                      disabled={pendingCancel}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium text-gray-900">This booking only</span>
+                      <span className="block text-xs text-gray-600">
+                        Future bookings in this series stay on the diary.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="cancel-scope"
+                      checked={cancelScopeFollowing}
+                      onChange={() => setCancelScopeFollowing(true)}
+                      disabled={pendingCancel}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium text-gray-900">
+                        This and all following bookings
+                      </span>
+                      <span className="block text-xs text-gray-600">
+                        Cancels every confirmed booking in this series from this date forward.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
@@ -1186,8 +1720,170 @@ export function BookingsView({
                   <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
                   Cancelling…
                 </>
+              ) : cancelScopeFollowing && cancelTarget?.series_id ? (
+                "Cancel this and following"
               ) : (
                 "Cancel booking"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={rescheduleTarget !== null}
+        onOpenChange={(next) => {
+          if (!next && !reschedulePending) setRescheduleTarget(null);
+        }}
+      >
+        <DialogContent
+          className="border border-gray-200/80 bg-white sm:max-w-md"
+          showCloseButton={!reschedulePending}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">
+              Reschedule booking
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Pick a new date and time. The customer is{" "}
+              <span className="font-medium text-gray-900">not</span> notified
+              automatically — let them know yourself.
+            </DialogDescription>
+          </DialogHeader>
+
+          {rescheduleTarget ? (
+            <div className="space-y-4">
+              <div className="rounded-md border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm">
+                <p className="font-medium text-gray-900">
+                  {rescheduleTarget.customer_name}
+                </p>
+                <p className="text-gray-600">
+                  {rescheduleTarget.services?.name ?? "Service"} —{" "}
+                  {formatAppointmentDateLine(rescheduleTarget.start_time)},{" "}
+                  {formatAppointmentTimeRange(
+                    rescheduleTarget.start_time,
+                    rescheduleTarget.end_time,
+                  )}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reschedule-date">Date</Label>
+                <Popover
+                  open={reschedulePickerOpen}
+                  onOpenChange={setReschedulePickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start"
+                    >
+                      <CalendarIcon className="mr-2 size-4" aria-hidden />
+                      {rescheduleDate
+                        ? format(new Date(rescheduleDate), "PPP")
+                        : "Pick date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={
+                        rescheduleDate ? new Date(rescheduleDate) : undefined
+                      }
+                      onSelect={(d) => {
+                        if (!d) return;
+                        const ymd = `${d.getFullYear()}-${String(
+                          d.getMonth() + 1,
+                        ).padStart(2, "0")}-${String(d.getDate()).padStart(
+                          2,
+                          "0",
+                        )}`;
+                        setRescheduleDate(ymd);
+                        setReschedulePickerOpen(false);
+                      }}
+                      disabled={(d) =>
+                        d <
+                        startOfDay(
+                          new Date(`${minBookingDateYmd}T00:00:00`),
+                        )
+                      }
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label>New time</Label>
+                {rescheduleSlotsLoading ? (
+                  <Skeleton className="h-9 w-full" />
+                ) : rescheduleSlotsError ? (
+                  <p className="text-sm text-red-600">
+                    {rescheduleSlotsError}
+                  </p>
+                ) : rescheduleSlots.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No open slots that day.
+                  </p>
+                ) : (
+                  <ScrollArea className="h-48 rounded-md border border-gray-200">
+                    <div className="grid grid-cols-3 gap-1.5 p-2">
+                      {rescheduleSlots.map((slot) => {
+                        const isActive = slot.startIso === rescheduleSlotIso;
+                        return (
+                          <button
+                            key={slot.startIso}
+                            type="button"
+                            onClick={() => setRescheduleSlotIso(slot.startIso)}
+                            className={cn(
+                              "rounded-md border px-2 py-1.5 text-xs font-medium tabular-nums transition-colors",
+                              isActive
+                                ? "border-gray-900 bg-gray-900 text-white"
+                                : "border-gray-200 bg-white text-gray-700 hover:border-gray-400",
+                            )}
+                          >
+                            {format(new Date(slot.startIso), "HH:mm")}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+
+              {rescheduleError ? (
+                <p className="text-sm text-red-600" role="alert">
+                  {rescheduleError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={reschedulePending}
+              onClick={() => setRescheduleTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={reschedulePending || !rescheduleSlotIso}
+              className="gap-1.5"
+              onClick={submitReschedule}
+            >
+              {reschedulePending ? (
+                <>
+                  <Loader2
+                    className="size-3.5 shrink-0 animate-spin"
+                    aria-hidden
+                  />
+                  Saving…
+                </>
+              ) : (
+                "Move booking"
               )}
             </Button>
           </DialogFooter>
@@ -1313,6 +2009,59 @@ export function BookingsView({
                       aria-hidden
                     />
                   </div>
+                  {availableAddons.length > 0 ? (
+                    <div className="mt-3 rounded-lg border border-gray-200 bg-white/60 p-3">
+                      <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">
+                        Add-ons
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        Each add-on extends the booking length and the total price.
+                      </p>
+                      <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        {availableAddons.map((a) => {
+                          const checked = selectedAddonIds.includes(a.id);
+                          return (
+                            <label
+                              key={a.id}
+                              className={`flex items-center gap-2 rounded-md border px-2.5 py-2 text-sm ${
+                                checked
+                                  ? "border-gray-900 bg-gray-50"
+                                  : "border-gray-200 bg-white"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="size-4 rounded border-gray-300"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setSelectedAddonIds((prev) => {
+                                    if (e.target.checked) {
+                                      return prev.includes(a.id)
+                                        ? prev
+                                        : [...prev, a.id];
+                                    }
+                                    return prev.filter((x) => x !== a.id);
+                                  });
+                                  setSlotIso("");
+                                }}
+                              />
+                              <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
+                                {a.name}
+                              </span>
+                              <span className="shrink-0 text-xs tabular-nums text-gray-600">
+                                {a.durationMinutes > 0
+                                  ? `+${a.durationMinutes}m`
+                                  : ""}
+                                {a.priceCents > 0
+                                  ? `${a.durationMinutes > 0 ? " · " : ""}+${formatEur(a.priceCents / 100)}`
+                                  : ""}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -1496,6 +2245,65 @@ export function BookingsView({
                 </div>
               </div>
 
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">Repeat booking</p>
+                    <p className="text-xs text-gray-600">
+                      Create a recurring series. The first booking confirmation is
+                      sent; the rest are added silently to the diary.
+                    </p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={repeatEnabled}
+                      onChange={(e) => setRepeatEnabled(e.target.checked)}
+                      className="size-4 rounded border-gray-300"
+                    />
+                    <span>{repeatEnabled ? "On" : "Off"}</span>
+                  </label>
+                </div>
+                {repeatEnabled ? (
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-700">Frequency</label>
+                      <select
+                        value={repeatFrequency}
+                        onChange={(e) =>
+                          setRepeatFrequency(
+                            e.target.value as "weekly" | "fortnightly" | "monthly",
+                          )
+                        }
+                        className="h-10 w-full rounded-md border border-gray-200 bg-white px-2 text-sm"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="fortnightly">Every 2 weeks</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-700">
+                        Number of bookings
+                      </label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={26}
+                        value={repeatCount}
+                        onChange={(e) =>
+                          setRepeatCount(parseInt(e.target.value || "0", 10) || 0)
+                        }
+                        className="h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
+                      />
+                      <p className="text-[11px] text-gray-500">
+                        Includes the first booking. Max 26.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
               {formError ? (
                 <div
                   className="flex gap-2 rounded-lg border border-red-200 bg-red-50/80 px-3 py-2.5 text-sm text-red-800"
@@ -1535,6 +2343,8 @@ export function BookingsView({
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Saving…
                 </>
+              ) : repeatEnabled ? (
+                `Create ${Math.max(2, Math.min(26, repeatCount || 0))} bookings`
               ) : (
                 "Confirm booking"
               )}

@@ -3,14 +3,21 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import { ClientsView } from "./clients-view";
 
-type ProfileRow = {
+type ClientRow = {
   id: string;
-  name: string | null;
-  created_at: string;
+  name: string;
+  phone_e164: string;
+  email: string | null;
+  notes: string | null;
+  allergies: string | null;
+  total_visits: number | null;
+  no_show_count: number | null;
+  last_visit_at: string | null;
 };
 
 type ApptRow = {
   id: string;
+  client_id: string | null;
   customer_name: string;
   customer_phone: string;
   start_time: string;
@@ -18,11 +25,8 @@ type ApptRow = {
   services: unknown;
 };
 
-function normName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function formatLastVisitShort(iso: string): string {
+function formatLastVisitShort(iso: string | null): string {
+  if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-IE", {
@@ -34,7 +38,7 @@ function formatLastVisitShort(iso: string): string {
 
 function serviceNameFromJoin(services: unknown): string {
   const s = Array.isArray(services) ? services[0] : services;
-  if (s && typeof s === "object" && "name" in s) {
+  if (s && typeof s === "object" && s !== null && "name" in s) {
     return String((s as { name: string }).name);
   }
   return "Appointment";
@@ -47,57 +51,58 @@ function normalizePhoneKey(raw: string): string | null {
   return digits;
 }
 
-function enrichFromAppointments(
-  profile: ProfileRow,
+function buildCanonicalClient(
+  row: ClientRow,
   appointments: ApptRow[],
 ): ClientDisplay {
-  const displayName = profile.name?.trim() || "Unnamed client";
-  const key = normName(displayName);
-
-  const matching =
-    displayName === "Unnamed client"
-      ? []
-      : appointments.filter((a) => normName(a.customer_name) === key);
-
-  const active = matching.filter((a) => a.status !== "cancelled");
-  const sorted = [...active].sort(
+  const linked = appointments.filter((a) => a.client_id === row.id);
+  const sorted = [...linked].sort(
     (a, b) =>
       new Date(b.start_time).getTime() - new Date(a.start_time).getTime(),
   );
-
-  const totalBookings = active.length;
-  const rawPhone = sorted[0]?.customer_phone?.trim();
-  const phone =
-    rawPhone && rawPhone.length > 0 ? rawPhone : "—";
-
-  const lastVisitLabel =
-    sorted.length > 0 ? formatLastVisitShort(sorted[0].start_time) : "—";
-
   const history = sorted.map((a) => ({
     id: a.id,
     dateLabel: formatLastVisitShort(a.start_time),
     service: serviceNameFromJoin(a.services),
+    status: a.status,
   }));
+  const total =
+    typeof row.total_visits === "number" && row.total_visits >= 0
+      ? row.total_visits
+      : sorted.filter(
+          (a) => a.status !== "cancelled" && a.status !== "no_show",
+        ).length;
+  const noShows =
+    typeof row.no_show_count === "number" && row.no_show_count >= 0
+      ? row.no_show_count
+      : sorted.filter((a) => a.status === "no_show").length;
 
   return {
-    id: profile.id,
-    name: displayName,
-    phone,
-    totalBookings,
-    noShows: 0,
-    lastVisitLabel,
+    id: `client:${row.id}`,
+    clientId: row.id,
+    name: row.name || "Unnamed client",
+    phone: row.phone_e164 || "—",
+    email: row.email,
+    notes: row.notes,
+    allergies: row.allergies,
+    totalBookings: total,
+    noShows,
+    lastVisitLabel: formatLastVisitShort(row.last_visit_at),
     history,
     canDelete: true,
   };
 }
 
-function buildGuestClientsFromAppointments(
+function buildLegacyGuestClients(
   appointments: ApptRow[],
+  takenPhoneKeys: Set<string>,
 ): ClientDisplay[] {
   const byKey = new Map<string, ApptRow[]>();
   for (const a of appointments) {
+    if (a.client_id) continue;
     const key = normalizePhoneKey(a.customer_phone);
     if (!key) continue;
+    if (takenPhoneKeys.has(key)) continue;
     const list = byKey.get(key) ?? [];
     list.push(a);
     byKey.set(key, list);
@@ -106,112 +111,67 @@ function buildGuestClientsFromAppointments(
   const out: (ClientDisplay & { _sort: number })[] = [];
 
   for (const [phoneKey, rows] of byKey) {
-    const active = rows.filter((a) => a.status !== "cancelled");
-    if (active.length === 0) continue;
-
-    const sorted = [...active].sort(
+    const sorted = [...rows].sort(
       (a, b) =>
         new Date(b.start_time).getTime() - new Date(a.start_time).getTime(),
     );
     const primary = sorted[0]!;
     const name = primary.customer_name?.trim() || "Guest";
     const phone = primary.customer_phone?.trim() || "—";
+    const totalBookings = sorted.filter(
+      (a) => a.status !== "cancelled" && a.status !== "no_show",
+    ).length;
+    const noShows = sorted.filter((a) => a.status === "no_show").length;
 
     const history = sorted.map((a) => ({
       id: a.id,
       dateLabel: formatLastVisitShort(a.start_time),
       service: serviceNameFromJoin(a.services),
+      status: a.status,
     }));
-
-    const lastTs = new Date(sorted[0]!.start_time).getTime();
 
     out.push({
       id: `guest:${phoneKey}`,
+      clientId: null,
       name,
       phone,
-      totalBookings: active.length,
-      noShows: 0,
+      email: null,
+      notes: null,
+      allergies: null,
+      totalBookings,
+      noShows,
       lastVisitLabel: formatLastVisitShort(sorted[0]!.start_time),
       history,
       canDelete: false,
-      _sort: lastTs,
+      _sort: new Date(sorted[0]!.start_time).getTime(),
     });
   }
 
   return out
     .sort((a, b) => b._sort - a._sort)
-    .map(({ _sort, ...c }) => c);
-}
-
-function mergeProfileAndGuestClients(
-  profiles: ProfileRow[],
-  appointments: ApptRow[],
-  guests: ClientDisplay[],
-): ClientDisplay[] {
-  const startByApptId = new Map(
-    appointments.map((a) => [a.id, new Date(a.start_time).getTime()] as const),
-  );
-
-  const latestVisitTs = (c: ClientDisplay): number => {
-    let max = 0;
-    for (const h of c.history) {
-      const t = startByApptId.get(h.id);
-      if (t !== undefined && t > max) max = t;
-    }
-    return max;
-  };
-
-  const guestByPhone = new Map<string, ClientDisplay>();
-  for (const g of guests) {
-    const key = normalizePhoneKey(g.phone);
-    if (key) guestByPhone.set(key, g);
-  }
-
-  const merged: ClientDisplay[] = [];
-  const consumedPhones = new Set<string>();
-
-  for (const p of profiles) {
-    const enriched = enrichFromAppointments(p, appointments);
-    const pk = normalizePhoneKey(enriched.phone);
-    if (pk && guestByPhone.has(pk) && enriched.totalBookings > 0) {
-      consumedPhones.add(pk);
-      merged.push({
-        ...enriched,
-        id: p.id,
-        canDelete: true,
-      });
-    } else {
-      merged.push(enriched);
-    }
-  }
-
-  for (const g of guests) {
-    const pk = normalizePhoneKey(g.phone);
-    if (pk && consumedPhones.has(pk)) continue;
-    merged.push(g);
-  }
-
-  return merged.sort((a, b) => latestVisitTs(b) - latestVisitTs(a));
+    .map(({ _sort: _ignored, ...c }) => c);
 }
 
 export default async function ClientsPage() {
   const { supabase, organizationId } = await requireDashboardSession();
 
   const [
-    { data: profileRows, error: profileError },
+    { data: clientRows, error: clientError },
     { data: apptRows, error: apptError },
   ] = await Promise.all([
     supabase
-      .from("profiles")
-      .select("id, name, created_at")
+      .from("clients")
+      .select(
+        "id, name, phone_e164, email, notes, allergies, total_visits, no_show_count, last_visit_at",
+      )
       .eq("organization_id", organizationId)
-      .eq("role", "customer")
-      .order("created_at", { ascending: false }),
+      .order("last_visit_at", { ascending: false, nullsFirst: false }),
     supabase
       .from("appointments")
       .select(
         `
           id,
+          client_id,
           customer_name,
           customer_phone,
           start_time,
@@ -221,18 +181,30 @@ export default async function ClientsPage() {
           )
         `,
       )
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .order("start_time", { ascending: false })
+      .limit(2000),
   ]);
 
   const appts = (apptRows ?? []) as ApptRow[];
+  const clients = (clientRows ?? []) as ClientRow[];
 
-  const guests = buildGuestClientsFromAppointments(appts);
+  const canonical = clients.map((c) => buildCanonicalClient(c, appts));
 
-  const clients: ClientDisplay[] = mergeProfileAndGuestClients(
-    (profileRows ?? []) as ProfileRow[],
-    appts,
-    guests,
-  );
+  const takenPhoneKeys = new Set<string>();
+  for (const c of clients) {
+    const k = normalizePhoneKey(c.phone_e164);
+    if (k) takenPhoneKeys.add(k);
+  }
+  const guests = buildLegacyGuestClients(appts, takenPhoneKeys);
+
+  const merged: ClientDisplay[] = [...canonical, ...guests].sort((a, b) => {
+    const aLast =
+      a.history.length > 0 ? new Date(a.history[0].dateLabel).getTime() : 0;
+    const bLast =
+      b.history.length > 0 ? new Date(b.history[0].dateLabel).getTime() : 0;
+    return bLast - aLast;
+  });
 
   return (
     <div className="-mx-6 -mt-8 flex h-full min-h-0 flex-1 flex-col bg-gray-50 lg:-mx-12">
@@ -247,8 +219,8 @@ export default async function ClientsPage() {
         </div>
       ) : (
         <ClientsView
-          clients={clients}
-          profileLoadError={profileError?.message ?? null}
+          clients={merged}
+          profileLoadError={clientError?.message ?? null}
         />
       )}
     </div>

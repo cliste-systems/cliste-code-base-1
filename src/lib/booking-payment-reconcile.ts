@@ -58,6 +58,8 @@ export async function reconcilePendingAppointmentPayments(args: {
     stripe_payment_intent_id: string | null;
     confirmation_sms_sent_at: string | null;
     confirmation_email_sent_at: string | null;
+    service_total_cents: number | null;
+    deposit_cents: number | null;
     service: { name: string | null } | { name: string | null }[] | null;
     organization:
       | { name: string | null; slug: string | null }
@@ -68,7 +70,7 @@ export async function reconcilePendingAppointmentPayments(args: {
   const { data: pending } = await admin
     .from("appointments")
     .select(
-      "id, organization_id, customer_name, customer_phone, customer_email, start_time, booking_reference, payment_status, stripe_payment_intent_id, confirmation_sms_sent_at, confirmation_email_sent_at, service:services(name), organization:organizations(name, slug)",
+      "id, organization_id, customer_name, customer_phone, customer_email, start_time, booking_reference, payment_status, stripe_payment_intent_id, confirmation_sms_sent_at, confirmation_email_sent_at, service_total_cents, deposit_cents, service:services(name), organization:organizations(name, slug)",
     )
     .eq("organization_id", organizationId)
     .eq("payment_status", "pending")
@@ -138,6 +140,8 @@ async function markPaid(
     booking_reference: string | null;
     confirmation_sms_sent_at: string | null;
     confirmation_email_sent_at: string | null;
+    service_total_cents: number | null;
+    deposit_cents: number | null;
     service: { name: string | null } | { name: string | null }[] | null;
     organization:
       | { name: string | null; slug: string | null }
@@ -157,10 +161,20 @@ async function markPaid(
       : pi.amount;
   const currency = pi.currency?.toLowerCase() ?? null;
 
+  const isDepositCharge =
+    pi.metadata?.charge_kind === "deposit" ||
+    (row.deposit_cents != null &&
+      row.service_total_cents != null &&
+      amountCents != null &&
+      amountCents < row.service_total_cents);
+  const nextStatus: "paid" | "deposit_paid" = isDepositCharge
+    ? "deposit_paid"
+    : "paid";
+
   const { error: updErr } = await admin
     .from("appointments")
     .update({
-      payment_status: "paid",
+      payment_status: nextStatus,
       paid_at: new Date().toISOString(),
       stripe_payment_intent_id: pi.id,
       stripe_charge_id: chargeId,

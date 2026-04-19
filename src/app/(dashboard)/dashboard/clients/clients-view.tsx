@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -24,12 +24,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { ClientDisplay } from "@/lib/client-types";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { cn } from "@/lib/utils";
 import {
+  AlertCircle,
   ChevronRight,
   ListFilter,
+  Loader2,
   MoreVertical,
   Phone,
   Plus,
@@ -37,7 +41,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { deleteClient } from "./actions";
+import { createClient, deleteClient, updateClient } from "./actions";
 
 type FilterMode = "all" | "no_shows" | "regulars";
 
@@ -54,7 +58,13 @@ function telHref(raw: string): string | null {
   return `tel:${digits}`;
 }
 
-function ClientPhoneLink({ raw, className }: { raw: string; className?: string }) {
+function ClientPhoneLink({
+  raw,
+  className,
+}: {
+  raw: string;
+  className?: string;
+}) {
   const display = formatE164ForDisplay(raw.trim() || raw);
   const href = telHref(raw);
   if (!href) {
@@ -69,7 +79,7 @@ function ClientPhoneLink({ raw, className }: { raw: string; className?: string }
       href={href}
       className={cn(
         "text-gray-900 tabular-nums underline-offset-4 hover:text-gray-700 hover:underline",
-        className
+        className,
       )}
     >
       {display}
@@ -94,7 +104,6 @@ function matchesFilter(client: ClientDisplay, mode: FilterMode): boolean {
 
 type ClientsViewProps = {
   clients: ClientDisplay[];
-  /** When profile query fails, booking-based clients still show. */
   profileLoadError?: string | null;
 };
 
@@ -106,7 +115,7 @@ export function ClientsView({
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [historyClient, setHistoryClient] = useState<ClientDisplay | null>(
-    null
+    null,
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ClientDisplay | null>(null);
@@ -116,9 +125,9 @@ export function ClientsView({
   const filtered = useMemo(
     () =>
       clients.filter(
-        (c) => matchesSearch(c, search) && matchesFilter(c, filterMode)
+        (c) => matchesSearch(c, search) && matchesFilter(c, filterMode),
       ),
-    [clients, search, filterMode]
+    [clients, search, filterMode],
   );
 
   const openHistory = useCallback((client: ClientDisplay) => {
@@ -141,8 +150,9 @@ export function ClientsView({
   const confirmDelete = useCallback(() => {
     if (!deleteTarget) return;
     setDeleteError(null);
+    const idToDelete = deleteTarget.clientId ?? deleteTarget.id;
     startDeleteTransition(async () => {
-      const result = await deleteClient(deleteTarget.id);
+      const result = await deleteClient(idToDelete);
       if (!result.ok) {
         setDeleteError(result.message);
         return;
@@ -189,8 +199,9 @@ export function ClientsView({
           Clients
         </h1>
         <p className="max-w-2xl text-base text-gray-500">
-          Manage your client roster. People who book are listed here, grouped by
-          phone number (name comes from their latest booking).
+          Add walk-ins, edit notes and allergies, and track no-shows. Anyone
+          who books through your AI receptionist or booking link is added
+          automatically.
         </p>
         {profileLoadError ? (
           <p className="mt-3 max-w-2xl text-sm text-amber-800" role="status">
@@ -220,7 +231,7 @@ export function ClientsView({
             <DropdownMenuTrigger
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "h-auto gap-2 border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-none hover:bg-gray-50"
+                "h-auto gap-2 border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-none hover:bg-gray-50",
               )}
             >
               <ListFilter className="size-4 text-gray-500" aria-hidden />
@@ -274,7 +285,7 @@ export function ClientsView({
           <>
             <div className="hidden overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
               <div className="w-full overflow-x-auto">
-                <table className="w-full min-w-[640px] border-collapse text-left">
+                <table className="w-full min-w-[680px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50/80">
                       <th className="px-6 py-4 text-xs font-medium tracking-widest text-gray-500 uppercase">
@@ -284,7 +295,10 @@ export function ClientsView({
                         Phone
                       </th>
                       <th className="px-6 py-4 text-xs font-medium tracking-widest text-gray-500 uppercase">
-                        Total bookings
+                        Bookings
+                      </th>
+                      <th className="px-6 py-4 text-xs font-medium tracking-widest text-gray-500 uppercase">
+                        No-shows
                       </th>
                       <th className="px-6 py-4 text-xs font-medium tracking-widest text-gray-500 uppercase">
                         Last visit
@@ -298,7 +312,7 @@ export function ClientsView({
                     {filtered.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="px-6 py-12 text-center text-sm text-gray-500"
                         >
                           No clients match your search or filter.
@@ -308,12 +322,28 @@ export function ClientsView({
                       filtered.map((client) => (
                         <tr
                           key={client.id}
-                          className="transition-colors hover:bg-gray-50/50"
+                          className="cursor-pointer transition-colors hover:bg-gray-50/50"
+                          onClick={() => openHistory(client)}
                         >
                           <td className="max-w-[14rem] truncate px-6 py-4 text-sm font-semibold text-gray-900">
                             {client.name}
+                            {client.allergies ? (
+                              <span
+                                className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                                title={`Allergies: ${client.allergies}`}
+                              >
+                                <AlertCircle
+                                  className="size-2.5"
+                                  aria-hidden
+                                />
+                                Allergy
+                              </span>
+                            ) : null}
                           </td>
-                          <td className="px-6 py-4 align-middle text-sm">
+                          <td
+                            className="px-6 py-4 align-middle text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <ClientPhoneLink raw={client.phone} />
                           </td>
                           <td className="px-6 py-4 align-middle">
@@ -321,10 +351,22 @@ export function ClientsView({
                               {client.totalBookings}
                             </span>
                           </td>
+                          <td className="px-6 py-4 align-middle">
+                            {client.noShows > 0 ? (
+                              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-amber-800">
+                                {client.noShows}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-sm tabular-nums text-gray-500">
                             {client.lastVisitLabel}
                           </td>
-                          <td className="px-6 py-4 text-right align-middle">
+                          <td
+                            className="px-6 py-4 text-right align-middle"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <div className="flex items-center justify-end gap-0.5">
                               {viewProfileButton(client)}
                               <DropdownMenu>
@@ -334,7 +376,7 @@ export function ClientsView({
                                       variant: "ghost",
                                       size: "icon-sm",
                                     }),
-                                    "size-8 text-gray-400 hover:text-gray-900"
+                                    "size-8 text-gray-400 hover:text-gray-900",
                                   )}
                                   aria-label={`More actions for ${client.name}`}
                                 >
@@ -344,7 +386,7 @@ export function ClientsView({
                                   <DropdownMenuItem
                                     onClick={() => openHistory(client)}
                                   >
-                                    View history
+                                    View profile
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => copyPhone(client.phone)}
@@ -385,23 +427,38 @@ export function ClientsView({
                 </div>
               ) : (
                 filtered.map((client) => (
-                  <div
+                  <button
                     key={client.id}
-                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+                    type="button"
+                    onClick={() => openHistory(client)}
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm"
                   >
                     <div className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <p className="min-w-0 flex-1 text-base leading-snug font-semibold text-gray-900">
                           {client.name}
                         </p>
-                        <span
-                          className="inline-flex shrink-0 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium tabular-nums text-gray-700"
-                          title="Total bookings"
-                        >
-                          {client.totalBookings}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <span
+                            className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium tabular-nums text-gray-700"
+                            title="Total bookings"
+                          >
+                            {client.totalBookings}
+                          </span>
+                          {client.noShows > 0 ? (
+                            <span
+                              className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium tabular-nums text-amber-800"
+                              title="No-shows"
+                            >
+                              {client.noShows}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="space-y-2 border-t border-gray-100 pt-3">
+                      <div
+                        className="space-y-2 border-t border-gray-100 pt-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center gap-2 text-sm">
                           <Phone
                             className="size-4 shrink-0 text-gray-400"
@@ -413,52 +470,8 @@ export function ClientsView({
                           Last visit: {client.lastVisitLabel}
                         </p>
                       </div>
-                      <div className="flex items-center justify-end gap-1 border-t border-gray-100 pt-3">
-                        {viewProfileButton(client)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className={cn(
-                              buttonVariants({
-                                variant: "ghost",
-                                size: "icon-sm",
-                              }),
-                              "size-8 text-gray-400 hover:text-gray-900"
-                            )}
-                            aria-label={`More actions for ${client.name}`}
-                          >
-                            <MoreVertical className="size-4" aria-hidden />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => openHistory(client)}
-                            >
-                              View history
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => copyPhone(client.phone)}
-                              disabled={client.phone === "—"}
-                            >
-                              Copy phone number
-                            </DropdownMenuItem>
-                            {client.canDelete !== false ? (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={() => {
-                                    setDeleteError(null);
-                                    setDeleteTarget(client);
-                                  }}
-                                >
-                                  Remove client…
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
@@ -466,26 +479,10 @@ export function ClientsView({
         )}
       </div>
 
-      <Dialog open={addClientOpen} onOpenChange={setAddClientOpen}>
-        <DialogContent
-          className="border border-gray-200/80 bg-white sm:max-w-md"
-          showCloseButton
-        >
-          <DialogHeader>
-            <DialogTitle className="text-gray-900">Add client</DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Walk-ins and manual client profiles will be available here soon.
-              For now, clients appear when they book through your AI receptionist
-              or booking link.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" onClick={() => setAddClientOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddClientDialog
+        open={addClientOpen}
+        onOpenChange={setAddClientOpen}
+      />
 
       <Dialog
         open={deleteTarget !== null}
@@ -504,7 +501,7 @@ export function ClientsView({
                   <span className="font-medium text-gray-900">
                     {deleteTarget.name}
                   </span>
-                  ’s login and CRM record. This cannot be undone.
+                  ’s CRM record. Past appointments stay on file.
                 </DialogDescription>
               </DialogHeader>
               {deleteError ? (
@@ -535,56 +532,364 @@ export function ClientsView({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={historyOpen} onOpenChange={handleHistoryOpenChange}>
-        <DialogContent className="max-h-[min(88vh,640px)] max-w-[calc(100%-2rem)] overflow-hidden border border-gray-200/80 bg-white p-0 sm:max-w-md">
-          {historyClient ? (
-            <>
-              <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 px-6 py-4 text-left">
-                <DialogTitle className="text-gray-900">Client profile</DialogTitle>
-                <DialogDescription className="sr-only">
-                  Appointment history for {historyClient.name}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="border-b border-gray-200 px-6 py-3">
-                <p className="text-base font-semibold text-gray-900">
-                  {historyClient.name}
-                </p>
-                <div className="mt-1 text-sm">
-                  <ClientPhoneLink raw={historyClient.phone} />
-                </div>
+      <ClientProfileDialog
+        client={historyClient}
+        open={historyOpen}
+        onOpenChange={handleHistoryOpenChange}
+      />
+    </div>
+  );
+}
+
+function AddClientDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [notes, setNotes] = useState("");
+  const [allergies, setAllergies] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) {
+      setName("");
+      setPhone("");
+      setEmail("");
+      setNotes("");
+      setAllergies("");
+      setError(null);
+    }
+  }, [open]);
+
+  const submit = useCallback(() => {
+    setError(null);
+    startTransition(async () => {
+      const res = await createClient({
+        name,
+        phone,
+        email,
+        notes,
+        allergies,
+      });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      onOpenChange(false);
+    });
+  }, [name, phone, email, notes, allergies, onOpenChange]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
+      <DialogContent
+        className="border border-gray-200/80 bg-white sm:max-w-md"
+        showCloseButton={!pending}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-gray-900">Add client</DialogTitle>
+          <DialogDescription className="text-gray-600">
+            Add a walk-in or known client to your CRM. They'll be linked
+            automatically when they next book.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="add-client-name">Full name</Label>
+            <Input
+              id="add-client-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Aoife Murphy"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="add-client-phone">Phone</Label>
+            <Input
+              id="add-client-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              placeholder="+353 87 1234567"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="add-client-email">Email (optional)</Label>
+            <Input
+              id="add-client-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="aoife@example.com"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="add-client-allergies">Allergies (optional)</Label>
+            <Input
+              id="add-client-allergies"
+              value={allergies}
+              onChange={(e) => setAllergies(e.target.value)}
+              placeholder="e.g. PPD, ammonia"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="add-client-notes">Notes (optional)</Label>
+            <Textarea
+              id="add-client-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Preferences, formulas, anything the team should know."
+              rows={3}
+            />
+          </div>
+          {error ? (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={pending}
+            onClick={submit}
+            className="gap-1.5"
+          >
+            {pending ? (
+              <>
+                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                Saving…
+              </>
+            ) : (
+              "Add client"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ClientProfileDialog({
+  client,
+  open,
+  onOpenChange,
+}: {
+  client: ClientDisplay | null;
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+}) {
+  const [notesDraft, setNotesDraft] = useState("");
+  const [allergiesDraft, setAllergiesDraft] = useState("");
+  const [emailDraft, setEmailDraft] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [savePending, startSaveTransition] = useTransition();
+
+  useEffect(() => {
+    if (!client) return;
+    setNotesDraft(client.notes ?? "");
+    setAllergiesDraft(client.allergies ?? "");
+    setEmailDraft(client.email ?? "");
+    setSaveError(null);
+    setSaved(false);
+  }, [client?.id]);
+
+  const canEdit = client?.clientId !== null && client?.clientId !== undefined;
+
+  const saveDetails = useCallback(() => {
+    if (!client?.clientId) return;
+    setSaveError(null);
+    setSaved(false);
+    startSaveTransition(async () => {
+      const res = await updateClient({
+        clientId: client.clientId!,
+        email: emailDraft,
+        notes: notesDraft,
+        allergies: allergiesDraft,
+      });
+      if (!res.ok) {
+        setSaveError(res.message);
+        return;
+      }
+      setSaved(true);
+    });
+  }, [client, emailDraft, notesDraft, allergiesDraft]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[min(90vh,720px)] max-w-[calc(100%-2rem)] overflow-hidden border border-gray-200/80 bg-white p-0 sm:max-w-lg">
+        {client ? (
+          <>
+            <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 px-6 py-4 text-left">
+              <DialogTitle className="text-gray-900">
+                {client.name}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                Profile and booking history for {client.name}.
+              </DialogDescription>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                <ClientPhoneLink raw={client.phone} />
+                <span>•</span>
+                <span className="tabular-nums">
+                  {client.totalBookings} booking
+                  {client.totalBookings === 1 ? "" : "s"}
+                </span>
+                {client.noShows > 0 ? (
+                  <>
+                    <span>•</span>
+                    <span className="text-amber-700 tabular-nums">
+                      {client.noShows} no-show
+                      {client.noShows === 1 ? "" : "s"}
+                    </span>
+                  </>
+                ) : null}
               </div>
-              <div className="px-6 py-4">
-                <p className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+            </DialogHeader>
+
+            <div className="max-h-[calc(min(90vh,720px)-4rem)] overflow-y-auto px-6 py-4">
+              {canEdit ? (
+                <section className="mb-6 space-y-3">
+                  <h3 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                    Details
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="profile-email" className="text-xs">
+                        Email
+                      </Label>
+                      <Input
+                        id="profile-email"
+                        value={emailDraft}
+                        onChange={(e) => setEmailDraft(e.target.value)}
+                        type="email"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="profile-allergies" className="text-xs">
+                        Allergies
+                      </Label>
+                      <Input
+                        id="profile-allergies"
+                        value={allergiesDraft}
+                        onChange={(e) => setAllergiesDraft(e.target.value)}
+                        placeholder="e.g. PPD, ammonia"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="profile-notes" className="text-xs">
+                        Notes
+                      </Label>
+                      <Textarea
+                        id="profile-notes"
+                        value={notesDraft}
+                        onChange={(e) => setNotesDraft(e.target.value)}
+                        rows={4}
+                        placeholder="Preferences, formulas, anything the team should know."
+                      />
+                    </div>
+                    {saveError ? (
+                      <p className="text-sm text-red-600" role="alert">
+                        {saveError}
+                      </p>
+                    ) : null}
+                    {saved ? (
+                      <p className="text-sm text-emerald-700">Saved.</p>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={saveDetails}
+                      disabled={savePending}
+                      className="gap-1.5"
+                    >
+                      {savePending ? (
+                        <>
+                          <Loader2
+                            className="size-3.5 shrink-0 animate-spin"
+                            aria-hidden
+                          />
+                          Saving…
+                        </>
+                      ) : (
+                        "Save details"
+                      )}
+                    </Button>
+                  </div>
+                </section>
+              ) : (
+                <section className="mb-6 rounded-md border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2.5 text-xs text-gray-600">
+                  Promote this guest to a managed client by saving their next
+                  booking with notes — or add them via{" "}
+                  <span className="font-medium">Add Client</span>.
+                </section>
+              )}
+
+              <section>
+                <h3 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   Past appointments
-                </p>
-                <div className="max-h-[50vh] overflow-y-auto">
-                  {historyClient.history.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      No past visits on file yet.
-                    </p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {historyClient.history.map((appt) => (
-                        <li
-                          key={appt.id}
-                          className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5"
-                        >
+                </h3>
+                {client.history.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No past visits on file yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {client.history.map((appt) => (
+                      <li
+                        key={appt.id}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5"
+                      >
+                        <div className="min-w-0">
                           <p className="text-xs font-medium tabular-nums text-gray-500">
                             {appt.dateLabel}
                           </p>
                           <p className="text-sm font-medium text-gray-900">
                             {appt.service}
                           </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </div>
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                            appt.status === "completed"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : appt.status === "no_show"
+                                ? "border-amber-200 bg-amber-50 text-amber-800"
+                                : appt.status === "cancelled"
+                                  ? "border-red-200 bg-red-50 text-red-700"
+                                  : "border-gray-200 bg-white text-gray-600",
+                          )}
+                        >
+                          {appt.status === "no_show"
+                            ? "No-show"
+                            : appt.status.charAt(0).toUpperCase() +
+                              appt.status.slice(1)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }

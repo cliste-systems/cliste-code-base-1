@@ -6,6 +6,7 @@ import { parseStorefrontTeamMembers } from "@/lib/storefront-blocks";
 import { servicesTableHasExtendedColumns } from "@/lib/services-schema";
 
 import { ServicesView, type DashboardServiceRow } from "./services-view";
+import type { ServiceCategory } from "./categories-actions";
 
 export default async function DashboardServicesPage() {
   const { supabase, organizationId } = await requireDashboardSession();
@@ -54,19 +55,36 @@ export default async function DashboardServicesPage() {
 
   const extendedSchema = await servicesTableHasExtendedColumns(supabase);
 
+  const SERVICE_FIELDS_BASE =
+    "id, name, category, price, duration_minutes, category_id, buffer_before_min, buffer_after_min, deposit_required, deposit_amount_cents, deposit_percent, processing_before_min, processing_min, processing_after_min";
+  const SERVICE_FIELDS_EXTENDED = `${SERVICE_FIELDS_BASE}, description, ai_voice_notes, is_published`;
+
   const { data: svcRows, error: svcError } = await (extendedSchema
     ? supabase
         .from("services")
-        .select(
-          "id, name, category, price, duration_minutes, description, ai_voice_notes, is_published"
-        )
+        .select(SERVICE_FIELDS_EXTENDED)
         .eq("organization_id", organizationId)
         .order("name")
     : supabase
         .from("services")
-        .select("id, name, category, price, duration_minutes")
+        .select(SERVICE_FIELDS_BASE)
         .eq("organization_id", organizationId)
         .order("name"));
+
+  const { data: catRows, error: catError } = await supabase
+    .from("service_categories")
+    .select("id, name, display_order")
+    .eq("organization_id", organizationId)
+    .order("display_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  const initialCategories: ServiceCategory[] = catError
+    ? []
+    : (catRows ?? []).map((r) => ({
+        id: r.id as string,
+        name: (r.name as string) ?? "",
+        displayOrder: (r.display_order as number) ?? 0,
+      }));
 
   const initialTeamMembers = parseStorefrontTeamMembers(
     "storefront_team_members" in org
@@ -76,17 +94,32 @@ export default async function DashboardServicesPage() {
 
   const initialServices: DashboardServiceRow[] =
     !svcError && svcRows
-      ? svcRows.map((s) => ({
-          id: s.id as string,
-          name: (s.name as string) ?? "",
-          category: (s.category as string) ?? "",
-          priceEur: String(s.price ?? ""),
-          durationMin: String(s.duration_minutes ?? ""),
-          description: (s as { description?: string }).description ?? "",
-          aiVoiceNotes: (s as { ai_voice_notes?: string }).ai_voice_notes ?? "",
-          isPublished:
-            (s as { is_published?: boolean }).is_published !== false,
-        }))
+      ? svcRows.map((s) => {
+          const r = s as Record<string, unknown>;
+          return {
+            id: r.id as string,
+            name: (r.name as string) ?? "",
+            category: (r.category as string) ?? "",
+            priceEur: String(r.price ?? ""),
+            durationMin: String(r.duration_minutes ?? ""),
+            description: (r.description as string | undefined) ?? "",
+            aiVoiceNotes: (r.ai_voice_notes as string | undefined) ?? "",
+            isPublished: r.is_published !== false,
+            categoryId: (r.category_id as string | null | undefined) ?? null,
+            bufferBeforeMin: Number(r.buffer_before_min ?? 0) || 0,
+            bufferAfterMin: Number(r.buffer_after_min ?? 0) || 0,
+            depositRequired: Boolean(r.deposit_required),
+            depositAmountCents:
+              r.deposit_amount_cents == null
+                ? null
+                : Number(r.deposit_amount_cents) || 0,
+            depositPercent:
+              r.deposit_percent == null ? null : Number(r.deposit_percent) || 0,
+            processingBeforeMin: Number(r.processing_before_min ?? 0) || 0,
+            processingMin: Number(r.processing_min ?? 0) || 0,
+            processingAfterMin: Number(r.processing_after_min ?? 0) || 0,
+          };
+        })
       : [];
 
   return (
@@ -106,6 +139,7 @@ export default async function DashboardServicesPage() {
           extendedSchema={extendedSchema}
           initialServices={initialServices}
           initialTeamMembers={initialTeamMembers}
+          initialCategories={initialCategories}
           teamSyncKey={org.updated_at ?? ""}
         />
       )}

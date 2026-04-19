@@ -1,6 +1,7 @@
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import { parseBusinessHoursFromDb } from "./business-hours";
+import { parseBookingRulesFromDb } from "./actions";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
@@ -8,7 +9,7 @@ export default async function SettingsPage() {
 
   const { data: org, error } = await supabase
     .from("organizations")
-    .select("is_active, fresha_url, tier, business_hours")
+    .select("is_active, fresha_url, tier, business_hours, booking_rules")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -36,6 +37,7 @@ export default async function SettingsPage() {
   }
 
   const week = parseBusinessHoursFromDb(org.business_hours);
+  const bookingRules = parseBookingRulesFromDb(org.booking_rules);
   const showFreshaSettings = org.tier === "connect";
 
   return (
@@ -46,6 +48,7 @@ export default async function SettingsPage() {
           isActive: org.is_active ?? true,
           freshaUrl: org.fresha_url ?? "",
           week,
+          bookingRules,
         }}
       />
     </div>

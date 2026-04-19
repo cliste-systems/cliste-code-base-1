@@ -26,7 +26,7 @@ export default async function CalendarPage() {
   const { supabase, organizationId } = await requireDashboardSession();
   const { data: orgRow } = await supabase
     .from("organizations")
-    .select("tier")
+    .select("tier, business_hours")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -42,6 +42,19 @@ export default async function CalendarPage() {
     .eq("organization_id", organizationId)
     .in("role", ["staff", "admin"])
     .order("name", { ascending: true });
+
+  const [staffHoursQuery, staffTimeOffQuery] = await Promise.all([
+    supabase
+      .from("staff_working_hours")
+      .select("staff_id, weekday, start_time, end_time")
+      .eq("organization_id", organizationId),
+    supabase
+      .from("staff_time_off")
+      .select("staff_id, starts_at, ends_at, note")
+      .eq("organization_id", organizationId)
+      .gte("ends_at", from.toISOString())
+      .lte("starts_at", to.toISOString()),
+  ]);
 
   const staffMembers: CalendarStaffMember[] =
     staffQuery.error || !staffQuery.data?.length
@@ -159,6 +172,28 @@ export default async function CalendarPage() {
         <CalendarView
           appointments={appointments}
           staffMembers={staffMembers}
+          businessHours={
+            (orgRow?.business_hours ?? null) as Record<
+              string,
+              { open?: boolean; start?: string; end?: string }
+            > | null
+          }
+          staffWorkingHours={
+            (staffHoursQuery.data ?? []).map((r) => ({
+              staffId: r.staff_id as string,
+              weekday: r.weekday as number,
+              startTime: r.start_time as string,
+              endTime: r.end_time as string,
+            }))
+          }
+          staffTimeOff={
+            (staffTimeOffQuery.data ?? []).map((r) => ({
+              staffId: r.staff_id as string,
+              startsAt: r.starts_at as string,
+              endsAt: r.ends_at as string,
+              note: (r.note as string | null) ?? null,
+            }))
+          }
         />
       )}
     </div>

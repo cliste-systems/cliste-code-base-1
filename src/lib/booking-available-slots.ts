@@ -15,6 +15,13 @@ export type DashboardBookingSlot = {
   label: string;
 };
 
+/**
+ * Per-stylist windows for a single calendar day, in salon-local minutes
+ * since midnight. Multiple ranges on the same weekday model lunch breaks
+ * (e.g. 600-780 + 840-1080 = 10:00-13:00 + 14:00-18:00 with a 1 PM lunch).
+ */
+export type StaffDayWindow = { startMin: number; endMin: number };
+
 const DAY_ORDER: DayKey[] = [
   "sunday",
   "monday",
@@ -62,6 +69,13 @@ const FUTURE_BUFFER_MS = 60_000;
  * Available start times for a service on a calendar day: within business hours,
  * honouring duration (appointment ends by closing), existing confirmed bookings,
  * and step (default 15 min).
+ *
+ * Optional inputs:
+ *  - `staffWindows`: when present, the slot must also fall fully inside one of
+ *    these per-stylist working windows. Empty array => stylist not working.
+ *  - `staffBusy`: optional second busy list for the chosen stylist. Lets the
+ *    public flow check "is THIS stylist free?" while still respecting the
+ *    org-wide busy list.
  */
 export function computeAvailableBookingSlots(input: {
   dateYmd: string;
@@ -71,6 +85,11 @@ export function computeAvailableBookingSlots(input: {
   now: Date;
   timeZone: string;
   slotStepMinutes?: number;
+  staffWindows?: StaffDayWindow[];
+  staffBusy?: BusyInterval[];
+  bufferBeforeMin?: number;
+  bufferAfterMin?: number;
+  minNoticeMinutes?: number;
 }): DashboardBookingSlot[] {
   const tz = input.timeZone;
   const step = input.slotStepMinutes ?? 15;
@@ -82,32 +101,63 @@ export function computeAvailableBookingSlots(input: {
   const closeM = parseHHMMToMinutes(day.end);
   if (openM === null || closeM === null || closeM <= openM) return [];
 
-  const lastStartMin = closeM - input.durationMinutes;
-  if (lastStartMin < openM) return [];
+  const before = Math.max(0, input.bufferBeforeMin ?? 0);
+  const after = Math.max(0, input.bufferAfterMin ?? 0);
+  const noticeMs = Math.max(0, input.minNoticeMinutes ?? 0) * 60_000;
+
+  const lastStartMin = closeM - input.durationMinutes - after;
+  const earliestStartMin = openM + before;
+  if (lastStartMin < earliestStartMin) return [];
+
+  if (input.staffWindows && input.staffWindows.length === 0) return [];
 
   const out: DashboardBookingSlot[] = [];
 
-  for (let t = openM; t <= lastStartMin; t += step) {
+  for (let t = earliestStartMin; t <= lastStartMin; t += step) {
+    const slotEndMin = t + input.durationMinutes;
+    const effStart = t - before;
+    const effEnd = slotEndMin + after;
+
+    if (input.staffWindows && input.staffWindows.length > 0) {
+      const insideStaffWindow = input.staffWindows.some(
+        (w) => effStart >= w.startMin && effEnd <= w.endMin,
+      );
+      if (!insideStaffWindow) continue;
+    }
+
     const h = Math.floor(t / 60);
     const m = t % 60;
     const startUtc = fromZonedTime(
       `${input.dateYmd} ${pad2(h)}:${pad2(m)}:00`,
       tz,
     );
-    if (startUtc.getTime() < input.now.getTime() + FUTURE_BUFFER_MS) {
+    const minStart = input.now.getTime() + Math.max(FUTURE_BUFFER_MS, noticeMs);
+    if (startUtc.getTime() < minStart) {
       continue;
     }
 
     const endUtc = addMinutes(startUtc, input.durationMinutes);
+    const effStartUtc = addMinutes(startUtc, -before);
+    const effEndUtc = addMinutes(endUtc, after);
 
     let blocked = false;
     for (const b of input.busy) {
-      if (startUtc < b.end && endUtc > b.start) {
+      if (effStartUtc < b.end && effEndUtc > b.start) {
         blocked = true;
         break;
       }
     }
     if (blocked) continue;
+
+    if (input.staffBusy && input.staffBusy.length > 0) {
+      for (const b of input.staffBusy) {
+        if (effStartUtc < b.end && effEndUtc > b.start) {
+          blocked = true;
+          break;
+        }
+      }
+      if (blocked) continue;
+    }
 
     out.push({
       startIso: startUtc.toISOString(),
@@ -116,6 +166,83 @@ export function computeAvailableBookingSlots(input: {
   }
 
   return out;
+}
+
+/**
+ * Convert per-stylist `staff_working_hours` rows + `staff_time_off` rows
+ * into a list of bookable windows for a single calendar day in `tz`,
+ * expressed as minutes since salon-local midnight. Used by both the
+ * dashboard and public booking flows.
+ *
+ * `weekday` is JS-style: 0 = Sunday … 6 = Saturday.
+ */
+export function staffDayWindowsForDate(input: {
+  dateYmd: string;
+  timeZone: string;
+  weekday: number;
+  workingHours: { weekday: number; opensAt: string; closesAt: string }[];
+  timeOff: { startsAt: string; endsAt: string }[];
+}): StaffDayWindow[] {
+  const tz = input.timeZone;
+  const baseRanges: StaffDayWindow[] = input.workingHours
+    .filter((w) => w.weekday === input.weekday)
+    .map((w) => {
+      const s = parseHHMMToMinutes(w.opensAt.slice(0, 5));
+      const e = parseHHMMToMinutes(w.closesAt.slice(0, 5));
+      if (s === null || e === null || e <= s) return null;
+      return { startMin: s, endMin: e };
+    })
+    .filter((x): x is StaffDayWindow => x !== null)
+    .sort((a, b) => a.startMin - b.startMin);
+
+  if (baseRanges.length === 0) return [];
+
+  const dayStartUtc = fromZonedTime(`${input.dateYmd} 00:00:00`, tz);
+  const dayEndUtc = addMinutes(dayStartUtc, 24 * 60);
+
+  // Convert each time-off row into a (startMin, endMin) range overlapping
+  // this calendar day in salon-local minutes.
+  const offRanges: StaffDayWindow[] = [];
+  for (const off of input.timeOff) {
+    const offStart = new Date(off.startsAt);
+    const offEnd = new Date(off.endsAt);
+    if (Number.isNaN(offStart.getTime()) || Number.isNaN(offEnd.getTime())) {
+      continue;
+    }
+    if (offEnd <= dayStartUtc || offStart >= dayEndUtc) continue;
+    const clampedStart = offStart < dayStartUtc ? dayStartUtc : offStart;
+    const clampedEnd = offEnd > dayEndUtc ? dayEndUtc : offEnd;
+    const startMin = Math.max(
+      0,
+      Math.round((clampedStart.getTime() - dayStartUtc.getTime()) / 60_000),
+    );
+    const endMin = Math.min(
+      24 * 60,
+      Math.round((clampedEnd.getTime() - dayStartUtc.getTime()) / 60_000),
+    );
+    if (endMin > startMin) offRanges.push({ startMin, endMin });
+  }
+  offRanges.sort((a, b) => a.startMin - b.startMin);
+
+  // Subtract each offRange from the union of baseRanges.
+  let result: StaffDayWindow[] = [...baseRanges];
+  for (const off of offRanges) {
+    const next: StaffDayWindow[] = [];
+    for (const r of result) {
+      if (off.endMin <= r.startMin || off.startMin >= r.endMin) {
+        next.push(r);
+        continue;
+      }
+      if (off.startMin > r.startMin) {
+        next.push({ startMin: r.startMin, endMin: off.startMin });
+      }
+      if (off.endMin < r.endMin) {
+        next.push({ startMin: off.endMin, endMin: r.endMin });
+      }
+    }
+    result = next;
+  }
+  return result;
 }
 
 export function getSalonTimeZone(): string {

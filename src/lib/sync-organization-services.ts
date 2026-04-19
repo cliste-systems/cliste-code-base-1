@@ -14,6 +14,18 @@ export type OrganizationServiceSyncInput = {
   description: string;
   aiVoiceNotes: string;
   isPublished: boolean;
+  categoryId?: string | null;
+  bufferBeforeMin?: number;
+  bufferAfterMin?: number;
+  depositRequired?: boolean;
+  depositAmountCents?: number | null;
+  depositPercent?: number | null;
+  /** Active stylist time before processing kicks off. */
+  processingBeforeMin?: number;
+  /** Hands-off processing window (e.g. colour develops). */
+  processingMin?: number;
+  /** Active stylist time after processing. */
+  processingAfterMin?: number;
 };
 
 export type SyncOrganizationServicesResult =
@@ -73,14 +85,55 @@ export async function syncOrganizationServices(
       updated_at: now,
     };
 
+    const cleanCents = (v: number | null | undefined): number | null => {
+      if (v == null) return null;
+      const n = Math.round(Number(v));
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    };
+    const cleanPercent = (v: number | null | undefined): number | null => {
+      if (v == null) return null;
+      const n = Math.round(Number(v));
+      if (!Number.isFinite(n)) return null;
+      if (n < 1 || n > 100) return null;
+      return n;
+    };
+    const cleanBuffer = (v: number | undefined): number => {
+      if (v == null) return 0;
+      const n = Math.max(0, Math.min(240, Math.round(Number(v) || 0)));
+      return n;
+    };
+    const cleanProcessing = (v: number | undefined): number => {
+      if (v == null) return 0;
+      const n = Math.max(0, Math.min(480, Math.round(Number(v) || 0)));
+      return n;
+    };
+    const cleanCategoryId = (v: string | null | undefined): string | null => {
+      if (!v) return null;
+      const t = v.trim();
+      return UUID_RE.test(t) ? t : null;
+    };
+    const depositRequired = Boolean(s.depositRequired);
+    const extras = {
+      category_id: cleanCategoryId(s.categoryId),
+      buffer_before_min: cleanBuffer(s.bufferBeforeMin),
+      buffer_after_min: cleanBuffer(s.bufferAfterMin),
+      deposit_required: depositRequired,
+      deposit_amount_cents: depositRequired ? cleanCents(s.depositAmountCents) : null,
+      deposit_percent: depositRequired ? cleanPercent(s.depositPercent) : null,
+      processing_before_min: cleanProcessing(s.processingBeforeMin),
+      processing_min: cleanProcessing(s.processingMin),
+      processing_after_min: cleanProcessing(s.processingAfterMin),
+    };
+
     const row = extended
       ? {
           ...baseRow,
           description: s.description.trim() || null,
           ai_voice_notes: s.aiVoiceNotes.trim() || null,
           is_published: Boolean(s.isPublished),
+          ...extras,
         }
-      : baseRow;
+      : { ...baseRow, ...extras };
 
     const sid = s.id?.trim() ?? "";
 

@@ -18,9 +18,12 @@ import {
   computeAvailableBookingSlots,
   getCalendarDayUtcRange,
   getSalonTimeZone,
+  staffDayWindowsForDate,
   type BusyInterval,
   type DashboardBookingSlot,
+  type StaffDayWindow,
 } from "@/lib/booking-available-slots";
+import { toZonedTime } from "date-fns-tz";
 import {
   generateBookingReference,
   isPlausibleCustomerPhoneE164,
@@ -181,7 +184,7 @@ export async function getPublicBookingSlots(payload: {
 
   const { data: org, error: orgErr } = await admin
     .from("organizations")
-    .select("business_hours, tier, is_active")
+    .select("business_hours, booking_rules, tier, is_active")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -192,7 +195,7 @@ export async function getPublicBookingSlots(payload: {
   const extended = await servicesTableHasExtendedColumns(admin);
   let svcQuery = admin
     .from("services")
-    .select("duration_minutes")
+    .select("duration_minutes, buffer_before_min, buffer_after_min")
     .eq("id", serviceId)
     .eq("organization_id", organizationId);
   if (extended) {
@@ -206,6 +209,7 @@ export async function getPublicBookingSlots(payload: {
 
   const tz = getSalonTimeZone();
   const schedule = parseBusinessHoursFromDb(org.business_hours);
+  const rules = readBookingRules(org.booking_rules);
   const { busy, error: busyErr } = await fetchBusyIntervalsPublic(
     admin,
     organizationId,
@@ -223,9 +227,42 @@ export async function getPublicBookingSlots(payload: {
     busy,
     now: new Date(),
     timeZone: tz,
+    slotStepMinutes: rules.slotIntervalMin,
+    minNoticeMinutes: rules.minNoticeMin,
+    bufferBeforeMin:
+      Number((svc as { buffer_before_min?: number }).buffer_before_min ?? 0) ||
+      0,
+    bufferAfterMin:
+      Number((svc as { buffer_after_min?: number }).buffer_after_min ?? 0) ||
+      0,
   });
 
   return { ok: true, slots, timeZone: tz };
+}
+
+type PublicBookingRules = {
+  slotIntervalMin: number;
+  minNoticeMin: number;
+  maxAdvanceDays: number;
+};
+
+function readBookingRules(raw: unknown): PublicBookingRules {
+  const def: PublicBookingRules = {
+    slotIntervalMin: 15,
+    minNoticeMin: 0,
+    maxAdvanceDays: 60,
+  };
+  if (!raw || typeof raw !== "object") return def;
+  const r = raw as Record<string, unknown>;
+  const num = (k: string, d: number) => {
+    const v = r[k];
+    return typeof v === "number" && Number.isFinite(v) ? v : d;
+  };
+  return {
+    slotIntervalMin: num("slot_interval_min", def.slotIntervalMin),
+    minNoticeMin: num("min_notice_min", def.minNoticeMin),
+    maxAdvanceDays: num("max_advance_days", def.maxAdvanceDays),
+  };
 }
 
 export type GetPublicBookingSlotsRangeResult =
@@ -284,7 +321,7 @@ export async function getPublicBookingSlotsRange(payload: {
 
   const { data: org, error: orgErr } = await admin
     .from("organizations")
-    .select("business_hours, tier, is_active")
+    .select("business_hours, booking_rules, tier, is_active")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -295,7 +332,7 @@ export async function getPublicBookingSlotsRange(payload: {
   const extended = await servicesTableHasExtendedColumns(admin);
   let svcQuery = admin
     .from("services")
-    .select("duration_minutes")
+    .select("duration_minutes, buffer_before_min, buffer_after_min")
     .eq("id", serviceId)
     .eq("organization_id", organizationId);
   if (extended) {
@@ -309,7 +346,9 @@ export async function getPublicBookingSlotsRange(payload: {
 
   const tz = getSalonTimeZone();
   const schedule = parseBusinessHoursFromDb(org.business_hours);
-  const lastYmd = addDaysToYmd(startYmd, days - 1, tz);
+  const rules = readBookingRules(org.booking_rules);
+  const cappedDays = Math.min(days, Math.max(1, rules.maxAdvanceDays));
+  const lastYmd = addDaysToYmd(startYmd, cappedDays - 1, tz);
   const rangeStartUtc = getCalendarDayUtcRange(startYmd, tz).startUtc;
   const rangeEndExclusiveUtc = getCalendarDayUtcRange(lastYmd, tz).endExclusiveUtc;
 
@@ -325,13 +364,75 @@ export async function getPublicBookingSlotsRange(payload: {
     return { ok: false, message: apptErr };
   }
 
+  // When a stylist is selected, also load their working hours + time off
+  // for the whole window in one round trip so we can subtract them per
+  // day. We intentionally only intersect with staff windows when the
+  // stylist HAS a working_hours row — otherwise we fall back to org
+  // business hours so a brand-new stylist is bookable immediately
+  // without setup.
+  let staffHoursAll: { weekday: number; opens_at: string; closes_at: string }[] | null = null;
+  let staffOffAll: { starts_at: string; ends_at: string }[] = [];
+  if (staffId) {
+    const [hoursRes, offRes] = await Promise.all([
+      admin
+        .from("staff_working_hours")
+        .select("weekday, opens_at, closes_at")
+        .eq("organization_id", organizationId)
+        .eq("staff_id", staffId),
+      admin
+        .from("staff_time_off")
+        .select("starts_at, ends_at")
+        .eq("organization_id", organizationId)
+        .eq("staff_id", staffId)
+        .lt("starts_at", rangeEndExclusiveUtc.toISOString())
+        .gt("ends_at", rangeStartUtc.toISOString()),
+    ]);
+    if (!hoursRes.error && hoursRes.data && hoursRes.data.length > 0) {
+      staffHoursAll = hoursRes.data.map((h) => ({
+        weekday: Number(h.weekday),
+        opens_at: String(h.opens_at),
+        closes_at: String(h.closes_at),
+      }));
+    }
+    if (!offRes.error && offRes.data) {
+      staffOffAll = offRes.data.map((o) => ({
+        starts_at: String(o.starts_at),
+        ends_at: String(o.ends_at),
+      }));
+    }
+  }
+
   const now = new Date();
   const slotsByDate: Record<string, DashboardBookingSlot[]> = {};
   let firstAvailableYmd: string | null = null;
 
-  for (let i = 0; i < days; i++) {
+  const bufferBeforeMin =
+    Number((svc as { buffer_before_min?: number }).buffer_before_min ?? 0) || 0;
+  const bufferAfterMin =
+    Number((svc as { buffer_after_min?: number }).buffer_after_min ?? 0) || 0;
+
+  for (let i = 0; i < cappedDays; i++) {
     const dateYmd = addDaysToYmd(startYmd, i, tz);
     const busy = busyIntervalsForCalendarDay(appointments, dateYmd, tz);
+    let staffWindows: StaffDayWindow[] | undefined;
+    if (staffId && staffHoursAll) {
+      const dayDate = toZonedTime(`${dateYmd}T12:00:00Z`, tz);
+      const weekday = dayDate.getDay();
+      staffWindows = staffDayWindowsForDate({
+        dateYmd,
+        timeZone: tz,
+        weekday,
+        workingHours: staffHoursAll.map((h) => ({
+          weekday: h.weekday,
+          opensAt: h.opens_at,
+          closesAt: h.closes_at,
+        })),
+        timeOff: staffOffAll.map((o) => ({
+          startsAt: o.starts_at,
+          endsAt: o.ends_at,
+        })),
+      });
+    }
     const slots = computeAvailableBookingSlots({
       dateYmd,
       durationMinutes: svc.duration_minutes,
@@ -339,6 +440,11 @@ export async function getPublicBookingSlotsRange(payload: {
       busy,
       now,
       timeZone: tz,
+      staffWindows,
+      slotStepMinutes: rules.slotIntervalMin,
+      minNoticeMinutes: rules.minNoticeMin,
+      bufferBeforeMin,
+      bufferAfterMin,
     });
     slotsByDate[dateYmd] = slots;
     if (firstAvailableYmd === null && slots.length > 0) {
@@ -732,7 +838,9 @@ export async function submitPublicBooking(
   const extended = await servicesTableHasExtendedColumns(admin);
   let svcQuery = admin
     .from("services")
-    .select("id, organization_id, duration_minutes, name, price")
+    .select(
+      "id, organization_id, duration_minutes, name, price, deposit_required, deposit_amount_cents, deposit_percent",
+    )
     .eq("id", serviceId)
     .eq("organization_id", organizationId);
   if (extended) {
@@ -746,26 +854,69 @@ export async function submitPublicBooking(
 
   const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
 
-  // Decide whether this booking requires up-front Stripe payment. The storefront
-  // only prompts for payment when ALL of these are true:
-  //   - service has a positive price
-  //   - Stripe is configured on the server (STRIPE_SECRET_KEY)
-  //   - the salon has an onboarded Stripe Connect account with charges enabled
+  // Decide whether this booking requires up-front Stripe payment.
+  //
+  // Two flavours:
+  //   - FULL  — service has a positive price, no deposit configured. Stripe
+  //             charges the entire amount.
+  //   - DEPOSIT — service has `deposit_required = true`. Stripe charges only
+  //             the deposit (amount or % of price); the balance is collected
+  //             in salon and surfaced as `balance_due_cents` for the
+  //             dashboard.
+  // In both cases Stripe must be configured + the salon must be onboarded.
   const priceNumber =
     typeof svc.price === "number"
       ? svc.price
       : Number.parseFloat(String(svc.price ?? ""));
-  const amountCents = toMinorUnits(Number.isFinite(priceNumber) ? priceNumber : 0);
+  const serviceTotalCents = toMinorUnits(
+    Number.isFinite(priceNumber) ? priceNumber : 0,
+  );
   const currency = getDefaultCurrency();
   const stripeAccountId = (org.stripe_account_id ?? "").trim() || null;
+
+  const depositRequired = Boolean(
+    (svc as { deposit_required?: boolean | null }).deposit_required,
+  );
+  let depositCents: number | null = null;
+  if (depositRequired) {
+    const explicitAmount = Number(
+      (svc as { deposit_amount_cents?: number | null })
+        .deposit_amount_cents ?? 0,
+    );
+    const explicitPct = Number(
+      (svc as { deposit_percent?: number | null }).deposit_percent ?? 0,
+    );
+    if (Number.isFinite(explicitAmount) && explicitAmount > 0) {
+      depositCents = Math.min(explicitAmount, serviceTotalCents);
+    } else if (
+      Number.isFinite(explicitPct) &&
+      explicitPct > 0 &&
+      explicitPct <= 100 &&
+      serviceTotalCents > 0
+    ) {
+      depositCents = Math.max(
+        1,
+        Math.min(
+          serviceTotalCents,
+          Math.round((serviceTotalCents * explicitPct) / 100),
+        ),
+      );
+    }
+  }
+
+  // chargeNowCents is what we ask Stripe to actually collect. When the salon
+  // configured a deposit it's just that; otherwise full price.
+  const chargeNowCents =
+    depositCents != null ? depositCents : serviceTotalCents;
+
   const requiresPayment =
-    amountCents > 0 &&
+    chargeNowCents > 0 &&
     stripeIsConfigured() &&
     stripeAccountId != null &&
     Boolean(org.stripe_charges_enabled);
   const platformFeeCents = requiresPayment
     ? computeApplicationFeeCents(
-        amountCents,
+        chargeNowCents,
         (org as { application_fee_bps?: number | null }).application_fee_bps,
       )
     : 0;
@@ -833,11 +984,15 @@ export async function submitPublicBooking(
         ...(requiresPayment
           ? {
               payment_status: "pending",
-              amount_cents: amountCents,
+              amount_cents: chargeNowCents,
+              service_total_cents: serviceTotalCents,
+              ...(depositCents != null ? { deposit_cents: depositCents } : {}),
               currency,
               platform_fee_cents: platformFeeCents,
             }
-          : {}),
+          : serviceTotalCents > 0
+            ? { service_total_cents: serviceTotalCents }
+            : {}),
       })
       .select("id")
       .single();
@@ -894,13 +1049,14 @@ export async function submitPublicBooking(
       organizationId,
       appointmentId: insertedId,
       stripeAccountId: stripeAccountId!,
-      amountCents,
+      amountCents: chargeNowCents,
       platformFeeCents,
       currency,
       serviceName,
       salonName,
       customerEmail: customerEmailNorm,
       bookingReference: bookingRef,
+      isDeposit: depositCents != null,
     });
 
     if (!intentResult.ok) {
@@ -1043,6 +1199,8 @@ type CreatePaymentIntentArgs = {
   salonName: string;
   customerEmail: string | null;
   bookingReference: string;
+  /** Stamp metadata so the webhook can disambiguate deposit vs full charge. */
+  isDeposit?: boolean;
 };
 
 type CreatePaymentIntentResult =
@@ -1073,13 +1231,14 @@ async function createBookingPaymentIntent(
         // (cards, Apple Pay, Google Pay if configured on the account).
         automatic_payment_methods: { enabled: true },
         receipt_email: args.customerEmail ?? undefined,
-        description: `${args.serviceName} at ${args.salonName} (ref ${args.bookingReference})`,
+        description: `${args.isDeposit ? "Deposit for " : ""}${args.serviceName} at ${args.salonName} (ref ${args.bookingReference})`,
         statement_descriptor_suffix:
           args.salonName.replace(/[^a-z0-9 ]/gi, "").slice(0, 22) || "CLISTE",
         metadata: {
           appointment_id: args.appointmentId,
           organization_id: args.organizationId,
           booking_reference: args.bookingReference,
+          ...(args.isDeposit ? { charge_kind: "deposit" } : {}),
         },
       },
       {

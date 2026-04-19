@@ -15,6 +15,7 @@ export async function cancelConfirmedAppointmentForOrganization(
   supabase: SupabaseClient,
   organizationId: string,
   appointmentId: string,
+  options?: { reason?: string | null; cancelledBy?: string | null },
 ): Promise<CancelConfirmedAppointmentResult> {
   const id = appointmentId.trim();
   if (!UUID_RE.test(id)) {
@@ -44,9 +45,21 @@ export async function cancelConfirmedAppointmentForOrganization(
     };
   }
 
+  const reasonRaw = options?.reason ?? null;
+  const reason =
+    typeof reasonRaw === "string"
+      ? reasonRaw.trim().slice(0, 200) || null
+      : null;
+  const cancelledBy = options?.cancelledBy ?? null;
+
   const { error: updErr } = await supabase
     .from("appointments")
-    .update({ status: "cancelled" })
+    .update({
+      status: "cancelled",
+      cancel_reason: reason,
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: cancelledBy,
+    })
     .eq("id", id)
     .eq("organization_id", organizationId);
 

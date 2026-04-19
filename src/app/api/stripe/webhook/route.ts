@@ -194,7 +194,7 @@ async function handlePaymentIntentSucceeded(
   const { data: existing, error: readErr } = await admin
     .from("appointments")
     .select(
-      "id, organization_id, customer_name, customer_phone, customer_email, start_time, booking_reference, payment_status, confirmation_sms_sent_at, confirmation_email_sent_at, service:services(name), organization:organizations(slug, name)",
+      "id, organization_id, customer_name, customer_phone, customer_email, start_time, booking_reference, payment_status, confirmation_sms_sent_at, confirmation_email_sent_at, service_total_cents, deposit_cents, service:services(name), organization:organizations(slug, name)",
     )
     .eq("id", appointmentId)
     .maybeSingle();
@@ -208,18 +208,34 @@ async function handlePaymentIntentSucceeded(
     return;
   }
 
-  // ATOMIC FLIP — the conditional `payment_status <> 'paid'` clause makes
-  // this the single point where a new `paid` event "wins". Stripe can
-  // (and does) deliver `payment_intent.succeeded` more than once: webhook
-  // retries, replays from the dashboard, multiple endpoints subscribed,
-  // etc. By gating side effects (receipt SMS, revalidation) on whether
-  // we *actually* flipped the row, we prevent duplicate confirmations
-  // even under concurrent webhook deliveries. `select("id")` lets us read
+  // Decide whether this charge fully paid the booking, or is a deposit (so
+  // there's still a balance owing to be collected in salon).
+  const serviceTotal =
+    typeof existing.service_total_cents === "number"
+      ? existing.service_total_cents
+      : null;
+  const isDepositCharge =
+    pi.metadata?.charge_kind === "deposit" ||
+    (existing.deposit_cents != null &&
+      serviceTotal != null &&
+      amountCents != null &&
+      amountCents < serviceTotal);
+  const nextStatus: "paid" | "deposit_paid" = isDepositCharge
+    ? "deposit_paid"
+    : "paid";
+
+  // ATOMIC FLIP — the conditional `payment_status not in ('paid','deposit_paid')`
+  // clause makes this the single point where a new `paid`/`deposit_paid` event
+  // "wins". Stripe can (and does) deliver `payment_intent.succeeded` more than
+  // once: webhook retries, dashboard replays, multiple endpoints subscribed,
+  // etc. By gating side effects (receipt SMS, revalidation) on whether we
+  // *actually* flipped the row, we prevent duplicate confirmations even under
+  // concurrent webhook deliveries. `select("id")` lets us read the
   // affected-rows count via the returned array length.
   const flip = await admin
     .from("appointments")
     .update({
-      payment_status: "paid",
+      payment_status: nextStatus,
       paid_at: paidAt,
       stripe_payment_intent_id: pi.id,
       stripe_charge_id: chargeId,
@@ -227,7 +243,7 @@ async function handlePaymentIntentSucceeded(
       ...(currency ? { currency } : {}),
     })
     .eq("id", appointmentId)
-    .neq("payment_status", "paid")
+    .not("payment_status", "in", "(paid,deposit_paid)")
     .select("id");
   if (flip.error) throw new Error(`update appointment paid: ${flip.error.message}`);
   const wonRace = (flip.data?.length ?? 0) > 0;

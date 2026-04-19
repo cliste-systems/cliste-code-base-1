@@ -5,9 +5,17 @@ import {
   useCallback,
   useMemo,
   useState,
+  useTransition,
   type ChangeEvent,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 
+import {
+  rescheduleAppointment,
+  resizeAppointment,
+} from "@/app/(dashboard)/dashboard/bookings/actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { CalendarAppointment } from "@/lib/calendar-appointment";
@@ -26,14 +34,151 @@ import {
   Wand2,
 } from "lucide-react";
 
-const START_HOUR = 9;
-const END_HOUR = 18;
+const DEFAULT_START_HOUR = 9;
+const DEFAULT_END_HOUR = 18;
 const HOUR_REM = 8;
 /** Matches Aura mock: one hour = 8rem; appointments positioned by minute within the hour. */
 
+const WEEKDAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+
+type BusinessHoursMap = Record<
+  string,
+  { open?: boolean; start?: string; end?: string }
+> | null;
+
+type StaffWorkingHoursRow = {
+  staffId: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+};
+
+type StaffTimeOffRow = {
+  staffId: string;
+  startsAt: string;
+  endsAt: string;
+  note: string | null;
+};
+
+function parseHm(value: string | undefined | null): { h: number; m: number } | null {
+  if (!value) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (Number.isNaN(h) || Number.isNaN(min)) return null;
+  if (h < 0 || h > 24 || min < 0 || min > 59) return null;
+  return { h, m: min };
+}
+
+function segmentRem(
+  startMinFromGrid: number,
+  endMinFromGrid: number,
+): { topRem: number; heightRem: number } {
+  return {
+    topRem: (startMinFromGrid / 60) * HOUR_REM,
+    heightRem: Math.max(((endMinFromGrid - startMinFromGrid) / 60) * HOUR_REM, 0.5),
+  };
+}
+
+function staffWorkingSegmentsForDay(
+  staffId: string,
+  date: Date,
+  rows: StaffWorkingHoursRow[],
+  startHour: number,
+  endHour: number,
+): Array<{ topRem: number; heightRem: number }> {
+  const weekday = date.getDay();
+  const matched = rows.filter(
+    (r) => r.staffId === staffId && r.weekday === weekday,
+  );
+  if (matched.length === 0) return [];
+  const segs: Array<{ topRem: number; heightRem: number }> = [];
+  for (const r of matched) {
+    const s = parseHm(r.startTime);
+    const e = parseHm(r.endTime);
+    if (!s || !e) continue;
+    const startMin = (s.h - startHour) * 60 + s.m;
+    const endMin = (e.h - startHour) * 60 + e.m;
+    const clampedStart = Math.max(0, Math.min((endHour - startHour) * 60, startMin));
+    const clampedEnd = Math.max(0, Math.min((endHour - startHour) * 60, endMin));
+    if (clampedEnd <= clampedStart) continue;
+    segs.push(segmentRem(clampedStart, clampedEnd));
+  }
+  return segs;
+}
+
+function staffTimeOffSegmentsForDay(
+  staffId: string,
+  date: Date,
+  rows: StaffTimeOffRow[],
+  startHour: number,
+  endHour: number,
+): Array<{ topRem: number; heightRem: number; note: string | null }> {
+  const day0 = startOfDay(date);
+  const next = addDays(day0, 1);
+  const winStart = new Date(day0);
+  winStart.setHours(startHour, 0, 0, 0);
+  const winEnd = new Date(day0);
+  winEnd.setHours(endHour, 0, 0, 0);
+
+  const out: Array<{ topRem: number; heightRem: number; note: string | null }> = [];
+  for (const r of rows) {
+    if (r.staffId !== staffId) continue;
+    const s = new Date(r.startsAt);
+    const e = new Date(r.endsAt);
+    if (
+      Number.isNaN(s.getTime()) ||
+      Number.isNaN(e.getTime()) ||
+      e.getTime() <= day0.getTime() ||
+      s.getTime() >= next.getTime()
+    ) {
+      continue;
+    }
+    const startClamped = Math.max(s.getTime(), winStart.getTime());
+    const endClamped = Math.min(e.getTime(), winEnd.getTime());
+    if (endClamped <= startClamped) continue;
+    const startMin = (startClamped - winStart.getTime()) / 60000;
+    const endMin = (endClamped - winStart.getTime()) / 60000;
+    out.push({ ...segmentRem(startMin, endMin), note: r.note });
+  }
+  return out;
+}
+
+function dayHoursForOrg(
+  businessHours: BusinessHoursMap,
+  date: Date,
+): { startHour: number; endHour: number; isOpen: boolean } {
+  const key = WEEKDAY_NAMES[date.getDay()];
+  const cfg = businessHours?.[key];
+  const start = parseHm(cfg?.start);
+  const end = parseHm(cfg?.end);
+  const open = cfg?.open !== false;
+  if (!start || !end) {
+    return {
+      startHour: DEFAULT_START_HOUR,
+      endHour: DEFAULT_END_HOUR,
+      isOpen: open,
+    };
+  }
+  return {
+    startHour: Math.max(0, Math.min(23, start.h)),
+    endHour: Math.max(start.h + 1, Math.min(24, end.m === 0 ? end.h : end.h + 1)),
+    isOpen: open,
+  };
+}
+
 type Clock = { h: number; m: number };
 
-type Variant = "indigo" | "amber" | "slate" | "red";
+type Variant = "indigo" | "amber" | "slate" | "red" | "emerald" | "purple";
 
 type DayBlock = {
   id: string;
@@ -73,13 +218,13 @@ function formatTimeLabel24(h: number, m: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-function minutesFromGridStart(h: number, m: number): number {
-  return (h - START_HOUR) * 60 + m;
+function minutesFromGridStart(h: number, m: number, startHour: number): number {
+  return (h - startHour) * 60 + m;
 }
 
-function slotStyle(start: Clock, end: Clock) {
-  const startMin = minutesFromGridStart(start.h, start.m);
-  const endMin = minutesFromGridStart(end.h, end.m);
+function slotStyle(start: Clock, end: Clock, startHour: number) {
+  const startMin = minutesFromGridStart(start.h, start.m, startHour);
+  const endMin = minutesFromGridStart(end.h, end.m, startHour);
   const topRem = (startMin / 60) * HOUR_REM;
   const heightRem = ((endMin - startMin) / 60) * HOUR_REM;
   return {
@@ -92,9 +237,9 @@ function formatRange24(start: Clock, end: Clock): string {
   return `${formatTimeLabel24(start.h, start.m)} - ${formatTimeLabel24(end.h, end.m)}`;
 }
 
-function formatDurationShort(start: Clock, end: Clock): string {
-  const a = minutesFromGridStart(start.h, start.m);
-  const b = minutesFromGridStart(end.h, end.m);
+function formatDurationShort(start: Clock, end: Clock, startHour: number): string {
+  const a = minutesFromGridStart(start.h, start.m, startHour);
+  const b = minutesFromGridStart(end.h, end.m, startHour);
   const mins = b - a;
   const h = mins / 60;
   if (mins <= 0) return "";
@@ -120,6 +265,8 @@ function clipToDayGrid(
   start: Date,
   end: Date,
   day: Date,
+  startHour: number,
+  endHour: number,
 ): { start: Clock; end: Clock } | null {
   const day0 = startOfDay(day);
   const next = addDays(day0, 1);
@@ -128,9 +275,9 @@ function clipToDayGrid(
   }
 
   const winStart = new Date(day0);
-  winStart.setHours(START_HOUR, 0, 0, 0);
+  winStart.setHours(startHour, 0, 0, 0);
   const winEnd = new Date(day0);
-  winEnd.setHours(END_HOUR, 0, 0, 0);
+  winEnd.setHours(endHour, 0, 0, 0);
 
   const clippedStart = new Date(Math.max(start.getTime(), winStart.getTime()));
   const clippedEnd = new Date(Math.min(end.getTime(), winEnd.getTime()));
@@ -141,9 +288,12 @@ function clipToDayGrid(
 
 function variantForAppointment(
   source: CalendarAppointment["source"],
-  cancelled: boolean,
+  status: string,
 ): Variant {
-  if (cancelled) return "red";
+  const s = (status ?? "").toLowerCase();
+  if (s === "cancelled") return "red";
+  if (s === "no_show") return "purple";
+  if (s === "completed") return "emerald";
   switch (source) {
     case "ai_call":
       return "indigo";
@@ -235,19 +385,51 @@ const VARIANT_DESKTOP: Record<
     badge: "border-red-200 text-red-800",
     avatar: "bg-red-200 text-red-900",
   },
+  emerald: {
+    border: "border-emerald-500",
+    bg: "bg-emerald-50",
+    title: "text-emerald-950",
+    time: "text-emerald-700",
+    client: "text-emerald-900",
+    badge: "border-emerald-200 text-emerald-800",
+    avatar: "bg-emerald-200 text-emerald-900",
+  },
+  purple: {
+    border: "border-purple-500",
+    bg: "bg-purple-50",
+    title: "text-purple-950",
+    time: "text-purple-700",
+    client: "text-purple-900",
+    badge: "border-purple-200 text-purple-800",
+    avatar: "bg-purple-200 text-purple-900",
+  },
 };
 
 type CalendarViewProps = {
   appointments: CalendarAppointment[];
   staffMembers: CalendarStaffMember[];
+  businessHours?: BusinessHoursMap;
+  staffWorkingHours?: StaffWorkingHoursRow[];
+  staffTimeOff?: StaffTimeOffRow[];
 };
 
 export function CalendarView({
   appointments,
   staffMembers,
+  businessHours = null,
+  staffWorkingHours = [],
+  staffTimeOff = [],
 }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [mobileStaffFilter, setMobileStaffFilter] = useState<string>("all");
+  const [activeAppointmentId, setActiveAppointmentId] = useState<string | null>(
+    null,
+  );
+  const router = useRouter();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragHoverColumn, setDragHoverColumn] = useState<string | null>(null);
+  const [dragMessage, setDragMessage] = useState<string | null>(null);
+  const [, startDragSaveTransition] = useTransition();
 
   const onMonthYearChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -262,14 +444,31 @@ export function CalendarView({
     [],
   );
 
-  const hourCount = END_HOUR - START_HOUR;
+  const dayHours = useMemo(
+    () => dayHoursForOrg(businessHours, selectedDate),
+    [businessHours, selectedDate],
+  );
+  const startHour = dayHours.startHour;
+  const endHour = dayHours.endHour;
+  const hourCount = endHour - startHour;
   const gridBodyHeight = `${hourCount * HOUR_REM}rem`;
 
   const hours = useMemo(() => {
     const list: number[] = [];
-    for (let h = START_HOUR; h < END_HOUR; h++) list.push(h);
+    for (let h = startHour; h < endHour; h++) list.push(h);
     return list;
-  }, []);
+  }, [startHour, endHour]);
+
+  const apptById = useMemo(() => {
+    const m = new Map<string, CalendarAppointment>();
+    for (const a of appointments) m.set(a.id, a);
+    return m;
+  }, [appointments]);
+
+  const activeAppointment = useMemo(
+    () => (activeAppointmentId ? apptById.get(activeAppointmentId) ?? null : null),
+    [activeAppointmentId, apptById],
+  );
 
   const staffIdSet = useMemo(
     () => new Set(staffMembers.map((s) => s.id)),
@@ -286,7 +485,7 @@ export function CalendarView({
 
       if (!sameLocalCalendarDay(start, selectedDate)) continue;
 
-      const clip = clipToDayGrid(start, end, selectedDate);
+      const clip = clipToDayGrid(start, end, selectedDate, startHour, endHour);
       if (!clip) continue;
 
       const cancelled = appt.status === "cancelled";
@@ -299,7 +498,7 @@ export function CalendarView({
         end: clip.end,
         service: appt.service_name,
         client: appt.customer_name,
-        variant: variantForAppointment(appt.source, cancelled),
+        variant: variantForAppointment(appt.source, appt.status),
         showAiBadge: appt.source === "ai_call" && !cancelled,
         dimmed: appt.status === "completed" || cancelled,
         cancelled,
@@ -308,11 +507,11 @@ export function CalendarView({
 
     out.sort(
       (a, b) =>
-        minutesFromGridStart(a.start.h, a.start.m) -
-        minutesFromGridStart(b.start.h, b.start.m),
+        minutesFromGridStart(a.start.h, a.start.m, startHour) -
+        minutesFromGridStart(b.start.h, b.start.m, startHour),
     );
     return out;
-  }, [appointments, selectedDate, staffIdSet]);
+  }, [appointments, selectedDate, staffIdSet, startHour, endHour]);
 
   const showUnassignedColumn = useMemo(() => {
     return dayBlocks.some((b) => b.columnId === UNASSIGNED_STAFF_ID);
@@ -341,6 +540,197 @@ export function CalendarView({
     setSelectedDate((d) => addDays(d, 1));
   }, []);
 
+  const appointmentsById = useMemo(() => {
+    const m = new Map<string, CalendarAppointment>();
+    for (const a of appointments) m.set(a.id, a);
+    return m;
+  }, [appointments]);
+
+  const onDragStartBlock = useCallback(
+    (e: DragEvent<HTMLElement>, apptId: string) => {
+      const a = appointmentsById.get(apptId);
+      if (!a || a.status !== "confirmed") {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.effectAllowed = "move";
+      try {
+        e.dataTransfer.setData("text/plain", apptId);
+      } catch {
+        // Some browsers throw if data is set on the same drag — ignore.
+      }
+      setDraggingId(apptId);
+      setDragMessage(null);
+    },
+    [appointmentsById],
+  );
+
+  const onDragEndBlock = useCallback(() => {
+    setDraggingId(null);
+    setDragHoverColumn(null);
+  }, []);
+
+  // Resize: bottom-edge handle on a confirmed appointment block. We track the
+  // mouse globally during the gesture, snap to 5-minute steps, and call the
+  // resize action on mouseup.
+  const onResizeStart = useCallback(
+    (apptId: string, e: ReactMouseEvent<HTMLElement>) => {
+      const appt = appointmentsById.get(apptId);
+      if (!appt || appt.status !== "confirmed") return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const remPx =
+        Number.parseFloat(
+          getComputedStyle(document.documentElement).fontSize,
+        ) || 16;
+      const minutesPerPx = 60 / (HOUR_REM * remPx);
+      const initialEnd = new Date(appt.end_time);
+      const initialStart = new Date(appt.start_time);
+      const startY = e.clientY;
+      let lastNewEnd = initialEnd;
+
+      const onMove = (ev: MouseEvent) => {
+        const dyPx = ev.clientY - startY;
+        const dyMin = dyPx * minutesPerPx;
+        const SNAP = 5;
+        const snapped = Math.round(dyMin / SNAP) * SNAP;
+        const candidate = new Date(initialEnd.getTime() + snapped * 60_000);
+        const minEnd = new Date(initialStart.getTime() + 5 * 60_000);
+        const maxEnd = new Date(initialStart.getTime() + 8 * 60 * 60_000);
+        if (candidate.getTime() < minEnd.getTime()) {
+          lastNewEnd = minEnd;
+        } else if (candidate.getTime() > maxEnd.getTime()) {
+          lastNewEnd = maxEnd;
+        } else {
+          lastNewEnd = candidate;
+        }
+        setDragMessage(
+          `Resize: ${formatTimeLabel24(initialStart.getHours(), initialStart.getMinutes())}–${formatTimeLabel24(lastNewEnd.getHours(), lastNewEnd.getMinutes())}`,
+        );
+      };
+
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        if (lastNewEnd.getTime() === initialEnd.getTime()) {
+          setDragMessage(null);
+          return;
+        }
+        startDragSaveTransition(async () => {
+          const result = await resizeAppointment({
+            appointmentId: apptId,
+            newEndIso: lastNewEnd.toISOString(),
+          });
+          if (!result.ok) {
+            setDragMessage(result.message);
+            return;
+          }
+          setDragMessage(null);
+          router.refresh();
+        });
+      };
+
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [appointmentsById, router],
+  );
+
+  const handleColumnDragOver = useCallback(
+    (e: DragEvent<HTMLDivElement>, columnId: string) => {
+      if (!draggingId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (dragHoverColumn !== columnId) setDragHoverColumn(columnId);
+    },
+    [draggingId, dragHoverColumn],
+  );
+
+  const handleColumnDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>, columnId: string) => {
+      e.preventDefault();
+      const apptId = draggingId ?? e.dataTransfer.getData("text/plain");
+      setDraggingId(null);
+      setDragHoverColumn(null);
+      if (!apptId) return;
+      const appt = appointmentsById.get(apptId);
+      if (!appt || appt.status !== "confirmed") {
+        setDragMessage("Only confirmed bookings can be moved.");
+        return;
+      }
+
+      const target = e.currentTarget as HTMLDivElement;
+      const rect = target.getBoundingClientRect();
+      const offsetY = e.clientY - rect.top;
+      const remPx =
+        Number.parseFloat(
+          getComputedStyle(document.documentElement).fontSize,
+        ) || 16;
+      const minutesPerRem = 60 / HOUR_REM;
+      const minutesFromGridStartRaw = (offsetY / remPx) * minutesPerRem;
+      const SLOT_INTERVAL_MIN = 15;
+      const snappedFromStart =
+        Math.round(minutesFromGridStartRaw / SLOT_INTERVAL_MIN) *
+        SLOT_INTERVAL_MIN;
+      const newLocalMinutes =
+        startHour * 60 + Math.max(0, snappedFromStart);
+
+      const oldStart = new Date(appt.start_time);
+      const oldEnd = new Date(appt.end_time);
+      const durationMs = oldEnd.getTime() - oldStart.getTime();
+      const newStart = new Date(selectedDate);
+      newStart.setHours(
+        Math.floor(newLocalMinutes / 60),
+        newLocalMinutes % 60,
+        0,
+        0,
+      );
+      const newEnd = new Date(newStart.getTime() + durationMs);
+
+      const dayEndMinutes = endHour * 60;
+      const newEndMinutes =
+        newEnd.getHours() * 60 + newEnd.getMinutes() + (newEnd.getDate() === selectedDate.getDate() ? 0 : 24 * 60);
+      if (newLocalMinutes < startHour * 60 || newEndMinutes > dayEndMinutes) {
+        setDragMessage("That time is outside today's open hours.");
+        return;
+      }
+
+      const newStaffId =
+        columnId === UNASSIGNED_STAFF_ID ? null : columnId;
+
+      // Avoid no-op moves.
+      if (
+        newStart.getTime() === oldStart.getTime() &&
+        (appt.staff_id ?? null) === newStaffId
+      ) {
+        return;
+      }
+
+      startDragSaveTransition(async () => {
+        const result = await rescheduleAppointment({
+          appointmentId: apptId,
+          newStartIso: newStart.toISOString(),
+          staffId: newStaffId,
+        });
+        if (!result.ok) {
+          setDragMessage(result.message);
+          return;
+        }
+        setDragMessage(null);
+        router.refresh();
+      });
+    },
+    [
+      appointmentsById,
+      draggingId,
+      endHour,
+      router,
+      selectedDate,
+      startHour,
+    ],
+  );
+
   const mobileFilteredBlocks = useMemo(() => {
     if (mobileStaffFilter === "all") return dayBlocks;
     return dayBlocks.filter((b) => b.columnId === mobileStaffFilter);
@@ -349,10 +739,10 @@ export function CalendarView({
   const mobileListBlocks = useMemo(() => {
     return [...dayBlocks].sort(
       (a, b) =>
-        minutesFromGridStart(a.start.h, a.start.m) -
-        minutesFromGridStart(b.start.h, b.start.m),
+        minutesFromGridStart(a.start.h, a.start.m, startHour) -
+        minutesFromGridStart(b.start.h, b.start.m, startHour),
     );
-  }, [dayBlocks]);
+  }, [dayBlocks, startHour]);
 
   const morningBlocks = useMemo(
     () => mobileListBlocks.filter((b) => b.start.h < 12),
@@ -537,27 +927,104 @@ export function CalendarView({
                   ))}
                 </div>
 
-                {columnIds.map((cid) => (
-                  <div
-                    key={cid}
-                    className="group/col relative z-10 w-[240px] shrink-0 cursor-crosshair border-r border-gray-200"
-                  >
-                    <div className="pointer-events-none absolute inset-y-0 left-0 right-0 hidden bg-gray-50/30 group-hover/col:block" />
+                {columnIds.map((cid) => {
+                  const isStaffCol = cid !== UNASSIGNED_STAFF_ID;
+                  const workSegs = isStaffCol
+                    ? staffWorkingSegmentsForDay(
+                        cid,
+                        selectedDate,
+                        staffWorkingHours,
+                        startHour,
+                        endHour,
+                      )
+                    : [];
+                  const offSegs = isStaffCol
+                    ? staffTimeOffSegmentsForDay(
+                        cid,
+                        selectedDate,
+                        staffTimeOff,
+                        startHour,
+                        endHour,
+                      )
+                    : [];
+                  return (
                     <div
-                      className="pointer-events-none absolute top-0 right-0 left-0"
-                      style={{ height: gridBodyHeight }}
+                      key={cid}
+                      className={cn(
+                        "group/col relative z-10 w-[240px] shrink-0 cursor-crosshair border-r border-gray-200",
+                        dragHoverColumn === cid &&
+                          "ring-2 ring-inset ring-blue-300/70",
+                      )}
+                      onDragOver={(e) => handleColumnDragOver(e, cid)}
+                      onDragLeave={() =>
+                        setDragHoverColumn((prev) =>
+                          prev === cid ? null : prev,
+                        )
+                      }
+                      onDrop={(e) => handleColumnDrop(e, cid)}
                     >
-                      {dayBlocks
-                        .filter((b) => b.columnId === cid)
-                        .map((appt) => (
-                          <DesktopAppointmentBlock
-                            key={appt.id}
-                            appt={appt}
-                          />
-                        ))}
+                      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 hidden bg-gray-50/30 group-hover/col:block" />
+                      {isStaffCol && workSegs.length > 0 ? (
+                        <div
+                          className="pointer-events-none absolute top-0 right-0 left-0 bg-gray-100/70"
+                          style={{ height: gridBodyHeight }}
+                          aria-hidden
+                        >
+                          {workSegs.map((seg, i) => (
+                            <div
+                              key={`work-${i}`}
+                              className="absolute right-0 left-0 bg-white"
+                              style={{
+                                top: `${seg.topRem}rem`,
+                                height: `${seg.heightRem}rem`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                      {isStaffCol && offSegs.length > 0 ? (
+                        <div
+                          className="pointer-events-none absolute top-0 right-0 left-0"
+                          style={{ height: gridBodyHeight }}
+                          aria-hidden
+                        >
+                          {offSegs.map((seg, i) => (
+                            <div
+                              key={`off-${i}`}
+                              className="absolute right-0 left-0 border-y border-amber-200/70 bg-[repeating-linear-gradient(45deg,rgba(251,191,36,0.18)_0,rgba(251,191,36,0.18)_8px,transparent_8px,transparent_16px)]"
+                              style={{
+                                top: `${seg.topRem}rem`,
+                                height: `${seg.heightRem}rem`,
+                              }}
+                              title={seg.note ?? "Time off"}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                      <div
+                        className="pointer-events-none absolute top-0 right-0 left-0"
+                        style={{ height: gridBodyHeight }}
+                      >
+                        {dayBlocks
+                          .filter((b) => b.columnId === cid)
+                          .map((appt) => (
+                            <DesktopAppointmentBlock
+                              key={appt.id}
+                              appt={appt}
+                              startHour={startHour}
+                              onSelect={setActiveAppointmentId}
+                              draggable={!appt.cancelled}
+                              dragging={draggingId === appt.id}
+                              onDragStartBlock={onDragStartBlock}
+                              onDragEndBlock={onDragEndBlock}
+                              resizable={!appt.cancelled}
+                              onResizeStart={onResizeStart}
+                            />
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -583,6 +1050,8 @@ export function CalendarView({
                         block.columnId,
                         staffMembers,
                       )}
+                      startHour={startHour}
+                      onSelect={setActiveAppointmentId}
                     />
                   ))}
                 </>
@@ -603,6 +1072,8 @@ export function CalendarView({
                         block.columnId,
                         staffMembers,
                       )}
+                      startHour={startHour}
+                      onSelect={setActiveAppointmentId}
                     />
                   ))}
                 </>
@@ -618,6 +1089,8 @@ export function CalendarView({
                   blocks={mobileFilteredBlocks}
                   hours={hours}
                   gridBodyHeight={gridBodyHeight}
+                  startHour={startHour}
+                  onSelect={setActiveAppointmentId}
                 />
               )}
             </div>
@@ -634,22 +1107,174 @@ export function CalendarView({
           </div>
         </div>
       </div>
+
+      <CalendarApptQuickLook
+        appointment={activeAppointment}
+        staffMembers={staffMembers}
+        onClose={() => setActiveAppointmentId(null)}
+      />
+
+      {dragMessage ? (
+        <div
+          className="pointer-events-auto fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm text-red-700 shadow-lg"
+          role="alert"
+        >
+          <div className="flex items-center gap-3">
+            <span>{dragMessage}</span>
+            <button
+              type="button"
+              onClick={() => setDragMessage(null)}
+              className="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline"
+            >
+              dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function DesktopAppointmentBlock({ appt }: { appt: DayBlock }) {
-  const pos = slotStyle(appt.start, appt.end);
+function CalendarApptQuickLook({
+  appointment,
+  staffMembers,
+  onClose,
+}: {
+  appointment: CalendarAppointment | null;
+  staffMembers: CalendarStaffMember[];
+  onClose: () => void;
+}) {
+  if (!appointment) return null;
+  const start = new Date(appointment.start_time);
+  const end = new Date(appointment.end_time);
+  const staff =
+    appointment.staff_id
+      ? staffMembers.find((s) => s.id === appointment.staff_id)?.name ?? "Unassigned"
+      : "Unassigned";
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+              {appointment.status === "cancelled"
+                ? "Cancelled"
+                : appointment.status === "no_show"
+                  ? "No-show"
+                  : appointment.status === "completed"
+                    ? "Completed"
+                    : "Confirmed"}
+            </p>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {appointment.service_name}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <dl className="space-y-1.5 text-sm text-gray-700">
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">Client</dt>
+            <dd className="font-medium text-gray-900">
+              {appointment.customer_name}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">When</dt>
+            <dd className="tabular-nums">
+              {start.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              })}{" "}
+              · {formatTimeLabel24(start.getHours(), start.getMinutes())}–
+              {formatTimeLabel24(end.getHours(), end.getMinutes())}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">Stylist</dt>
+            <dd>{staff}</dd>
+          </div>
+          {appointment.booking_reference ? (
+            <div className="flex justify-between gap-3">
+              <dt className="text-gray-500">Ref</dt>
+              <dd className="font-mono text-xs">
+                {appointment.booking_reference}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+        <div className="mt-4 flex justify-end gap-2">
+          <Link
+            href="/dashboard/bookings"
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Open in bookings
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesktopAppointmentBlock({
+  appt,
+  startHour,
+  onSelect,
+  draggable = false,
+  dragging = false,
+  onDragStartBlock,
+  onDragEndBlock,
+  resizable = false,
+  onResizeStart,
+}: {
+  appt: DayBlock;
+  startHour: number;
+  onSelect?: (id: string) => void;
+  draggable?: boolean;
+  dragging?: boolean;
+  onDragStartBlock?: (e: DragEvent<HTMLElement>, apptId: string) => void;
+  onDragEndBlock?: () => void;
+  resizable?: boolean;
+  onResizeStart?: (apptId: string, e: ReactMouseEvent<HTMLElement>) => void;
+}) {
+  const pos = slotStyle(appt.start, appt.end, startHour);
   const v = VARIANT_DESKTOP[appt.variant];
 
   return (
-    <div
+    <button
+      type="button"
+      draggable={draggable}
+      onDragStart={
+        draggable && onDragStartBlock
+          ? (e) => onDragStartBlock(e, appt.id)
+          : undefined
+      }
+      onDragEnd={draggable && onDragEndBlock ? onDragEndBlock : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect?.(appt.id);
+      }}
       className={cn(
-        "pointer-events-auto absolute left-1 right-1.5 overflow-hidden rounded-r-lg border-l-[3px] p-2.5 shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md",
+        "pointer-events-auto absolute left-1 right-1.5 cursor-pointer overflow-hidden rounded-r-lg border-l-[3px] p-2.5 text-left shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900",
         v.border,
         v.bg,
         appt.dimmed && "opacity-70",
         appt.cancelled && "opacity-80",
+        dragging && "opacity-40 ring-2 ring-blue-400",
       )}
       style={{
         top: pos.top,
@@ -698,28 +1323,45 @@ function DesktopAppointmentBlock({ appt }: { appt: DayBlock }) {
         </div>
         <span className={cn(appt.cancelled && "line-through")}>{appt.client}</span>
       </div>
-    </div>
+      {resizable && onResizeStart ? (
+        <span
+          role="separator"
+          aria-label="Drag to resize"
+          onMouseDown={(e) => onResizeStart(appt.id, e)}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute inset-x-0 bottom-0 z-10 flex h-2 cursor-ns-resize items-center justify-center"
+        >
+          <span className="h-0.5 w-6 rounded-full bg-gray-400/40 transition group-hover:bg-gray-500/60" />
+        </span>
+      ) : null}
+    </button>
   );
 }
 
 function MobileAppointmentRow({
   block,
   staffLabel,
+  startHour,
+  onSelect,
 }: {
   block: DayBlock;
   staffLabel: string;
+  startHour: number;
+  onSelect?: (id: string) => void;
 }) {
   const v = VARIANT_DESKTOP[block.variant];
-  const dur = formatDurationShort(block.start, block.end);
+  const dur = formatDurationShort(block.start, block.end, startHour);
 
   return (
     <div className="relative flex gap-3">
       <div className="mt-0.5 w-14 shrink-0 text-right text-sm font-medium text-gray-900 tabular-nums">
         {formatTimeLabel24(block.start.h, block.start.m)}
       </div>
-      <div
+      <button
+        type="button"
+        onClick={() => onSelect?.(block.id)}
         className={cn(
-          "flex-1 rounded-r-lg border border-l-[3px] p-3 shadow-sm",
+          "flex-1 cursor-pointer rounded-r-lg border border-l-[3px] p-3 text-left shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900",
           v.border,
           v.bg,
           block.dimmed && "opacity-75",
@@ -766,7 +1408,7 @@ function MobileAppointmentRow({
             <span className="font-normal text-gray-700">{block.client}</span>
           </span>
         </div>
-      </div>
+      </button>
     </div>
   );
 }
@@ -784,10 +1426,14 @@ function SingleDayColumn({
   blocks,
   hours,
   gridBodyHeight,
+  startHour,
+  onSelect,
 }: {
   blocks: DayBlock[];
   hours: number[];
   gridBodyHeight: string;
+  startHour: number;
+  onSelect?: (id: string) => void;
 }) {
   if (blocks.length === 0) {
     return (
@@ -814,7 +1460,12 @@ function SingleDayColumn({
         style={{ height: gridBodyHeight }}
       >
         {blocks.map((appt) => (
-          <MobileDayBlock key={appt.id} appt={appt} />
+          <MobileDayBlock
+            key={appt.id}
+            appt={appt}
+            startHour={startHour}
+            onSelect={onSelect}
+          />
         ))}
       </div>
       <div className="absolute top-0 bottom-0 left-0 w-12 border-r border-gray-200 bg-white">
@@ -831,14 +1482,24 @@ function SingleDayColumn({
   );
 }
 
-function MobileDayBlock({ appt }: { appt: DayBlock }) {
-  const pos = slotStyle(appt.start, appt.end);
+function MobileDayBlock({
+  appt,
+  startHour,
+  onSelect,
+}: {
+  appt: DayBlock;
+  startHour: number;
+  onSelect?: (id: string) => void;
+}) {
+  const pos = slotStyle(appt.start, appt.end, startHour);
   const v = VARIANT_DESKTOP[appt.variant];
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onSelect?.(appt.id)}
       className={cn(
-        "pointer-events-auto absolute left-0 right-0 overflow-hidden rounded-r-lg border-l-[3px] px-2 py-1.5 shadow-sm",
+        "pointer-events-auto absolute left-0 right-0 cursor-pointer overflow-hidden rounded-r-lg border-l-[3px] px-2 py-1.5 text-left shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900",
         v.border,
         v.bg,
         appt.dimmed && "opacity-70",
@@ -856,6 +1517,6 @@ function MobileDayBlock({ appt }: { appt: DayBlock }) {
         {appt.service}
       </p>
       <p className={cn("text-[11px]", v.client)}>{appt.client}</p>
-    </div>
+    </button>
   );
 }

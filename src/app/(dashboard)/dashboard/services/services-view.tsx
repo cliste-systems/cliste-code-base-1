@@ -14,11 +14,32 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { saveDashboardServices } from "./actions";
+import {
+  createServiceCategory,
+  deleteServiceCategory,
+  renameServiceCategory,
+  type ServiceCategory,
+} from "./categories-actions";
+import {
+  createServiceAddon,
+  deleteServiceAddon,
+  listServiceAddons,
+  updateServiceAddon,
+  type ServiceAddon,
+} from "./addons-actions";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { StorefrontTeamMember } from "@/lib/storefront-blocks";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +52,18 @@ export type DashboardServiceRow = {
   description: string;
   aiVoiceNotes: string;
   isPublished: boolean;
+  categoryId: string | null;
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
+  depositRequired: boolean;
+  depositAmountCents: number | null;
+  depositPercent: number | null;
+  /** Active stylist time before processing (e.g. apply colour). */
+  processingBeforeMin: number;
+  /** Hands-off processing window (e.g. colour develops). */
+  processingMin: number;
+  /** Active stylist time after processing (e.g. wash + style). */
+  processingAfterMin: number;
 };
 
 function newRow(): DashboardServiceRow {
@@ -43,6 +76,15 @@ function newRow(): DashboardServiceRow {
     description: "",
     aiVoiceNotes: "",
     isPublished: true,
+    categoryId: null,
+    bufferBeforeMin: 0,
+    bufferAfterMin: 0,
+    depositRequired: false,
+    depositAmountCents: null,
+    depositPercent: null,
+    processingBeforeMin: 0,
+    processingMin: 0,
+    processingAfterMin: 0,
   };
 }
 
@@ -72,6 +114,7 @@ type ServicesViewProps = {
   extendedSchema?: boolean;
   initialServices: DashboardServiceRow[];
   initialTeamMembers: StorefrontTeamMember[];
+  initialCategories?: ServiceCategory[];
   /** Bumps when org row reloads so team editor syncs from the server. */
   teamSyncKey: string;
 };
@@ -80,6 +123,7 @@ export function ServicesView({
   extendedSchema = true,
   initialServices,
   initialTeamMembers,
+  initialCategories = [],
   teamSyncKey,
 }: ServicesViewProps) {
   const router = useRouter();
@@ -95,6 +139,10 @@ export function ServicesView({
   const [teamRows, setTeamRows] = useState<TeamEditorRow[]>(() =>
     teamToEditorRows(initialTeamMembers),
   );
+  const [categories, setCategories] =
+    useState<ServiceCategory[]>(initialCategories);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [addonsOpen, setAddonsOpen] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -109,12 +157,22 @@ export function ServicesView({
         services.map((s) => ({
           id: s.id,
           name: s.name,
-          category: s.category,
+          category:
+            categories.find((c) => c.id === s.categoryId)?.name ?? s.category,
           priceEur: s.priceEur,
           durationMin: s.durationMin,
           description: s.description,
           aiVoiceNotes: s.aiVoiceNotes,
           isPublished: s.isPublished,
+          categoryId: s.categoryId,
+          bufferBeforeMin: s.bufferBeforeMin,
+          bufferAfterMin: s.bufferAfterMin,
+          depositRequired: s.depositRequired,
+          depositAmountCents: s.depositAmountCents,
+          depositPercent: s.depositPercent,
+          processingBeforeMin: s.processingBeforeMin,
+          processingMin: s.processingMin,
+          processingAfterMin: s.processingAfterMin,
         })),
         {
           teamMembers: teamRows
@@ -134,7 +192,7 @@ export function ServicesView({
         setSaveWarning(null);
       }
     });
-  }, [router, services, teamRows]);
+  }, [router, services, teamRows, categories]);
 
   const updateService = useCallback(
     (id: string, patch: Partial<Omit<DashboardServiceRow, "id">>) => {
@@ -216,6 +274,13 @@ export function ServicesView({
               Storefront appearance
               <ChevronRight className="size-4 text-gray-400" aria-hidden />
             </Link>
+            <button
+              type="button"
+              onClick={() => setAddonsOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              Manage add-ons
+            </button>
             <button
               type="button"
               onClick={handleSave}
@@ -456,21 +521,38 @@ export function ServicesView({
                       />
                     </div>
                     <div>
-                      <Label
-                        htmlFor={`${s.id}-cat`}
-                        className="mb-1.5 block text-sm font-medium text-gray-700"
-                      >
-                        Category
-                      </Label>
-                      <Input
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <Label
+                          htmlFor={`${s.id}-cat`}
+                          className="block text-sm font-medium text-gray-700"
+                        >
+                          Category
+                        </Label>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline"
+                          onClick={() => setCategoriesOpen(true)}
+                        >
+                          Manage categories
+                        </button>
+                      </div>
+                      <select
                         id={`${s.id}-cat`}
-                        value={s.category}
+                        value={s.categoryId ?? ""}
                         onChange={(e) =>
-                          updateService(s.id, { category: e.target.value })
+                          updateService(s.id, {
+                            categoryId: e.target.value || null,
+                          })
                         }
-                        placeholder="Colour, cuts…"
                         className={fieldClass}
-                      />
+                      >
+                        <option value="">Uncategorised</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
@@ -512,6 +594,225 @@ export function ServicesView({
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+                    <div>
+                      <Label className="mb-1.5 block text-sm font-medium text-gray-700">
+                        Buffer before (min)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={240}
+                        step={5}
+                        value={s.bufferBeforeMin}
+                        onChange={(e) =>
+                          updateService(s.id, {
+                            bufferBeforeMin: Math.max(
+                              0,
+                              Math.min(240, Number(e.target.value) || 0),
+                            ),
+                          })
+                        }
+                        className={fieldClass}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Time blocked before this service starts (e.g. setup).
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-sm font-medium text-gray-700">
+                        Buffer after (min)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={240}
+                        step={5}
+                        value={s.bufferAfterMin}
+                        onChange={(e) =>
+                          updateService(s.id, {
+                            bufferAfterMin: Math.max(
+                              0,
+                              Math.min(240, Number(e.target.value) || 0),
+                            ),
+                          })
+                        }
+                        className={fieldClass}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Cleanup / turnover time blocked after this service.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+                    <div className="flex items-baseline justify-between">
+                      <Label className="text-sm font-medium text-gray-700">
+                        Processing time (optional)
+                      </Label>
+                      <span className="text-[11px] text-gray-500">
+                        For colour, perms, etc — chair freed during processing
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <Label className="mb-1.5 block text-xs font-medium text-gray-600">
+                          Active before (min)
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={480}
+                          step={5}
+                          value={s.processingBeforeMin}
+                          onChange={(e) =>
+                            updateService(s.id, {
+                              processingBeforeMin: Math.max(
+                                0,
+                                Math.min(480, Number(e.target.value) || 0),
+                              ),
+                            })
+                          }
+                          className={fieldClass}
+                        />
+                      </div>
+                      <div>
+                        <Label className="mb-1.5 block text-xs font-medium text-gray-600">
+                          Processing (min)
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={480}
+                          step={5}
+                          value={s.processingMin}
+                          onChange={(e) =>
+                            updateService(s.id, {
+                              processingMin: Math.max(
+                                0,
+                                Math.min(480, Number(e.target.value) || 0),
+                              ),
+                            })
+                          }
+                          className={fieldClass}
+                        />
+                      </div>
+                      <div>
+                        <Label className="mb-1.5 block text-xs font-medium text-gray-600">
+                          Active after (min)
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={480}
+                          step={5}
+                          value={s.processingAfterMin}
+                          onChange={(e) =>
+                            updateService(s.id, {
+                              processingAfterMin: Math.max(
+                                0,
+                                Math.min(480, Number(e.target.value) || 0),
+                              ),
+                            })
+                          }
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+                    {s.processingMin > 0 ? (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Total stylist time:{" "}
+                        {s.processingBeforeMin + s.processingAfterMin} min ·
+                        Hands-off: {s.processingMin} min
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">
+                          Require deposit to book online
+                        </Label>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          When on, the public booking page charges a deposit
+                          before confirming the appointment.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={s.depositRequired}
+                        onCheckedChange={(v) =>
+                          updateService(s.id, { depositRequired: Boolean(v) })
+                        }
+                        className="h-5 w-9 data-checked:bg-gray-900 dark:data-checked:bg-gray-900"
+                      />
+                    </div>
+                    {s.depositRequired ? (
+                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <Label className="mb-1.5 block text-sm font-medium text-gray-700">
+                            Deposit amount (€)
+                          </Label>
+                          <Input
+                            inputMode="decimal"
+                            value={
+                              s.depositAmountCents == null
+                                ? ""
+                                : (s.depositAmountCents / 100).toFixed(2)
+                            }
+                            onChange={(e) => {
+                              const raw = e.target.value.trim();
+                              if (!raw) {
+                                updateService(s.id, {
+                                  depositAmountCents: null,
+                                });
+                                return;
+                              }
+                              const eur = Number(raw);
+                              if (!Number.isFinite(eur) || eur < 0) return;
+                              updateService(s.id, {
+                                depositAmountCents: Math.round(eur * 100),
+                                depositPercent: null,
+                              });
+                            }}
+                            placeholder="20.00"
+                            className={fieldClass}
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-1.5 block text-sm font-medium text-gray-700">
+                            …or % of price
+                          </Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={s.depositPercent ?? ""}
+                            onChange={(e) => {
+                              const raw = e.target.value.trim();
+                              if (!raw) {
+                                updateService(s.id, { depositPercent: null });
+                                return;
+                              }
+                              const n = Math.round(Number(raw));
+                              if (!Number.isFinite(n) || n < 1 || n > 100)
+                                return;
+                              updateService(s.id, {
+                                depositPercent: n,
+                                depositAmountCents: null,
+                              });
+                            }}
+                            placeholder="20"
+                            className={fieldClass}
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            Use either a fixed amount or a percentage — not both.
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
                   {extendedSchema ? (
                     <>
                       <div>
@@ -579,6 +880,22 @@ export function ServicesView({
         </button>
       </div>
 
+      <ManageCategoriesDialog
+        open={categoriesOpen}
+        onOpenChange={setCategoriesOpen}
+        categories={categories}
+        onChange={setCategories}
+      />
+
+      <ManageAddonsDialog
+        open={addonsOpen}
+        onOpenChange={setAddonsOpen}
+        services={services.map((s) => ({
+          id: s.id,
+          name: s.name.trim() || "(unnamed)",
+        }))}
+      />
+
       <div className="sticky bottom-0 z-10 -mx-6 border-t border-gray-100 bg-white/95 px-6 pt-4 pb-2 backdrop-blur-sm md:hidden">
         <button
           type="button"
@@ -590,5 +907,516 @@ export function ServicesView({
         </button>
       </div>
     </div>
+  );
+}
+
+function ManageCategoriesDialog({
+  open,
+  onOpenChange,
+  categories,
+  onChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  categories: ServiceCategory[];
+  onChange: (next: ServiceCategory[]) => void;
+}) {
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState<Record<string, string>>({});
+
+  const submitNew = useCallback(() => {
+    const name = newName.trim();
+    if (!name) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await createServiceCategory({ name });
+      if (res.ok) {
+        onChange(res.categories);
+        setNewName("");
+      } else {
+        setError(res.message);
+      }
+    });
+  }, [newName, onChange]);
+
+  const submitRename = useCallback(
+    (id: string) => {
+      const name = (editing[id] ?? "").trim();
+      if (!name) return;
+      setError(null);
+      startTransition(async () => {
+        const res = await renameServiceCategory({ id, name });
+        if (res.ok) {
+          onChange(res.categories);
+          setEditing((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        } else {
+          setError(res.message);
+        }
+      });
+    },
+    [editing, onChange],
+  );
+
+  const submitDelete = useCallback(
+    (id: string) => {
+      if (
+        !window.confirm(
+          "Delete this category? Services in it become Uncategorised.",
+        )
+      ) {
+        return;
+      }
+      setError(null);
+      startTransition(async () => {
+        const res = await deleteServiceCategory({ id });
+        if (res.ok) {
+          onChange(res.categories);
+        } else {
+          setError(res.message);
+        }
+      });
+    },
+    [onChange],
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manage categories</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submitNew();
+                }
+              }}
+              placeholder="e.g. Colour"
+              className={fieldClass}
+            />
+            <Button
+              type="button"
+              onClick={submitNew}
+              disabled={pending || !newName.trim()}
+            >
+              Add
+            </Button>
+          </div>
+          {error ? (
+            <p className="text-xs text-red-600">{error}</p>
+          ) : null}
+          {categories.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No categories yet. Add one above to group your services.
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+              {categories.map((c) => {
+                const editVal = editing[c.id];
+                const isEditing = editVal !== undefined;
+                return (
+                  <li
+                    key={c.id}
+                    className="flex items-center gap-2 px-3 py-2"
+                  >
+                    {isEditing ? (
+                      <Input
+                        autoFocus
+                        value={editVal}
+                        onChange={(e) =>
+                          setEditing((prev) => ({
+                            ...prev,
+                            [c.id]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            submitRename(c.id);
+                          }
+                          if (e.key === "Escape") {
+                            setEditing((prev) => {
+                              const next = { ...prev };
+                              delete next[c.id];
+                              return next;
+                            });
+                          }
+                        }}
+                        className={fieldClass}
+                      />
+                    ) : (
+                      <span className="flex-1 text-sm text-gray-900">
+                        {c.name}
+                      </span>
+                    )}
+                    {isEditing ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setEditing((prev) => {
+                              const next = { ...prev };
+                              delete next[c.id];
+                              return next;
+                            })
+                          }
+                          disabled={pending}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => submitRename(c.id)}
+                          disabled={pending}
+                        >
+                          Save
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900"
+                          onClick={() =>
+                            setEditing((prev) => ({ ...prev, [c.id]: c.name }))
+                          }
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-gray-500 hover:text-red-600"
+                          onClick={() => submitDelete(c.id)}
+                          disabled={pending}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatEur(cents: number): string {
+  if (!Number.isFinite(cents) || cents === 0) return "Free";
+  return new Intl.NumberFormat("en-IE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
+function ManageAddonsDialog({
+  open,
+  onOpenChange,
+  services,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  services: { id: string; name: string }[];
+}) {
+  const [addons, setAddons] = useState<ServiceAddon[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const [draftName, setDraftName] = useState("");
+  const [draftPriceEur, setDraftPriceEur] = useState("");
+  const [draftDuration, setDraftDuration] = useState("");
+  const [draftServiceId, setDraftServiceId] = useState<string>("");
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      const res = await listServiceAddons();
+      if (cancelled) return;
+      if (res.ok) {
+        setAddons(res.addons);
+      } else {
+        setError(res.message);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const submitNew = useCallback(() => {
+    const name = draftName.trim();
+    if (!name) return;
+    setError(null);
+    const priceCents = Math.max(
+      0,
+      Math.round(Number.parseFloat(draftPriceEur || "0") * 100) || 0,
+    );
+    const durationMinutes = Math.max(
+      0,
+      Math.round(Number.parseInt(draftDuration || "0", 10) || 0),
+    );
+    const serviceId = draftServiceId || null;
+    startTransition(async () => {
+      const res = await createServiceAddon({
+        name,
+        priceCents,
+        durationMinutes,
+        serviceId,
+      });
+      if (res.ok) {
+        setAddons((prev) =>
+          [...prev, res.addon].sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        setDraftName("");
+        setDraftPriceEur("");
+        setDraftDuration("");
+        setDraftServiceId("");
+      } else {
+        setError(res.message);
+      }
+    });
+  }, [draftName, draftPriceEur, draftDuration, draftServiceId]);
+
+  const handleUpdate = useCallback(
+    (id: string, patch: Partial<ServiceAddon>) => {
+      setAddons((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+      );
+      startTransition(async () => {
+        const res = await updateServiceAddon({
+          id,
+          ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.priceCents !== undefined
+            ? { priceCents: patch.priceCents }
+            : {}),
+          ...(patch.durationMinutes !== undefined
+            ? { durationMinutes: patch.durationMinutes }
+            : {}),
+          ...("serviceId" in patch
+            ? { serviceId: patch.serviceId ?? null }
+            : {}),
+          ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
+        });
+        if (!res.ok) setError(res.message);
+      });
+    },
+    [],
+  );
+
+  const handleDelete = useCallback((id: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Delete this add-on?")
+    ) {
+      return;
+    }
+    setAddons((prev) => prev.filter((a) => a.id !== id));
+    startTransition(async () => {
+      const res = await deleteServiceAddon(id);
+      if (!res.ok) setError(res.message);
+    });
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Manage add-ons</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5">
+          <p className="text-xs text-gray-500">
+            Add-ons appear next to a service in the booking flow. Customers can
+            pick any number of them; each add-on adds its own price and
+            duration. Leave the service blank to offer the add-on with every
+            service.
+          </p>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+            <Label className="text-xs font-medium text-gray-700">
+              New add-on
+            </Label>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+              <Input
+                placeholder="e.g. Toner"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+              />
+              <Input
+                placeholder="€"
+                inputMode="decimal"
+                value={draftPriceEur}
+                onChange={(e) => setDraftPriceEur(e.target.value)}
+              />
+              <Input
+                placeholder="min"
+                inputMode="numeric"
+                value={draftDuration}
+                onChange={(e) => setDraftDuration(e.target.value)}
+              />
+              <Button
+                type="button"
+                onClick={submitNew}
+                disabled={pending || !draftName.trim()}
+              >
+                Add
+              </Button>
+            </div>
+            <select
+              value={draftServiceId}
+              onChange={(e) => setDraftServiceId(e.target.value)}
+              className="mt-2 block w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700"
+            >
+              <option value="">All services</option>
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Only with: {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {error ? (
+            <p className="text-xs text-red-600">{error}</p>
+          ) : null}
+
+          {loading ? (
+            <p className="text-sm text-gray-500">Loading add-ons…</p>
+          ) : addons.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No add-ons yet. Create one above to get started.
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+              {addons.map((a) => (
+                <li
+                  key={a.id}
+                  className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-[2fr_1fr_1fr_2fr_auto] sm:items-center"
+                >
+                  <Input
+                    value={a.name}
+                    onChange={(e) =>
+                      setAddons((prev) =>
+                        prev.map((x) =>
+                          x.id === a.id ? { ...x, name: e.target.value } : x,
+                        ),
+                      )
+                    }
+                    onBlur={(e) => handleUpdate(a.id, { name: e.target.value })}
+                  />
+                  <Input
+                    placeholder="€"
+                    inputMode="decimal"
+                    value={(a.priceCents / 100).toFixed(2)}
+                    onChange={(e) => {
+                      const eur = Number(e.target.value);
+                      if (!Number.isFinite(eur) || eur < 0) return;
+                      setAddons((prev) =>
+                        prev.map((x) =>
+                          x.id === a.id
+                            ? { ...x, priceCents: Math.round(eur * 100) }
+                            : x,
+                        ),
+                      );
+                    }}
+                    onBlur={() =>
+                      handleUpdate(a.id, { priceCents: a.priceCents })
+                    }
+                  />
+                  <Input
+                    placeholder="min"
+                    inputMode="numeric"
+                    value={String(a.durationMinutes)}
+                    onChange={(e) => {
+                      const v = Math.max(
+                        0,
+                        Number.parseInt(e.target.value || "0", 10) || 0,
+                      );
+                      setAddons((prev) =>
+                        prev.map((x) =>
+                          x.id === a.id ? { ...x, durationMinutes: v } : x,
+                        ),
+                      );
+                    }}
+                    onBlur={() =>
+                      handleUpdate(a.id, { durationMinutes: a.durationMinutes })
+                    }
+                  />
+                  <select
+                    value={a.serviceId ?? ""}
+                    onChange={(e) =>
+                      handleUpdate(a.id, {
+                        serviceId: e.target.value || null,
+                      })
+                    }
+                    className="block w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700"
+                  >
+                    <option value="">All services</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="text-[11px] text-gray-500">
+                      {formatEur(a.priceCents)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(a.id)}
+                      className="rounded-md border border-transparent p-1 text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                      aria-label="Delete add-on"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

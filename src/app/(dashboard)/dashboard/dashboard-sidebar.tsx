@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  BarChart3,
   Calendar,
   CreditCard,
   Gauge,
@@ -34,8 +35,10 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/bookings": NotebookText,
   "/dashboard/clients": Users,
   "/dashboard/services": ShoppingBag,
+  "/dashboard/team": Scissors,
   "/dashboard/storefront": Store,
   "/dashboard/payments": CreditCard,
+  "/dashboard/reports": BarChart3,
   "/dashboard/billing": Gauge,
   "/dashboard/support": HelpCircle,
   "/dashboard/settings": Settings,
