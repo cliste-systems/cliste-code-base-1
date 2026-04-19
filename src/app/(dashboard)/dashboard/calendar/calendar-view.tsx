@@ -1403,10 +1403,73 @@ function DesktopAppointmentBlock({
 }) {
   const pos = slotStyle(appt.start, appt.end, startHour);
   const v = VARIANT_DESKTOP[appt.variant];
+  const durationMin =
+    minutesFromGridStart(appt.end.h, appt.end.m, startHour) -
+    minutesFromGridStart(appt.start.h, appt.start.m, startHour);
+  // Anything under 25 mins can't fit our 3-line stacked layout (title +
+  // time row + client row), so collapse to a single inline line so the
+  // block stays informative instead of looking like a mystery yellow strip.
+  const isTiny = durationMin > 0 && durationMin < 25;
+  const tooltip = `${appt.service} · ${formatRange24(appt.start, appt.end)} · ${appt.client}${appt.cancelled ? " (cancelled)" : ""}`;
+
+  if (isTiny) {
+    return (
+      <button
+        type="button"
+        title={tooltip}
+        onMouseDown={
+          draggable && onMouseDownBlock
+            ? (e) => onMouseDownBlock(e, appt.id)
+            : undefined
+        }
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect?.(appt.id);
+        }}
+        className={cn(
+          "pointer-events-auto absolute left-1 right-1.5 flex cursor-grab items-center gap-1.5 overflow-hidden rounded-r-md border-l-[3px] px-1.5 py-0.5 text-left shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 active:cursor-grabbing",
+          v.border,
+          v.bg,
+          appt.dimmed && "opacity-70",
+          appt.cancelled && "opacity-80",
+          dragging && "opacity-30 ring-2 ring-blue-400",
+        )}
+        style={{ top: pos.top, height: pos.height }}
+      >
+        <span
+          className={cn(
+            "shrink-0 truncate text-[11px] font-semibold leading-tight tracking-tight",
+            v.title,
+            appt.cancelled && "line-through decoration-red-800/50",
+          )}
+        >
+          {appt.service}
+        </span>
+        <span
+          className={cn(
+            "shrink-0 text-[10px] font-medium tabular-nums",
+            v.time,
+          )}
+        >
+          {formatTimeLabel24(appt.start.h, appt.start.m)}–
+          {formatTimeLabel24(appt.end.h, appt.end.m)}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 truncate text-[10px] font-medium",
+            v.client,
+          )}
+        >
+          {appt.client}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button
       type="button"
+      title={tooltip}
       onMouseDown={
         draggable && onMouseDownBlock
           ? (e) => onMouseDownBlock(e, appt.id)
