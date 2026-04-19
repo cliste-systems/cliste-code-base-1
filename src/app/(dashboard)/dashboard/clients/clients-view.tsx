@@ -557,14 +557,19 @@ function AddClientDialog({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!open) {
-      setName("");
-      setPhone("");
-      setEmail("");
-      setNotes("");
-      setAllergies("");
-      setError(null);
-    }
+    if (open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form fields on close
+    setName("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPhone("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEmail("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNotes("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAllergies("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError(null);
   }, [open]);
 
   const submit = useCallback(() => {
@@ -594,7 +599,7 @@ function AddClientDialog({
         <DialogHeader>
           <DialogTitle className="text-gray-900">Add client</DialogTitle>
           <DialogDescription className="text-gray-600">
-            Add a walk-in or known client to your CRM. They'll be linked
+            Add a walk-in or known client to your CRM. They&apos;ll be linked
             automatically when they next book.
           </DialogDescription>
         </DialogHeader>
@@ -703,11 +708,17 @@ function ClientProfileDialog({
 
   useEffect(() => {
     if (!client) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync drafts when selected client changes
     setNotesDraft(client.notes ?? "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAllergiesDraft(client.allergies ?? "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEmailDraft(client.email ?? "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaveError(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaved(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync when the selected client changes
   }, [client?.id]);
 
   const canEdit = client?.clientId !== null && client?.clientId !== undefined;

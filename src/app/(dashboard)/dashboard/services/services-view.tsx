@@ -1159,6 +1159,7 @@ function ManageAddonsDialog({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- toggle loading state for dialog open
     setLoading(true);
     void (async () => {
       const res = await listServiceAddons();

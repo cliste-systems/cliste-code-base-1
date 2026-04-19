@@ -26,9 +26,11 @@ export default async function BookingsPage() {
   // Pull a wide window so the Upcoming / Today / Past / Cancelled tabs
   // all have data to filter from. Cap at ~6 months back to keep the
   // payload sane (history pages will paginate later).
+  /* eslint-disable react-hooks/purity -- server component; deterministic per request */
   const sixMonthsAgoIso = new Date(
     Date.now() - 1000 * 60 * 60 * 24 * 180,
   ).toISOString();
+  /* eslint-enable react-hooks/purity */
 
   const [
     { data: appointmentRows, error: apptError },

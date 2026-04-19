@@ -8,6 +8,6 @@ export type CalendarAppointment = {
   /** Assigned professional (`profiles.id`), or null when unassigned. */
   staff_id: string | null;
   booking_reference?: string;
-  status: "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "cancelled" | "completed" | "no_show";
   source: "booking_link" | "ai_call" | "dashboard";
 };

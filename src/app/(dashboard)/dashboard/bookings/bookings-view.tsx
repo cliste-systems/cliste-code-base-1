@@ -1773,17 +1773,17 @@ export function BookingsView({
                   open={reschedulePickerOpen}
                   onOpenChange={setReschedulePickerOpen}
                 >
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                    >
-                      <CalendarIcon className="mr-2 size-4" aria-hidden />
-                      {rescheduleDate
-                        ? format(new Date(rescheduleDate), "PPP")
-                        : "Pick date"}
-                    </Button>
+                  <PopoverTrigger
+                    type="button"
+                    className={cn(
+                      buttonVariants({ variant: "outline" }),
+                      "w-full justify-start",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 size-4" aria-hidden />
+                    {rescheduleDate
+                      ? format(new Date(rescheduleDate), "PPP")
+                      : "Pick date"}
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar

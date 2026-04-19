@@ -1105,7 +1105,7 @@ export async function submitPublicBooking(
       payment: {
         clientSecret: intentResult.clientSecret,
         publishableKey,
-        amountCents,
+        amountCents: chargeNowCents,
         currency,
         bookingReference: bookingRef,
         salonName,

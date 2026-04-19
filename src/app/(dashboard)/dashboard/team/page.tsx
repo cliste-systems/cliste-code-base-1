@@ -51,12 +51,16 @@ export default async function DashboardTeamPage() {
       .eq("organization_id", organizationId)
       .order("weekday", { ascending: true })
       .order("opens_at", { ascending: true }),
-    supabase
-      .from("staff_time_off")
-      .select("id, staff_id, starts_at, ends_at, reason")
-      .eq("organization_id", organizationId)
-      .gte("ends_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .order("starts_at", { ascending: true }),
+    (() => {
+      // eslint-disable-next-line react-hooks/purity -- server component; deterministic per request
+      const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      return supabase
+        .from("staff_time_off")
+        .select("id, staff_id, starts_at, ends_at, reason")
+        .eq("organization_id", organizationId)
+        .gte("ends_at", sinceIso)
+        .order("starts_at", { ascending: true });
+    })(),
     supabase
       .from("staff_services")
       .select("staff_id, service_id")
