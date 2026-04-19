@@ -57,8 +57,10 @@ export function DashboardLiveRefresh({
 }: DashboardLiveRefreshProps) {
   const pathname = usePathname();
   const router = useRouter();
-  // Seed with mount time so focus-on-tab-back doesn't immediately re-fetch.
-  const lastPollRefreshAt = useRef(Date.now());
+  // Seeded inside the mount effect below — `Date.now()` during render
+  // would violate react-hooks/purity. 0 is fine pre-mount because the
+  // focus listener doesn't attach until then either.
+  const lastPollRefreshAt = useRef(0);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -97,6 +99,8 @@ export function DashboardLiveRefresh({
     if (!shouldSoftRefresh(pathname)) return;
     // Don't kick off an immediate refresh on mount — the page just rendered,
     // any data older than the request itself is fine for the first 45-60s.
+    // Seed lastPollRefreshAt so the focus-throttle treats mount as "fresh".
+    lastPollRefreshAt.current = Date.now();
     const t = setInterval(pollRefresh, POLL_INTERVAL_MS);
     return () => clearInterval(t);
   }, [pathname, pollRefresh]);
