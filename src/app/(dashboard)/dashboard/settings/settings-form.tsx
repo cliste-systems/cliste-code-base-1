@@ -18,11 +18,8 @@ import {
 } from "lucide-react";
 
 import { type DayKey, type WeekSchedule } from "./business-hours";
-import {
-  saveOrganizationSettings,
-  saveBookingRules,
-  type BookingRules,
-} from "./actions";
+import { saveOrganizationSettings, saveBookingRules } from "./actions";
+import { type BookingRules } from "./booking-rules";
 
 const SLOT_INTERVAL_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
 

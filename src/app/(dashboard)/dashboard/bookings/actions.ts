@@ -144,8 +144,6 @@ export async function getDashboardBookingSlots(payload: {
   return { ok: true, slots, timeZone: tz };
 }
 
-export type { CreateAppointmentResult };
-
 export async function createAppointment(payload: {
   customerName: string;
   customerPhone: string;

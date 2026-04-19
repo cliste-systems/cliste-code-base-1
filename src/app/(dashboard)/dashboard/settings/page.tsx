@@ -1,7 +1,7 @@
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import { parseBusinessHoursFromDb } from "./business-hours";
-import { parseBookingRulesFromDb } from "./actions";
+import { parseBookingRulesFromDb } from "./booking-rules";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
