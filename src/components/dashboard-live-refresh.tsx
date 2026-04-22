@@ -9,8 +9,11 @@ const IS_DEV = process.env.NODE_ENV === "development";
 
 /**
  * Fallback polling when Realtime is unavailable or tables aren’t in the
- * `supabase_realtime` publication. Realtime is the primary path (events
- * arrive in <1s); polling is a safety net only, so it can be slow.
+ * `supabase_realtime` publication. Realtime is the primary path — the three
+ * activity tables are added in migration
+ * `034_realtime_publication_activity_tables.sql`, so events arrive in <1s
+ * — and polling is a safety net for the dashboards where activity data is
+ * actively rendered.
  *
  * Why so infrequent? Each `router.refresh()` re-runs the dashboard layout
  * + page server render — that's ~10+ Supabase queries on the home page
@@ -22,14 +25,29 @@ const POLL_INTERVAL_MS = IS_DEV ? 60_000 : 45_000;
 /** Coalesce interval + focus refreshes so RSC fetches don’t overlap. */
 const MIN_MS_BETWEEN_POLL_REFRESH = 8_000;
 
-function shouldSoftRefresh(pathname: string | null): boolean {
+/**
+ * Realtime is event-driven (no cost unless data actually changes) and the
+ * sidebar badges live on every dashboard page, so we subscribe everywhere
+ * under `/dashboard`. The only exclusion is `/dashboard/set-password`,
+ * where the session is mid-bootstrap and we don't want stray refreshes.
+ */
+function shouldEnableRealtime(pathname: string | null): boolean {
   if (!pathname?.startsWith("/dashboard")) return false;
-  if (
-    pathname === "/dashboard/settings" ||
-    pathname.startsWith("/dashboard/set-password")
-  ) {
-    return false;
-  }
+  if (pathname.startsWith("/dashboard/set-password")) return false;
+  return true;
+}
+
+/**
+ * Polling re-renders the layout on a timer regardless of whether anything
+ * changed, so keep it scoped to pages that actually display the activity
+ * streams. Other pages still update instantly via Realtime.
+ */
+function shouldPoll(pathname: string | null): boolean {
+  if (!shouldEnableRealtime(pathname)) return false;
+  // `shouldEnableRealtime` already verified `pathname` starts with
+  // "/dashboard", so it can't be null here — re-assert for TS.
+  if (!pathname) return false;
+  if (pathname === "/dashboard/settings") return false;
   if (pathname === "/dashboard") return true;
   const prefixes = [
     "/dashboard/bookings",
@@ -96,7 +114,7 @@ export function DashboardLiveRefresh({
   }, [router]);
 
   useEffect(() => {
-    if (!shouldSoftRefresh(pathname)) return;
+    if (!shouldPoll(pathname)) return;
     // Don't kick off an immediate refresh on mount — the page just rendered,
     // any data older than the request itself is fine for the first 45-60s.
     // Seed lastPollRefreshAt so the focus-throttle treats mount as "fresh".
@@ -106,7 +124,7 @@ export function DashboardLiveRefresh({
   }, [pathname, pollRefresh]);
 
   useEffect(() => {
-    if (!shouldSoftRefresh(pathname)) return;
+    if (!shouldPoll(pathname)) return;
     // Skip focus/visibility refreshes if the data is fresh enough. Avoids
     // re-rendering the entire dashboard every time the user switches tabs.
     const FOCUS_REFRESH_THRESHOLD_MS = 30_000;
@@ -127,7 +145,7 @@ export function DashboardLiveRefresh({
 
   useEffect(() => {
     if (!organizationId) return;
-    if (!shouldSoftRefresh(pathname)) return;
+    if (!shouldEnableRealtime(pathname)) return;
 
     const supabase = createClient();
     const filter = `organization_id=eq.${organizationId}`;
