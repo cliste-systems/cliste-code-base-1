@@ -1,14 +1,12 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import {
-  Activity,
   AlertTriangle,
   Building2,
   Euro,
   ExternalLink,
   Eye,
   LifeBuoy,
-  MessageSquare,
   Phone,
   Ticket,
   Wallet,
@@ -67,25 +65,6 @@ function isMissingCostEstimateColumnError(message: string): boolean {
     m.includes("cost_estimate") ||
     (m.includes("column") && m.includes("does not exist") && m.includes("call_logs"))
   );
-}
-
-function isMissingVoicePipelineIncidentsTableError(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("voice_pipeline_incidents") &&
-    (m.includes("does not exist") ||
-      m.includes("could not find the table") ||
-      m.includes("relation") ||
-      m.includes("schema cache"))
-  );
-}
-
-/** Redacts a subscriber number like +353871234567 → +3538712***67 so operator UI never leaks. */
-function maskPhoneForAdminUi(raw: string | null): string {
-  if (!raw) return "—";
-  const t = raw.trim();
-  if (t.length < 6) return "withheld";
-  return `${t.slice(0, Math.max(4, t.length - 5))}***${t.slice(-2)}`;
 }
 
 function aggregateCallCostEstimates(
@@ -260,26 +239,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     organizations: { name: string; slug: string } | { name: string; slug: string }[] | null;
   };
   let urgentEngineeringTickets: UrgentEngineeringRow[] = [];
-  type VoicePipelineIncidentRow = {
-    id: string;
-    occurred_at: string;
-    organization_id: string | null;
-    caller_number: string | null;
-    called_number: string | null;
-    stage: string;
-    error_message: string;
-    model_label: string | null;
-    retryable: boolean | null;
-    sms_fallback_sent: boolean;
-    organizations:
-      | { name: string; slug: string }
-      | { name: string; slug: string }[]
-      | null;
-  };
-  let voicePipelineIncidents24h = 0;
-  let voicePipelineIncidentsRecent: VoicePipelineIncidentRow[] = [];
-  /** DB table missing — soft-fail so /admin still renders. */
-  let voicePipelineIncidentsTableMissing = false;
   let loadError: string | null = null;
 
   try {
@@ -369,46 +328,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
       estimatedVoiceCostUsd = agg.totalUsd;
       voiceCostCallsWithEstimate = agg.callsWithEstimate;
       voiceCostBreakdown = agg.breakdown;
-    }
-
-    // Voice pipeline health. Loaded separately so a schema regression
-    // (migration 035 not applied yet in this env) cannot break the rest
-    // of the overview. Showing the last 24h count in the metric grid +
-    // the most recent 25 incidents in the dedicated section below.
-    const incidentsWindowStartIso = new Date(
-      Date.now() - 7 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-    const last24hStartIso = new Date(
-      Date.now() - 24 * 60 * 60 * 1000,
-    ).toISOString();
-    const [incidentCountRes, incidentListRes] = await Promise.all([
-      admin
-        .from("voice_pipeline_incidents")
-        .select("id", { count: "exact", head: true })
-        .gte("occurred_at", last24hStartIso),
-      admin
-        .from("voice_pipeline_incidents")
-        .select(
-          "id, occurred_at, organization_id, caller_number, called_number, stage, error_message, model_label, retryable, sms_fallback_sent, organizations ( name, slug )",
-        )
-        .gte("occurred_at", incidentsWindowStartIso)
-        .order("occurred_at", { ascending: false })
-        .limit(25),
-    ]);
-
-    if (incidentCountRes.error || incidentListRes.error) {
-      const msg =
-        incidentCountRes.error?.message ??
-        incidentListRes.error?.message ??
-        "";
-      if (isMissingVoicePipelineIncidentsTableError(msg)) {
-        voicePipelineIncidentsTableMissing = true;
-      }
-      /* Other errors: show zero, don't block overview. */
-    } else {
-      voicePipelineIncidents24h = incidentCountRes.count ?? 0;
-      voicePipelineIncidentsRecent =
-        (incidentListRes.data ?? []) as VoicePipelineIncidentRow[];
     }
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load admin data.";
@@ -543,7 +462,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 sm:items-stretch lg:grid-cols-3 xl:grid-cols-7">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 sm:items-stretch lg:grid-cols-3 xl:grid-cols-6">
           <AdminMetricCard
             title="Organizations"
             icon={<Building2 strokeWidth={1.5} aria-hidden />}
@@ -614,41 +533,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
               </Link>
             }
             value={formatInt(openSupportTickets)}
-          />
-
-          <AdminMetricCard
-            className={cn(
-              voicePipelineIncidents24h > 0
-                ? "border-2 border-amber-300 bg-amber-50/70"
-                : undefined,
-            )}
-            title="Pipeline errors"
-            icon={
-              <Activity
-                className={cn(
-                  voicePipelineIncidents24h > 0 ? "text-amber-700" : undefined,
-                )}
-                strokeWidth={1.5}
-                aria-hidden
-              />
-            }
-            subtitle="Last 24h"
-            topRowClassName={
-              voicePipelineIncidents24h > 0 ? "text-amber-900/90" : "text-gray-500"
-            }
-            titleClassName={
-              voicePipelineIncidents24h > 0 ? "font-semibold" : "font-medium"
-            }
-            value={
-              voicePipelineIncidentsTableMissing
-                ? "—"
-                : formatInt(voicePipelineIncidents24h)
-            }
-            valueClassName={
-              voicePipelineIncidents24h > 0
-                ? "font-semibold text-amber-800"
-                : undefined
-            }
           />
         </div>
       </section>
@@ -738,122 +622,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
             Nothing in the urgent queue right now. When a call needs engineering
             attention, it will show above in red.
           </p>
-        </section>
-      ) : null}
-
-      {!loadError ? (
-        <section className="mb-14" aria-labelledby="voice-pipeline-health-heading">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2
-                id="voice-pipeline-health-heading"
-                className="px-1 text-sm font-medium text-gray-900"
-              >
-                Voice pipeline health
-              </h2>
-              <p className="mt-1 max-w-3xl px-1 text-sm leading-relaxed text-gray-600">
-                Calls where the STT / LLM / TTS pipeline died mid-call with an
-                unrecoverable error (forced the session to close, caller heard
-                dead air). The worker also SMSes the caller the salon&apos;s
-                booking link as a soft-landing — check the{" "}
-                <span className="inline-flex translate-y-[1px] items-center gap-1 text-xs font-medium text-gray-500">
-                  <MessageSquare className="size-3" aria-hidden />
-                  SMS
-                </span>{" "}
-                badge to confirm it fired.
-              </p>
-            </div>
-          </div>
-          {voicePipelineIncidentsTableMissing ? (
-            <div className="rounded-xl border border-amber-200/90 bg-amber-50/60 px-4 py-3 text-sm text-amber-950/90 sm:px-5">
-              Run migration{" "}
-              <span className="font-mono text-xs">
-                035_voice_pipeline_incidents.sql
-              </span>{" "}
-              against this environment to turn this section on. Until then the
-              worker still soft-lands callers and the webhook is a no-op.
-            </div>
-          ) : voicePipelineIncidentsRecent.length === 0 ? (
-            <p className="rounded-lg border border-gray-200/80 bg-gray-50/80 px-4 py-3 text-sm text-gray-600">
-              No voice pipeline incidents in the last 7 days. New incidents
-              appear here within seconds of the affected call.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {voicePipelineIncidentsRecent.map((incident) => {
-                const org = embeddedOrgName(incident.organizations);
-                const stageLabel = incident.stage.toUpperCase();
-                const stageClass =
-                  incident.stage === "stt" || incident.stage === "llm"
-                    ? "bg-amber-600"
-                    : incident.stage === "tts"
-                      ? "bg-orange-600"
-                      : "bg-gray-700";
-                return (
-                  <li
-                    key={incident.id}
-                    className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 shadow-sm sm:p-5"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white uppercase",
-                              stageClass,
-                            )}
-                          >
-                            {stageLabel}
-                          </span>
-                          {org ? (
-                            <Link
-                              href={`/admin/organizations/${incident.organization_id}`}
-                              className="inline-flex items-center gap-1 text-sm font-semibold text-amber-950 hover:underline"
-                            >
-                              {org.name}
-                              <ExternalLink className="size-3.5 opacity-70" aria-hidden />
-                            </Link>
-                          ) : (
-                            <span className="text-sm font-medium text-amber-950/90">
-                              Unknown tenant
-                            </span>
-                          )}
-                          <span className="font-mono text-xs text-amber-900/80">
-                            {maskPhoneForAdminUi(incident.caller_number)}
-                          </span>
-                          {incident.sms_fallback_sent ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">
-                              <MessageSquare className="size-3" aria-hidden />
-                              SMS
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-gray-200 px-1.5 py-0.5 text-[11px] font-medium text-gray-600">
-                              <MessageSquare className="size-3" aria-hidden />
-                              no SMS
-                            </span>
-                          )}
-                          {incident.model_label ? (
-                            <span className="font-mono text-[11px] text-amber-900/70">
-                              {incident.model_label}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-amber-950/95">
-                          {incident.error_message}
-                        </p>
-                        <p className="text-xs text-amber-800/70">
-                          {formatDate(incident.occurred_at)}
-                          {incident.called_number
-                            ? ` · dialled ${incident.called_number}`
-                            : ""}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
         </section>
       ) : null}
 
