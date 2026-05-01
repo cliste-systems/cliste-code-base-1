@@ -103,14 +103,18 @@ export async function POST(request: Request) {
 
   const calledNumberRaw = String(body.called_number ?? "").trim();
   const claimedOrgId = String(body.organization_id ?? "").trim();
-  // Accept legacy worker builds that only send organization_id while we roll
-  // out called_number. Once every worker is updated, flip
-  // CLISTE_VOICE_REQUIRE_CALLED_NUMBER=1 in env to reject org-id-only writes.
-  const requireCalledNumber =
-    process.env.CLISTE_VOICE_REQUIRE_CALLED_NUMBER?.trim().toLowerCase() ===
-      "1" ||
-    process.env.CLISTE_VOICE_REQUIRE_CALLED_NUMBER?.trim().toLowerCase() ===
-      "true";
+  // The shared webhook secret only proves "the call came from a worker we
+  // trust" — it must NOT decide which tenant to bill / write into. Trusting
+  // organization_id from the body would mean a leaked secret = cross-tenant
+  // write capability, so called_number is required by default.
+  //
+  // Set CLISTE_VOICE_ALLOW_LEGACY_ORG_ID=1 ONLY to temporarily accept the old
+  // org-id-only worker payload during a worker rollout. Remove the flag (and
+  // the legacy branch below) once every worker sends called_number.
+  const allowLegacyOrgIdOnly =
+    process.env.CLISTE_VOICE_ALLOW_LEGACY_ORG_ID?.trim().toLowerCase() === "1" ||
+    process.env.CLISTE_VOICE_ALLOW_LEGACY_ORG_ID?.trim().toLowerCase() === "true";
+  const requireCalledNumber = !allowLegacyOrgIdOnly;
   if (!calledNumberRaw && !claimedOrgId) {
     return NextResponse.json(
       { ok: false, error: "called_number (or legacy organization_id) is required" },

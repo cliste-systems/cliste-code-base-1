@@ -27,7 +27,7 @@ const COOKIES: Cookie[] = [
   {
     name: "cliste_dashboard_gate",
     purpose:
-      "Confirms the dashboard&rsquo;s extra unlock gate — prevents anyone with just a session cookie from opening dashboards on a shared device.",
+      "Confirms the dashboard’s extra unlock gate — prevents anyone with just a session cookie from opening dashboards on a shared device.",
     category: "security",
     duration: "Up to 12 hours",
     party: "first",
@@ -43,7 +43,7 @@ const COOKIES: Cookie[] = [
   {
     name: "cliste_support_dashboard",
     purpose:
-      "When a Cliste support engineer is acting on behalf of a salon, marks the session as &ldquo;support&rdquo; so the dashboard shows a banner.",
+      "When a Cliste support engineer is acting on behalf of a salon, marks the session as “support” so the dashboard shows a banner.",
     category: "security",
     duration: "Session",
     party: "first",
@@ -75,7 +75,7 @@ const COOKIES: Cookie[] = [
   {
     name: "Google Maps cookies",
     purpose:
-      "Set by the embedded Google Maps storefront map. We do not control these directly; see Google&rsquo;s policy.",
+      "Set by the embedded Google Maps storefront map. We do not control these directly; see Google’s policy.",
     category: "functional",
     duration: "Varies",
     party: "third",
@@ -88,7 +88,7 @@ const CATEGORY_DESCRIPTION: Record<Cookie["category"], string> = {
   security:
     "Used to keep the platform safe — e.g. detect bot traffic, protect dashboards from unauthorised access. Treated as strictly necessary under PECR Reg 5(5) exemption for security.",
   functional:
-    "Remember your preferences and small UI state across visits. We&rsquo;ll ask before using these where required.",
+    "Remember your preferences and small UI state across visits. We’ll ask before using these where required.",
 };
 
 export default function CookiesPage() {
@@ -136,7 +136,7 @@ export default function CookiesPage() {
               <td>
                 <code>{c.name}</code>
               </td>
-              <td dangerouslySetInnerHTML={{ __html: c.purpose }} />
+              <td>{c.purpose}</td>
               <td>{c.category}</td>
               <td>{c.duration}</td>
               <td>{c.party === "first" ? "First-party" : "Third-party"}</td>

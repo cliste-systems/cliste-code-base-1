@@ -66,11 +66,23 @@ export function hashRateLimitIdentifier(raw: string): string {
 }
 
 function getClientIp(headersList: Headers): string {
-  const xff = headersList.get("x-forwarded-for");
-  const fromXff = xff?.split(",")[0]?.trim();
-  const fromRealIp = headersList.get("x-real-ip")?.trim();
+  // Prefer headers that are set by the trusted edge (Cloudflare, Vercel) and
+  // cannot be forged by the client. `x-forwarded-for` is appended by each hop
+  // — the leftmost entry is whatever the original caller claimed, so on
+  // platforms that don't sanitise XFF an attacker can forge "0.0.0.0" and get
+  // unlimited buckets. We only fall back to XFF when no trusted header exists,
+  // and we take the rightmost (closest-to-us) entry rather than the leftmost.
   const fromCf = headersList.get("cf-connecting-ip")?.trim();
-  return fromXff || fromRealIp || fromCf || "0.0.0.0";
+  if (fromCf) return fromCf;
+  const fromRealIp = headersList.get("x-real-ip")?.trim();
+  if (fromRealIp) return fromRealIp;
+  const xff = headersList.get("x-forwarded-for");
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    const rightmost = parts[parts.length - 1];
+    if (rightmost) return rightmost;
+  }
+  return "0.0.0.0";
 }
 
 export function rateLimitFingerprint(

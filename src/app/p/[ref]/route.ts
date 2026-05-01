@@ -7,13 +7,21 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function clientIp(req: NextRequest): string {
+  // Prefer trusted-edge headers (Cloudflare, Vercel) over leftmost XFF, which
+  // is client-controlled on platforms that don't sanitise it. Falls back to
+  // the rightmost (closest-hop) XFF entry rather than the leftmost so a
+  // forged "0.0.0.0" prefix can't share a bucket with everyone else.
+  const fromCf = req.headers.get("cf-connecting-ip")?.trim();
+  if (fromCf) return fromCf;
+  const fromRealIp = req.headers.get("x-real-ip")?.trim();
+  if (fromRealIp) return fromRealIp;
   const xff = req.headers.get("x-forwarded-for");
-  return (
-    xff?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip")?.trim() ||
-    req.headers.get("cf-connecting-ip")?.trim() ||
-    "0.0.0.0"
-  );
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    const rightmost = parts[parts.length - 1];
+    if (rightmost) return rightmost;
+  }
+  return "0.0.0.0";
 }
 
 /**
@@ -84,7 +92,13 @@ export async function GET(
     .maybeSingle();
 
   if (error || !data) {
-    return new NextResponse("Booking not found", { status: 404 });
+    // Don't expose booking existence to unauthenticated callers — return the
+    // same generic redirect a paid/legacy ref would. This avoids turning the
+    // route into a "does ref X exist?" oracle for ref enumeration.
+    return NextResponse.redirect(
+      new URL(`/booking/success?ref=${encodeURIComponent(bookingRef)}`, _req.url),
+      302,
+    );
   }
 
   const org = Array.isArray(data.organization)

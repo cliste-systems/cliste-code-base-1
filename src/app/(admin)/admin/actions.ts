@@ -168,9 +168,16 @@ async function getAppOriginForRedirect(
     }
   }
 
-  if (refererOrigin) return refererOrigin;
-  if (headerOrigin) return headerOrigin;
-  if (process.env.NODE_ENV === "development") return "http://localhost:3000";
+  // In production, refuse to derive the magic-link origin from request
+  // headers. `referer`, `host`, and `x-forwarded-host` are all attacker-
+  // controllable, and a forged value would land in the Supabase-sent invite
+  // email — a phishing primitive. If env-derived origins were not set, we
+  // fall back to the canonical production host instead.
+  if (process.env.NODE_ENV !== "production") {
+    if (refererOrigin) return refererOrigin;
+    if (headerOrigin) return headerOrigin;
+    return "http://localhost:3000";
+  }
   return "https://app.clistesystems.ie";
 }
 

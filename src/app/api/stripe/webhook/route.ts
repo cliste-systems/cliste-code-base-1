@@ -73,16 +73,16 @@ export async function POST(req: NextRequest) {
       return new NextResponse("invalid signature", { status: 400 });
     }
   } else {
-    // No secret configured. Refuse outright in production — silently parsing
-    // unsigned payloads is a paid-status forgery primitive.
-    if (process.env.NODE_ENV === "production") {
+    // No secret configured. Silently parsing unsigned payloads is a paid-status
+    // forgery primitive, so refuse unless the operator has explicitly opted in.
+    // NODE_ENV alone is not a safe gate — Vercel preview deploys often run
+    // without `production` set but are still publicly addressable.
+    if (process.env.CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS !== "1") {
       console.error(
-        "[stripe webhook] STRIPE_WEBHOOK_SECRET not set in production — rejecting.",
+        "[stripe webhook] STRIPE_WEBHOOK_SECRET not set — rejecting. Set CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS=1 for local fixture testing only.",
       );
       return new NextResponse("webhook secret not configured", { status: 500 });
     }
-    // Dev-only convenience: parse without verifying so `stripe trigger` /
-    // local fixtures work without a CLI listener.
     try {
       event = JSON.parse(rawBody) as Stripe.Event;
     } catch {
