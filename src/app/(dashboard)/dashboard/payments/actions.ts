@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { LOCAL_DEV_APP_ORIGIN, resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { buildSecurityEventContext, logSecurityEvent } from "@/lib/security-events";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -13,7 +13,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 /**
  * Resolve an absolute origin for Connect redirect URLs. Prefers the configured
  * `NEXT_PUBLIC_APP_URL`; falls back to the incoming request host so local dev
- * (`localhost:3000`) works with Stripe sandbox.
+ * (`localhost:3001`) works with Stripe sandbox.
  */
 async function resolveReturnOrigin(): Promise<string> {
   const configured = resolveAppSiteOrigin();
@@ -23,7 +23,7 @@ async function resolveReturnOrigin(): Promise<string> {
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "http";
   if (host) return `${proto}://${host}`;
-  return "http://localhost:3000";
+  return LOCAL_DEV_APP_ORIGIN;
 }
 
 /**

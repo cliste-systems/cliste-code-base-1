@@ -10,7 +10,7 @@ import {
   DEFAULT_GATE_TTL_SECONDS,
 } from "@/lib/gate-cookie";
 
-import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { LOCAL_DEV_APP_ORIGIN, resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import {
   isLaunchTier,
   isPlanTier,
@@ -436,5 +436,5 @@ async function resolveReturnOrigin(): Promise<string> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "http";
-  return host ? `${proto}://${host}` : "http://localhost:3000";
+  return host ? `${proto}://${host}` : LOCAL_DEV_APP_ORIGIN;
 }

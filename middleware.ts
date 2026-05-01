@@ -48,6 +48,16 @@ async function dashboardGate(
 ): Promise<NextResponse> {
   const path = request.nextUrl.pathname;
   if (!pathIsTenantDashboardSection(path)) return response;
+  if (process.env.NODE_ENV !== "production") {
+    const host = request.headers.get("host") ?? "";
+    if (
+      host.startsWith("localhost:") ||
+      host.startsWith("127.0.0.1:") ||
+      host.startsWith("0.0.0.0:")
+    ) {
+      return response;
+    }
+  }
 
   const secret = process.env.CLISTE_DASHBOARD_GATE_SECRET?.trim();
   if (!secret) {

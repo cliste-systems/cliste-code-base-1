@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 const OPTIONS: { value: DashboardMetricRangeKey; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "4w", label: "Last 4 weeks" },
+  { value: "7d", label: "7 days" },
+  { value: "4w", label: "30 days" },
 ];
 
 export function DashboardMetricRangeToggle() {
@@ -33,7 +33,7 @@ export function DashboardMetricRangeToggle() {
 
   return (
     <div
-      className="inline-flex flex-wrap items-center gap-1 rounded-full border border-gray-200/80 bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+      className="no-scrollbar inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-[#e2e8f0] bg-white p-1 shadow-[0_12px_30px_rgba(15,23,42,0.04)]"
       role="group"
       aria-label="Metrics time range"
     >
@@ -45,10 +45,10 @@ export function DashboardMetricRangeToggle() {
             type="button"
             onClick={() => setRange(value)}
             className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              "h-[42px] shrink-0 rounded-full px-4 text-[13px] font-medium whitespace-nowrap transition-colors",
               active
-                ? "bg-gray-900 text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+                ? "bg-[#3f4451] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_6px_rgba(15,23,42,0.12)]"
+                : "text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]",
             )}
           >
             {label}

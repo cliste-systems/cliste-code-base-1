@@ -14,6 +14,7 @@ import {
   SUPPORT_DASHBOARD_COOKIE,
   supportDashboardCookieOptions,
 } from "@/lib/support-dashboard-cookie";
+import { LOCAL_DEV_APP_ORIGIN } from "@/lib/booking-site-origin";
 import { geocodeIrelandLocation } from "@/lib/geocode-ireland";
 import {
   type OrganizationNiche,
@@ -139,6 +140,29 @@ function isDevLocalOrLanHostname(hostname: string): boolean {
 async function getAppOriginForRedirect(
   clientOrigin?: string | null
 ): Promise<string> {
+  const h = await headers();
+  const refererOrigin = parseRefererOrigin(h.get("referer"));
+  const headerOrigin = headerDerivedOrigin(h);
+  const hint = normalizeClientOrigin(clientOrigin);
+
+  /**
+   * In development, `NEXT_PUBLIC_APP_URL` is often copied from production.
+   * For Server Actions that pass `window.location.origin` (e.g. admin “Open
+   * dashboard”), prefer the **actual request host** over that env value so
+   * Supabase `redirect_to` stays on localhost. Requires `hint === headerOrigin`
+   * so the browser cannot spoof a foreign origin.
+   */
+  if (process.env.NODE_ENV === "development" && hint && headerOrigin && hint === headerOrigin) {
+    try {
+      const { hostname } = new URL(hint);
+      if (isDevLocalOrLanHostname(hostname)) {
+        return hint;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const explicit = normalizeConfiguredOrigin(process.env.NEXT_PUBLIC_APP_URL);
   if (explicit) return explicit;
 
@@ -149,11 +173,6 @@ async function getAppOriginForRedirect(
 
   const vercelPreview = normalizeConfiguredOrigin(process.env.VERCEL_URL);
   if (vercelPreview) return vercelPreview;
-
-  const h = await headers();
-  const refererOrigin = parseRefererOrigin(h.get("referer"));
-  const headerOrigin = headerDerivedOrigin(h);
-  const hint = normalizeClientOrigin(clientOrigin);
 
   if (hint) {
     if (refererOrigin && hint === refererOrigin) return hint;
@@ -176,7 +195,7 @@ async function getAppOriginForRedirect(
   if (process.env.NODE_ENV !== "production") {
     if (refererOrigin) return refererOrigin;
     if (headerOrigin) return headerOrigin;
-    return "http://localhost:3000";
+    return LOCAL_DEV_APP_ORIGIN;
   }
   return "https://app.clistesystems.ie";
 }

@@ -17,6 +17,9 @@ export function resolveAppSiteOrigin(): URL | null {
   return parseConfiguredOrigin(process.env.NEXT_PUBLIC_APP_URL);
 }
 
+/** When `Host` is missing (e.g. some server actions); must match `npm run dev` port in package.json. */
+export const LOCAL_DEV_APP_ORIGIN = "http://localhost:3001";
+
 /** Public customer storefront origin (`book.*` or explicit `NEXT_PUBLIC_BOOKING_URL`). */
 export function resolveBookingSiteOrigin(): URL | null {
   const explicit = parseConfiguredOrigin(process.env.NEXT_PUBLIC_BOOKING_URL);

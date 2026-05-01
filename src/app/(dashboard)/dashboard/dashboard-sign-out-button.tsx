@@ -29,18 +29,13 @@ export function DashboardSignOutButton() {
       variant="ghost"
       disabled={pending}
       onClick={() => void handleSignOut()}
-      className="group h-auto w-full justify-between rounded-lg px-4 py-2 text-sm font-normal text-gray-500 hover:bg-gray-100/50 hover:text-gray-900"
+      className="group h-9 w-full justify-start gap-2.5 rounded-[10px] px-3 text-[13px] font-normal text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
     >
-      <span className="flex items-center gap-3">
-        <LogOut
-          className="size-[1.125rem] shrink-0 text-gray-400 group-hover:text-gray-900"
-          aria-hidden
-        />
-        {pending ? "Signing out…" : "Log out"}
-      </span>
-      <kbd className="pointer-events-none flex size-6 items-center justify-center rounded-full bg-gray-200/60 text-xs font-medium text-gray-600">
-        N
-      </kbd>
+      <LogOut
+        className="size-[18px] shrink-0 text-[#94a3b8] group-hover:text-[#64748b]"
+        aria-hidden
+      />
+      {pending ? "Signing out…" : "Log out"}
     </Button>
   );
 }
