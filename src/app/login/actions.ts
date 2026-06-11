@@ -8,7 +8,7 @@ import {
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
-import { verifyTurnstileToken } from "@/lib/public-booking-security";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 import {
   buildSecurityEventContext,
   logSecurityEvent,

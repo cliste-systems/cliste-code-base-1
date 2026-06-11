@@ -3,15 +3,25 @@ import "server-only";
 import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
+import { enforceOnboardingStepOrder } from "@/lib/onboarding-dev";
 import { createClient } from "@/utils/supabase/server";
 
-/** Bump organisations.onboarding_step when a step completes. */
+/**
+ * Bump organisations.onboarding_step when a step completes.
+ *
+ * Payment is deferred to the end. The wizard runs:
+ * profile -> voice -> knowledge -> actions -> number -> test call ->
+ * go live (plan + pay) -> dashboard.
+ */
 export const ONBOARDING_STEPS = {
   profile: 1,
-  payments: 2,
-  plan: 3,
-  phone: 4,
-  done: 5,
+  voice: 2,
+  knowledge: 3,
+  actions: 4,
+  number: 5,
+  testCall: 6,
+  goLive: 7,
+  done: 8,
 } as const;
 
 export type OnboardingStepKey = keyof typeof ONBOARDING_STEPS;
@@ -23,6 +33,7 @@ export type OnboardingSession = {
   onboardingStep: number;
   planTier: string;
   launchTier: string | null;
+  billingInterval: "month" | "year";
   launchStatus: string;
   phoneNumber: string | null;
   platformSubscriptionId: string | null;
@@ -56,7 +67,7 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "id, status, onboarding_step, plan_tier, launch_tier, launch_status, phone_number, platform_subscription_id, stripe_account_id, stripe_charges_enabled, application_fee_bps",
+      "id, status, onboarding_step, plan_tier, launch_tier, launch_status, phone_number, platform_subscription_id, stripe_account_id, stripe_charges_enabled, application_fee_bps, billing_interval",
     )
     .eq("id", profile.organization_id)
     .maybeSingle();
@@ -65,7 +76,7 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
     redirect("/authenticate?error=no_org");
   }
 
-  if (org.status === "active") {
+  if (org.status === "active" && enforceOnboardingStepOrder()) {
     redirect("/dashboard");
   }
   if (org.status === "suspended") {
@@ -79,6 +90,7 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
     onboardingStep: (org.onboarding_step as number) ?? 1,
     planTier: (org.plan_tier as string) ?? "pro",
     launchTier: (org.launch_tier as string | null) ?? null,
+    billingInterval: org.billing_interval === "year" ? "year" : "month",
     launchStatus: (org.launch_status as string) ?? "not_started",
     phoneNumber: (org.phone_number as string | null) ?? null,
     platformSubscriptionId: (org.platform_subscription_id as string | null) ?? null,
@@ -89,12 +101,14 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
 }
 
 export function resolveCurrentStepPath(session: OnboardingSession): string {
-  // Step 1 must always run first (name was captured at signup but address /
-  // niche are still blank). Then payments, then plan, then phone, then done.
+  // Payment deferred: profile -> voice -> knowledge -> actions -> number ->
+  // test call -> go live (plan) -> dashboard.
   if (session.onboardingStep <= ONBOARDING_STEPS.profile) return "/onboarding/profile";
-  if (!session.stripeAccountId || !session.stripeChargesEnabled)
-    return "/onboarding/payments";
-  if (!session.platformSubscriptionId) return "/onboarding/plan";
-  if (!session.phoneNumber) return "/onboarding/phone";
-  return "/onboarding/done";
+  if (session.onboardingStep <= ONBOARDING_STEPS.voice) return "/onboarding/voice";
+  if (session.onboardingStep <= ONBOARDING_STEPS.knowledge) return "/onboarding/knowledge";
+  if (session.onboardingStep <= ONBOARDING_STEPS.actions) return "/onboarding/actions";
+  if (session.onboardingStep <= ONBOARDING_STEPS.number) return "/onboarding/number";
+  if (session.onboardingStep <= ONBOARDING_STEPS.testCall) return "/onboarding/test-call";
+  if (session.onboardingStep < ONBOARDING_STEPS.done) return "/onboarding/plan";
+  return "/dashboard";
 }

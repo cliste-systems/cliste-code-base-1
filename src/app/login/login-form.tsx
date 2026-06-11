@@ -61,7 +61,7 @@ export function LoginForm() {
           placeholder="name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="border-slate-200/90 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:ring-emerald-500"
+          className="border-slate-200/90 bg-slate-50/70 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#0b1220] focus-visible:ring-[#0b1220]/15"
         />
       </div>
       <div className="space-y-2">
@@ -80,7 +80,7 @@ export function LoginForm() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border-slate-200/90 bg-slate-50/70 pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-emerald-500 focus-visible:ring-emerald-500"
+            className="border-slate-200/90 bg-slate-50/70 pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-[#0b1220] focus-visible:ring-[#0b1220]/15"
           />
           <button
             type="button"
@@ -97,7 +97,7 @@ export function LoginForm() {
         </div>
       </div>
       {requiresCaptcha ? (
-        <div className="space-y-2 rounded-md border border-emerald-200/70 bg-emerald-50/40 p-3">
+        <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/80 p-3">
           <p className="text-xs text-slate-600">
             Extra security check is required after failed attempts.
           </p>

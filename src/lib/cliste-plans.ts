@@ -20,8 +20,10 @@ export type {
 export {
   PLANS,
   LAUNCHES,
+  SELF_SERVE_PLAN_TIERS,
   planFromPriceCents,
   isPlanTier,
   isLaunchTier,
   normaliseLaunchTierForDb,
+  planSupportsSelfServeCheckout,
 } from "./cliste-plans.data";

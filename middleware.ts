@@ -1,20 +1,14 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import { hostMatchesConfiguredBookingHost } from "./src/lib/booking-site-origin";
-import { clisteHostRoutingRedirect } from "./src/lib/cliste-host-routing";
 import {
   ADMIN_GATE_COOKIE_PREFIX,
-  DASHBOARD_GATE_COOKIE_PREFIX,
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
-import {
-  pathIsAgencyAdminSection,
-  pathIsTenantDashboardSection,
-} from "./src/lib/staff-route-paths";
-import {
-  isValidSupportDashboardCookieValue,
-  SUPPORT_DASHBOARD_COOKIE,
-} from "./src/lib/support-dashboard-cookie";
+import { LEGACY_DASHBOARD_REDIRECTS } from "./src/lib/dashboard-routes";
+import { DASHBOARD_LEGAL_ACCEPT_PATH } from "./src/lib/legal-documents";
+import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
+import { pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
+import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
 
 const ADMIN_GATE_COOKIE = "cliste_admin_gate";
@@ -27,72 +21,41 @@ function copySessionCookies(from: NextResponse, to: NextResponse) {
 
 function rootToLoginRedirect(
   request: NextRequest,
-  response: NextResponse
+  response: NextResponse,
 ): NextResponse {
   if (request.nextUrl.pathname !== "/") return response;
-  const reqHost = request.headers.get("host");
-  if (hostMatchesConfiguredBookingHost(reqHost)) return response;
-
   const redirectRes = NextResponse.redirect(new URL("/authenticate", request.url));
   copySessionCookies(response, redirectRes);
   return redirectRes;
 }
 
-/**
- * Extra password layer for /dashboard (all environments). Separate from Supabase sign-in.
- * Internal /admin is not gated in-app — protect /admin at your host if needed.
- */
-async function dashboardGate(
+/** Canonical dashboard URLs (Calls, Contacts, Usage, Cara Setup). */
+function legacyDashboardPathRedirect(
   request: NextRequest,
-  response: NextResponse
-): Promise<NextResponse> {
+  response: NextResponse,
+): NextResponse {
   const path = request.nextUrl.pathname;
-  if (!pathIsTenantDashboardSection(path)) return response;
-  if (process.env.NODE_ENV !== "production") {
-    const host = request.headers.get("host") ?? "";
-    if (
-      host.startsWith("localhost:") ||
-      host.startsWith("127.0.0.1:") ||
-      host.startsWith("0.0.0.0:")
-    ) {
-      return response;
-    }
+  const target = LEGACY_DASHBOARD_REDIRECTS[path];
+  if (!target) return response;
+  const url = new URL(target, request.url);
+  url.search = request.nextUrl.search;
+  const redirectRes = NextResponse.redirect(url);
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
+}
+
+/** Legacy URL — extra dashboard password gate was removed for v1 pilot. */
+function dashboardUnlockRedirect(
+  request: NextRequest,
+  response: NextResponse,
+): NextResponse {
+  const path = request.nextUrl.pathname;
+  if (path !== "/dashboard-unlock" && !path.startsWith("/dashboard-unlock/")) {
+    return response;
   }
-
-  const secret = process.env.CLISTE_DASHBOARD_GATE_SECRET?.trim();
-  if (!secret) {
-    if (path === "/dashboard-unlock") return response;
-    const redirectRes = NextResponse.redirect(
-      new URL("/dashboard-unlock?error=config", request.url)
-    );
-    copySessionCookies(response, redirectRes);
-    return redirectRes;
-  }
-
-  if (path === "/dashboard-unlock") return response;
-
-  // Admin "Open dashboard" launches set this cookie; bypass the extra gate
-  // so support can jump straight into the tenant dashboard.
-  const supportView = await isValidSupportDashboardCookieValue(
-    request.cookies.get(SUPPORT_DASHBOARD_COOKIE)?.value
-  );
-  if (supportView) return response;
-
-  const cookie = request.cookies.get("cliste_dashboard_gate")?.value ?? "";
-  const ok = await isValidGateCookieValue(
-    cookie,
-    DASHBOARD_GATE_COOKIE_PREFIX,
-    secret
-  );
-  if (!ok) {
-    const redirectRes = NextResponse.redirect(
-      new URL("/dashboard-unlock", request.url)
-    );
-    copySessionCookies(response, redirectRes);
-    return redirectRes;
-  }
-
-  return response;
+  const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
 }
 
 /**
@@ -101,7 +64,7 @@ async function dashboardGate(
  */
 async function adminGate(
   request: NextRequest,
-  response: NextResponse
+  response: NextResponse,
 ): Promise<NextResponse> {
   const path = request.nextUrl.pathname;
   if (!pathIsAgencyAdminSection(path)) return response;
@@ -110,7 +73,7 @@ async function adminGate(
   if (!secret) {
     if (path === "/admin-unlock") return response;
     const redirectRes = NextResponse.redirect(
-      new URL("/admin-unlock?error=config", request.url)
+      new URL("/admin-unlock?error=config", request.url),
     );
     copySessionCookies(response, redirectRes);
     return redirectRes;
@@ -122,11 +85,11 @@ async function adminGate(
   const ok = await isValidGateCookieValue(
     cookie,
     ADMIN_GATE_COOKIE_PREFIX,
-    secret
+    secret,
   );
   if (!ok) {
     const redirectRes = NextResponse.redirect(
-      new URL("/admin-unlock", request.url)
+      new URL("/admin-unlock", request.url),
     );
     copySessionCookies(response, redirectRes);
     return redirectRes;
@@ -135,15 +98,61 @@ async function adminGate(
   return response;
 }
 
-export async function middleware(request: NextRequest) {
-  const hostRedirect = clisteHostRoutingRedirect(request);
-  if (hostRedirect) return hostRedirect;
+function buildForwardRequestHeaders(request: NextRequest): Headers {
+  const headers = new Headers(request.headers);
+  headers.set("x-pathname", request.nextUrl.pathname);
+  return headers;
+}
 
-  const response = await updateSession(request);
+async function dashboardLegalAcceptRedirect(
+  request: NextRequest,
+  response: NextResponse,
+  userId: string | undefined,
+): Promise<NextResponse | null> {
+  if (!userId) return null;
+
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const organizationId = profile?.organization_id;
+  if (!organizationId) return null;
+
+  const needsAcceptance = await dashboardPathNeedsLegalAcceptance({
+    pathname: request.nextUrl.pathname,
+    userId,
+    organizationId,
+  });
+  if (!needsAcceptance) return null;
+
+  const redirectRes = NextResponse.redirect(
+    new URL(DASHBOARD_LEGAL_ACCEPT_PATH, request.url),
+  );
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
+}
+
+export async function middleware(request: NextRequest) {
+  const forwardHeaders = buildForwardRequestHeaders(request);
+  const { response, user } = await updateSession(request, forwardHeaders);
+
+  const legalRedirect = await dashboardLegalAcceptRedirect(
+    request,
+    response,
+    user?.id,
+  );
+  if (legalRedirect) return legalRedirect;
+
   const maybeRootRedirect = rootToLoginRedirect(request, response);
   if (maybeRootRedirect !== response) return maybeRootRedirect;
-  const gatedAdmin = await adminGate(request, response);
-  return dashboardGate(request, gatedAdmin);
+  const legacyNavRedirect = legacyDashboardPathRedirect(request, response);
+  if (legacyNavRedirect !== response) return legacyNavRedirect;
+  const unlockRedirect = dashboardUnlockRedirect(request, response);
+  if (unlockRedirect !== response) return unlockRedirect;
+  return adminGate(request, response);
 }
 
 export const config = {

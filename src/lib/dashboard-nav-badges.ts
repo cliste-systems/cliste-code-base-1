@@ -1,11 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export {
-  DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
-  DASHBOARD_BOOKINGS_SEEN_COOKIE,
-  DASHBOARD_CALENDAR_SEEN_COOKIE,
-  DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
-} from "./dashboard-nav-seen-cookies";
+export { DASHBOARD_ACTION_INBOX_SEEN_COOKIE, DASHBOARD_CALL_HISTORY_SEEN_COOKIE } from "./dashboard-nav-seen-cookies";
 
 export type DashboardNavBadgeMap = Partial<Record<string, number>>;
 
@@ -15,8 +10,6 @@ const SEEN_FALLBACK_MS = 24 * 60 * 60 * 1000;
 export type DashboardNavSeenAt = {
   callHistory: Date | null;
   actionInbox: Date | null;
-  calendar: Date | null;
-  bookings: Date | null;
 };
 
 function countHead(
@@ -33,36 +26,25 @@ function sinceOrFallback(seen: Date | null): string {
   return new Date(Date.now() - SEEN_FALLBACK_MS).toISOString();
 }
 
-/**
- * Sidebar counts use “new since last visit” per route (httpOnly cookies), with a
- * 24h fallback if the user has never opened that area. Native: calendar & bookings.
- */
 const EMPTY_SEEN_AT: DashboardNavSeenAt = {
   callHistory: null,
   actionInbox: null,
-  calendar: null,
-  bookings: null,
 };
 
+/**
+ * Sidebar counts use “new since last visit” per route (httpOnly cookies), with a
+ * 24h fallback if the user has never opened that area.
+ */
 export async function fetchDashboardNavBadges(
   supabase: SupabaseClient,
   organizationId: string,
-  includeNativeAppointmentBadges: boolean,
   seen: DashboardNavSeenAt | null | undefined,
 ): Promise<DashboardNavBadgeMap> {
   const s = seen ?? EMPTY_SEEN_AT;
   const actionInboxSince = sinceOrFallback(s.actionInbox);
   const callHistorySince = sinceOrFallback(s.callHistory);
 
-  // PostgREST query builders are thenable but not real Promises — type the
-  // batches as PromiseLike so we can fan them out via Promise.all().
-  type CountResult = {
-    count: number | null;
-    error: { message: string } | null;
-  };
-
-  // Build the always-on badge queries.
-  const baseQueries: PromiseLike<CountResult>[] = [
+  const [openRes, callHistoryRes] = await Promise.all([
     supabase
       .from("action_tickets")
       .select("id", { count: "exact", head: true })
@@ -74,67 +56,15 @@ export async function fetchDashboardNavBadges(
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .gt("created_at", callHistorySince),
-  ];
+  ]);
 
-  // Tier-gated extras for native salons (calendar + bookings counts).
-  let appointmentExtras: PromiseLike<CountResult>[] = [];
-  if (includeNativeAppointmentBadges) {
-    const now = new Date();
-    const nowIso = now.toISOString();
-    const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    const startOfUtcDay = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0,
-        0,
-        0,
-        0,
-      ),
-    );
-    const endOfUtcDay = new Date(startOfUtcDay);
-    endOfUtcDay.setUTCDate(endOfUtcDay.getUTCDate() + 1);
-
-    const calendarSince = sinceOrFallback(s.calendar);
-    const bookingsSince = sinceOrFallback(s.bookings);
-
-    appointmentExtras = [
-      supabase
-        .from("appointments")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("status", "confirmed")
-        .gte("start_time", nowIso)
-        .lt("start_time", weekEnd.toISOString())
-        .gt("created_at", calendarSince),
-      supabase
-        .from("appointments")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .eq("status", "confirmed")
-        .gte("start_time", startOfUtcDay.toISOString())
-        .lt("start_time", endOfUtcDay.toISOString())
-        .gt("created_at", bookingsSince),
-    ];
-  }
-
-  // Single round of fan-out — all badge counts in parallel.
-  const results = await Promise.all([...baseQueries, ...appointmentExtras]);
-  const [openRes, callHistoryRes, weekRes, todayRes] = results;
-
-  const badges: DashboardNavBadgeMap = {
-    "/dashboard/action-inbox": countHead(openRes),
-    "/dashboard/call-history": countHead(callHistoryRes),
+  const callBadge = countHead(callHistoryRes);
+  const inboxBadge = countHead(openRes);
+  return {
+    "/dashboard/action-inbox": inboxBadge,
+    "/dashboard/calls": callBadge,
+    "/dashboard/call-history": callBadge,
   };
-
-  if (includeNativeAppointmentBadges && weekRes && todayRes) {
-    badges["/dashboard/calendar"] = countHead(weekRes);
-    badges["/dashboard/bookings"] = countHead(todayRes);
-  }
-
-  return badges;
 }
 
 export function formatNavBadgeCount(n: number): string {

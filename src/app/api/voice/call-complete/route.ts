@@ -7,7 +7,9 @@ import {
   isDatabaseOverlapConstraintError,
 } from "@/lib/appointments-overlap";
 import { generateBookingReference, normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
+import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
+import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -37,7 +39,14 @@ type VoiceCallCompleteBody = {
   /** E.164 of the SIP DID the call landed on. REQUIRED — used to look up the tenant. */
   called_number?: string;
   caller_number: string;
+  /** Optional display name for Contacts / call history when the worker knows it. */
+  caller_name?: string | null;
   duration_seconds?: number;
+  /**
+   * Free-text or canonical outcome. Normalized server-side to the stable v1
+   * set in `@/lib/call-history-types` (answered, link_sent, callback_requested,
+   * action_created, failed, voicemail_or_no_speech, spam_or_abuse).
+   */
   outcome: string;
   transcript?: string | null;
   transcript_review?: string | null;
@@ -136,13 +145,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const outcome = String(body.outcome ?? "").trim();
-  if (!outcome) {
+  const rawOutcome = String(body.outcome ?? "").trim();
+  if (!rawOutcome) {
     return NextResponse.json(
       { ok: false, error: "outcome is required" },
       { status: 400 },
     );
   }
+  // Normalize to the stable v1 outcome set so dashboard metrics (e.g. "Routing
+  // links sent") never depend on free-text the worker happens to send. Older
+  // workers can keep sending free text; this maps it to a canonical value.
+  const outcome = normalizeCallOutcome(rawOutcome);
 
   const durationSeconds = Math.max(
     0,
@@ -266,11 +279,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const callerName = String(body.caller_name ?? "").trim().slice(0, 120) || null;
+
   const { data: insertedCall, error: callErr } = await admin
     .from("call_logs")
     .insert({
       organization_id: orgId,
       caller_number: callerNumber,
+      caller_name: callerName,
       duration_seconds: durationSeconds,
       outcome,
       transcript: transcriptRedacted.text,
@@ -451,6 +467,20 @@ export async function POST(request: Request) {
     appointmentId = appt.id;
   }
 
+  if (outcome === "action_created") {
+    const notifySummary =
+      summaryRedacted.text?.trim() ||
+      reviewRedacted.text?.trim() ||
+      "A caller needs follow-up in your Action Inbox.";
+    void notifyActionInboxOwner(admin, orgId, {
+      summary: notifySummary,
+      callerNumber,
+      callerName,
+    }).catch((e) => {
+      console.error("[voice/call-complete] action inbox notify", e);
+    });
+  }
+
   revalidateAfterWrite();
 
   return NextResponse.json({
@@ -462,6 +492,7 @@ export async function POST(request: Request) {
 
 function revalidateAfterWrite() {
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/calls");
   revalidatePath("/dashboard/call-history");
-  revalidatePath("/dashboard/bookings");
+  revalidatePath("/dashboard/action-inbox");
 }

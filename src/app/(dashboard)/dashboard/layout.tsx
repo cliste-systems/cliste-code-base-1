@@ -4,12 +4,15 @@ import { redirect } from "next/navigation";
 
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
+import { DashboardVerticalProvider } from "./dashboard-vertical-context";
 import { DashboardNavSeenSync } from "./dashboard-nav-seen-sync";
 
 /** Layout reads httpOnly “seen” cookies; must not be statically cached across navigations. */
 export const dynamic = "force-dynamic";
-import { getEffectiveProductTier } from "@/lib/dev-tier-server";
+import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { verticalPackForNiche } from "@/lib/verticals";
+import { enforceDashboardLegalAcceptance } from "@/lib/legal-acceptance-gate";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import {
   fetchDashboardNavBadges,
@@ -17,8 +20,6 @@ import {
 } from "@/lib/dashboard-nav-badges";
 import {
   DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
-  DASHBOARD_BOOKINGS_SEEN_COOKIE,
-  DASHBOARD_CALENDAR_SEEN_COOKIE,
   DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
   parseSeenAtCookie,
 } from "@/lib/dashboard-nav-seen-cookies";
@@ -27,30 +28,28 @@ import {
   DashboardSidebar,
   type DashboardSidebarNavItem,
 } from "./dashboard-sidebar";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+
+import { DASHBOARD_INTERACTIVE_CURSOR } from "@/components/dashboard/dashboard-surface";
+import { cn } from "@/lib/utils";
+
 import { DashboardViewportLock } from "./dashboard-viewport-lock";
 
 const navItems: {
   href: string;
   label: string;
-  nativeOnly?: boolean;
-  section: "core" | "cara" | "admin";
+  section: "core" | "agent" | "account";
 }[] = [
-  { href: "/dashboard", label: "Home", section: "core" },
-  { href: "/dashboard/action-inbox", label: "Action Inbox", section: "core" },
-  { href: "/dashboard/call-history", label: "Call History", section: "core" },
-  { href: "/dashboard/calendar", label: "Calendar", nativeOnly: true, section: "core" },
-  { href: "/dashboard/bookings", label: "Bookings", nativeOnly: true, section: "core" },
-  { href: "/dashboard/clients", label: "Clients", nativeOnly: true, section: "core" },
-  { href: "/dashboard/services", label: "Services", nativeOnly: true, section: "core" },
-  { href: "/dashboard/team", label: "Team", nativeOnly: true, section: "core" },
-  { href: "/dashboard/storefront", label: "Storefront", nativeOnly: true, section: "core" },
-  { href: "/dashboard/payments", label: "Payments", nativeOnly: true, section: "core" },
-  { href: "/dashboard/reports", label: "Reports", nativeOnly: true, section: "core" },
-  { href: "/cara", label: "Cara", section: "cara" },
-  { href: "/dashboard/billing", label: "Billing & usage", section: "admin" },
-  { href: "/dashboard/support", label: "Support", section: "admin" },
-  { href: "/dashboard/settings", label: "Settings", section: "admin" },
-  { href: "/dashboard/privacy", label: "Privacy tools", section: "admin" },
+  { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
+  { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
+  { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
+  { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
+  { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
+  { href: DASHBOARD_ROUTES.caraSetup, label: "Cara Setup", section: "agent" },
+  { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
+  { href: DASHBOARD_ROUTES.support, label: "Support", section: "account" },
+  { href: DASHBOARD_ROUTES.legalDataRequests, label: "Legal", section: "account" },
+  { href: DASHBOARD_ROUTES.settings, label: "Settings", section: "account" },
 ];
 
 function toNavItem(
@@ -70,7 +69,10 @@ export default async function DashboardLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { supabase, organizationId, user } = await requireDashboardSession();
+  const session = await requireDashboardSession();
+  const { supabase, organizationId, profile, user } = session;
+
+  await enforceDashboardLegalAcceptance(session);
 
   const [cookieStore, orgRow] = await Promise.all([
     cookies(),
@@ -82,12 +84,6 @@ export default async function DashboardLayout({
     ),
     actionInbox: parseSeenAtCookie(
       cookieStore.get(DASHBOARD_ACTION_INBOX_SEEN_COOKIE)?.value,
-    ),
-    calendar: parseSeenAtCookie(
-      cookieStore.get(DASHBOARD_CALENDAR_SEEN_COOKIE)?.value,
-    ),
-    bookings: parseSeenAtCookie(
-      cookieStore.get(DASHBOARD_BOOKINGS_SEEN_COOKIE)?.value,
     ),
   };
 
@@ -104,16 +100,12 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
   if (lifecycleStatus === "suspended") {
-    redirect("/dashboard/billing?suspended=1");
+    redirect("/dashboard/usage?suspended=1");
   }
 
-  const effectiveTier = await getEffectiveProductTier(orgRow?.tier);
-  const showNativeNav = effectiveTier === "native";
-
-  const navBadges = await fetchDashboardNavBadges(
+  const navBadges: DashboardNavBadgeMap = await fetchDashboardNavBadges(
     supabase,
     organizationId,
-    showNativeNav,
     navSeenAt,
   );
 
@@ -121,37 +113,44 @@ export default async function DashboardLayout({
   const needsPassword =
     userMeta?.needs_password === true || userMeta?.needs_password === "true";
 
-  const visibleNav = showNativeNav
-    ? navItems
-    : navItems.filter((item) => !item.nativeOnly);
-
-  const coreNav = visibleNav
+  const coreNav = navItems
     .filter((i) => i.section === "core")
     .map((item) => toNavItem(item, navBadges));
-  const caraNav = visibleNav
-    .filter((i) => i.section === "cara")
+  const caraNav = navItems
+    .filter((i) => i.section === "agent")
     .map((item) => toNavItem(item, navBadges));
-  const adminNav = visibleNav
-    .filter((i) => i.section === "admin")
+  const adminNav = navItems
+    .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = visibleNav.map((item) =>
+  const mobileNavItems: DashboardSidebarNavItem[] = navItems.map((item) =>
     toNavItem(item, navBadges),
   );
+
+  const accountSummary = buildDashboardAccountSummary(profile, user, orgRow);
+  const vertical = verticalPackForNiche(orgRow?.niche);
+  const productNoun = vertical.id === "generic" ? null : vertical.productNoun;
 
   return (
     <>
       <DashboardViewportLock />
-      <div className="fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-[#f4f6f8] text-slate-900 lg:flex-row">
+      <div
+        className={cn(
+          "fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-white text-slate-900 lg:flex-row",
+          DASHBOARD_INTERACTIVE_CURSOR,
+        )}
+      >
         <DashboardSidebar
           coreNav={coreNav}
           caraNav={caraNav}
           adminNav={adminNav}
           needsPassword={needsPassword}
+          account={accountSummary}
+          productNoun={productNoun}
         />
 
-        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f4f6f8] lg:h-full">
+        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white lg:h-full">
           <div className="shrink-0 border-b border-slate-200 bg-[#fcfcfd] px-4 py-3 lg:hidden">
-            <DashboardMobileNav items={mobileNavItems} />
+            <DashboardMobileNav items={mobileNavItems} productNoun={productNoun} />
           </div>
           {needsPassword ? (
             <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/90 px-4 py-3 text-xs leading-snug text-amber-950 lg:hidden">
@@ -164,9 +163,11 @@ export default async function DashboardLayout({
               </Link>
             </div>
           ) : null}
-          <main className="flex h-full min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden overscroll-y-none bg-[#f4f6f8]">
-            <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-y-hidden px-4 py-4 sm:px-6 sm:py-5 lg:px-10 lg:py-5">
-              {children}
+          <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-white">
+            <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-white px-6 py-6 has-[>[data-dashboard-fill]]:overflow-hidden has-[>[data-dashboard-fill]]:p-0 sm:px-8 [scrollbar-gutter:stable] has-[>[data-dashboard-fill]]:[scrollbar-gutter:auto]">
+              <DashboardVerticalProvider niche={orgRow?.niche}>
+                {children}
+              </DashboardVerticalProvider>
             </div>
           </main>
         </div>

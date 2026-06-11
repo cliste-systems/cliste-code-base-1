@@ -12,9 +12,8 @@ function pathnameToSeenKey(pathname: string | null): DashboardNavSeenKey | null 
   if (!pathname) return null;
   const routes: { prefix: string; key: DashboardNavSeenKey }[] = [
     { prefix: "/dashboard/call-history", key: "call-history" },
+    { prefix: "/dashboard/calls", key: "call-history" },
     { prefix: "/dashboard/action-inbox", key: "action-inbox" },
-    { prefix: "/dashboard/calendar", key: "calendar" },
-    { prefix: "/dashboard/bookings", key: "bookings" },
   ];
   for (const { prefix, key } of routes) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
@@ -25,9 +24,8 @@ function pathnameToSeenKey(pathname: string | null): DashboardNavSeenKey | null 
 }
 
 /**
- * When the user opens Call History, Action Inbox, Calendar, or Bookings, persist
- * “seen” via a Server Action so the next layout render reads the cookie (middleware
- * alone is not visible to RSC on the same round-trip).
+ * When the user opens Calls or Action Inbox, persist “seen” via a Server Action
+ * so the next layout render reads the cookie.
  */
 export function DashboardNavSeenSync() {
   const pathname = usePathname();

@@ -25,7 +25,7 @@ export default async function AdminUnlockPage({
           <div className="relative z-10 flex flex-col items-start">
             <div className="mb-16 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
               <Image
-                src="/cliste-logo.png"
+                src="/m8x4p2n7.png"
                 alt="Cliste"
                 width={30}
                 height={30}
@@ -59,7 +59,7 @@ export default async function AdminUnlockPage({
           <div className="mb-10 flex flex-col lg:hidden">
             <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
               <Image
-                src="/cliste-logo.png"
+                src="/m8x4p2n7.png"
                 alt="Cliste"
                 width={30}
                 height={30}

@@ -98,7 +98,7 @@ export async function syncUsageToStripe(): Promise<UsageSyncResult> {
     const org = orgIndex.get(row.organization_id);
     const minutes =
       typeof row.minutes_billable === "number"
-        ? Math.max(0, Math.round(row.minutes_billable))
+        ? Math.max(0, Math.round(row.minutes_billable * 100) / 100)
         : 0;
 
     if (!org?.platform_customer_id) {

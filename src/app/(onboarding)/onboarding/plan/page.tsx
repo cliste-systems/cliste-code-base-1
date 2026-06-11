@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 
-import { LAUNCHES, PLANS, isLaunchTier, isPlanTier } from "@/lib/cliste-plans";
+import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
+import { PLANS, isPlanTier } from "@/lib/cliste-plans";
+import { guardOnboardingPage } from "@/lib/onboarding-page-guard";
 import { requireOnboardingSession } from "@/lib/onboarding-session";
 
 import { finalisePlanCheckout } from "../actions";
-import { WizardStepper } from "../wizard-stepper";
 
 import { PlanPicker } from "./plan-picker";
 
@@ -13,12 +14,14 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<{
   status?: string | string[];
   session_id?: string | string[];
+  error?: string | string[];
 }>;
 
 export default async function OnboardingPlanPage(props: {
   searchParams?: SearchParams;
 }) {
   const session = await requireOnboardingSession();
+
   const params = (await props.searchParams) ?? {};
 
   const status = Array.isArray(params.status) ? params.status[0] : params.status;
@@ -26,6 +29,7 @@ export default async function OnboardingPlanPage(props: {
     ? params.session_id[0]
     : params.session_id;
 
+  let returnError = false;
   if (status === "return" && checkoutSessionId) {
     try {
       await finalisePlanCheckout(checkoutSessionId);
@@ -34,9 +38,13 @@ export default async function OnboardingPlanPage(props: {
     }
     const refreshed = await requireOnboardingSession();
     if (refreshed.platformSubscriptionId) {
-      redirect("/onboarding/phone");
+      redirect("/dashboard?welcome=1");
     }
+    // Payment didn't stick — fall through and show an error on the picker.
+    returnError = true;
   }
+
+  guardOnboardingPage(session, "/onboarding/plan");
 
   const plans = Object.values(PLANS).map((p) => ({
     tier: p.tier,
@@ -45,45 +53,27 @@ export default async function OnboardingPlanPage(props: {
     monthlyCents: p.monthlyCents,
     annualCents: p.annualCents,
     includedMinutes: p.includedMinutes,
+    includedSms: p.includedSms,
     overageRateCents: p.overageRateCents,
+    smsOverageRateCents: p.smsOverageRateCents,
     applicationFeeBps: p.applicationFeeBps,
     features: p.features,
     recommended: Boolean(p.recommended),
-  }));
-
-  const launches = Object.values(LAUNCHES).map((l) => ({
-    tier: l.tier,
-    name: l.name,
-    description: l.description,
-    priceCents: l.priceCents,
-    targetRegion: l.targetRegion,
+    selfServe: p.selfServe,
   }));
 
   return (
-    <div className="flex flex-col gap-6">
-      <WizardStepper current="plan" />
-
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-          Pick your plan + launch
-        </h1>
-        <p className="max-w-prose text-sm text-gray-600">
-          Plans compared below. Annual billing saves you two months. Setup is
-          optional — most salons pick Remote Launch for an hour with a
-          specialist, or DIY if you&apos;re comfortable with the self-serve flow.
-        </p>
-      </header>
-
+    <OnboardingStepShell
+      variant="wide"
+      title="Last step — go live"
+      description="Pick a plan to put Cara on your number. 14-day free trial, cancel anytime."
+    >
       <PlanPicker
         plans={plans}
-        launches={launches}
         defaultPlan={isPlanTier(session.planTier) ? session.planTier : "pro"}
-        defaultLaunch={
-          isLaunchTier(session.launchTier ?? "")
-            ? (session.launchTier as (typeof launches)[number]["tier"])
-            : "remote"
-        }
+        defaultInterval={session.billingInterval}
+        initialError={returnError ? "payment_unconfirmed" : null}
       />
-    </div>
+    </OnboardingStepShell>
   );
 }

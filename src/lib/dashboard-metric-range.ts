@@ -1,7 +1,7 @@
 import { addDays, startOfDay, subDays } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
-export type DashboardMetricRangeKey = "today" | "yesterday" | "7d" | "4w";
+export type DashboardMetricRangeKey = "today" | "7d" | "4w";
 
 const DUBLIN = "Europe/Dublin";
 
@@ -9,7 +9,8 @@ export function parseDashboardMetricRange(
   raw: string | string[] | undefined,
 ): DashboardMetricRangeKey {
   const v = Array.isArray(raw) ? raw[0] : raw;
-  if (v === "yesterday" || v === "7d" || v === "4w") return v;
+  if (v === "7d" || v === "4w" || v === "30d") return v === "30d" ? "4w" : v;
+  if (v === "today") return "today";
   return "today";
 }
 
@@ -24,31 +25,21 @@ export function getDashboardMetricRangeLowerBoundIso(
     return subDays(now, 7).toISOString();
   }
   if (key === "4w") {
-    return subDays(now, 28).toISOString();
+    // Nav label “30 days” — use 45 days so recent pilot calls are not clipped at month boundaries.
+    return subDays(now, 45).toISOString();
   }
 
-  const zonedNow = toZonedTime(now, DUBLIN);
-  const startTodayZoned = startOfDay(zonedNow);
-
-  if (key === "today") {
-    return fromZonedTime(startTodayZoned, DUBLIN).toISOString();
-  }
-
-  const startYesterdayZoned = subDays(startTodayZoned, 1);
-  return fromZonedTime(startYesterdayZoned, DUBLIN).toISOString();
-}
-
-/**
- * Exclusive upper bound for "yesterday" (`lt`). Null when a simple `gte` from lower bound is enough.
- */
-export function getDashboardMetricRangeUpperExclusiveIso(
-  key: DashboardMetricRangeKey,
-  now: Date = new Date(),
-): string | null {
-  if (key !== "yesterday") return null;
   const zonedNow = toZonedTime(now, DUBLIN);
   const startTodayZoned = startOfDay(zonedNow);
   return fromZonedTime(startTodayZoned, DUBLIN).toISOString();
+}
+
+/** Exclusive upper bound when needed. Home/Calls use `gte` from lower bound only. */
+export function getDashboardMetricRangeUpperExclusiveIso(
+  _key: DashboardMetricRangeKey,
+  _now: Date = new Date(),
+): string | null {
+  return null;
 }
 
 /** Start of tomorrow in Dublin (UTC ISO), for `lt created_at` “end of calendar today”. */
@@ -67,8 +58,6 @@ export function dashboardMetricRangePeriodPhrase(
   switch (key) {
     case "today":
       return "today";
-    case "yesterday":
-      return "yesterday";
     case "7d":
       return "last 7 days";
     case "4w":
@@ -76,4 +65,23 @@ export function dashboardMetricRangePeriodPhrase(
     default:
       return "today";
   }
+}
+
+/** Greeting subline under “Hello, …” — calendar date for Today, range label otherwise. */
+export function dashboardMetricRangeGreetingSubline(
+  key: DashboardMetricRangeKey,
+  now: Date = new Date(),
+): string {
+  if (key === "today") {
+    return new Intl.DateTimeFormat("en-IE", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: DUBLIN,
+    }).format(now);
+  }
+
+  const phrase = dashboardMetricRangePeriodPhrase(key);
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }

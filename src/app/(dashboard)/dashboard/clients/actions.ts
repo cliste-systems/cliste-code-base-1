@@ -85,6 +85,7 @@ export async function deleteClient(
       .eq("id", id);
     if (delErr) return { ok: false, message: delErr.message };
 
+    revalidatePath("/dashboard/contacts");
     revalidatePath("/dashboard/clients");
     return { ok: true };
   }
@@ -136,6 +137,7 @@ export async function deleteClient(
     return { ok: false, message: delError.message };
   }
 
+  revalidatePath("/dashboard/contacts");
   revalidatePath("/dashboard/clients");
   return { ok: true };
 }
@@ -193,6 +195,7 @@ export async function createClient(payload: {
       })
       .eq("id", existing.id);
     if (updateErr) return { ok: false, message: updateErr.message };
+    revalidatePath("/dashboard/contacts");
     revalidatePath("/dashboard/clients");
     return { ok: true, clientId: existing.id };
   }
@@ -216,6 +219,7 @@ export async function createClient(payload: {
     };
   }
 
+  revalidatePath("/dashboard/contacts");
   revalidatePath("/dashboard/clients");
   return { ok: true, clientId: created.id };
 }
@@ -266,6 +270,7 @@ export async function updateClient(payload: {
     .eq("organization_id", organizationId);
   if (error) return { ok: false, message: error.message };
 
+  revalidatePath("/dashboard/contacts");
   revalidatePath("/dashboard/clients");
   return { ok: true };
 }

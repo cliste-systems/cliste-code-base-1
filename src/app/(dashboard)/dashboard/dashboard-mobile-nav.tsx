@@ -4,21 +4,15 @@ import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
-  Calendar,
-  CreditCard,
+  Bot,
+  Gauge,
   Menu,
-  HelpCircle,
   Inbox,
   LayoutDashboard,
-  NotebookText,
   Phone,
-  Scissors,
   Settings,
-  ShieldCheck,
-  ShoppingBag,
-  Store,
+  Share2,
   Users,
-  Waves,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -32,26 +26,28 @@ import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
-  "/dashboard/action-inbox": Inbox,
+  "/dashboard/calls": Phone,
   "/dashboard/call-history": Phone,
-  "/dashboard/calendar": Calendar,
-  "/dashboard/bookings": NotebookText,
+  "/dashboard/action-inbox": Inbox,
+  "/dashboard/contacts": Users,
   "/dashboard/clients": Users,
-  "/dashboard/services": ShoppingBag,
-  "/dashboard/team": Scissors,
-  "/dashboard/storefront": Store,
-  "/dashboard/payments": CreditCard,
-  "/cara": Waves,
-  "/dashboard/support": HelpCircle,
+  "/dashboard/routing": Share2,
+  "/dashboard/cara-setup": Bot,
+  "/dashboard/agent-setup": Bot,
+  "/dashboard/usage": Gauge,
+  "/dashboard/billing": Gauge,
   "/dashboard/settings": Settings,
-  "/dashboard/privacy": ShieldCheck,
 };
 
 type DashboardMobileNavProps = {
   items: DashboardSidebarNavItem[];
+  productNoun?: string | null;
 };
 
-export function DashboardMobileNav({ items }: DashboardMobileNavProps) {
+export function DashboardMobileNav({
+  items,
+  productNoun,
+}: DashboardMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const actionInbox = items.find((item) => item.href === "/dashboard/action-inbox");
@@ -65,7 +61,7 @@ export function DashboardMobileNav({ items }: DashboardMobileNavProps) {
       <div className="flex items-center justify-between gap-3">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image
-            src="/cliste-logo.png"
+            src="/m8x4p2n7.png"
             alt=""
             width={30}
             height={30}
@@ -76,8 +72,8 @@ export function DashboardMobileNav({ items }: DashboardMobileNavProps) {
             <span className="block text-[13px] font-semibold tracking-[0.2em] text-slate-950">
               CLISTE
             </span>
-            <span className="mt-1 block text-[9px] font-medium tracking-[0.3em] text-slate-500">
-              STUDIO
+            <span className="mt-1 block text-[9px] font-medium tracking-[0.14em] text-slate-500">
+              {productNoun ?? "Connect"}
             </span>
           </span>
         </Link>

@@ -59,7 +59,7 @@ function SheetContent({
       <DialogPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          "fixed inset-y-0 right-0 z-[101] flex h-dvh w-full max-w-md flex-col border-l border-gray-200 bg-white shadow-2xl outline-none",
+          "fixed inset-y-0 right-0 z-[101] flex h-dvh w-full max-w-md flex-col border-l border-gray-200 bg-white shadow-2xl outline-none [&_a[href]]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_summary]:cursor-pointer",
           "data-open:animate-in data-open:slide-in-from-right data-open:duration-200",
           "data-closed:animate-out data-closed:slide-out-to-right data-closed:duration-200",
           className,
@@ -73,7 +73,7 @@ function SheetContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-3 right-3 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                className="absolute top-3 right-3 cursor-pointer rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
                 size="icon-sm"
               />
             }

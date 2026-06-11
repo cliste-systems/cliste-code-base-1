@@ -1,108 +1,217 @@
-import { CheckCircle2, Inbox } from "lucide-react";
+import { Inbox } from "lucide-react";
 
+import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-summary";
+import {
+  DASHBOARD_ICON_CHIP_LG,
+  DASHBOARD_ICON_GLYPH_LG,
+  DASHBOARD_PAGE_SHELL_FILL_WHITE,
+} from "@/components/dashboard/dashboard-surface";
+import {
+  formatCallDateTimeLabel,
+  formatE164ForDisplay,
+} from "@/lib/call-history-types";
+import { resolveCallerDisplayName } from "@/lib/caller-identity";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import {
-  ActionInboxView,
-  type ActionInboxTicket,
-} from "./action-inbox-view";
+  ACTION_CATEGORY_LABELS,
+  ACTION_CATEGORY_SHORT,
+  classifyActionCategory,
+} from "./categories";
+import {
+  buildActionInboxMetrics,
+  formatActionDateTimeLabel,
+  resolveContactEmail,
+  type ActionInboxItem,
+  type RelatedCallPreview,
+} from "./action-inbox-helpers";
+import { ActionInboxView } from "./action-inbox-view";
 
-type ActionTicketRow = {
+type ActionInboxPageProps = {
+  searchParams?: Promise<{ ticket?: string }>;
+};
+
+type TicketRow = {
   id: string;
   caller_number: string;
+  caller_name: string | null;
   summary: string;
   status: string;
   created_at: string;
 };
 
-function partitionTickets(rows: ActionTicketRow[]): {
-  open: ActionInboxTicket[];
-  resolved: ActionInboxTicket[];
-} {
-  const open: ActionInboxTicket[] = [];
-  const resolved: ActionInboxTicket[] = [];
-  for (const row of rows) {
-    const t: ActionInboxTicket = {
-      id: row.id,
-      callerNumber: row.caller_number,
-      summary: row.summary,
-      createdAt: row.created_at,
-    };
-    if (row.status === "resolved") resolved.push(t);
-    else open.push(t);
+type CallRow = {
+  id: string;
+  caller_number: string;
+  caller_name: string | null;
+  ai_summary: string | null;
+  created_at: string;
+};
+
+type ClientRow = {
+  phone_e164: string;
+  name: string;
+  email: string | null;
+};
+
+type ClientByPhone = {
+  name: string;
+  email: string | null;
+};
+
+function phoneKey(raw: string | null | undefined): string | null {
+  const digits = (raw ?? "").replace(/\D/g, "");
+  return digits.length >= 6 ? digits : null;
+}
+
+function buildLatestCallByPhone(calls: CallRow[]): Map<string, RelatedCallPreview> {
+  const map = new Map<string, RelatedCallPreview>();
+  for (const call of calls) {
+    const key = phoneKey(call.caller_number);
+    if (!key || map.has(key)) continue;
+    map.set(key, {
+      id: call.id,
+      summary: call.ai_summary?.trim() ?? null,
+      dateLabel: formatCallDateTimeLabel(call.created_at),
+      callerName: call.caller_name?.trim() || null,
+    });
   }
-  return { open, resolved };
+  return map;
 }
 
-function InboxPageHeader() {
-  return (
-    <header className="mb-8">
-      <div className="mb-3 inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-gray-500 uppercase">
-        <Inbox className="size-3.5 shrink-0" aria-hidden />
-        Operations
-      </div>
-      <h1 className="mb-4 text-3xl font-semibold tracking-tight text-gray-900">
-        Action Inbox
-      </h1>
-      <p className="max-w-2xl text-sm font-medium leading-relaxed text-gray-500">
-        Edge cases the AI could not close on the call — patch tests, medical
-        questions, and complex requests land here for your team. Use the tabs
-        below to switch between open items and history.
-      </p>
-    </header>
+function buildClientsByPhone(clients: ClientRow[]): Map<string, ClientByPhone> {
+  const map = new Map<string, ClientByPhone>();
+  for (const client of clients) {
+    const key = phoneKey(client.phone_e164);
+    if (!key || map.has(key)) continue;
+    map.set(key, {
+      name: client.name.trim(),
+      email: client.email?.trim() || null,
+    });
+  }
+  return map;
+}
+
+function toInboxItem(
+  row: TicketRow,
+  callsByPhone: Map<string, RelatedCallPreview>,
+  clientsByPhone: Map<string, ClientByPhone>,
+): ActionInboxItem {
+  const category = classifyActionCategory(row.summary);
+  const callerNumber = row.caller_number?.trim() ?? "";
+  const callerDisplay = formatE164ForDisplay(callerNumber) || "";
+  const key = phoneKey(callerNumber);
+  const client = key ? clientsByPhone.get(key) : undefined;
+  const relatedCall = key ? (callsByPhone.get(key) ?? null) : null;
+
+  const callerName = resolveCallerDisplayName(
+    [row.caller_name, client?.name, relatedCall?.callerName],
+    callerDisplay,
   );
+
+  const contactEmail = resolveContactEmail(client?.email, row.summary);
+
+  return {
+    id: row.id,
+    callerNumber,
+    callerDisplay,
+    callerName,
+    contactLabel: callerName,
+    contactEmail,
+    summary: row.summary ?? "",
+    status: row.status === "resolved" ? "resolved" : "open",
+    createdAt: row.created_at,
+    createdAtLabel: formatActionDateTimeLabel(row.created_at),
+    category,
+    categoryTitle: ACTION_CATEGORY_LABELS[category],
+    categoryShort: ACTION_CATEGORY_SHORT[category],
+    relatedCall,
+  };
 }
 
-export default async function ActionInboxPage() {
-  const { supabase, organizationId } = await requireDashboardSession();
-  const { data, error } = await supabase
-    .from("action_tickets")
-    .select("id, caller_number, summary, status, created_at")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false });
+export default async function ActionInboxPage({
+  searchParams,
+}: ActionInboxPageProps) {
+  const sp = searchParams ? await searchParams : {};
+  const initialSelectedTicketId =
+    typeof sp.ticket === "string" && sp.ticket.trim() ? sp.ticket.trim() : null;
 
-  const rows = (error ? [] : (data ?? [])) as ActionTicketRow[];
-  const { open, resolved } = partitionTickets(rows);
+  const { supabase, organizationId } = await requireDashboardSession();
+
+  const [{ data: ticketData, error }, { data: callData }, { data: clientData }] =
+    await Promise.all([
+      supabase
+        .from("action_tickets")
+        .select("id, caller_number, caller_name, summary, status, created_at")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("call_logs")
+        .select("id, caller_number, caller_name, ai_summary, created_at")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      supabase
+        .from("clients")
+        .select("phone_e164, name, email")
+        .eq("organization_id", organizationId)
+        .limit(5000),
+    ]);
+
+  const callsByPhone = buildLatestCallByPhone((callData ?? []) as CallRow[]);
+  const clientsByPhone = buildClientsByPhone((clientData ?? []) as ClientRow[]);
+  const items = !error
+    ? ((ticketData ?? []) as TicketRow[]).map((row) =>
+        toInboxItem(row, callsByPhone, clientsByPhone),
+      )
+    : [];
+
+  const metrics = buildActionInboxMetrics(items);
 
   return (
-    <div className="-mx-6 -mt-8 flex min-h-0 flex-1 flex-col bg-[#FAFAFA] px-6 pb-12 pt-8 lg:-mx-12 lg:px-12 lg:pt-10">
-      <div className="mx-auto max-w-[1000px]">
-        <InboxPageHeader />
-
-        {error ? (
-          <div className="rounded-2xl border border-red-200/80 bg-white p-8 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <p className="text-sm font-semibold text-red-700">
-              Could not load action tickets
-            </p>
-            <p className="mt-2 text-sm text-gray-600">{error.message}</p>
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="relative flex min-h-[440px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-8 text-center shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-50/50 via-white to-white"
-              aria-hidden
-            />
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="mb-5 text-gray-300">
-                <CheckCircle2
-                  className="size-16 stroke-[1]"
-                  strokeWidth={1}
-                  aria-hidden
-                />
-              </div>
-              <h2 className="mb-2 text-base font-semibold tracking-tight text-gray-900">
-                No actions required
-              </h2>
-              <p className="mx-auto max-w-md text-sm font-medium leading-relaxed text-gray-500">
-                There are no tickets in your inbox. New items from calls will
-                appear here automatically.
+    <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
+      <DashboardAnimatedPageSections>
+      <header className="shrink-0">
+        <div className="flex items-start gap-3">
+          <span className={DASHBOARD_ICON_CHIP_LG}>
+            <Inbox className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
+          </span>
+          <div className="min-w-0 space-y-2">
+            <div>
+              <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
+                Action inbox
+              </h1>
+              <p className="mt-0.5 max-w-xl text-[13px] leading-snug text-slate-600">
+                Callbacks, urgent issues, and follow-ups Cara flagged for you — not
+                your full call log.
               </p>
             </div>
+            <DashboardInlineSummary
+              segments={[
+                { value: String(metrics.openCount), label: "open" },
+                { value: String(metrics.urgentCount), label: "urgent" },
+                { value: String(metrics.callbackCount), label: "callbacks" },
+                { value: String(metrics.resolvedCount), label: "resolved" },
+              ]}
+            />
           </div>
-        ) : (
-          <ActionInboxView openTickets={open} resolvedTickets={resolved} />
-        )}
-      </div>
+        </div>
+      </header>
+
+      {error ? (
+        <p className="shrink-0 text-[13px] text-red-700">
+          Could not load Action Inbox: {error.message}
+        </p>
+      ) : (
+        <ActionInboxView
+          className="min-h-0 flex-1"
+          items={items}
+          metrics={metrics}
+          initialSelectedTicketId={initialSelectedTicketId}
+        />
+      )}
+      </DashboardAnimatedPageSections>
     </div>
   );
 }

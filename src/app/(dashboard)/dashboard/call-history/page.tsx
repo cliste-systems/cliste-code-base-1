@@ -1,98 +1,201 @@
-import { History, Info } from "lucide-react";
+import { Phone } from "lucide-react";
 
+import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-summary";
+import {
+  DASHBOARD_ICON_CHIP_LG,
+  DASHBOARD_ICON_GLYPH_LG,
+  DASHBOARD_PAGE_SHELL_FILL_WHITE,
+} from "@/components/dashboard/dashboard-surface";
+import {
+  OUTCOME_LABELS,
+  inferCallIntent,
+  mapCallLogToRow,
+  normalizeCallOutcome,
+} from "@/lib/call-history-types";
+import {
+  dashboardMetricRangeGreetingSubline,
+  getDashboardMetricRangeLowerBoundIso,
+  getDashboardMetricRangeUpperExclusiveIso,
+  parseDashboardMetricRange,
+} from "@/lib/dashboard-metric-range";
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { mapCallLogToRow } from "@/lib/call-history-types";
 
-import { CallHistoryTable } from "./call-history-table";
+import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
+import {
+  buildCallHistoryMetrics,
+  type CallFollowUp,
+  type CallHistoryListItem,
+  summaryForDisplay,
+} from "./call-history-helpers";
+import { CallHistoryView } from "./call-history-view";
 
 type CallHistoryPageProps = {
-  searchParams?: Promise<{ call?: string }>;
+  searchParams?: Promise<{ call?: string; range?: string }>;
 };
 
-export default async function CallHistoryPage({
-  searchParams,
-}: CallHistoryPageProps) {
+type CallLogDbRow = {
+  id: string;
+  caller_number: string;
+  caller_name?: string | null;
+  duration_seconds: number;
+  outcome: string;
+  transcript: string | null;
+  transcript_review: string | null;
+  ai_summary: string | null;
+  created_at: string;
+};
+
+type TicketDbRow = {
+  id: string;
+  caller_number: string;
+  caller_name?: string | null;
+  summary: string;
+  status: string;
+  created_at: string;
+};
+
+function phoneKey(raw: string | null | undefined): string | null {
+  const digits = (raw ?? "").replace(/\D/g, "");
+  return digits.length >= 6 ? digits : null;
+}
+
+function buildFollowUpMap(tickets: TicketDbRow[]): Map<string, CallFollowUp> {
+  const openByKey = new Map<string, CallFollowUp>();
+  for (const t of tickets) {
+    if (t.status !== "open") continue;
+    const key = phoneKey(t.caller_number);
+    if (!key || openByKey.has(key)) continue;
+    openByKey.set(key, {
+      id: t.id,
+      summary: t.summary,
+      status: "open",
+    });
+  }
+  return openByKey;
+}
+
+function toListItem(
+  row: CallLogDbRow,
+  openFollowUpByKey: Map<string, CallFollowUp>,
+): CallHistoryListItem {
+  const mapped = mapCallLogToRow(row);
+  const key = phoneKey(mapped.callerId);
+  const followUp = key ? (openFollowUpByKey.get(key) ?? null) : null;
+  const outcome = normalizeCallOutcome(row.outcome);
+  const item: CallHistoryListItem = {
+    id: mapped.id,
+    createdAt: row.created_at,
+    dateTimeLabel: mapped.dateTimeLabel,
+    callerId: mapped.callerId,
+    callerDisplay: mapped.callerDisplay || "Unknown number",
+    callerName: row.caller_name?.trim() || null,
+    durationSeconds: Math.max(0, row.duration_seconds ?? 0),
+    durationLabel: mapped.durationLabel || "—",
+    outcome,
+    outcomeLabel: OUTCOME_LABELS[outcome],
+    intentLabel: mapped.intentLabel || inferCallIntent(mapped.aiSummary, outcome),
+    summaryPreview: null,
+    transcriptVerbatim: mapped.transcriptVerbatim,
+    transcriptReview: mapped.transcriptReview,
+    aiSummary: mapped.aiSummary,
+    hasOpenAction: Boolean(followUp),
+    followUp,
+  };
+  item.summaryPreview = summaryForDisplay(item);
+  return item;
+}
+
+export default async function CallHistoryPage({ searchParams }: CallHistoryPageProps) {
   const sp = searchParams ? await searchParams : {};
-  const initialOpenCallId =
+  const rangeKey = parseDashboardMetricRange(sp.range);
+  const greetingSubline = dashboardMetricRangeGreetingSubline(rangeKey);
+  const initialSelectedCallId =
     typeof sp.call === "string" && sp.call.trim() ? sp.call.trim() : null;
 
   const { supabase, organizationId } = await requireDashboardSession();
-  const { data, error } = await supabase
+
+  const lowerIso = getDashboardMetricRangeLowerBoundIso(rangeKey);
+  const upperIso = getDashboardMetricRangeUpperExclusiveIso(rangeKey);
+
+  let callQuery = supabase
     .from("call_logs")
     .select(
-      "id, caller_number, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at"
+      "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at",
     )
     .eq("organization_id", organizationId)
+    .gte("created_at", lowerIso)
     .order("created_at", { ascending: false });
 
-  const calls =
-    !error && data
-      ? data.map((row) =>
-          mapCallLogToRow(
-            row as {
-              id: string;
-              caller_number: string;
-              duration_seconds: number;
-              outcome: string;
-              transcript: string | null;
-              transcript_review: string | null;
-              ai_summary: string | null;
-              created_at: string;
-            }
-          )
-        )
-      : [];
+  if (upperIso) {
+    callQuery = callQuery.lt("created_at", upperIso);
+  }
+
+  const [{ data, error }, { data: ticketRows }, { data: org }] = await Promise.all([
+    callQuery,
+    supabase
+      .from("action_tickets")
+      .select("id, caller_number, caller_name, summary, status, created_at")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("organizations")
+      .select("is_active")
+      .eq("id", organizationId)
+      .maybeSingle(),
+  ]);
+
+  const openFollowUpByKey = buildFollowUpMap((ticketRows ?? []) as TicketDbRow[]);
+
+  const calls = !error
+    ? ((data ?? []) as CallLogDbRow[]).map((row) =>
+        toListItem(row, openFollowUpByKey),
+      )
+    : [];
+
+  const metrics = buildCallHistoryMetrics(calls);
 
   return (
-    <div className="-mx-6 -mt-8 flex min-h-0 flex-1 flex-col bg-[#FAFAFA] px-6 pb-12 pt-8 lg:-mx-12 lg:px-12 lg:pt-10">
-      <div className="mx-auto w-full max-w-[1100px]">
-        <header className="mb-8">
-          <div className="mb-3 inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-gray-500 uppercase">
-            <History className="size-3.5 shrink-0" aria-hidden />
-            Audit Trail
-          </div>
-          <h1 className="mb-4 text-3xl font-semibold tracking-tight text-gray-900">
-            Call history
-          </h1>
-          <div className="flex flex-col gap-1">
-            <p className="max-w-2xl text-sm leading-relaxed text-gray-500">
-              Every conversation your AI handled — tap a row or the transcript
-              icon to read the full conversation.
-            </p>
-            <p className="max-w-2xl text-sm leading-relaxed text-gray-500">
-              Outcomes show how each call ended.
-            </p>
-          </div>
-        </header>
-
-        <div className="mb-8 flex items-start gap-3 rounded-xl border border-gray-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.01)] sm:items-center">
-          <Info
-            className="mt-0.5 size-4 shrink-0 text-gray-400 sm:mt-0"
-            aria-hidden
-          />
-          <p className="text-sm text-gray-500">
-            Duration is talk time, not hold time.{" "}
-            <span className="text-gray-400">
-              &ldquo;Message taken&rdquo; and similar outcomes sync to your
-              Action Inbox.
+    <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
+      <DashboardAnimatedPageSections>
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="flex items-center gap-3">
+            <span className={DASHBOARD_ICON_CHIP_LG}>
+              <Phone className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
             </span>
-          </p>
-        </div>
-
-        {error ? (
-          <div className="rounded-2xl border border-red-200/80 bg-white p-8 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <p className="text-sm font-semibold text-red-700">
-              Could not load call history
-            </p>
-            <p className="mt-2 text-sm text-gray-600">{error.message}</p>
+            <div className="min-w-0">
+              <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
+                Calls
+              </h1>
+              <p className="mt-0.5 text-[13px] text-slate-500">{greetingSubline}</p>
+            </div>
           </div>
-        ) : (
-          <CallHistoryTable
-            calls={calls}
-            initialOpenCallId={initialOpenCallId}
+          <DashboardInlineSummary
+            segments={[
+              { value: String(metrics.totalCalls), label: "total calls" },
+              { value: String(metrics.routedCount), label: "routed" },
+              { value: String(metrics.needsAttentionCount), label: "need attention" },
+              { value: metrics.avgDurationLabel, label: "avg. length" },
+            ]}
           />
-        )}
-      </div>
+        </div>
+        <DashboardHeaderRangeControls caraActive={org?.is_active !== false} />
+      </header>
+
+      {error ? (
+        <p className="shrink-0 text-[13px] text-red-700">
+          Could not load calls: {error.message}
+        </p>
+      ) : (
+        <CallHistoryView
+          className="min-h-0 flex-1"
+          calls={calls}
+          metrics={metrics}
+          initialSelectedCallId={initialSelectedCallId}
+        />
+      )}
+      </DashboardAnimatedPageSections>
     </div>
   );
 }

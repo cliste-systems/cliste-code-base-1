@@ -550,7 +550,8 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
               <p className="mt-1 max-w-3xl px-1 text-sm leading-relaxed text-red-900/80">
                 Flagged when the AI could not answer due to missing training data, a tool
                 failure, or something that needs a dashboard or product fix. Routine
-                handoffs (e.g. caller asked for a named person only) stay out of this list.
+                callback-only requests (e.g. caller asked for a named person) stay out of
+                this list.
                 Open the tenant to adjust AI instructions, services, or integrations.
               </p>
             </div>

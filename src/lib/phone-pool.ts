@@ -278,6 +278,84 @@ export type AssignFromPoolResult =
  * never matters at our scale, but the SKIP-LOCKED pattern means two parallel
  * signups never hand out the same number.
  */
+function devPlaceholderE164(organizationId: string): string {
+  const digits = organizationId.replace(/\D/g, "").slice(0, 7).padEnd(7, "0");
+  return `+3531555${digits}`;
+}
+
+/**
+ * Ensure an organisation has an Irish Cliste number. Idempotent — safe to call
+ * from Stripe webhooks and checkout return handlers.
+ *
+ * 1. Return immediately if already assigned.
+ * 2. Claim from the pre-buy pool.
+ * 3. If the pool is empty, buy one Irish DID from Twilio then claim.
+ * 4. In local dev without Twilio, seed a manual placeholder number.
+ */
+export async function provisionOrganizationPhoneNumber(
+  organizationId: string,
+): Promise<AssignFromPoolResult> {
+  const admin = createAdminClient();
+
+  const { data: assigned } = await admin
+    .from("phone_numbers")
+    .select("id, e164")
+    .eq("organization_id", organizationId)
+    .eq("status", "assigned")
+    .maybeSingle();
+
+  if (assigned?.e164) {
+    return {
+      ok: true,
+      e164: assigned.e164,
+      phoneNumberId: assigned.id,
+    };
+  }
+
+  let result = await assignFromPool(organizationId, "IE");
+  if (result.ok) return result;
+
+  if (twilioIsConfigured() && getVoiceRoutingUrl()) {
+    const purchase = await purchaseIrishDids(1);
+    if (purchase.ok && purchase.purchased.length > 0) {
+      result = await assignFromPool(organizationId, "IE");
+      if (result.ok) return result;
+    } else if (!purchase.ok) {
+      console.warn(
+        "[phone-pool] provision purchase failed",
+        organizationId,
+        purchase.message,
+      );
+    }
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    const e164 = devPlaceholderE164(organizationId);
+    const { data: existingDev } = await admin
+      .from("phone_numbers")
+      .select("id")
+      .eq("e164", e164)
+      .maybeSingle();
+
+    if (!existingDev) {
+      const seeded = await seedManualNumber({
+        e164,
+        countryCode: "IE",
+        provider: "manual",
+        notes: "[dev auto-provision]",
+      });
+      if (!seeded.ok) {
+        return { ok: false, message: seeded.message };
+      }
+    }
+
+    result = await assignFromPool(organizationId, "IE");
+    if (result.ok) return result;
+  }
+
+  return result;
+}
+
 export async function assignFromPool(
   organizationId: string,
   country: "IE" | "US" = "IE"

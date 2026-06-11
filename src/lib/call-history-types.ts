@@ -1,84 +1,152 @@
+/**
+ * Stable v1 call-outcome set. Canonical value on `call_logs.outcome`.
+ */
+
 export type CallOutcome =
-  | "booked"
-  | "appointment_set"
+  | "answered"
   | "link_sent"
-  | "message_taken"
-  | "action_required"
-  | "hung_up"
-  | "general_inquiry";
+  | "callback_requested"
+  | "action_created"
+  | "failed"
+  | "voicemail_or_no_speech"
+  | "spam_or_abuse";
+
+export const CALL_OUTCOMES: readonly CallOutcome[] = [
+  "answered",
+  "link_sent",
+  "callback_requested",
+  "action_created",
+  "failed",
+  "voicemail_or_no_speech",
+  "spam_or_abuse",
+] as const;
 
 export type CallHistoryRow = {
   id: string;
   dateTimeLabel: string;
-  /** Raw value from the database (E.164 or other). */
   callerId: string;
-  /** Display-friendly phone string. */
   callerDisplay: string;
   durationLabel: string;
   outcome: CallOutcome;
-  /** Verbatim STT + assistant lines as captured on the call. */
+  intentLabel: string;
   transcriptVerbatim: string;
-  /** Corrected for obvious STT errors using the menu; null for older rows. */
   transcriptReview: string | null;
-  /** Short AI summary for the salon owner; null for older rows. */
   aiSummary: string | null;
+  hasLinkedAction?: boolean;
 };
 
+/** Universal outcome labels (visible in UI). */
 export const OUTCOME_LABELS: Record<CallOutcome, string> = {
-  booked: "Booked",
-  appointment_set: "Appointment Set",
-  link_sent: "Link Sent",
-  message_taken: "Message Taken",
-  action_required: "Action Required",
-  hung_up: "Hung Up",
-  general_inquiry: "General Inquiry",
+  answered: "Answered",
+  link_sent: "Routed",
+  callback_requested: "Callback requested",
+  action_created: "Request captured",
+  failed: "Failed",
+  voicemail_or_no_speech: "No speech",
+  spam_or_abuse: "Spam or abuse",
 };
+
+/** Fallback intent when summary text does not match a pattern. */
+export const INTENT_FALLBACK_BY_OUTCOME: Record<CallOutcome, string> = {
+  answered: "General enquiry",
+  link_sent: "Information request",
+  callback_requested: "Callback request",
+  action_created: "Follow-up",
+  failed: "Unknown",
+  voicemail_or_no_speech: "Unknown",
+  spam_or_abuse: "Unknown",
+};
+
+/**
+ * Infer caller intent from summary + outcome (lightweight; no extra DB fields).
+ */
+export function inferCallIntent(
+  summary: string | null | undefined,
+  outcome: CallOutcome,
+): string {
+  const s = String(summary ?? "").toLowerCase();
+  if (/\b(urgent|emergency|asap|burst|leak|flooding)\b/.test(s)) {
+    return "Urgent issue";
+  }
+  if (/\b(complaint|unhappy|refund|disappointed|upset)\b/.test(s)) {
+    return "Complaint";
+  }
+  if (/(call ?back|callback|ring (me|them) back|call me back)/.test(s)) {
+    return "Callback request";
+  }
+  if (/\b(quote|estimate|pricing|price|cost|how much)\b/.test(s)) {
+    return "Quote request";
+  }
+  if (/\b(sales|fleet|enquir|inquir|new customer|interested in)\b/.test(s)) {
+    return "Sales enquiry";
+  }
+  if (/(hours|open|close|parking|location|address|directions|where are you)/.test(s)) {
+    return "Information request";
+  }
+  if (/(confirm|confirmation|verify|double.?check)/.test(s)) {
+    return "Information request";
+  }
+  if (outcome === "link_sent") return "Information request";
+  if (outcome === "callback_requested") return "Callback request";
+  if (outcome === "action_created") return "Follow-up";
+  return INTENT_FALLBACK_BY_OUTCOME[outcome];
+}
 
 export function normalizeCallOutcome(raw: string): CallOutcome {
-  const s = raw.trim().toLowerCase().replace(/\s+/g, "_");
-  const hay = raw.toLowerCase();
+  const hay = String(raw ?? "").toLowerCase();
+  const s = hay.trim().replace(/\s+/g, "_");
+  if (!hay.trim()) return "answered";
 
-  if (/\bbooked\b/.test(hay) || s === "booked") return "booked";
-  if (
-    hay.includes("appointment") &&
-    (hay.includes("set") ||
-      hay.includes("scheduled") ||
-      hay.includes("booked"))
-  )
-    return "appointment_set";
-  if (s === "appointment_set" || s === "appointmentset")
-    return "appointment_set";
-
-  if (hay.includes("link") && hay.includes("sent")) return "link_sent";
+  if (s === "answered") return "answered";
   if (s === "link_sent" || s === "linksent") return "link_sent";
+  if (s === "callback_requested") return "callback_requested";
+  if (s === "action_created") return "action_created";
+  if (s === "transferred" || s === "transfer") return "answered";
+  if (s === "failed") return "failed";
+  if (s === "voicemail_or_no_speech") return "voicemail_or_no_speech";
+  if (s === "spam_or_abuse") return "spam_or_abuse";
 
-  if (hay.includes("message") && hay.includes("taken")) return "message_taken";
-  if (s === "message_taken" || s === "messagetaken") return "message_taken";
-
-  if (hay.includes("action") && hay.includes("required"))
-    return "action_required";
-  if (s === "action_required" || s === "actionrequired")
-    return "action_required";
-
-  if (hay.includes("general") && hay.includes("inquiry"))
-    return "general_inquiry";
-  if (s === "general_inquiry" || s === "generalinquiry")
-    return "general_inquiry";
-
+  if (hay.includes("spam") || hay.includes("abuse") || hay.includes("robocall")) {
+    return "spam_or_abuse";
+  }
+  if (
+    hay.includes("voicemail") ||
+    hay.includes("no_speech") ||
+    hay.includes("no speech") ||
+    hay.includes("no_answer") ||
+    hay.includes("no answer") ||
+    hay.includes("silent") ||
+    hay.includes("silence")
+  ) {
+    return "voicemail_or_no_speech";
+  }
+  if (hay.includes("transfer") || hay.includes("forwarded")) return "answered";
+  if (hay.includes("link") && hay.includes("sent")) return "link_sent";
+  if (hay.includes("callback") || (hay.includes("call") && hay.includes("back"))) {
+    return "callback_requested";
+  }
   if (
     hay.includes("hung") ||
     hay.includes("disconnect") ||
-    s === "hung_up" ||
-    s === "hungup"
-  )
-    return "hung_up";
+    hay.includes("dropped") ||
+    hay.includes("failed") ||
+    hay.includes("cut off") ||
+    hay.includes("cutoff")
+  ) {
+    return "failed";
+  }
+  if (
+    hay.includes("message") ||
+    hay.includes("action") ||
+    hay.includes("ticket") ||
+    hay.includes("follow")
+  ) {
+    return "action_created";
+  }
 
-  if (hay.includes("message")) return "message_taken";
-
-  return "general_inquiry";
+  return "answered";
 }
 
-/** Pretty-print common E.164 values; otherwise groups digits for readability. */
 export function formatE164ForDisplay(raw: string): string {
   const t = raw.trim();
   if (!t) return t;
@@ -140,15 +208,18 @@ export function mapCallLogToRow(log: {
 }): CallHistoryRow {
   const callerId = log.caller_number.trim();
   const verbatim = log.transcript?.trim() || "";
+  const outcome = normalizeCallOutcome(log.outcome);
+  const summary = log.ai_summary?.trim() ?? null;
   return {
     id: log.id,
     dateTimeLabel: formatCallDateTimeLabel(log.created_at),
     callerId,
     callerDisplay: formatE164ForDisplay(callerId),
     durationLabel: formatDurationLabel(log.duration_seconds),
-    outcome: normalizeCallOutcome(log.outcome),
+    outcome,
+    intentLabel: inferCallIntent(summary, outcome),
     transcriptVerbatim: verbatim || "No transcript on file.",
     transcriptReview: log.transcript_review?.trim() ?? null,
-    aiSummary: log.ai_summary?.trim() ?? null,
+    aiSummary: summary,
   };
 }

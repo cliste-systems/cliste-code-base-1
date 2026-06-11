@@ -33,3 +33,30 @@ export async function markTicketResolved(formData: FormData): Promise<void> {
   revalidatePath("/dashboard/action-inbox");
   revalidatePath("/dashboard");
 }
+
+export async function markTicketReopen(formData: FormData): Promise<void> {
+  const ticketId = formData.get("ticketId");
+  if (typeof ticketId !== "string" || !UUID_RE.test(ticketId)) return;
+
+  const { supabase, organizationId } = await requireDashboardSession();
+
+  const { data: row } = await supabase
+    .from("action_tickets")
+    .select("id")
+    .eq("id", ticketId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (!row) return;
+
+  const { error } = await supabase
+    .from("action_tickets")
+    .update({ status: "open" })
+    .eq("id", ticketId)
+    .eq("organization_id", organizationId);
+
+  if (error) return;
+
+  revalidatePath("/dashboard/action-inbox");
+  revalidatePath("/dashboard");
+}

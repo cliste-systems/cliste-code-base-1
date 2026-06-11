@@ -77,7 +77,7 @@ export async function exportCustomerData(
     sb
       .from("call_logs")
       .select(
-        "id, caller_number, duration_seconds, outcome, ai_summary, created_at",
+        "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at",
       )
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
@@ -85,7 +85,7 @@ export async function exportCustomerData(
     sb
       .from("action_tickets")
       .select(
-        "id, status, summary, caller_number, engineering_priority, created_at",
+        "id, status, summary, caller_number, caller_name, engineering_priority, created_at",
       )
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
@@ -240,7 +240,6 @@ export async function eraseCustomerData(
 
   revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/calls");
-  revalidatePath("/dashboard/bookings");
 
   return { ok: true, phoneE164, affected: counts };
 }

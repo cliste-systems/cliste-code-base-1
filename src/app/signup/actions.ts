@@ -8,7 +8,13 @@ import {
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
+import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
+import { recordLegalAcceptances } from "@/lib/legal-acceptances";
 import { scoreSignupFraud, shouldRouteToReview } from "@/lib/signup-security";
+import {
+  buildSecurityEventContext,
+  logSecurityEvent,
+} from "@/lib/security-events";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
@@ -62,11 +68,24 @@ async function uniqueSlug(
  */
 export async function startSignup(_: unknown, formData: FormData): Promise<SignupResult> {
   const salonName = String(formData.get("salonName") ?? "").trim();
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const ownerName = [firstName, lastName].filter(Boolean).join(" ");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const rawPlan = String(formData.get("planTier") ?? "").trim();
+  const rawInterval = String(formData.get("billingInterval") ?? "").trim();
+  const planTier: PlanTier | null = isPlanTier(rawPlan) ? rawPlan : null;
+  const billingInterval = rawInterval === "year" ? "year" : "month";
 
   if (!salonName || salonName.length < MIN_SALON_NAME || salonName.length > MAX_SALON_NAME) {
     return { ok: false, message: "Enter your salon or business name." };
+  }
+  if (firstName.length < 1 || lastName.length < 1) {
+    return { ok: false, message: "Enter your first and last name." };
+  }
+  if (ownerName.length > MAX_SALON_NAME) {
+    return { ok: false, message: "Name is too long." };
   }
   if (!email || !EMAIL_RE.test(email)) {
     return { ok: false, message: "Enter a valid email address." };
@@ -77,8 +96,15 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       message: `Password must be between ${MIN_PASSWORD} and ${MAX_PASSWORD} characters.`,
     };
   }
+  if (formData.get("acceptLegal") !== "on") {
+    return {
+      ok: false,
+      message: "You must agree to the terms of service and privacy notice.",
+    };
+  }
 
   const h = await headers();
+  const securityCtx = buildSecurityEventContext(h);
   const ipFp = rateLimitFingerprint(h, "signup-ip");
   const ipStatus = getRateLimitStatus("authenticate", ipFp);
   if (!ipStatus.allowed) {
@@ -112,7 +138,9 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     password,
     email_confirm: true,
     user_metadata: {
-      full_name: salonName,
+      full_name: ownerName,
+      first_name: firstName,
+      last_name: lastName,
       source: "self_signup",
     },
     app_metadata: {
@@ -152,6 +180,8 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       billing_period_start: new Date().toISOString().slice(0, 10),
       signup_ip: signupIp,
       signup_user_agent: ua ?? null,
+      niche: "other",
+      ...(planTier ? { plan_tier: planTier, billing_interval: billingInterval } : {}),
     })
     .select("id")
     .single();
@@ -170,7 +200,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     id: userId,
     organization_id: orgId,
     role: "admin",
-    name: salonName,
+    name: ownerName,
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
@@ -191,6 +221,37 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       reasons: fraud.reasons,
     })
     .then(() => undefined);
+
+  try {
+    await recordLegalAcceptances(admin, {
+      userId,
+      organizationId: orgId,
+      documents: ["terms", "privacy"],
+      context: securityCtx,
+    });
+  } catch (err) {
+    await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+    await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
+    return {
+      ok: false,
+      message:
+        err instanceof Error
+          ? err.message
+          : "Could not record legal acceptance.",
+    };
+  }
+
+  await logSecurityEvent(securityCtx, {
+    eventType: "legal_acceptance",
+    outcome: "success",
+    actorUserId: userId,
+    actorEmail: email,
+    metadata: {
+      documents: ["terms", "privacy"],
+      organizationId: orgId,
+      source: "signup",
+    },
+  });
 
   // Auto sign-in via user-scoped client so the wizard sees the session.
   const userClient = await createClient();

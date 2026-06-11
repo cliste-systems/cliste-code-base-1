@@ -17,6 +17,7 @@
  *   - Price     monthly flat      lookup_key = cliste_plan_<tier>_monthly
  *   - Price     annual flat       lookup_key = cliste_plan_<tier>_annual
  *   - Price     metered overage   lookup_key = cliste_plan_<tier>_overage_min
+ *   - Price     metered SMS       lookup_key = cliste_plan_<tier>_overage_sms
  *
  * And per launch tier (diy / remote / onsite_dublin / onsite_rest_ie):
  *   - Product   "Cliste <Name>"   lookup_key = cliste_setup_<tier>
@@ -72,6 +73,11 @@ async function main() {
     `[ok] billing meter ${meter.id} (event_name=${meter.event_name}) ready`,
   );
 
+  const smsMeter = await upsertSmsMeter(stripe);
+  console.log(
+    `[ok] billing meter ${smsMeter.id} (event_name=${smsMeter.event_name}) ready`,
+  );
+
   for (const plan of Object.values(PLANS)) {
     const productLookup = `cliste_plan_${plan.tier}`;
     const product = await upsertProduct(stripe, {
@@ -117,10 +123,27 @@ async function main() {
       },
     });
 
+    const smsOverage = await upsertPrice(stripe, {
+      lookupKey: `cliste_plan_${plan.tier}_overage_sms`,
+      product: product.id,
+      unitAmount: plan.smsOverageRateCents,
+      currency: "eur",
+      interval: "month",
+      nickname: `${plan.name} overage per SMS`,
+      metered: true,
+      meterId: smsMeter.id,
+      metadata: {
+        cliste_plan_tier: plan.tier,
+        cliste_kind: "overage_sms",
+        cliste_meter_event: smsMeter.event_name ?? "cliste_sms",
+      },
+    });
+
     rows.push(
       row(`cliste_plan_${plan.tier}_monthly`, plan.tier, "month", product.id, monthly.id, plan.monthlyCents),
       row(`cliste_plan_${plan.tier}_annual`, plan.tier, "year", product.id, annual.id, plan.annualCents),
       row(`cliste_plan_${plan.tier}_overage_min`, plan.tier, "metered", product.id, overage.id, plan.overageRateCents),
+      row(`cliste_plan_${plan.tier}_overage_sms`, plan.tier, "metered", product.id, smsOverage.id, plan.smsOverageRateCents),
     );
   }
 
@@ -235,17 +258,35 @@ async function upsertProduct(
 async function upsertCallMinutesMeter(
   stripe: Stripe,
 ): Promise<Stripe.Billing.Meter> {
-  const eventName = "cliste_call_minute";
+  return upsertBillingMeter(stripe, {
+    eventName: "cliste_call_minute",
+    displayName: "Cliste AI call minutes",
+  });
+}
+
+async function upsertSmsMeter(
+  stripe: Stripe,
+): Promise<Stripe.Billing.Meter> {
+  return upsertBillingMeter(stripe, {
+    eventName: "cliste_sms",
+    displayName: "Cliste outbound SMS",
+  });
+}
+
+async function upsertBillingMeter(
+  stripe: Stripe,
+  opts: { eventName: string; displayName: string },
+): Promise<Stripe.Billing.Meter> {
   const existing = await stripe.billing.meters.list({ limit: 100 });
   const active = existing.data.find(
-    (m) => m.event_name === eventName && m.status !== "inactive",
+    (m) => m.event_name === opts.eventName && m.status !== "inactive",
   );
   if (active) {
     return active;
   }
   return stripe.billing.meters.create({
-    display_name: "Cliste AI call minutes",
-    event_name: eventName,
+    display_name: opts.displayName,
+    event_name: opts.eventName,
     default_aggregation: { formula: "sum" },
     customer_mapping: {
       event_payload_key: "stripe_customer_id",

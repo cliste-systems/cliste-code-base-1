@@ -1,44 +1,24 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 
-import { listPublicBookingDirectoryNiches } from "@/app/booking-directory-search";
-import { BookingNetworkLanding } from "@/components/booking-network-landing";
-import {
-  hostMatchesConfiguredBookingHost,
-  resolveAppSiteOrigin,
-} from "@/lib/booking-site-origin";
 import { cn } from "@/lib/utils";
 
 const linkButton =
   "inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (hostMatchesConfiguredBookingHost(host)) {
-    return {
-      title: "Cliste — Book",
-      description:
-        "Irish AI voice reception and native online booking for salons, barbershops, and local businesses.",
-    };
-  }
-  return {
-    title: "Cliste Systems",
-    description: "AI voice receptionist control plane for Irish salons",
-  };
-}
+export const metadata: Metadata = {
+  title: "Cliste Systems",
+  description: "AI voice agent that answers every call for your business.",
+};
 
-function AppHome() {
+export default function Home() {
   return (
     <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-6 p-8">
       <div className="max-w-lg space-y-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Cliste Systems
-        </h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Cliste Systems</h1>
         <p className="text-muted-foreground text-sm">
-          Control plane scaffold: salon dashboard, agency admin, and public
-          booking routes are wired. Next steps: Supabase auth and data layer.
+          AI voice agent for your business. Sign in to manage calls, your Action
+          Inbox, routing, and agent setup.
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
@@ -60,32 +40,26 @@ function AppHome() {
         >
           Agency admin
         </Link>
-        <Link
-          href="/demo-salon"
-          className={cn(
-            linkButton,
-            "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50",
-          )}
-        >
-          Sample public page
-        </Link>
       </div>
+      <footer className="mt-4 max-w-lg text-center text-xs text-muted-foreground">
+        <p>
+          <Link href="/legal/terms" className="underline-offset-2 hover:underline">
+            Terms
+          </Link>
+          {" · "}
+          <Link href="/legal/privacy" className="underline-offset-2 hover:underline">
+            Privacy
+          </Link>
+          {" · "}
+          <Link href="/legal/dpa" className="underline-offset-2 hover:underline">
+            DPA
+          </Link>
+          {" · "}
+          <Link href="/legal/cookies" className="underline-offset-2 hover:underline">
+            Cookies
+          </Link>
+        </p>
+      </footer>
     </div>
   );
-}
-
-export default async function Home() {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (hostMatchesConfiguredBookingHost(host)) {
-    const appOrigin = resolveAppSiteOrigin()?.origin ?? null;
-    const directoryNicheOptions = await listPublicBookingDirectoryNiches();
-    return (
-      <BookingNetworkLanding
-        appOrigin={appOrigin}
-        directoryNicheOptions={directoryNicheOptions}
-      />
-    );
-  }
-  return <AppHome />;
 }

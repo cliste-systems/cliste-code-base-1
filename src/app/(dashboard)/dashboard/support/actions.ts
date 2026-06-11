@@ -11,7 +11,7 @@ const MAX_SUBJECT = 200;
 const MAX_BODY = 8000;
 
 export type CreateSupportTicketResult =
-  | { ok: true }
+  | { ok: true; ticketId: string }
   | { ok: false; message: string };
 
 export async function createSupportTicket(payload: {
@@ -36,22 +36,26 @@ export async function createSupportTicket(payload: {
 
   const { supabase, organizationId, user } = await requireDashboardSession();
 
-  const { error } = await supabase.from("support_tickets").insert({
-    organization_id: organizationId,
-    created_by: user.id,
-    subject,
-    body,
-    status: "open",
-  });
+  const { data, error } = await supabase
+    .from("support_tickets")
+    .insert({
+      organization_id: organizationId,
+      created_by: user.id,
+      subject,
+      body,
+      status: "open",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    return { ok: false, message: error.message };
+  if (error || !data?.id) {
+    return { ok: false, message: error?.message ?? "Could not create ticket." };
   }
 
   revalidatePath("/dashboard/support");
   revalidatePath("/admin/support");
   revalidatePath("/admin");
-  return { ok: true };
+  return { ok: true, ticketId: data.id };
 }
 
 export type ReplySupportTicketResult =
@@ -110,6 +114,50 @@ export async function replyToSupportTicket(payload: {
   revalidatePath("/dashboard/support");
   revalidatePath("/admin/support");
   revalidatePath(`/admin/support/${ticketId}`);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export type CloseSupportTicketResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export async function closeSupportTicket(
+  ticketId: string,
+): Promise<CloseSupportTicketResult> {
+  const id = ticketId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid ticket." };
+  }
+
+  const { supabase, organizationId } = await requireDashboardSession();
+
+  const { data: ticket, error: ticketErr } = await supabase
+    .from("support_tickets")
+    .select("id, status")
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (ticketErr || !ticket) {
+    return { ok: false, message: ticketErr?.message ?? "Ticket not found." };
+  }
+
+  if (ticket.status === "closed") {
+    return { ok: true };
+  }
+
+  const { error } = await supabase.rpc("support_ticket_close_if_open", {
+    p_ticket_id: id,
+  });
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/dashboard/support");
+  revalidatePath("/admin/support");
+  revalidatePath(`/admin/support/${id}`);
   revalidatePath("/admin");
   return { ok: true };
 }

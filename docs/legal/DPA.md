@@ -139,7 +139,7 @@ have exclusive jurisdiction.
 | Processor              | Cliste Systems, Ireland                                     |
 | Processor contact      | privacy@clistesystems.ie                                    |
 | Frequency              | Continuous, for the duration of the subscription            |
-| Storage location       | EU (Supabase EU region) for primary data; see Annex III     |
+| Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); app & worker EU-hosted; see Annex III |
 
 ## Annex II — Technical & organisational measures
 
@@ -159,22 +159,22 @@ have exclusive jurisdiction.
 
 ## Annex III — Sub-processors and locations
 
-The authoritative list with country, transfer mechanism and purpose is
-at `https://app.clistesystems.ie/legal/sub-processors`. Snapshot as of
-the date this DPA is signed:
+The authoritative named list with country, transfer mechanism and purpose is
+in the customer dashboard (**Legal & privacy → Sub-processors**) and at
+`/legal/sub-processors` (category summary). Snapshot as of the date this DPA
+is signed:
 
-- Supabase (Ireland, AWS eu-west-1)
+- Supabase — EEA (AWS eu-west-1, Ireland); primary database
+- Vercel — EEA production region (dashboard & APIs)
+- Railway — EEA region (voice worker)
 - Stripe Payments Europe Ltd (Ireland)
-- Twilio Ireland (Ireland; SMS routed via Twilio US for international)
-- LiveKit Inc. (US — DPF certified)
-- ElevenLabs Inc. (US — DPF certified)
-- Deepgram Inc. (US — SCCs)
-- OpenAI Ireland (EU; some processing in US under DPF)
-- OpenRouter (US — SCCs)
-- SendGrid / Twilio (US — DPF)
-- Cloudflare Ireland (Ireland; DDoS / WAF / Turnstile)
-- Vercel Inc. (US — DPF; EU edge for production)
-- Railway (US — SCCs; voice worker hosting)
+- Twilio Ireland (Ireland; SMS may route globally)
+- LiveKit Inc. (US — DPF / SCCs; real-time voice)
+- Deepgram Inc. (US — SCCs; speech-to-text, transient)
+- ElevenLabs Inc. (US — DPF / SCCs; text-to-speech, transient)
+- OpenAI Ireland Ltd (EU entity; US processing possible — DPF / SCCs)
+- SendGrid / Twilio (US — SCCs)
+- Cloudflare Ireland (Ireland; global edge)
 
 ---
 

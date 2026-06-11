@@ -38,7 +38,6 @@ export function AIBrainConfigForm({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setGreetingValue(greeting ?? "");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCustomPromptValue(customPrompt ?? "");
   }, [organizationId, greeting, customPrompt]);
 

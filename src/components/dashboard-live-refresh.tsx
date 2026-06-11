@@ -50,10 +50,10 @@ function shouldPoll(pathname: string | null): boolean {
   if (pathname === "/dashboard/settings") return false;
   if (pathname === "/dashboard") return true;
   const prefixes = [
-    "/dashboard/bookings",
-    "/dashboard/calendar",
+    "/dashboard/calls",
     "/dashboard/call-history",
     "/dashboard/action-inbox",
+    "/dashboard/contacts",
     "/dashboard/clients",
     "/dashboard/support",
   ];

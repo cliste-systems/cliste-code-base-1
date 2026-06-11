@@ -1,16 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { LifeBuoy, Plus, Search } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
-import { SupportThreadMessages } from "@/components/support/support-thread-messages";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
+  DashboardAnimatedGroup,
+  DashboardAnimatedPageSections,
+} from "@/components/dashboard/dashboard-animated-group";
+import { dashboardQuickEnterVariants } from "@/components/dashboard/dashboard-motion";
+import { onboardingPageVariants } from "@/components/onboarding/onboarding-motion";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import {
+  DetailPanelBody,
+  DetailPanelShell,
+  ListDetailLayout,
+} from "@/components/dashboard/list-detail";
+import {
+  DASHBOARD_CARD_SURFACE,
+  DASHBOARD_INPUT_CLASS,
+  DASHBOARD_PRIMARY_BUTTON_CLASS,
+  DASHBOARD_SECONDARY_BUTTON_CLASS,
+} from "@/components/dashboard/dashboard-surface";
+import { SupportThreadMessages } from "@/components/support/support-thread-messages";
+import { StatusPill } from "@/components/dashboard/status-pill";
 import {
   Dialog,
   DialogContent,
@@ -19,77 +34,100 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { LifeBuoy, Plus } from "lucide-react";
 
 import { createSupportTicket } from "./actions";
+import {
+  buildSupportMetrics,
+  formatSupportDate,
+  hasAdminReply,
+  lastActivityAt,
+  matchesSupportFilter,
+  ticketListPreview,
+  type SupportStatusFilter,
+  type SupportTicketRow,
+} from "./support-helpers";
 import { TicketReplyForm } from "./ticket-reply-form";
 
-export type SupportMessageRow = {
-  id: string;
-  author_kind: string;
-  body: string;
-  created_at: string;
-};
-
-export type SupportTicketListRow = {
-  id: string;
-  subject: string;
-  body: string;
-  status: string;
-  created_at: string;
-  support_ticket_messages?: SupportMessageRow[] | null;
-};
-
-function formatListDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-IE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function statusPillClass(status: string): string {
-  const s = status.toLowerCase();
-  if (s === "open") {
-    return "inline-flex items-center rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 capitalize";
-  }
-  return "inline-flex items-center rounded-full border border-gray-200/60 bg-gray-50 px-3 py-1 text-xs font-medium capitalize text-gray-500";
-}
-
 type SupportViewProps = {
-  initialTickets: SupportTicketListRow[];
+  initialTickets: SupportTicketRow[];
+  className?: string;
 };
 
-export function SupportView({ initialTickets }: SupportViewProps) {
+function statusVariant(status: string): "success" | "muted" {
+  return status.toLowerCase() === "open" ? "success" : "muted";
+}
+
+export function SupportView({ initialTickets, className }: SupportViewProps) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
+  const [statusFilter, setStatusFilter] = useState<SupportStatusFilter>("all");
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const [formMsg, setFormMsg] = useState<string | null>(null);
+  const [selectAfterCreate, setSelectAfterCreate] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!selectAfterCreate) return;
+    if (initialTickets.some((t) => t.id === selectAfterCreate)) {
+      setSelectedId(selectAfterCreate);
+      setSelectAfterCreate(null);
+    }
+  }, [initialTickets, selectAfterCreate]);
+
+  const metrics = useMemo(() => buildSupportMetrics(initialTickets), [initialTickets]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return initialTickets.filter((t) => {
+      if (!matchesSupportFilter(t, statusFilter)) return false;
+      if (!q) return true;
+      return (
+        t.subject.toLowerCase().includes(q) ||
+        t.body.toLowerCase().includes(q) ||
+        (t.support_ticket_messages ?? []).some((m) =>
+          m.body.toLowerCase().includes(q),
+        )
+      );
+    });
+  }, [initialTickets, statusFilter, search]);
+
+  const resolvedSelectedId = useMemo(() => {
+    if (selectedId && filtered.some((t) => t.id === selectedId)) {
+      return selectedId;
+    }
+    return filtered[0]?.id ?? null;
+  }, [selectedId, filtered]);
+
+  const selected = useMemo(
+    () => filtered.find((t) => t.id === resolvedSelectedId) ?? null,
+    [filtered, resolvedSelectedId],
+  );
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      setMsg(null);
+      setFormMsg(null);
       startTransition(async () => {
         const result = await createSupportTicket({ subject, body });
         if (result.ok) {
           setSubject("");
           setBody("");
-          setMsg(null);
+          setFormMsg(null);
           setNewOpen(false);
+          setStatusFilter("all");
+          setSelectAfterCreate(result.ticketId);
           router.refresh();
         } else {
-          setMsg(result.message);
+          setFormMsg(result.message);
         }
       });
     },
@@ -99,91 +137,318 @@ export function SupportView({ initialTickets }: SupportViewProps) {
   const onNewOpenChange = useCallback((open: boolean) => {
     setNewOpen(open);
     if (!open) {
-      setMsg(null);
+      setFormMsg(null);
       setSubject("");
       setBody("");
     }
   }, []);
 
-  const fieldClass =
-    "w-full rounded-xl border border-gray-200/80 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 shadow-sm transition-all placeholder:text-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus-visible:ring-gray-900/10";
+  const fieldClass = cn(DASHBOARD_INPUT_CLASS, "text-[13px]");
+
+  const filterTabs: { id: SupportStatusFilter; label: string; count: number }[] =
+    [
+      { id: "all", label: "All", count: metrics.total },
+      { id: "open", label: "Open", count: metrics.open },
+      { id: "closed", label: "Closed", count: metrics.closed },
+    ];
 
   return (
-    <div className="mx-auto w-full max-w-[1000px]">
-      <header className="mb-12 flex flex-col justify-between gap-6 sm:mb-16 sm:flex-row sm:items-start">
-        <div>
-          <div className="mb-4 flex items-center gap-2 text-gray-500">
-            <LifeBuoy className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-            <span className="text-xs font-medium uppercase tracking-widest">
-              Help
-            </span>
-          </div>
-          <h1 className="mb-3 text-3xl font-medium tracking-tight text-gray-900">
-            Support
-          </h1>
-          <p className="max-w-xl text-base leading-relaxed text-gray-500">
-            Open a ticket for the Cliste team. Available on every plan.
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={() => setNewOpen(true)}
-          className="mt-2 h-auto shrink-0 gap-2 rounded-xl border border-transparent bg-gray-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-gray-800 sm:mt-0"
-        >
-          <Plus className="size-4" strokeWidth={2} aria-hidden />
-          New Ticket
-        </Button>
-      </header>
+    <>
+      <DashboardAnimatedPageSections className={className}>
+      <div className="shrink-0">
+        <DashboardPageHeader
+          eyebrow="Support"
+          title="Support"
+          icon={LifeBuoy}
+          description="Submit a ticket when you need help. The Cliste team replies here."
+          descriptionLine2="Your whole team shares this inbox for your business."
+          summary={[
+            { value: String(metrics.open), label: "open" },
+            { value: String(metrics.closed), label: "closed" },
+            { value: String(metrics.total), label: "total" },
+          ]}
+          actions={
+            <Button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              className={DASHBOARD_PRIMARY_BUTTON_CLASS}
+            >
+              <Plus className="size-4" aria-hidden />
+              New ticket
+            </Button>
+          }
+        />
+      </div>
 
-      <div className="mb-12 h-px w-full bg-gray-100" />
+      <section
+        className={cn(
+          DASHBOARD_CARD_SURFACE,
+          "flex min-h-0 flex-1 flex-col overflow-hidden",
+        )}
+      >
+        <ListDetailLayout
+          className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(280px,0.75fr)_minmax(360px,1fr)]"
+          list={
+            <div className="flex h-full min-h-0 flex-col overflow-hidden border-slate-100 bg-white max-xl:border-b xl:border-r">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
+                <div
+                  className="inline-flex w-full rounded-full border border-slate-200 bg-slate-50/90 p-0.5"
+                  role="tablist"
+                  aria-label="Ticket status"
+                >
+                  {filterTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={statusFilter === tab.id}
+                      onClick={() => setStatusFilter(tab.id)}
+                      className={cn(
+                        "min-w-0 flex-1 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+                        statusFilter === tab.id
+                          ? "bg-[#353D42] text-white shadow-sm"
+                          : "text-slate-600 hover:bg-white hover:text-[#0b1220]",
+                      )}
+                    >
+                      {tab.label}
+                      <span
+                        className={cn(
+                          "ml-1 tabular-nums",
+                          statusFilter === tab.id
+                            ? "text-white/80"
+                            : "text-slate-400",
+                        )}
+                      >
+                        {tab.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
+                    aria-hidden
+                  />
+                  <Input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search tickets"
+                    aria-label="Search tickets"
+                    className="h-9 border-slate-300 bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+                {filtered.length === 0 ? (
+                  <EmptyState
+                    icon={LifeBuoy}
+                    title={
+                      initialTickets.length === 0 ? "No tickets yet" : "No matches"
+                    }
+                    description={
+                      initialTickets.length === 0
+                        ? "Use New ticket when you need help from the Cliste team."
+                        : "Try a different filter or search term."
+                    }
+                    className="py-12"
+                  />
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    <AnimatePresence initial={false}>
+                      {filtered.map((t) => {
+                        const active = t.id === resolvedSelectedId;
+                        const replied = hasAdminReply(t);
+                        const row = (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedId(t.id)}
+                            className={cn(
+                              "grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-4 py-3.5 text-left transition-colors sm:px-5",
+                              "hover:bg-slate-50/90",
+                              active && "bg-slate-100/80",
+                            )}
+                          >
+                            <span className="min-w-0">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="text-[14px] font-semibold text-[#0b1220]">
+                                  {t.subject}
+                                </span>
+                                {replied ? (
+                                  <StatusPill
+                                    variant="info"
+                                    className="h-5 px-1.5 py-0 text-[10px]"
+                                  >
+                                    Reply
+                                  </StatusPill>
+                                ) : null}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-[12.5px] leading-snug text-slate-600">
+                                {ticketListPreview(t)}
+                              </span>
+                              <span className="mt-1.5 block text-[11px] tabular-nums text-slate-500">
+                                {formatSupportDate(lastActivityAt(t))}
+                              </span>
+                            </span>
+                            <StatusPill
+                              variant={statusVariant(t.status)}
+                              dot
+                              className="mt-0.5 shrink-0 capitalize"
+                            >
+                              {t.status}
+                            </StatusPill>
+                          </button>
+                        );
+
+                        if (reduceMotion) {
+                          return <li key={t.id}>{row}</li>;
+                        }
+
+                        return (
+                          <motion.li
+                            key={t.id}
+                            variants={dashboardQuickEnterVariants}
+                            initial="hidden"
+                            animate="show"
+                          >
+                            {row}
+                          </motion.li>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </ul>
+                )}
+              </div>
+            </div>
+          }
+          detail={
+            <AnimatePresence mode="wait">
+              {selected ? (
+                <motion.div
+                  key={selected.id}
+                  className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+                  variants={reduceMotion ? undefined : onboardingPageVariants}
+                  initial={reduceMotion ? false : "initial"}
+                  animate={reduceMotion ? undefined : "animate"}
+                  exit={reduceMotion ? undefined : "exit"}
+                >
+                  <DetailPanelShell surface="embedded">
+                    <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
+                          Ticket
+                        </p>
+                        <h2 className="mt-0.5 truncate text-[16px] font-semibold tracking-tight text-[#0b1220]">
+                          {selected.subject}
+                        </h2>
+                        <p className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                          {formatSupportDate(selected.created_at)}
+                        </p>
+                      </div>
+                      <StatusPill
+                        variant={statusVariant(selected.status)}
+                        dot
+                        className="shrink-0 capitalize"
+                      >
+                        {selected.status}
+                      </StatusPill>
+                    </div>
+                    <DetailPanelBody
+                      data-support-thread-scroll
+                      className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-y-contain px-4 py-3"
+                    >
+                      <SupportThreadMessages
+                        openedAt={selected.created_at}
+                        initialBody={selected.body}
+                        messages={selected.support_ticket_messages ?? []}
+                        perspective="salon"
+                      />
+                    </DetailPanelBody>
+                    <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+                      <TicketReplyForm
+                        ticketId={selected.id}
+                        ticketStatus={selected.status}
+                      />
+                      {selected.status.toLowerCase() === "open" &&
+                      !hasAdminReply(selected) ? (
+                        <p className="mt-2 text-[11px] leading-snug text-slate-500">
+                          The Cliste team typically replies within one business day.
+                        </p>
+                      ) : null}
+                    </div>
+                  </DetailPanelShell>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="support-empty-detail"
+                  className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+                  variants={reduceMotion ? undefined : onboardingPageVariants}
+                  initial={reduceMotion ? false : "initial"}
+                  animate={reduceMotion ? undefined : "animate"}
+                  exit={reduceMotion ? undefined : "exit"}
+                >
+                  <DetailPanelShell surface="embedded">
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+                      <EmptyState
+                        icon={LifeBuoy}
+                        title="Select a ticket"
+                        description="Choose a ticket from the list to read the thread and reply."
+                      />
+                    </div>
+                  </DetailPanelShell>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          }
+        />
+      </section>
+      </DashboardAnimatedPageSections>
 
       <Dialog open={newOpen} onOpenChange={onNewOpenChange}>
         <DialogContent className="sm:max-w-md" showCloseButton>
           <DialogHeader>
             <DialogTitle>New ticket</DialogTitle>
             <DialogDescription>
-              Describe your question or issue. Your whole team shares this inbox
-              for your salon.
+              Describe your question or issue. We will reply in this thread.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="support-subject" className="text-gray-700">
-                Subject
-              </Label>
-              <Input
-                id="support-subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g. Can't hear the AI on inbound calls"
-                maxLength={200}
-                autoComplete="off"
-                className={cn(fieldClass, "h-auto min-h-11")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="support-body" className="text-gray-700">
-                Message
-              </Label>
-              <Textarea
-                id="support-body"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Include steps to reproduce, times, and anything that helps us help you."
-                className={cn(fieldClass, "min-h-32 resize-y")}
-                maxLength={8000}
-              />
-            </div>
-            {msg ? (
-              <p className="text-destructive text-sm" role="alert">
-                {msg}
-              </p>
-            ) : null}
-            <DialogFooter className="gap-2 sm:gap-0">
+          <form onSubmit={handleSubmit}>
+            <DashboardAnimatedGroup className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="support-subject">Subject</Label>
+                <Input
+                  id="support-subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="e.g. Call audio quality on inbound calls"
+                  maxLength={200}
+                  autoComplete="off"
+                  className={fieldClass}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="support-body">Message</Label>
+                <Textarea
+                  id="support-body"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Include what happened, when, and anything that helps us help you."
+                  className={cn(fieldClass, "min-h-32 resize-y")}
+                  maxLength={8000}
+                />
+              </div>
+              {formMsg ? (
+                <p className="text-[13px] text-red-600" role="alert">
+                  {formMsg}
+                </p>
+              ) : null}
+            </DashboardAnimatedGroup>
+            <DialogFooter className="mt-4 gap-2 sm:gap-0">
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl border-gray-200/80"
+                className={DASHBOARD_SECONDARY_BUTTON_CLASS}
                 onClick={() => onNewOpenChange(false)}
                 disabled={pending}
               >
@@ -191,7 +456,7 @@ export function SupportView({ initialTickets }: SupportViewProps) {
               </Button>
               <Button
                 type="submit"
-                className="rounded-xl bg-gray-900 hover:bg-gray-800"
+                className={DASHBOARD_PRIMARY_BUTTON_CLASS}
                 disabled={pending}
               >
                 {pending ? "Sending…" : "Submit ticket"}
@@ -200,58 +465,6 @@ export function SupportView({ initialTickets }: SupportViewProps) {
           </form>
         </DialogContent>
       </Dialog>
-
-      <section aria-labelledby="support-history-heading">
-        <h2
-          id="support-history-heading"
-          className="mb-6 text-sm font-medium text-gray-900"
-        >
-          Your tickets
-        </h2>
-        {initialTickets.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-gray-200/80 bg-white px-4 py-12 text-center text-sm text-gray-500 shadow-sm">
-            No tickets yet. Use{" "}
-            <span className="font-medium text-gray-900">New Ticket</span> when you
-            need help.
-          </p>
-        ) : (
-          <Accordion multiple className="flex flex-col gap-3">
-            {initialTickets.map((t) => (
-              <AccordionItem
-                key={t.id}
-                value={t.id}
-                className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm transition-colors hover:border-gray-300"
-              >
-                <AccordionTrigger className="items-center justify-between gap-4 px-5 py-5 hover:bg-transparent hover:no-underline [&>svg]:text-gray-400">
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="block text-base font-medium text-gray-900">
-                      {t.subject}
-                    </span>
-                    <span className="mt-1.5 block text-sm font-normal tabular-nums text-gray-500">
-                      {formatListDate(t.created_at)}
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-4">
-                    <span className={statusPillClass(t.status)}>{t.status}</span>
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="border-t border-gray-100 bg-gray-50/40 px-5 py-4 sm:px-6">
-                  <SupportThreadMessages
-                    openedAt={t.created_at}
-                    initialBody={t.body}
-                    messages={t.support_ticket_messages ?? []}
-                    perspective="salon"
-                  />
-                  <TicketReplyForm
-                    ticketId={t.id}
-                    ticketStatus={t.status}
-                  />
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
-      </section>
-    </div>
+    </>
   );
 }

@@ -5,6 +5,9 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 export type DashboardOrganizationRow = {
   tier: string | null;
   status: string | null;
+  name: string | null;
+  slug: string | null;
+  niche: string | null;
 };
 
 /**
@@ -15,7 +18,7 @@ export const getCachedDashboardOrganizationRow = cache(
     const { supabase, organizationId } = await requireDashboardSession();
     const { data, error } = await supabase
       .from("organizations")
-      .select("tier, status")
+      .select("tier, status, name, slug, niche")
       .eq("id", organizationId)
       .maybeSingle();
     if (error) return null;

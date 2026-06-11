@@ -3,16 +3,8 @@ import "server-only";
 import Stripe from "stripe";
 
 /**
- * Shared Stripe server client.
- *
- * We use Stripe Connect in the **Platform** model:
- * - Each salon has its own **Express connected account** (`acct_…`) stored on
- *   `organizations.stripe_account_id`.
- * - Booking payments are **destination charges** created on the *platform*
- *   account with `transfer_data.destination = <connected account>`; the platform
- *   takes an `application_fee_amount`.
- * - Webhook events therefore land on the platform account endpoint
- *   (`/api/stripe/webhook`), not per-connected-account — simpler for MVP.
+ * Shared Stripe server client for Cliste platform billing (subscriptions,
+ * Billing Portal). Salon customer Connect / booking PaymentIntents were removed in v1.
  */
 let cachedClient: Stripe | null = null;
 

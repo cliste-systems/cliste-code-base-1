@@ -1,0 +1,246 @@
+import "server-only";
+
+import { headers } from "next/headers";
+
+import {
+  isLaunchTier,
+  isPlanTier,
+  normaliseLaunchTierForDb,
+  type LaunchTier,
+  type PlanTier,
+} from "@/lib/cliste-plans";
+import { LOCAL_DEV_APP_ORIGIN, resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { getStripeClient } from "@/lib/stripe";
+import { createAdminClient } from "@/utils/supabase/admin";
+
+export type PlatformCheckoutResult =
+  | { ok: true; mode: "redirect"; url: string }
+  | { ok: true; mode: "embedded"; clientSecret: string }
+  | { ok: false; message: string };
+
+export async function resolveCheckoutReturnOrigin(): Promise<string> {
+  const configured = resolveAppSiteOrigin();
+  if (configured) return configured.origin;
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  return host ? `${proto}://${host}` : LOCAL_DEV_APP_ORIGIN;
+}
+
+/** Persist plan / launch / interval on the org before Checkout. */
+export async function persistOrgBillingSelection(input: {
+  organizationId: string;
+  planTier: PlanTier;
+  launchTier: LaunchTier;
+  interval: "month" | "year";
+}): Promise<void> {
+  const admin = createAdminClient();
+  await admin
+    .from("organizations")
+    .update({
+      plan_tier: input.planTier,
+      launch_tier: normaliseLaunchTierForDb(input.launchTier),
+      billing_interval: input.interval,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.organizationId);
+}
+
+type PlatformCheckoutBaseInput = {
+  organizationId: string;
+  userEmail: string | undefined;
+  planTier: PlanTier;
+  launchTier: LaunchTier;
+  interval: "month" | "year";
+  idempotencyKey: string;
+};
+
+type RedirectCheckoutInput = PlatformCheckoutBaseInput & {
+  checkoutMode?: "redirect";
+  successUrl: string;
+  cancelUrl: string;
+};
+
+type EmbeddedCheckoutInput = PlatformCheckoutBaseInput & {
+  checkoutMode: "embedded";
+  returnUrl: string;
+};
+
+/**
+ * Stripe Billing Checkout for the Cliste platform subscription (plan + metered
+ * overage, optional one-off launch fee).
+ */
+export async function createPlatformSubscriptionCheckout(
+  input: RedirectCheckoutInput | EmbeddedCheckoutInput,
+): Promise<PlatformCheckoutResult> {
+  await persistOrgBillingSelection({
+    organizationId: input.organizationId,
+    planTier: input.planTier,
+    launchTier: input.launchTier,
+    interval: input.interval,
+  });
+
+  const admin = createAdminClient();
+
+  const planKey =
+    input.interval === "year"
+      ? `cliste_plan_${input.planTier}_annual`
+      : `cliste_plan_${input.planTier}_monthly`;
+  const overageKey = `cliste_plan_${input.planTier}_overage_min`;
+  const smsOverageKey = `cliste_plan_${input.planTier}_overage_sms`;
+  const wantedKeys = [planKey, overageKey, smsOverageKey];
+  if (input.launchTier !== "diy") {
+    wantedKeys.push(`cliste_setup_${input.launchTier}_once`);
+  }
+
+  const { data: priceRows } = await admin
+    .from("stripe_platform_prices")
+    .select("key, stripe_price_id")
+    .in("key", wantedKeys)
+    .eq("active", true);
+
+  const priceMap = new Map<string, string>();
+  for (const r of priceRows ?? []) {
+    priceMap.set(r.key as string, r.stripe_price_id as string);
+  }
+
+  const planPriceId = priceMap.get(planKey);
+  const overagePriceId = priceMap.get(overageKey);
+  const smsOveragePriceId = priceMap.get(smsOverageKey);
+  if (!planPriceId || !overagePriceId) {
+    return {
+      ok: false,
+      message:
+        "Pricing isn't configured yet. Run `npm run stripe:bootstrap` from the app repo and refresh.",
+    };
+  }
+
+  const stripe = getStripeClient();
+  const lineItems: Array<{ price: string; quantity?: number }> = [
+    { price: planPriceId, quantity: 1 },
+    { price: overagePriceId },
+  ];
+  if (smsOveragePriceId) {
+    lineItems.push({ price: smsOveragePriceId });
+  }
+
+  const addInvoiceItems: Array<{ price: string; quantity?: number }> = [];
+  if (input.launchTier !== "diy") {
+    const setupPriceId = priceMap.get(`cliste_setup_${input.launchTier}_once`);
+    if (setupPriceId) {
+      addInvoiceItems.push({ price: setupPriceId, quantity: 1 });
+    }
+  }
+
+  const sessionBase = {
+    mode: "subscription" as const,
+    line_items: lineItems,
+    customer_email: input.userEmail,
+    allow_promotion_codes: true,
+    subscription_data: {
+      trial_period_days: 14,
+      metadata: {
+        cliste_organization_id: input.organizationId,
+        cliste_plan_tier: input.planTier,
+        cliste_launch_tier: input.launchTier,
+      },
+      ...(addInvoiceItems.length > 0
+        ? { add_invoice_items: addInvoiceItems }
+        : {}),
+    },
+    metadata: {
+      cliste_organization_id: input.organizationId,
+      cliste_plan_tier: input.planTier,
+      cliste_launch_tier: input.launchTier,
+    },
+  };
+
+  try {
+    if (input.checkoutMode === "embedded") {
+      const checkout = await stripe.checkout.sessions.create(
+        {
+          ...sessionBase,
+          ui_mode: "embedded_page",
+          return_url: input.returnUrl,
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+
+      if (!checkout.client_secret) {
+        return {
+          ok: false,
+          message: "Stripe did not return an embedded Checkout client secret.",
+        };
+      }
+      return { ok: true, mode: "embedded", clientSecret: checkout.client_secret };
+    }
+
+    const checkout = await stripe.checkout.sessions.create(
+      {
+        ...sessionBase,
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+      },
+      { idempotencyKey: input.idempotencyKey },
+    );
+
+    if (!checkout.url) {
+      return { ok: false, message: "Stripe did not return a Checkout URL." };
+    }
+    return { ok: true, mode: "redirect", url: checkout.url };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Checkout failed.";
+    console.error("[platform-billing] checkout failed", err);
+    return { ok: false, message };
+  }
+}
+
+/** Persist Stripe customer + subscription ids after Checkout success. */
+export async function persistPlatformCheckoutSession(
+  organizationId: string,
+  checkoutSessionId: string,
+): Promise<void> {
+  if (!checkoutSessionId.trim()) return;
+
+  const stripe = getStripeClient();
+  const co = await stripe.checkout.sessions.retrieve(checkoutSessionId, {
+    expand: ["subscription", "customer"],
+  });
+
+  if (co.metadata?.cliste_organization_id !== organizationId) {
+    throw new Error("Checkout session does not belong to this organisation.");
+  }
+
+  const subscriptionId =
+    typeof co.subscription === "string"
+      ? co.subscription
+      : co.subscription?.id ?? null;
+  const customerId =
+    typeof co.customer === "string" ? co.customer : co.customer?.id ?? null;
+
+  const admin = createAdminClient();
+  await admin
+    .from("organizations")
+    .update({
+      platform_subscription_id: subscriptionId,
+      platform_customer_id: customerId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", organizationId);
+}
+
+export function parseOrgBillingSelection(org: {
+  plan_tier: string | null;
+  launch_tier: string | null;
+  billing_interval: string | null;
+}): {
+  planTier: PlanTier;
+  launchTier: LaunchTier;
+  interval: "month" | "year";
+} {
+  const planTier = isPlanTier(org.plan_tier) ? org.plan_tier : "pro";
+  const launchTier =
+    isLaunchTier(org.launch_tier ?? "") ? (org.launch_tier as LaunchTier) : "diy";
+  const interval = org.billing_interval === "year" ? "year" : "month";
+  return { planTier, launchTier, interval };
+}

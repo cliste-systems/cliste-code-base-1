@@ -18,10 +18,10 @@ export function OpenBillingPortalButton({ className }: { className?: string }) {
             setError(null);
             try {
               const res = await openBillingPortal();
-              if (res?.url) {
+              if (res.ok) {
                 window.location.href = res.url;
               } else {
-                setError("Could not open billing portal.");
+                setError(res.message);
               }
             } catch (err) {
               setError(
@@ -32,9 +32,9 @@ export function OpenBillingPortalButton({ className }: { className?: string }) {
             }
           })
         }
-        className="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex items-center justify-center rounded-xl bg-[#0b1220] px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-[#0b1220]/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Opening…" : "Manage subscription"}
+        {pending ? "Opening…" : "Manage billing"}
       </button>
       {error ? (
         <p className="mt-2 text-xs text-red-600">{error}</p>

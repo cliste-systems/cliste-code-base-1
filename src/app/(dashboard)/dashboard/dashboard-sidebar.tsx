@@ -2,23 +2,17 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
-  Calendar,
+  Bot,
   ChevronRight,
-  CreditCard,
   Gauge,
-  HelpCircle,
   Inbox,
   LayoutDashboard,
-  NotebookText,
+  LifeBuoy,
   Phone,
-  Scissors,
   Settings,
-  ShieldCheck,
-  ShoppingBag,
-  Store,
+  Share2,
+  Shield,
   Users,
-  Waves,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -27,25 +21,26 @@ import { usePathname } from "next/navigation";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import { cn } from "@/lib/utils";
 
+import type { DashboardAccountSummary } from "@/lib/dashboard-account-summary";
+
 import { DashboardSignOutButton } from "./dashboard-sign-out-button";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
-  "/dashboard/action-inbox": Inbox,
+  "/dashboard/calls": Phone,
   "/dashboard/call-history": Phone,
-  "/dashboard/calendar": Calendar,
-  "/dashboard/bookings": NotebookText,
+  "/dashboard/action-inbox": Inbox,
+  "/dashboard/contacts": Users,
   "/dashboard/clients": Users,
-  "/dashboard/services": ShoppingBag,
-  "/dashboard/team": Scissors,
-  "/dashboard/storefront": Store,
-  "/dashboard/payments": CreditCard,
-  "/dashboard/reports": BarChart3,
-  "/cara": Waves,
+  "/dashboard/routing": Share2,
+  "/dashboard/cara-setup": Bot,
+  "/dashboard/agent-setup": Bot,
+  "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
-  "/dashboard/support": HelpCircle,
+  "/dashboard/support": LifeBuoy,
+  "/dashboard/legal/data-requests": Shield,
+  "/dashboard/privacy": Shield,
   "/dashboard/settings": Settings,
-  "/dashboard/privacy": ShieldCheck,
 };
 
 export type DashboardSidebarNavItem = {
@@ -60,6 +55,9 @@ type DashboardSidebarProps = {
   caraNav: DashboardSidebarNavItem[];
   adminNav: DashboardSidebarNavItem[];
   needsPassword: boolean;
+  account: DashboardAccountSummary;
+  /** Short word beside the wordmark; falls back to "Connect" when not tailored. */
+  productNoun?: string | null;
 };
 
 function NavRow({
@@ -79,33 +77,29 @@ function NavRow({
     <Link
       href={href}
       className={cn(
-        "flex h-9 items-center justify-between gap-2 rounded-[10px] px-3 text-[13px] transition-colors",
+        "group flex h-11 items-center justify-between gap-2 rounded-xl px-3 text-[13px] transition-colors",
         active
-          ? "bg-[#e8edf3] font-medium text-[#0f172a]"
-          : "group font-normal text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]",
+          ? "border border-slate-200 bg-white font-semibold text-[#0b1220] shadow-[0_1px_2px_rgba(15,23,42,0.05),0_8px_20px_-14px_rgba(15,23,42,0.25)]"
+          : "border border-transparent font-normal text-slate-500 hover:bg-white/70 hover:text-[#0b1220]",
       )}
       aria-current={active ? "page" : undefined}
     >
       <span className="flex min-w-0 flex-1 items-center gap-3">
         <Icon
           className={cn(
-            "size-[17px] shrink-0 transition-colors",
+            "size-4 shrink-0 transition-colors",
             active
               ? "text-[#0f172a]"
               : "text-[#64748b] group-hover:text-[#0f172a]",
           )}
+          strokeWidth={1.75}
           aria-hidden
         />
         <span className="truncate">{label}</span>
       </span>
       {showBadge ? (
         <span
-          className={cn(
-            "inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold text-white tabular-nums",
-            href === "/dashboard/action-inbox"
-              ? "bg-[#334155]"
-              : "bg-[#0f172a]",
-          )}
+          className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums"
           aria-label={`${formatNavBadgeCount(badge)} pending`}
         >
           {formatNavBadgeCount(badge)}
@@ -127,7 +121,7 @@ function NavSection({
 
   return (
     <section className="space-y-1.5">
-      <p className="px-3 text-[9px] font-semibold tracking-[0.14em] text-[#94a3b8] uppercase">
+      <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
         {label}
       </p>
       <div className="space-y-0.5">
@@ -154,13 +148,15 @@ export function DashboardSidebar({
   caraNav,
   adminNav,
   needsPassword,
+  account,
+  productNoun,
 }: DashboardSidebarProps) {
   return (
-    <aside className="relative z-10 hidden h-dvh w-[288px] shrink-0 flex-col overflow-hidden border-r border-[#e8ecf0] bg-[#fafbfc] lg:flex">
+    <aside className="relative z-10 hidden h-dvh w-[260px] shrink-0 flex-col overflow-hidden border-r border-slate-200/80 bg-[#fafbfc] lg:flex">
       <div className="flex h-full min-h-0 flex-col overflow-hidden px-4 pb-4 pt-7">
         <div className="mb-6 flex min-w-0 shrink-0 items-center gap-3.5 px-0.5">
           <Image
-            src="/cliste-logo.png"
+            src="/m8x4p2n7.png"
             alt=""
             width={48}
             height={48}
@@ -171,18 +167,18 @@ export function DashboardSidebar({
             <p className="text-[15px] font-semibold tracking-[0.18em] text-[#0f172a]">
               CLISTE
             </p>
-            <p className="mt-1 text-[10px] font-medium tracking-[0.26em] text-[#64748b]">
-              STUDIO
+            <p className="mt-1 text-[10px] font-medium tracking-[0.14em] text-[#64748b]">
+              {productNoun ?? "Connect"}
             </p>
           </div>
         </div>
 
-        <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-hidden pt-0.5">
-          <NavSection label="Core Operations" items={coreNav} />
+        <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-0.5">
+          <NavSection label="Workspace" items={coreNav} />
           <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
           <NavSection label="Cara" items={caraNav} />
           <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-          <NavSection label="Admin & Account" items={adminNav} />
+          <NavSection label="Account" items={adminNav} />
           {needsPassword ? (
             <>
               <Link
@@ -202,17 +198,17 @@ export function DashboardSidebar({
         <div className="mt-auto shrink-0 space-y-2 border-t border-[#e8ecf0] pt-4">
           <Link
             href="/dashboard/settings"
-            className="flex items-center gap-2.5 rounded-xl border border-[#e2e8f0] bg-white px-2.5 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:border-[#cbd5e1] hover:bg-[#fcfcfd]"
+            className="flex items-center gap-2.5 rounded-[18px] border border-slate-200/80 bg-white px-3 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-white/70 transition-colors hover:border-slate-300 hover:bg-[#fcfcfd]"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f1f5f9] text-[10px] font-semibold tracking-tight text-[#64748b]">
-              SD
+              {account.initials}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[12px] font-semibold text-[#0f172a]">
-                Sarah Doyle
+                {account.displayName}
               </span>
               <span className="mt-0.5 block truncate text-[11px] leading-snug text-[#64748b]">
-                Admin · Willow &amp; Co Studio
+                {account.subtitle}
               </span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-[#cbd5e1]" aria-hidden />

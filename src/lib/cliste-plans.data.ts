@@ -2,9 +2,7 @@
  * Pure data for Cliste platform plans + launches.
  *
  * This file is isomorphic: no `server-only`, no Next imports, no Supabase.
- * That lets the Node-based `scripts/stripe-bootstrap.ts` import it directly
- * under tsx while `src/lib/cliste-plans.ts` re-exports it for app code with
- * the `server-only` guard attached.
+ * Marketing site CTAs should use the same tier slugs: starter | pro | business | custom
  */
 
 export type PlanTier = "starter" | "pro" | "business" | "enterprise";
@@ -18,88 +16,94 @@ export type PlanDefinition = {
   monthlyCents: number;
   annualCents: number;
   includedMinutes: number;
+  includedSms: number;
   overageRateCents: number;
+  smsOverageRateCents: number;
   applicationFeeBps: number;
   features: string[];
   recommended?: boolean;
+  /** When false, checkout is blocked — contact sales (Custom / Enterprise). */
+  selfServe: boolean;
 };
 
 export const PLANS: Record<PlanTier, PlanDefinition> = {
   starter: {
     tier: "starter",
     name: "Starter",
-    tagline: "Solo stylists, barbers, nail techs. One chair, no staff logins.",
+    tagline:
+      "For smaller businesses that want calls answered and requests captured.",
     monthlyCents: 9900,
     annualCents: 9900 * 10,
-    includedMinutes: 150,
-    overageRateCents: 70,
+    includedMinutes: 140,
+    includedSms: 40,
+    overageRateCents: 59,
+    smsOverageRateCents: 15,
     applicationFeeBps: 150,
+    selfServe: true,
     features: [
-      "AI receptionist 24/7",
-      "Calendar + service menu",
-      "SMS confirmations + reminders",
-      "Stripe Connect payments",
-      "1 staff login",
-      "150 AI call minutes/mo, €0.70/min after",
-      "1.5% platform fee on card bookings",
+      "Cara answers calls 24/7",
+      "Call summaries and Action Inbox",
+      "Call flow routing (links, files, inbox)",
     ],
   },
   pro: {
     tier: "pro",
     name: "Professional",
-    tagline: "2–5 chair salons. The sweet spot for most independent salons.",
+    tagline:
+      "For busy local businesses handling more calls each month.",
     monthlyCents: 24900,
     annualCents: 24900 * 10,
     includedMinutes: 500,
+    includedSms: 150,
     overageRateCents: 55,
+    smsOverageRateCents: 15,
     applicationFeeBps: 100,
     recommended: true,
+    selfServe: true,
     features: [
-      "Everything in Starter, plus:",
-      "500 AI call minutes/mo, €0.55/min after",
-      "1.0% platform fee on card bookings",
-      "No-show deposits + cancellation policies",
-      "Online payments + rebooking reminders",
-      "Weekly performance email",
-      "Up to 5 staff logins",
+      "Everything in Starter",
+      "Lower per-minute rate as you grow",
+      "Priority onboarding support",
     ],
   },
   business: {
     tier: "business",
     name: "Business",
-    tagline: "6+ chair salons, premium spas.",
-    monthlyCents: 49900,
-    annualCents: 49900 * 10,
-    includedMinutes: 1500,
-    overageRateCents: 40,
+    tagline:
+      "For high-volume or multi-location businesses that need more included usage.",
+    monthlyCents: 44900,
+    annualCents: 44900 * 10,
+    includedMinutes: 1000,
+    includedSms: 300,
+    overageRateCents: 49,
+    smsOverageRateCents: 15,
     applicationFeeBps: 50,
+    selfServe: true,
     features: [
-      "Everything in Professional, plus:",
-      "1,500 AI call minutes/mo, €0.40/min after",
-      "0.5% platform fee on card bookings",
-      "Quarterly AI prompt tuning with our team",
+      "Everything in Professional",
+      "Lowest standard per-minute rate",
       "Priority phone support",
-      "Unlimited staff logins",
-      "Analytics dashboard",
     ],
   },
   enterprise: {
     tier: "enterprise",
-    name: "Enterprise",
-    tagline: "Multi-location, chains, franchises. Talk to us.",
-    monthlyCents: 99900,
-    annualCents: 99900 * 10,
-    includedMinutes: 4000,
-    overageRateCents: 30,
+    name: "Custom",
+    tagline:
+      "Volume pricing, negotiated rates, and tailored setup for larger businesses.",
+    monthlyCents: 44900,
+    annualCents: 44900 * 10,
+    includedMinutes: 2000,
+    includedSms: 500,
+    overageRateCents: 45,
+    smsOverageRateCents: 15,
     applicationFeeBps: 25,
+    selfServe: false,
     features: [
-      "Everything in Business, plus:",
-      "4,000+ AI call minutes/mo, €0.30/min after",
-      "0.25% platform fee (negotiable)",
+      "Volume minutes and SMS",
+      "Negotiated overage rates",
       "Multi-location routing",
-      "Dedicated success manager",
-      "Monthly AI tuning",
-      "Custom voice branding + SSO",
+      "Dedicated success contact",
+      "Custom Cara setup reviews",
     ],
   },
 };
@@ -124,14 +128,14 @@ export const LAUNCHES: Record<LaunchTier, LaunchDefinition> = {
     tier: "remote",
     name: "Remote Launch",
     description:
-      "60-minute Zoom with a Cliste specialist. We co-write your AI prompt from your menu, walk through forwarding setup, run 3 test calls together.",
+      "60-minute Zoom with a Cliste specialist. We co-write your AI prompt, walk through forwarding, run test calls together.",
     priceCents: 14900,
   },
   onsite_dublin: {
     tier: "onsite_dublin",
     name: "On-Site Launch (Dublin + commuter belt)",
     description:
-      "Specialist visits your salon: sets up forwarding on your phone, trains all staff, runs 10+ test calls, updates your Google Business Profile + Instagram.",
+      "Specialist visits your premises: sets up forwarding, trains staff, runs test calls, updates Google Business Profile.",
     priceCents: 34900,
     targetRegion: "Dublin, Kildare, Meath, Wicklow, Louth",
   },
@@ -139,11 +143,18 @@ export const LAUNCHES: Record<LaunchTier, LaunchDefinition> = {
     tier: "onsite_rest_ie",
     name: "On-Site Launch (rest of Ireland)",
     description:
-      "Specialist visits your salon. Same scope as the Dublin on-site launch; includes travel time + mileage for the rest of the country.",
+      "Same scope as Dublin on-site; includes travel for the rest of the country.",
     priceCents: 44900,
-    targetRegion: "Cork, Galway, Limerick, Waterford, and anywhere else in Ireland",
+    targetRegion: "Cork, Galway, Limerick, Waterford, and nationwide",
   },
 };
+
+/** Self-serve tiers shown in checkout (excludes Custom). */
+export const SELF_SERVE_PLAN_TIERS: PlanTier[] = (
+  Object.values(PLANS) as PlanDefinition[]
+)
+  .filter((p) => p.selfServe)
+  .map((p) => p.tier);
 
 export function planFromPriceCents(cents: number): PlanTier | null {
   for (const p of Object.values(PLANS)) {
@@ -178,4 +189,8 @@ export function normaliseLaunchTierForDb(
   if (t === "diy") return "diy";
   if (t === "remote") return "remote";
   return "onsite";
+}
+
+export function planSupportsSelfServeCheckout(tier: PlanTier): boolean {
+  return PLANS[tier].selfServe;
 }

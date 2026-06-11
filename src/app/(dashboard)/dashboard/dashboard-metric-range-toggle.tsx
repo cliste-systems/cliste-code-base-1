@@ -7,18 +7,28 @@ import { cn } from "@/lib/utils";
 
 const OPTIONS: { value: DashboardMetricRangeKey; label: string }[] = [
   { value: "today", label: "Today" },
-  { value: "yesterday", label: "Yesterday" },
   { value: "7d", label: "7 days" },
   { value: "4w", label: "30 days" },
 ];
 
-export function DashboardMetricRangeToggle() {
+type DashboardMetricRangeToggleProps = {
+  /** Hero panel: lighter pill on silver gradient background. */
+  variant?: "default" | "hero";
+};
+
+export function DashboardMetricRangeToggle({
+  variant = "default",
+}: DashboardMetricRangeToggleProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const raw = searchParams.get("range");
   const current: DashboardMetricRangeKey =
-    raw === "yesterday" || raw === "7d" || raw === "4w" ? raw : "today";
+    raw === "7d" || raw === "4w" || raw === "30d"
+      ? raw === "30d"
+        ? "4w"
+        : raw
+      : "today";
 
   function setRange(next: DashboardMetricRangeKey) {
     const q = new URLSearchParams(searchParams.toString());
@@ -31,9 +41,16 @@ export function DashboardMetricRangeToggle() {
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   }
 
+  const isHero = variant === "hero";
+
   return (
     <div
-      className="no-scrollbar inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-[#e2e8f0] bg-white p-1 shadow-[0_12px_30px_rgba(15,23,42,0.04)]"
+      className={cn(
+        "no-scrollbar inline-flex max-w-full items-center overflow-x-auto rounded-full border backdrop-blur",
+        isHero
+          ? "gap-0 border-white/60 bg-white/70 p-0.5 shadow-[0_6px_18px_rgba(15,23,42,0.05)]"
+          : "gap-0.5 border-[#e5eaf2] bg-white/70 p-1 shadow-[0_8px_30px_rgba(15,23,42,0.04)]",
+      )}
       role="group"
       aria-label="Metrics time range"
     >
@@ -45,10 +62,15 @@ export function DashboardMetricRangeToggle() {
             type="button"
             onClick={() => setRange(value)}
             className={cn(
-              "h-[42px] shrink-0 rounded-full px-4 text-[13px] font-medium whitespace-nowrap transition-colors",
+              "shrink-0 rounded-full font-medium whitespace-nowrap transition-colors",
+              isHero
+                ? "h-9 px-3.5 text-[12px]"
+                : "h-[42px] px-4 text-[13px]",
               active
-                ? "bg-[#3f4451] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_6px_rgba(15,23,42,0.12)]"
-                : "text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]",
+                ? "bg-[#0b1220] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_6px_rgba(15,23,42,0.12)]"
+                : isHero
+                  ? "text-slate-600 hover:bg-white/80 hover:text-[#0b1220]"
+                  : "text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]",
             )}
           >
             {label}
