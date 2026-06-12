@@ -15,6 +15,7 @@ import {
   ONBOARDING_FIELD_HINT,
   ONBOARDING_FIELD_INPUT,
 } from "@/components/onboarding/onboarding-ui";
+import { AuthFormAlert } from "@/components/auth/auth-form-alert";
 import { cn } from "@/lib/utils";
 
 import { passwordSignIn } from "./actions";
@@ -173,13 +174,7 @@ export function LoginForm() {
           </OnboardingEnter>
         ) : null}
 
-        {error ? (
-          <OnboardingEnter tone="profile">
-            <p className="text-center text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          </OnboardingEnter>
-        ) : null}
+        <AuthFormAlert message={error} />
 
         <OnboardingEnter tone="profile" className="flex justify-center pt-2">
           <OnboardingPrimaryButton

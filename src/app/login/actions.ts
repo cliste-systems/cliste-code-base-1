@@ -50,9 +50,9 @@ function maskEmailForLog(raw: string | null | undefined): string {
 
 function genericAuthFailureMessage(retryAfterSeconds?: number): string {
   if (retryAfterSeconds && retryAfterSeconds > 0) {
-    return `Too many attempts. Try again in ${retryAfterSeconds}s.`;
+    return `For your security, sign-in is paused for ${retryAfterSeconds} seconds. Then try again.`;
   }
-  return "Invalid email or password.";
+  return "We couldn't sign you in with those details. Check your email and password, then try again.";
 }
 
 export async function passwordSignIn(payload: {

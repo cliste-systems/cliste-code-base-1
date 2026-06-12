@@ -19,6 +19,7 @@ import {
   LegalAcceptanceCheckbox,
   LegalDocLink,
 } from "@/components/legal/legal-acceptance-checkbox";
+import { AuthFormAlert } from "@/components/auth/auth-form-alert";
 import { cn } from "@/lib/utils";
 import type { BillingInterval, PlanTier } from "@/lib/cliste-plans";
 
@@ -270,13 +271,7 @@ export function SignupForm({
           </div>
         </OnboardingEnter>
 
-        {errorMessage ? (
-          <OnboardingEnter tone="profile">
-            <p className="text-center text-sm text-red-600" role="alert">
-              {errorMessage}
-            </p>
-          </OnboardingEnter>
-        ) : null}
+        <AuthFormAlert message={errorMessage || null} />
 
         {turnstileSiteKey ? (
           <OnboardingEnter tone="profile" className="flex justify-center">

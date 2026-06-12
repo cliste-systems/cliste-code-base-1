@@ -22,6 +22,7 @@ import {
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { cn } from "@/lib/utils";
 
+import { AuthFormAlert } from "./auth-form-alert";
 import { AUTH_CARD, AUTH_PAGE_BG } from "./auth-ui";
 
 type PageBackground = {
@@ -139,14 +140,9 @@ function SignupGlassShell({
 
           <div className="w-full">
             {urlError ? (
-              <OnboardingEnter tone="profile">
-                <p
-                  className="mb-4 rounded-2xl border border-red-200/80 bg-red-50/70 px-4 py-3 text-center text-sm leading-relaxed text-red-700"
-                  role="alert"
-                >
-                  {urlError}
-                </p>
-              </OnboardingEnter>
+              <div className="mb-4">
+                <AuthFormAlert message={urlError} />
+              </div>
             ) : null}
             {children}
           </div>
