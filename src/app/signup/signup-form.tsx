@@ -122,10 +122,11 @@ export function SignupForm({
         setVerifyingSecurity(true);
         try {
           turnstileRef.current?.execute();
-          token = await turnstileRef.current?.getResponsePromise(20_000);
-          if (!token) {
+          const verified = await turnstileRef.current?.getResponsePromise(20_000);
+          if (!verified) {
             throw new Error("missing token");
           }
+          token = verified;
           setTurnstileToken(token);
         } catch {
           setFieldErrors({
