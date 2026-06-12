@@ -1,45 +1,39 @@
 "use client";
 
-import { Turnstile } from "@marsidev/react-turnstile";
-
-import { ONBOARDING_PROFILE_FIELD_BOX } from "@/components/onboarding/onboarding-ui";
-import { cn } from "@/lib/utils";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { forwardRef } from "react";
 
 type Props = {
   siteKey: string;
-  token: string | null;
   onSuccess: (token: string) => void;
   onExpire: () => void;
-  className?: string;
+  onError?: () => void;
+  onReady?: () => void;
 };
 
-/** Turnstile wrapped to match onboarding glass field styling. */
-export function AuthTurnstileField({
-  siteKey,
-  token,
-  onSuccess,
-  onExpire,
-  className,
-}: Props) {
-  return (
-    <div
-      className={cn(
-        ONBOARDING_PROFILE_FIELD_BOX,
-        "flex min-h-0 items-center justify-center overflow-hidden px-2 py-1",
-        "[&_iframe]:rounded-lg",
-        className,
-      )}
-    >
-      <input type="hidden" name="turnstileToken" value={token ?? ""} />
+/**
+ * Invisible Turnstile — no checkbox in the form. Challenge runs on execute();
+ * Cloudflare only surfaces UI when interaction is required.
+ */
+export const AuthInvisibleTurnstile = forwardRef<TurnstileInstance, Props>(
+  function AuthInvisibleTurnstile(
+    { siteKey, onSuccess, onExpire, onError, onReady },
+    ref,
+  ) {
+    return (
       <Turnstile
+        ref={ref}
         siteKey={siteKey}
         onSuccess={onSuccess}
         onExpire={onExpire}
+        onError={onError}
+        onWidgetLoad={onReady}
         options={{
-          theme: "light",
-          size: "compact",
+          execution: "execute",
+          appearance: "interaction-only",
         }}
+        className="sr-only"
       />
-    </div>
-  );
-}
+    );
+  },
+);

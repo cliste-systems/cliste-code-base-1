@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState, type FormEvent } from "react";
+import { useActionState, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
-import { AuthTurnstileField } from "@/components/auth/auth-turnstile-field";
+import { AuthInvisibleTurnstile } from "@/components/auth/auth-turnstile-field";
 import {
   OnboardingFieldBox,
   OnboardingFieldRow,
@@ -14,7 +15,6 @@ import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-prim
 import {
   ONBOARDING_FIELD_INPUT,
   ONBOARDING_GLASS_PREVIEW,
-  ONBOARDING_PROFILE_FIELD_BOX,
 } from "@/components/onboarding/onboarding-ui";
 import {
   LegalAcceptanceCheckbox,
@@ -91,6 +91,8 @@ export function SignupForm({
   const [showPw, setShowPw] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [verifyingSecurity, setVerifyingSecurity] = useState(false);
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const turnstileSiteKey =
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
   const errorMessage = !state.ok && state.message ? state.message : null;
@@ -104,21 +106,43 @@ export function SignupForm({
     });
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    const formData = new FormData(event.currentTarget);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const errors = validateSignupFields(formData);
     if (Object.keys(errors).length > 0) {
-      event.preventDefault();
       setFieldErrors(errors);
       return;
     }
-    if (turnstileSiteKey && !turnstileToken) {
-      event.preventDefault();
-      setFieldErrors({ email: "Please complete the security check." });
-      return;
+
+    let token = turnstileToken;
+    if (turnstileSiteKey) {
+      if (!token) {
+        setVerifyingSecurity(true);
+        try {
+          turnstileRef.current?.execute();
+          token = await turnstileRef.current?.getResponsePromise(20_000);
+          if (!token) {
+            throw new Error("missing token");
+          }
+          setTurnstileToken(token);
+        } catch {
+          setFieldErrors({
+            email: "Security check failed. Please try again.",
+          });
+          turnstileRef.current?.reset();
+          setTurnstileToken(null);
+          setVerifyingSecurity(false);
+          return;
+        }
+        setVerifyingSecurity(false);
+      }
+      formData.set("turnstileToken", token);
     }
+
     setFieldErrors({});
-    // Valid submits use the native form action so server redirects work.
+    formAction(formData);
   }
 
   return (
@@ -255,12 +279,7 @@ export function SignupForm({
         </OnboardingFieldBox>
 
         <OnboardingEnter tone="profile">
-          <div
-            className={cn(
-              ONBOARDING_PROFILE_FIELD_BOX,
-              "space-y-2 px-3.5 py-2.5",
-            )}
-          >
+          <div className="space-y-1">
             <LegalAcceptanceCheckbox
               id="acceptLegal"
               name="acceptLegal"
@@ -268,8 +287,8 @@ export function SignupForm({
               compact
               onCheckedChange={() => clearFieldError("acceptLegal")}
               className={cn(
-                "border-0 bg-transparent p-0 shadow-none",
-                fieldErrors.acceptLegal && "text-red-700",
+                fieldErrors.acceptLegal &&
+                  "border-red-300/90 bg-red-50/60 ring-1 ring-red-200",
               )}
             >
               I agree to the{" "}
@@ -278,31 +297,36 @@ export function SignupForm({
               <LegalDocLink href="/legal/privacy">privacy notice</LegalDocLink>.
             </LegalAcceptanceCheckbox>
             {fieldErrors.acceptLegal ? (
-              <p className="text-[11px] font-medium leading-snug text-red-600">
+              <p className="px-1 text-[11px] font-medium leading-snug text-red-600">
                 {fieldErrors.acceptLegal}
               </p>
             ) : null}
-            {turnstileSiteKey ? (
-              <AuthTurnstileField
-                siteKey={turnstileSiteKey}
-                token={turnstileToken}
-                onSuccess={setTurnstileToken}
-                onExpire={() => setTurnstileToken(null)}
-                className="border-0 bg-white/35 px-0 py-0 shadow-none ring-0"
-              />
-            ) : null}
           </div>
         </OnboardingEnter>
+
+        {turnstileSiteKey ? (
+          <AuthInvisibleTurnstile
+            ref={turnstileRef}
+            siteKey={turnstileSiteKey}
+            onSuccess={setTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+          />
+        ) : null}
 
         <AuthFormAlert message={errorMessage || null} />
 
         <OnboardingEnter tone="profile" className="flex justify-center pt-0.5">
           <OnboardingPrimaryButton
             type="submit"
-            pending={pending}
+            pending={pending || verifyingSecurity}
             className="w-full max-w-none sm:min-w-[14rem]"
           >
-            {pending ? "Creating your account…" : "Create account"}
+            {verifyingSecurity
+              ? "Verifying…"
+              : pending
+                ? "Creating your account…"
+                : "Create account"}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </OnboardingPrimaryButton>
         </OnboardingEnter>
