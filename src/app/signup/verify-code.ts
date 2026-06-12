@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import {
   getRateLimitStatus,
+  hashRateLimitIdentifier,
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
@@ -35,14 +36,20 @@ export async function verifySignupCode(
   }
 
   const h = await headers();
-  const fp = rateLimitFingerprint(h, `signup-verify:${email}`);
-  const status = await getRateLimitStatus("authenticate", fp);
-  if (!status.allowed) {
-    return {
-      ok: false,
-      message: `Too many attempts. Try again in ${status.retryAfterSeconds}s.`,
-      retryAfterSeconds: status.retryAfterSeconds,
-    };
+  // Two limiters: per IP+UA (request origin) and per email (global). The
+  // second is IP/UA-independent so rotating user agents or IPs cannot grind
+  // the 6-digit code space against a single account.
+  const fpOrigin = rateLimitFingerprint(h, `signup-verify:${email}`);
+  const fpEmail = hashRateLimitIdentifier(`signup-verify-email:${email}`);
+  for (const fp of [fpOrigin, fpEmail]) {
+    const status = await getRateLimitStatus("authenticate", fp);
+    if (!status.allowed) {
+      return {
+        ok: false,
+        message: `Too many attempts. Try again in ${status.retryAfterSeconds}s.`,
+        retryAfterSeconds: status.retryAfterSeconds,
+      };
+    }
   }
 
   const supabase = await createClient();
@@ -57,7 +64,8 @@ export async function verifySignupCode(
     }
   }
 
-  await recordRateLimitFailure("authenticate", fp);
+  await recordRateLimitFailure("authenticate", fpOrigin);
+  await recordRateLimitFailure("authenticate", fpEmail);
   return {
     ok: false,
     message:
