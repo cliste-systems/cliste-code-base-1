@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Check, Copy, Inbox, Phone, PhoneCall, Search, User } from "lucide-react";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -22,10 +23,12 @@ import {
   DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import type { DashboardMetricRangeKey } from "@/lib/dashboard-metric-range";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+import { fetchCallHistoryDetail } from "./actions";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
@@ -42,23 +45,56 @@ import {
   type OutcomeFilterValue,
 } from "./call-history-helpers";
 
+export type CallHistoryPagination = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  rangeKey: DashboardMetricRangeKey;
+};
+
 type CallHistoryViewProps = {
   calls: CallHistoryListItem[];
   metrics: CallHistoryMetrics;
   initialSelectedCallId?: string | null;
+  pagination?: CallHistoryPagination;
   className?: string;
 };
+
+function callsPageHref(
+  pagination: CallHistoryPagination,
+  page: number,
+  callId?: string | null,
+): string {
+  const params = new URLSearchParams();
+  if (pagination.rangeKey !== "today") {
+    params.set("range", pagination.rangeKey);
+  }
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+  if (callId?.trim()) {
+    params.set("call", callId.trim());
+  }
+  const qs = params.toString();
+  return qs ? `${DASHBOARD_ROUTES.calls}?${qs}` : DASHBOARD_ROUTES.calls;
+}
 
 export function CallHistoryView({
   calls,
   metrics: _metrics,
   initialSelectedCallId,
+  pagination,
   className,
 }: CallHistoryViewProps) {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilterValue>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [detailById, setDetailById] = useState<
+    Record<string, { transcriptVerbatim: string; transcriptReview: string | null }>
+  >({});
 
   const filtered = useMemo(() => {
     return calls.filter(
@@ -75,9 +111,40 @@ export function CallHistoryView({
     return filtered[0]?.id ?? null;
   }, [selectedId, filtered, initialSelectedCallId]);
 
-  const selected = useMemo(
+  const selectedBase = useMemo(
     () => filtered.find((c) => c.id === resolvedSelectedId) ?? null,
     [filtered, resolvedSelectedId],
+  );
+
+  const selected = useMemo(() => {
+    if (!selectedBase) return null;
+    const detail = detailById[selectedBase.id];
+    if (!detail) return selectedBase;
+    return {
+      ...selectedBase,
+      transcriptVerbatim: detail.transcriptVerbatim,
+      transcriptReview: detail.transcriptReview,
+    };
+  }, [selectedBase, detailById]);
+
+  const ensureDetailLoaded = useCallback((id: string) => {
+    void fetchCallHistoryDetail(id).then((detail) => {
+      if (!detail) return;
+      setDetailById((prev) => {
+        if (prev[id]) return prev;
+        return { ...prev, [id]: detail };
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (resolvedSelectedId) {
+      ensureDetailLoaded(resolvedSelectedId);
+    }
+  }, [resolvedSelectedId, ensureDetailLoaded]);
+
+  const detailLoading = Boolean(
+    selectedBase && !detailById[selectedBase.id],
   );
 
   const copySummary = useCallback(async () => {
@@ -163,18 +230,29 @@ export function CallHistoryView({
                       key={row.id}
                       row={row}
                       selected={row.id === resolvedSelectedId}
-                      onSelect={() => setSelectedId(row.id)}
+                      onSelect={() => {
+                        setSelectedId(row.id);
+                        ensureDetailLoaded(row.id);
+                      }}
                     />
                   ))}
                 </ul>
               )}
             </div>
+            {pagination && pagination.totalPages > 1 ? (
+              <CallHistoryPaginationBar
+                pagination={pagination}
+                selectedCallId={resolvedSelectedId}
+                rangeFromUrl={searchParams.get("range")}
+              />
+            ) : null}
           </div>
         }
         detail={
           <CallDetailPanel
             call={selected}
             copied={copied}
+            detailLoading={detailLoading}
             onCopySummary={copySummary}
             contactHref={contactHref}
           />
@@ -247,14 +325,72 @@ function CallListRow({
   );
 }
 
+function CallHistoryPaginationBar({
+  pagination,
+  selectedCallId,
+  rangeFromUrl,
+}: {
+  pagination: CallHistoryPagination;
+  selectedCallId: string | null;
+  rangeFromUrl: string | null;
+}) {
+  const rangeKey =
+    rangeFromUrl === "7d" || rangeFromUrl === "4w"
+      ? rangeFromUrl
+      : pagination.rangeKey;
+  const paged: CallHistoryPagination = { ...pagination, rangeKey };
+  const { page, totalPages, totalCount, pageSize } = paged;
+  const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, totalCount);
+
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 sm:px-5">
+      <p className="text-[12px] text-slate-500 tabular-nums">
+        {from}–{to} of {totalCount}
+      </p>
+      <div className="flex items-center gap-2">
+        {page > 1 ? (
+          <Link
+            href={callsPageHref(paged, page - 1, selectedCallId)}
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Previous
+          </Link>
+        ) : (
+          <span className="rounded-lg border border-slate-100 px-2.5 py-1 text-[12px] text-slate-300">
+            Previous
+          </span>
+        )}
+        <span className="text-[12px] text-slate-500 tabular-nums">
+          {page} / {totalPages}
+        </span>
+        {page < totalPages ? (
+          <Link
+            href={callsPageHref(paged, page + 1, selectedCallId)}
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Next
+          </Link>
+        ) : (
+          <span className="rounded-lg border border-slate-100 px-2.5 py-1 text-[12px] text-slate-300">
+            Next
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CallDetailPanel({
   call,
   copied,
+  detailLoading,
   onCopySummary,
   contactHref,
 }: {
   call: CallHistoryListItem | null;
   copied: boolean;
+  detailLoading: boolean;
   onCopySummary: () => void;
   contactHref: string;
 }) {
@@ -278,6 +414,7 @@ function CallDetailPanel({
       key={call.id}
       call={call}
       copied={copied}
+      detailLoading={detailLoading}
       onCopySummary={onCopySummary}
       contactHref={contactHref}
     />
@@ -287,11 +424,13 @@ function CallDetailPanel({
 function CallDetailPanelContent({
   call,
   copied,
+  detailLoading,
   onCopySummary,
   contactHref,
 }: {
   call: CallHistoryListItem;
   copied: boolean;
+  detailLoading: boolean;
   onCopySummary: () => void;
   contactHref: string;
 }) {
@@ -384,7 +523,9 @@ function CallDetailPanelContent({
             </Link>{" "}
             to erase if asked.
           </p>
-          {safeTranscript || showFull ? (
+          {detailLoading ? (
+            <p className="text-[13px] text-slate-500">Loading transcript…</p>
+          ) : safeTranscript || showFull ? (
             <pre className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-slate-800">
               {showFull ? fullTranscript : safeTranscript}
             </pre>

@@ -1,6 +1,9 @@
 import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
 import { resolveCallerDisplayName } from "@/lib/caller-identity";
-import type { CallOutcome } from "@/lib/call-history-types";
+import {
+  normalizeCallOutcome,
+  type CallOutcome,
+} from "@/lib/call-history-types";
 export type CallFollowUp = {
   id: string;
   summary: string;
@@ -195,5 +198,37 @@ export function buildCallHistoryMetrics(calls: CallHistoryListItem[]): CallHisto
     routedCount,
     needsAttentionCount,
     avgDurationLabel: formatAvgDuration(averageDurationSeconds(calls)),
+  };
+}
+
+/** Metrics from lightweight rows (no transcripts) plus open follow-up count. */
+export function buildCallHistoryMetricsFromSummaryRows(
+  rows: { outcome: string; duration_seconds: number }[],
+  openFollowUpCount: number,
+): CallHistoryMetrics {
+  const stubItems: CallHistoryListItem[] = rows.map((row, i) => ({
+    id: `summary-${i}`,
+    createdAt: "",
+    dateTimeLabel: "",
+    callerId: "",
+    callerDisplay: "",
+    callerName: null,
+    durationSeconds: Math.max(0, row.duration_seconds ?? 0),
+    durationLabel: "",
+    outcome: normalizeCallOutcome(row.outcome),
+    outcomeLabel: "",
+    intentLabel: "",
+    summaryPreview: null,
+    transcriptVerbatim: "",
+    transcriptReview: null,
+    aiSummary: null,
+    hasOpenAction: false,
+    followUp: null,
+  }));
+  const base = buildCallHistoryMetrics(stubItems);
+  return {
+    ...base,
+    totalCalls: rows.length,
+    needsAttentionCount: openFollowUpCount,
   };
 }

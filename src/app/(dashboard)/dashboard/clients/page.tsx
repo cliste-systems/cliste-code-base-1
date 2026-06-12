@@ -10,6 +10,11 @@ import {
 import { normalizeContactEmail } from "../action-inbox/action-inbox-helpers";
 import { mergeCallerName, resolveCallerDisplayName } from "@/lib/caller-identity";
 import { formatPhoneForDisplay } from "@/lib/phone-display";
+import {
+  CONTACTS_CALL_LIMIT,
+  CONTACTS_CLIENT_LIMIT,
+  CONTACTS_TICKET_LIMIT,
+} from "@/lib/dashboard-list-limits";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import {
@@ -234,18 +239,18 @@ export default async function ContactsPage() {
         )
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
-        .limit(5000),
+        .limit(CONTACTS_CALL_LIMIT),
       supabase
         .from("action_tickets")
         .select("id, caller_number, caller_name, summary, status, created_at")
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
-        .limit(5000),
+        .limit(CONTACTS_TICKET_LIMIT),
       supabase
         .from("clients")
         .select("id, phone_e164, name, email, notes, created_at")
         .eq("organization_id", organizationId)
-        .limit(5000),
+        .limit(CONTACTS_CLIENT_LIMIT),
     ]);
 
   const ticketsByKey = buildTicketsByKey((ticketData ?? []) as TicketRow[]);

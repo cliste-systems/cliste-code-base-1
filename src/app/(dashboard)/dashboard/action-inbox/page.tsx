@@ -12,6 +12,11 @@ import {
   formatE164ForDisplay,
 } from "@/lib/call-history-types";
 import { resolveCallerDisplayName } from "@/lib/caller-identity";
+import {
+  ACTION_INBOX_CALL_LIMIT,
+  ACTION_INBOX_CLIENT_LIMIT,
+  ACTION_INBOX_TICKET_LIMIT,
+} from "@/lib/dashboard-list-limits";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import {
@@ -145,18 +150,19 @@ export default async function ActionInboxPage({
         .from("action_tickets")
         .select("id, caller_number, caller_name, summary, status, created_at")
         .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(ACTION_INBOX_TICKET_LIMIT),
       supabase
         .from("call_logs")
         .select("id, caller_number, caller_name, ai_summary, created_at")
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
-        .limit(2000),
+        .limit(ACTION_INBOX_CALL_LIMIT),
       supabase
         .from("clients")
         .select("phone_e164, name, email")
         .eq("organization_id", organizationId)
-        .limit(5000),
+        .limit(ACTION_INBOX_CLIENT_LIMIT),
     ]);
 
   const callsByPhone = buildLatestCallByPhone((callData ?? []) as CallRow[]);

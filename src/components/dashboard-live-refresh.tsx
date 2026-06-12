@@ -15,12 +15,10 @@ const IS_DEV = process.env.NODE_ENV === "development";
  * — and polling is a safety net for the dashboards where activity data is
  * actively rendered.
  *
- * Why so infrequent? Each `router.refresh()` re-runs the dashboard layout
- * + page server render — that's ~10+ Supabase queries on the home page
- * alone. At a tight cadence the dashboard always *feels* like it's
- * "loading" because a fresh re-fetch is permanently in flight.
+ * Polling is disabled while Realtime is healthy to avoid ~10+ Supabase queries
+ * per `router.refresh()` on a fixed timer.
  */
-const POLL_INTERVAL_MS = IS_DEV ? 60_000 : 45_000;
+const POLL_INTERVAL_MS = IS_DEV ? 90_000 : 120_000;
 
 /** Coalesce interval + focus refreshes so RSC fetches don’t overlap. */
 const MIN_MS_BETWEEN_POLL_REFRESH = 8_000;
@@ -63,28 +61,38 @@ function shouldPoll(pathname: string | null): boolean {
   );
 }
 
+function isRealtimeHealthyStatus(status: string): boolean {
+  return status === "SUBSCRIBED";
+}
+
 type DashboardLiveRefreshProps = {
   organizationId: string;
 };
 
 /**
  * Keeps the dashboard current: Supabase Realtime on relevant tables (near–instant
- * when enabled in the project), plus timed `router.refresh()` as a safety net.
+ * when enabled in the project), plus timed `router.refresh()` only when Realtime
+ * is not connected.
  */
 export function DashboardLiveRefresh({
   organizationId,
 }: DashboardLiveRefreshProps) {
   const pathname = usePathname();
   const router = useRouter();
-  // Seeded inside the mount effect below — `Date.now()` during render
-  // would violate react-hooks/purity. 0 is fine pre-mount because the
-  // focus listener doesn't attach until then either.
   const lastPollRefreshAt = useRef(0);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const realtimeHealthyRef = useRef(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   const pollRefresh = useCallback(() => {
+    if (realtimeHealthyRef.current) return;
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
       return;
     }
@@ -98,6 +106,20 @@ export function DashboardLiveRefresh({
     lastPollRefreshAt.current = now;
     router.refresh();
   }, [router]);
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollIntervalRef.current || realtimeHealthyRef.current) return;
+    if (!shouldPoll(pathnameRef.current)) return;
+    lastPollRefreshAt.current = Date.now();
+    pollIntervalRef.current = setInterval(pollRefresh, POLL_INTERVAL_MS);
+  }, [pollRefresh]);
 
   const scheduleRealtimeRefresh = useCallback(() => {
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
@@ -115,22 +137,20 @@ export function DashboardLiveRefresh({
   }, [router]);
 
   useEffect(() => {
-    if (!shouldPoll(pathname)) return;
-    // Don't kick off an immediate refresh on mount — the page just rendered,
-    // any data older than the request itself is fine for the first 45-60s.
-    // Seed lastPollRefreshAt so the focus-throttle treats mount as "fresh".
-    lastPollRefreshAt.current = Date.now();
-    const t = setInterval(pollRefresh, POLL_INTERVAL_MS);
-    return () => clearInterval(t);
-  }, [pathname, pollRefresh]);
+    stopPolling();
+    realtimeHealthyRef.current = false;
+    if (shouldPoll(pathname)) {
+      startPolling();
+    }
+    return () => stopPolling();
+  }, [pathname, startPolling, stopPolling]);
 
   useEffect(() => {
     if (!shouldPoll(pathname)) return;
-    // Skip focus/visibility refreshes if the data is fresh enough. Avoids
-    // re-rendering the entire dashboard every time the user switches tabs.
     const FOCUS_REFRESH_THRESHOLD_MS = 30_000;
     const onResume = () => {
       if (document.visibilityState !== "visible") return;
+      if (realtimeHealthyRef.current) return;
       if (Date.now() - lastPollRefreshAt.current < FOCUS_REFRESH_THRESHOLD_MS) {
         return;
       }
@@ -147,6 +167,9 @@ export function DashboardLiveRefresh({
   useEffect(() => {
     if (!organizationId) return;
     if (!shouldEnableRealtime(pathname)) return;
+
+    realtimeHealthyRef.current = false;
+    startPolling();
 
     const supabase = createClient();
     const filter = `organization_id=eq.${organizationId}`;
@@ -224,21 +247,29 @@ export function DashboardLiveRefresh({
         scheduleRealtimeRefresh,
       )
       .subscribe((status) => {
+        const healthy = isRealtimeHealthyStatus(status);
+        realtimeHealthyRef.current = healthy;
+        if (healthy) {
+          stopPolling();
+        } else if (shouldPoll(pathnameRef.current)) {
+          startPolling();
+        }
         if (IS_DEV && status === "CHANNEL_ERROR") {
           console.warn(
-            "[DashboardLiveRefresh] Realtime error — enable Realtime and add call_logs, action_tickets, appointments to the publication in Supabase; polling still applies.",
+            "[DashboardLiveRefresh] Realtime error — enable Realtime and add call_logs, action_tickets, appointments to the publication in Supabase; polling fallback will run.",
           );
         }
       });
 
     return () => {
+      realtimeHealthyRef.current = false;
       if (realtimeDebounceRef.current) {
         clearTimeout(realtimeDebounceRef.current);
         realtimeDebounceRef.current = null;
       }
       supabase.removeChannel(channel);
     };
-  }, [organizationId, pathname, scheduleRealtimeRefresh]);
+  }, [organizationId, pathname, scheduleRealtimeRefresh, startPolling, stopPolling]);
 
   return null;
 }

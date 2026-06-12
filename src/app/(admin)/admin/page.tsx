@@ -416,7 +416,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+            <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
               <span className="text-2xl font-medium tracking-tight text-gray-900 tabular-nums sm:text-3xl">
                 {voiceCostSchemaMissing
                   ? "—"
@@ -424,6 +424,15 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
                     ? formatApproxEurFromUsd(estimatedVoiceCostUsd)
                     : "—"}
               </span>
+              {!voiceCostSchemaMissing && voiceCostCallsWithEstimate > 0 ? (
+                <span className="text-[11px] text-gray-500 tabular-nums">
+                  ≈{" "}
+                  {formatApproxEurFromUsd(
+                    estimatedVoiceCostUsd / voiceCostCallsWithEstimate,
+                  )}{" "}
+                  per estimated call
+                </span>
+              ) : null}
             </div>
           </div>
           {voiceCostSchemaMissing ? (
@@ -449,9 +458,19 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
                 <li>Supabase {formatApproxEurFromUsd(voiceCostBreakdown.supabase)}</li>
               </ul>
               <p className="mt-2 text-[11px] text-gray-500">
+                {callsInRange > 0 ? (
+                  <>
+                    {formatInt(callsInRange)} call{callsInRange === 1 ? "" : "s"} in period;{" "}
+                    {voiceCostCallsWithEstimate < callsInRange
+                      ? `${formatInt(callsInRange - voiceCostCallsWithEstimate)} without cost data. `
+                      : null}
+                  </>
+                ) : null}
                 Stored as USD in <span className="font-mono">call_logs</span>; shown as ≈ EUR here. Set{" "}
                 <span className="font-mono">VOICE_COST_USD_TO_EUR</span> (e.g. 0.93) in this app&apos;s env.
                 Tune worker <span className="font-mono">CALL_COST_*</span> against vendor invoices.
+                Margin review: compare this total to Stripe revenue for the same range — see{" "}
+                <span className="font-mono">docs/ops/INFRASTRUCTURE-COSTS.md</span>.
               </p>
             </details>
           ) : (

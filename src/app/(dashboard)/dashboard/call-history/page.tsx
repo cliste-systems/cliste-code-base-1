@@ -14,6 +14,10 @@ import {
   normalizeCallOutcome,
 } from "@/lib/call-history-types";
 import {
+  CALL_HISTORY_OPEN_TICKET_LIMIT,
+  CALL_HISTORY_PAGE_SIZE,
+} from "@/lib/dashboard-list-limits";
+import {
   dashboardMetricRangeGreetingSubline,
   getDashboardMetricRangeLowerBoundIso,
   getDashboardMetricRangeUpperExclusiveIso,
@@ -23,7 +27,7 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
 import {
-  buildCallHistoryMetrics,
+  buildCallHistoryMetricsFromSummaryRows,
   type CallFollowUp,
   type CallHistoryListItem,
   summaryForDisplay,
@@ -31,19 +35,22 @@ import {
 import { CallHistoryView } from "./call-history-view";
 
 type CallHistoryPageProps = {
-  searchParams?: Promise<{ call?: string; range?: string }>;
+  searchParams?: Promise<{ call?: string; range?: string; page?: string }>;
 };
 
-type CallLogDbRow = {
+type CallLogListRow = {
   id: string;
   caller_number: string;
   caller_name?: string | null;
   duration_seconds: number;
   outcome: string;
-  transcript: string | null;
-  transcript_review: string | null;
   ai_summary: string | null;
   created_at: string;
+};
+
+type CallLogMetricsRow = {
+  outcome: string;
+  duration_seconds: number;
 };
 
 type TicketDbRow = {
@@ -75,11 +82,20 @@ function buildFollowUpMap(tickets: TicketDbRow[]): Map<string, CallFollowUp> {
   return openByKey;
 }
 
+function parsePageParam(raw: string | undefined): number {
+  const n = Number.parseInt(String(raw ?? "1"), 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 function toListItem(
-  row: CallLogDbRow,
+  row: CallLogListRow,
   openFollowUpByKey: Map<string, CallFollowUp>,
 ): CallHistoryListItem {
-  const mapped = mapCallLogToRow(row);
+  const mapped = mapCallLogToRow({
+    ...row,
+    transcript: null,
+    transcript_review: null,
+  });
   const key = phoneKey(mapped.callerId);
   const followUp = key ? (openFollowUpByKey.get(key) ?? null) : null;
   const outcome = normalizeCallOutcome(row.outcome);
@@ -96,8 +112,8 @@ function toListItem(
     outcomeLabel: OUTCOME_LABELS[outcome],
     intentLabel: mapped.intentLabel || inferCallIntent(mapped.aiSummary, outcome),
     summaryPreview: null,
-    transcriptVerbatim: mapped.transcriptVerbatim,
-    transcriptReview: mapped.transcriptReview,
+    transcriptVerbatim: "",
+    transcriptReview: null,
     aiSummary: mapped.aiSummary,
     hasOpenAction: Boolean(followUp),
     followUp,
@@ -112,32 +128,65 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const greetingSubline = dashboardMetricRangeGreetingSubline(rangeKey);
   const initialSelectedCallId =
     typeof sp.call === "string" && sp.call.trim() ? sp.call.trim() : null;
+  const requestedPage = parsePageParam(sp.page);
 
   const { supabase, organizationId } = await requireDashboardSession();
 
   const lowerIso = getDashboardMetricRangeLowerBoundIso(rangeKey);
   const upperIso = getDashboardMetricRangeUpperExclusiveIso(rangeKey);
 
-  let callQuery = supabase
-    .from("call_logs")
-    .select(
-      "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at",
-    )
-    .eq("organization_id", organizationId)
-    .gte("created_at", lowerIso)
-    .order("created_at", { ascending: false });
-
-  if (upperIso) {
-    callQuery = callQuery.lt("created_at", upperIso);
+  function applyRangeFilters<T extends { gte: (col: string, val: string) => T }>(
+    query: T,
+  ): T {
+    let q = query.gte("created_at", lowerIso);
+    if (upperIso) {
+      q = (q as T & { lt: (col: string, val: string) => T }).lt(
+        "created_at",
+        upperIso,
+      );
+    }
+    return q;
   }
 
-  const [{ data, error }, { data: ticketRows }, { data: org }] = await Promise.all([
-    callQuery,
+  const listFrom = (requestedPage - 1) * CALL_HISTORY_PAGE_SIZE;
+  const listTo = listFrom + CALL_HISTORY_PAGE_SIZE - 1;
+
+  const [
+    { count: totalCount, error: countError },
+    { data: metricsData, error: metricsError },
+    { data: pageData, error: listError },
+    { data: ticketRows },
+    { data: org },
+  ] = await Promise.all([
+    applyRangeFilters(
+      supabase
+        .from("call_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId),
+    ),
+    applyRangeFilters(
+      supabase
+        .from("call_logs")
+        .select("outcome, duration_seconds")
+        .eq("organization_id", organizationId),
+    ),
+    applyRangeFilters(
+      supabase
+        .from("call_logs")
+        .select(
+          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at",
+        )
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .range(listFrom, listTo),
+    ),
     supabase
       .from("action_tickets")
       .select("id, caller_number, caller_name, summary, status, created_at")
       .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false }),
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(CALL_HISTORY_OPEN_TICKET_LIMIT),
     supabase
       .from("organizations")
       .select("is_active")
@@ -145,15 +194,27 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       .maybeSingle(),
   ]);
 
+  const error = countError ?? metricsError ?? listError;
+
   const openFollowUpByKey = buildFollowUpMap((ticketRows ?? []) as TicketDbRow[]);
 
+  const total = totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / CALL_HISTORY_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+
+  const metrics = buildCallHistoryMetricsFromSummaryRows(
+    (metricsData ?? []) as CallLogMetricsRow[],
+    openFollowUpByKey.size,
+  );
+  if (total > 0) {
+    metrics.totalCalls = total;
+  }
+
   const calls = !error
-    ? ((data ?? []) as CallLogDbRow[]).map((row) =>
+    ? ((pageData ?? []) as CallLogListRow[]).map((row) =>
         toListItem(row, openFollowUpByKey),
       )
     : [];
-
-  const metrics = buildCallHistoryMetrics(calls);
 
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
@@ -193,6 +254,13 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           calls={calls}
           metrics={metrics}
           initialSelectedCallId={initialSelectedCallId}
+          pagination={{
+            page,
+            pageSize: CALL_HISTORY_PAGE_SIZE,
+            totalCount: total,
+            totalPages,
+            rangeKey,
+          }}
         />
       )}
       </DashboardAnimatedPageSections>
