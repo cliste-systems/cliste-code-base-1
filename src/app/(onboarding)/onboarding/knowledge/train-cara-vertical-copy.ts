@@ -2,7 +2,7 @@ import { verticalIdForNiche } from "@/lib/verticals";
 
 import {
   ABOUT_PLACEHOLDER,
-  DETAILS_TO_COLLECT_PLACEHOLDER,
+  DEFAULT_DETAILS_TO_COLLECT,
   OPENING_HOURS_PLACEHOLDER,
   RULES_PLACEHOLDER,
   SERVICE_AREA_PLACEHOLDER,
@@ -68,7 +68,7 @@ function genericCopy(): TrainCaraVerticalCopy {
       about: ABOUT_PLACEHOLDER,
       openingHours: OPENING_HOURS_PLACEHOLDER,
       serviceArea: SERVICE_AREA_PLACEHOLDER,
-      detailsToCollect: DETAILS_TO_COLLECT_PLACEHOLDER,
+      detailsToCollect: DEFAULT_DETAILS_TO_COLLECT,
       rules: RULES_PLACEHOLDER,
     },
   };

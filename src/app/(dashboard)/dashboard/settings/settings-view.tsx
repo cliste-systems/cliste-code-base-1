@@ -56,6 +56,7 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
       isActive: initial.isActive,
       businessName,
       phoneNumber: initial.phoneNumber,
+      signupSegment: initial.signupSegment,
       notificationEmail,
       notificationPhone,
       callRoutingMode,
@@ -66,6 +67,7 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
       initial.isActive,
       businessName,
       initial.phoneNumber,
+      initial.signupSegment,
       notificationEmail,
       notificationPhone,
       callRoutingMode,
@@ -170,6 +172,27 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
               />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="signup-segment">Business type</Label>
+              <Input
+                id="signup-segment"
+                readOnly
+                tabIndex={-1}
+                value={initial.signupSegment}
+                className={cn(
+                  fieldClass,
+                  "cursor-default bg-slate-50/80 focus-visible:ring-0",
+                )}
+                aria-describedby="signup-segment-hint"
+              />
+              <p
+                id="signup-segment-hint"
+                className="text-[12px] leading-relaxed text-slate-500"
+              >
+                Chosen at signup — Cara uses this to tailor your dashboard. Contact
+                support if it needs updating.
+              </p>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="cliste-number">Cliste number</Label>
               <Input
                 id="cliste-number"
@@ -181,16 +204,17 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
                   "cursor-default bg-slate-50/80 tabular-nums focus-visible:ring-0",
                   phoneDisplay ? "text-[#0b1220]" : "text-slate-500",
                 )}
-                aria-describedby={hasClisteNumber ? undefined : "cliste-number-hint"}
+                aria-describedby="cliste-number-hint"
               />
-              {!hasClisteNumber ? (
-                <p
-                  id="cliste-number-hint"
-                  className="text-[12px] leading-relaxed text-slate-500"
-                >
-                  Assigned after onboarding.
-                </p>
-              ) : null}
+              <p
+                id="cliste-number-hint"
+                className="text-[12px] leading-relaxed text-slate-500"
+              >
+                {hasClisteNumber
+                  ? "Assigned to your account — it can't be changed here."
+                  : "Assigned after onboarding — it can't be changed here."}{" "}
+                Contact support if you have any questions.
+              </p>
             </div>
           </div>
         </SettingsSection>

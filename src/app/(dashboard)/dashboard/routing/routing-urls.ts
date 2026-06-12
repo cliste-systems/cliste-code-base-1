@@ -10,23 +10,10 @@ export type RoutingLinkDestination = {
   url: string;
 };
 
-export const EMPTY_LINK_DESTINATION: RoutingLinkDestination = {
-  label: "",
-  url: "",
-};
-
 function trimDestination(d: RoutingLinkDestination): RoutingLinkDestination {
   return {
     label: d.label.trim().slice(0, MAX_LINK_LABEL_LEN),
     url: d.url.trim().slice(0, MAX_ROUTING_FIELD_LEN),
-  };
-}
-
-/** Keep in-progress rows while editing (do not require both fields yet). */
-function draftDestination(d: RoutingLinkDestination): RoutingLinkDestination {
-  return {
-    label: d.label.slice(0, MAX_LINK_LABEL_LEN),
-    url: d.url.slice(0, MAX_ROUTING_FIELD_LEN),
   };
 }
 
@@ -79,34 +66,6 @@ export function getRoutingLinkDestinations(
   }));
 }
 
-/** Drop blank rows; keep in-progress rows only when nothing is complete yet. */
-export function pruneRoutingLinkDestinations(
-  destinations: RoutingLinkDestination[],
-): RoutingLinkDestination[] {
-  const complete = destinations.filter(isCompleteLinkDestination);
-  if (complete.length > 0) return complete;
-  const partial = destinations.filter((d) => d.label.trim() || d.url.trim());
-  return partial.length > 0 ? partial : [{ ...EMPTY_LINK_DESTINATION }];
-}
-
-/** Update state while the user types (keeps partial rows). */
-export function applyRoutingLinkDestinationsDraft(
-  destinations: RoutingLinkDestination[],
-): Pick<RoutingLink, "url" | "urls" | "links"> {
-  const rows = destinations
-    .map(draftDestination)
-    .slice(0, MAX_ROUTING_URLS_PER_PRESET);
-  const complete = rows.filter(isCompleteLinkDestination).map(trimDestination);
-  const hasDraftRows =
-    rows.length > 0 && (rows.some((d) => d.label || d.url) || rows.length > 1);
-
-  return {
-    links: hasDraftRows ? rows : null,
-    urls: complete.length > 0 ? complete.map((d) => d.url) : null,
-    url: complete[0]?.url ?? "",
-  };
-}
-
 /** Persist destinations on save (complete rows only). */
 export function applyRoutingLinkDestinations(
   destinations: RoutingLinkDestination[],
@@ -125,33 +84,6 @@ export function applyRoutingLinkDestinations(
 
 export function hasRoutingLinkDestination(link: RoutingLinkDestinationsSource): boolean {
   return getRoutingLinkDestinations(link).some(isCompleteLinkDestination);
-}
-
-/** @deprecated Use getRoutingLinkDestinations */
-export function getRoutingLinkUrls(link: RoutingLinkDestinationsSource): string[] {
-  return getRoutingLinkDestinations(link)
-    .filter(isCompleteLinkDestination)
-    .map((d) => d.url);
-}
-
-/** @deprecated Use applyRoutingLinkDestinations */
-export function applyRoutingLinkUrls(
-  _link: RoutingLink,
-  urls: string[],
-): Pick<RoutingLink, "url" | "urls" | "links"> {
-  return applyRoutingLinkDestinations(
-    urls.map((url, index) => ({
-      label: urls.length > 1 ? `Link ${index + 1}` : "",
-      url,
-    })),
-  );
-}
-
-/** @deprecated Use hasRoutingLinkDestination */
-export function hasRoutingLinkUrl(
-  link: Pick<RoutingLink, "url" | "urls" | "links">,
-): boolean {
-  return hasRoutingLinkDestination(link);
 }
 
 export function formatDestinationsSummary(

@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { Cookie } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import { ONBOARDING_GLASS_FLOAT } from "@/components/onboarding/onboarding-ui";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "cliste_cookie_notice_v1_acknowledged";
 
@@ -17,16 +21,10 @@ const STORAGE_KEY = "cliste_cookie_notice_v1_acknowledged";
  * "Reject all" given equal prominence to "Accept").
  */
 export function CookieNoticeBanner() {
-  // Hydration-safe: render nothing on the server, then on the first
-  // client render check localStorage and decide whether to show the
-  // banner. We track the "checked" state so the banner can re-mount
-  // (e.g. after dismiss) without re-querying.
   const [hydrated, setHydrated] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // We have to flip both flags from inside the effect so the banner
-    // never renders during SSR (no localStorage on the server).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(true);
     try {
@@ -34,8 +32,6 @@ export function CookieNoticeBanner() {
       const seen = window.localStorage.getItem(STORAGE_KEY);
       if (seen) setDismissed(true);
     } catch {
-      // localStorage may be blocked (Safari private mode etc); failing
-      // closed (no banner) is fine — we're not legally required to show one.
       setDismissed(true);
     }
   }, []);
@@ -57,25 +53,33 @@ export function CookieNoticeBanner() {
     <div
       role="region"
       aria-label="Cookie notice"
-      className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-3xl flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-lg sm:flex-row sm:items-center sm:justify-between"
+      className={cn(
+        ONBOARDING_GLASS_FLOAT,
+        "fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-3xl items-center gap-2.5 rounded-xl px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
+        "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+      )}
     >
-      <p className="leading-snug">
-        We only use strictly-necessary cookies (sign-in session, security,
-        bot protection). No advertising or third-party analytics. See the{" "}
+      <Cookie
+        className="hidden size-4 shrink-0 text-slate-500 sm:block"
+        aria-hidden
+      />
+      <p className="min-w-0 flex-1 text-[12px] leading-snug text-slate-600 sm:text-[13px]">
+        Strictly necessary cookies only — sign-in, security, bot protection. No
+        ads or analytics.{" "}
         <Link
           href="/legal/cookies"
-          className="font-medium text-gray-900 underline underline-offset-2"
+          className="font-medium text-[#0b1220] underline decoration-slate-300 underline-offset-2 hover:decoration-[#0b1220]"
         >
-          cookie policy
+          Cookie policy
         </Link>
         .
       </p>
       <button
         type="button"
         onClick={dismiss}
-        className="self-end rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 sm:self-auto"
+        className="shrink-0 cursor-pointer rounded-lg bg-[#0b1220] px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[#05070b] sm:px-3.5"
       >
-        OK, got it
+        Got it
       </button>
     </div>
   );

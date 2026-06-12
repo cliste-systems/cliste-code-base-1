@@ -213,7 +213,7 @@ def push_rate_limit_rules() -> None:
     # 5 min per IP -> block 30 min. Legitimate users will never trip this.
     rules = [
         {
-            "description": "Brute-force lockout for /admin-unlock, /dashboard-unlock, /authenticate",
+            "description": "Brute-force lockout for auth, signup, and voice-preview POSTs",
             "action": "block",
             "action_parameters": {
                 "response": {
@@ -225,8 +225,9 @@ def push_rate_limit_rules() -> None:
             "enabled": True,
             "expression": (
                 '(http.request.method eq "POST") and ('
-                'http.request.uri.path in {"/admin-unlock" "/dashboard-unlock"} '
-                'or starts_with(http.request.uri.path, "/authenticate")'
+                'http.request.uri.path in {"/admin-unlock" "/dashboard-unlock" "/signup"} '
+                'or starts_with(http.request.uri.path, "/authenticate") '
+                'or http.request.uri.path eq "/api/onboarding/voice-preview"'
                 ')'
             ),
             # Free plan limits: period = 10s, mitigation_timeout = 10s.

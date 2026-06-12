@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Bot,
+  GraduationCap,
   Gauge,
   Menu,
   Inbox,
@@ -34,6 +35,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/routing": Share2,
   "/dashboard/cara-setup": Bot,
   "/dashboard/agent-setup": Bot,
+  "/dashboard/cara-training": GraduationCap,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
   "/dashboard/settings": Settings,

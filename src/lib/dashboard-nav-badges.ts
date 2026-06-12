@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export { DASHBOARD_ACTION_INBOX_SEEN_COOKIE, DASHBOARD_CALL_HISTORY_SEEN_COOKIE } from "./dashboard-nav-seen-cookies";
+export {
+  DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
+  DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
+  DASHBOARD_CARA_TRAINING_SEEN_COOKIE,
+} from "./dashboard-nav-seen-cookies";
 
 export type DashboardNavBadgeMap = Partial<Record<string, number>>;
 
@@ -10,6 +14,7 @@ const SEEN_FALLBACK_MS = 24 * 60 * 60 * 1000;
 export type DashboardNavSeenAt = {
   callHistory: Date | null;
   actionInbox: Date | null;
+  caraTraining: Date | null;
 };
 
 function countHead(
@@ -29,6 +34,7 @@ function sinceOrFallback(seen: Date | null): string {
 const EMPTY_SEEN_AT: DashboardNavSeenAt = {
   callHistory: null,
   actionInbox: null,
+  caraTraining: null,
 };
 
 /**
@@ -43,8 +49,9 @@ export async function fetchDashboardNavBadges(
   const s = seen ?? EMPTY_SEEN_AT;
   const actionInboxSince = sinceOrFallback(s.actionInbox);
   const callHistorySince = sinceOrFallback(s.callHistory);
+  const caraTrainingSince = sinceOrFallback(s.caraTraining);
 
-  const [openRes, callHistoryRes] = await Promise.all([
+  const [openRes, callHistoryRes, trainingRes] = await Promise.all([
     supabase
       .from("action_tickets")
       .select("id", { count: "exact", head: true })
@@ -56,14 +63,22 @@ export async function fetchDashboardNavBadges(
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .gt("created_at", callHistorySince),
+    supabase
+      .from("cara_training_items")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("status", ["awaiting_answer", "draft_ready"])
+      .gt("updated_at", caraTrainingSince),
   ]);
 
   const callBadge = countHead(callHistoryRes);
   const inboxBadge = countHead(openRes);
+  const trainingBadge = countHead(trainingRes);
   return {
     "/dashboard/action-inbox": inboxBadge,
     "/dashboard/calls": callBadge,
     "/dashboard/call-history": callBadge,
+    "/dashboard/cara-training": trainingBadge,
   };
 }
 

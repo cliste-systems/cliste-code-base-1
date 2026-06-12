@@ -31,49 +31,6 @@ export function parseReviewChipList(
   return items;
 }
 
-export function buildReviewBusinessLine(input: {
-  businessType: string;
-  about: string;
-  serviceArea: string;
-}): string {
-  const type = input.businessType.trim();
-  const area = input.serviceArea.trim();
-  const areaLooksLikeSentence =
-    area.length > 48 || /^(we cover|covering|areas? covered)/i.test(area);
-
-  if (type && area && !areaLooksLikeSentence) return `${type} across ${area}`;
-  if (type) return type;
-  if (area) return `Service area: ${area}`;
-
-  const firstLine = input.about.trim().split(/\n+/)[0]?.trim() ?? "";
-  if (firstLine) {
-    const shortened =
-      firstLine.length > 96 ? `${firstLine.slice(0, 93).trim()}…` : firstLine;
-    return shortened;
-  }
-
-  return "Your business";
-}
-
-export function buildReviewEmergencyLine(input: {
-  about: string;
-  servicesOffered: string;
-  openingHours: string;
-}): string | null {
-  const blob = `${input.about} ${input.servicesOffered} ${input.openingHours}`;
-  const lower = blob.toLowerCase();
-
-  if (!/emergency|callout|outside hours|after hours|24\s*\/\s*7|urgent/i.test(lower)) {
-    return null;
-  }
-
-  if (/outside hours|after hours|24\s*\/\s*7|weekend/i.test(lower)) {
-    return "Available outside hours";
-  }
-
-  return "Emergency callouts available";
-}
-
 export function buildReviewRules(rules: string[]): string[] {
   const cleaned = rules.map((rule) => rule.trim()).filter(Boolean);
   const seen = new Set<string>();
@@ -86,7 +43,3 @@ export function buildReviewRules(rules: string[]): string[] {
   });
 }
 
-/** Readable inline list — avoids chip-wall clutter on review. */
-export function formatReviewInlineList(items: string[]): string {
-  return items.join(" · ");
-}

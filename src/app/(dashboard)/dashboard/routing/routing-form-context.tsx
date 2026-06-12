@@ -60,7 +60,7 @@ export function RoutingFormProvider({
   const [routes, setRoutesState] = useState(() =>
     ensureAccountRoutes(initialRoutes),
   );
-  const baselineRef = useRef(routesKey(initialRoutes));
+  const [baselineKey, setBaselineKey] = useState(() => routesKey(initialRoutes));
   const initialRoutesRef = useRef(ensureAccountRoutes(initialRoutes));
   const [setup, setSetup] = useState(setupContext);
   const [pending, startTransition] = useTransition();
@@ -70,8 +70,8 @@ export function RoutingFormProvider({
   } | null>(null);
 
   const isDirty = useMemo(
-    () => routesKey(routes) !== baselineRef.current,
-    [routes],
+    () => routesKey(routes) !== baselineKey,
+    [routes, baselineKey],
   );
 
   const setRoutes = useCallback((next: SavedRoute[]) => {
@@ -91,7 +91,7 @@ export function RoutingFormProvider({
     const payload = serializeRoutes(normalized);
     const res = await saveRoutingLinks(payload);
     if (res.ok) {
-      baselineRef.current = routesKey(normalized);
+      setBaselineKey(routesKey(normalized));
       setStatus({
         kind: "ok",
         message: "Call flow saved — Cara will use this on live calls.",

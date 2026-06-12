@@ -28,8 +28,10 @@ import {
   parseCallRoutingMode,
 } from "@/lib/call-routing";
 
+import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
+
 const PROMPT_ORG_COLUMNS =
-  "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_services_departments, agent_services_not_offered, agent_details_to_collect, agent_business_rules, agent_faqs, agent_location_address, agent_location_eircode, routing_links, fallback_number, call_routing_mode";
+  "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_faqs, agent_location_address, agent_location_eircode, routing_links, fallback_number, call_routing_mode";
 
 type PromptOrgRow = Record<string, unknown>;
 
@@ -112,6 +114,7 @@ export function buildCaraSetupPromptInputFromOrg(
       String(org?.agent_location_address ?? "").trim() || undefined,
     locationEircode:
       String(org?.agent_location_eircode ?? "").trim() || undefined,
+    baseTown: String(org?.agent_base_town ?? "").trim() || undefined,
     ...hoursFieldsFromOrg(org),
     serviceArea: String(org?.agent_service_area ?? "").trim() || undefined,
     serviceAreaExclusions:
@@ -122,6 +125,7 @@ export function buildCaraSetupPromptInputFromOrg(
       String(org?.agent_services_not_offered ?? "").trim() || undefined,
     detailsToCollect:
       String(org?.agent_details_to_collect ?? "").trim() || undefined,
+    detailsCollectMode: parseDetailsCollectMode(org?.agent_details_collect_mode),
     businessRules: parseAgentBusinessRules(org?.agent_business_rules),
     faqs: parseAgentFaqs(org?.agent_faqs).map((f) => ({
       question: f.question,
@@ -130,28 +134,6 @@ export function buildCaraSetupPromptInputFromOrg(
     routes: routingRoutesFromLinks(org?.routing_links),
     fallbackNote: fallbackNoteFromLinks(org?.routing_links),
     transferNumber: callRoutingAllowsHumanTransfer(mode) ? transfer : "",
-  };
-}
-
-/** @deprecated Use buildCaraSetupPromptInputFromOrg — kept for callers expecting CaraCustomPromptInput shape. */
-export function buildCustomPromptInputFromOrg(
-  org: PromptOrgRow | null | undefined,
-) {
-  const input = buildCaraSetupPromptInputFromOrg(org);
-  return {
-    businessName: input.businessName,
-    businessType: input.businessType,
-    knowledgeSummary: input.anythingElse ?? "",
-    openingHours: input.openingHours,
-    serviceArea: input.serviceArea,
-    servicesOffered: input.servicesOffered,
-    servicesNotOffered: input.servicesNotOffered,
-    detailsToCollect: input.detailsToCollect,
-    businessRules: input.businessRules,
-    faqs: input.faqs,
-    routes: input.routes,
-    fallbackNote: input.fallbackNote,
-    transferNumber: input.transferNumber,
   };
 }
 

@@ -1,11 +1,19 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/app/login/login-form";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { describeAuthCallbackError } from "@/lib/auth-error-message";
+import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { createClient } from "@/utils/supabase/server";
 
+import { AuthenticateSignUpLink } from "./authenticate-sign-up-link";
 import { AuthParamForwarder } from "./auth-param-forwarder";
+
+export const metadata: Metadata = {
+  title: "Sign in — Cliste Systems",
+  description: "Sign in to your Cliste account and manage Cara, your AI phone agent.",
+};
 
 type AuthenticatePageProps = {
   searchParams: Promise<{ error?: string; message?: string }>;
@@ -29,19 +37,13 @@ export default async function AuthenticatePage({
     <>
       <AuthParamForwarder />
       <AuthMarketingShell
-        title="Authenticate"
-        subtitle="Continue to your Cliste account"
-        marketingHeadline={
-          <>
-            The New Standard for
-            <br />
-            <span className="text-zinc-300/90">AI Voice in Ireland.</span>
-          </>
-        }
-        marketingBody="Cara is your AI phone agent — an Irish voice that answers every call, runs your call flow, and puts follow-ups in your Action Inbox."
+        title="Sign in"
+        subtitle="Welcome back — pick up where you left off with Cara."
+        pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
         urlError={urlError}
       >
         <LoginForm />
+        <AuthenticateSignUpLink />
       </AuthMarketingShell>
     </>
   );

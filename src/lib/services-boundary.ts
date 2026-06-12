@@ -3,17 +3,12 @@
  */
 
 import {
-  CARA_SETUP_CHIP_MAX_LENGTH,
-  caraSetupChipKey,
   dedupeCaraSetupChips,
   findExactChipInList,
   findNearDuplicateChip,
-  isCaraSetupChipTooLong,
   normalizeCaraSetupChip,
   splitCaraSetupChipInput,
 } from "@/lib/cara-setup-chips";
-
-export const SERVICE_CHIP_MAX_LENGTH = CARA_SETUP_CHIP_MAX_LENGTH;
 
 export type ServiceListKind = "offered" | "excluded";
 
@@ -61,12 +56,10 @@ const NEGATION_PATTERNS: RegExp[] = [
 ];
 
 export const normalizeServiceChip = normalizeCaraSetupChip;
-export const serviceChipKey = caraSetupChipKey;
 export const dedupeServiceChips = dedupeCaraSetupChips;
 export const findExactInList = findExactChipInList;
 export const findNearDuplicate = findNearDuplicateChip;
 export const splitServiceChipInput = splitCaraSetupChipInput;
-export const isServiceChipTooLong = isCaraSetupChipTooLong;
 
 export function crossListConflictMessage(
   kind: ServiceListKind,

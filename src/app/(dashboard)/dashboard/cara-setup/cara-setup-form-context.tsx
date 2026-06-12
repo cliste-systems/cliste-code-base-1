@@ -43,6 +43,7 @@ import type { AgentSetupInitial } from "../agent-setup/agent-setup-helpers";
 import type { BusinessFileListItem } from "@/lib/business-files";
 import type { WeekSchedule } from "@/lib/business-hours";
 import type { CaraSetupPromptInput } from "@/lib/compile-cara-prompt";
+import type { DetailsCollectMode } from "@/lib/details-collect-mode";
 
 type FormSnapshot = {
   assistantDisplayName: string;
@@ -59,10 +60,12 @@ type FormSnapshot = {
   servicesItems: string[];
   servicesNotOfferedItems: string[];
   detailsToCollectItems: string[];
+  detailsCollectMode: DetailsCollectMode;
   businessRulesItems: string[];
   faqs: AgentFaq[];
   locationAddress: string;
   locationEircode: string;
+  baseTown: string;
 };
 
 type CaraSetupFormContextValue = {
@@ -81,6 +84,8 @@ type CaraSetupFormContextValue = {
   setLocationAddress: (v: string) => void;
   locationEircode: string;
   setLocationEircode: (v: string) => void;
+  baseTown: string;
+  setBaseTown: (v: string) => void;
   openingHoursSchedule: WeekSchedule;
   setOpeningHoursSchedule: (v: WeekSchedule) => void;
   openingHoursLegacy: string;
@@ -99,6 +104,8 @@ type CaraSetupFormContextValue = {
   setServicesNotOfferedItems: (v: string[]) => void;
   detailsToCollectItems: string[];
   setDetailsToCollectItems: (v: string[]) => void;
+  detailsCollectMode: DetailsCollectMode;
+  setDetailsCollectMode: (v: DetailsCollectMode) => void;
   businessRulesItems: string[];
   setBusinessRulesItems: (v: string[]) => void;
   faqs: AgentFaq[];
@@ -162,6 +169,7 @@ export function CaraSetupFormProvider({
   const [locationEircode, setLocationEircode] = useState(
     initial.locationEircode,
   );
+  const [baseTown, setBaseTown] = useState(initial.baseTown);
   const [openingHoursSchedule, setOpeningHoursSchedule] = useState(
     initial.openingHoursSchedule,
   );
@@ -185,6 +193,9 @@ export function CaraSetupFormProvider({
   );
   const [detailsToCollectItems, setDetailsToCollectItems] = useState(
     initial.detailsToCollectItems,
+  );
+  const [detailsCollectMode, setDetailsCollectMode] = useState(
+    initial.detailsCollectMode,
   );
   const [businessRulesItems, setBusinessRulesItems] = useState(
     initial.businessRules,
@@ -215,10 +226,12 @@ export function CaraSetupFormProvider({
         servicesItems: initial.servicesItems,
         servicesNotOfferedItems: initial.servicesNotOfferedItems,
         detailsToCollectItems: initial.detailsToCollectItems,
+        detailsCollectMode: initial.detailsCollectMode,
         businessRulesItems: initial.businessRules,
         faqs: initial.faqs,
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
+        baseTown: initial.baseTown,
       },
       initial.openingHoursLegacy ?? "",
     ),
@@ -245,10 +258,12 @@ export function CaraSetupFormProvider({
         servicesItems: initial.servicesItems,
         servicesNotOfferedItems: initial.servicesNotOfferedItems,
         detailsToCollectItems: initial.detailsToCollectItems,
+        detailsCollectMode: initial.detailsCollectMode,
         businessRulesItems: initial.businessRules,
         faqs: initial.faqs,
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
+        baseTown: initial.baseTown,
       }),
     [initial],
   );
@@ -271,10 +286,12 @@ export function CaraSetupFormProvider({
         servicesItems,
         servicesNotOfferedItems,
         detailsToCollectItems,
+        detailsCollectMode,
         businessRulesItems,
         faqs,
         locationAddress,
         locationEircode,
+        baseTown,
       },
       openingHoursLegacy,
     );
@@ -293,6 +310,7 @@ export function CaraSetupFormProvider({
     setBusinessType(initial.businessType);
     setLocationAddress(initial.locationAddress);
     setLocationEircode(initial.locationEircode);
+    setBaseTown(initial.baseTown);
     setOpeningHoursSchedule(initial.openingHoursSchedule);
     setOpeningHoursLegacy(initial.openingHoursLegacy ?? "");
     setHoursNeverConfigured(initial.hoursNeverConfigured);
@@ -303,6 +321,7 @@ export function CaraSetupFormProvider({
     setServicesItems(initial.servicesItems);
     setServicesNotOfferedItems(initial.servicesNotOfferedItems);
     setDetailsToCollectItems(initial.detailsToCollectItems);
+    setDetailsCollectMode(initial.detailsCollectMode);
     setBusinessRulesItems(initial.businessRules);
     setFaqs(initial.faqs);
     baselineRef.current = snapshotFromState(
@@ -321,10 +340,12 @@ export function CaraSetupFormProvider({
         servicesItems: initial.servicesItems,
         servicesNotOfferedItems: initial.servicesNotOfferedItems,
         detailsToCollectItems: initial.detailsToCollectItems,
+        detailsCollectMode: initial.detailsCollectMode,
         businessRulesItems: initial.businessRules,
         faqs: initial.faqs,
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
+        baseTown: initial.baseTown,
       },
       initial.openingHoursLegacy ?? "",
     );
@@ -347,10 +368,12 @@ export function CaraSetupFormProvider({
       servicesItems,
       servicesNotOfferedItems,
       detailsToCollectItems,
+      detailsCollectMode,
       businessRulesItems,
       faqs,
       locationAddress,
       locationEircode,
+      baseTown,
     },
     openingHoursLegacy,
   );
@@ -379,10 +402,12 @@ export function CaraSetupFormProvider({
     setServicesItems(base.servicesItems);
     setServicesNotOfferedItems(base.servicesNotOfferedItems);
     setDetailsToCollectItems(base.detailsToCollectItems);
+    setDetailsCollectMode(base.detailsCollectMode);
     setBusinessRulesItems(base.businessRulesItems);
     setFaqs(base.faqs);
     setLocationAddress(base.locationAddress);
     setLocationEircode(base.locationEircode);
+    setBaseTown(base.baseTown);
   }, []);
 
   const buildSavePayload = useCallback(() => {
@@ -411,9 +436,11 @@ export function CaraSetupFormProvider({
       detailsToCollect: formatAgentKnowledgeList(
         dedupeCaraSetupChips(detailsToCollectItems),
       ),
+      detailsCollectMode,
       businessRules: cleanBusinessRules(businessRulesItems),
       locationAddress,
       locationEircode,
+      baseTown,
     };
   }, [
     assistantDisplayName,
@@ -430,9 +457,11 @@ export function CaraSetupFormProvider({
     servicesItems,
     servicesNotOfferedItems,
     detailsToCollectItems,
+    detailsCollectMode,
     businessRulesItems,
     locationAddress,
     locationEircode,
+    baseTown,
   ]);
 
   const saveAsync = useCallback(async (): Promise<boolean> => {
@@ -492,6 +521,7 @@ export function CaraSetupFormProvider({
       businessType,
       locationAddress,
       locationEircode,
+      baseTown: baseTown.trim() || undefined,
       greeting: resolveVoiceGreetingPreview(
         greetingIntro,
         VOICE_ASSISTANT_DEFAULT_NAME,
@@ -516,6 +546,7 @@ export function CaraSetupFormProvider({
         formatAgentKnowledgeList(servicesNotOfferedItems) || undefined,
       detailsToCollect:
         formatAgentKnowledgeList(detailsToCollectItems) || undefined,
+      detailsCollectMode,
       businessRules: cleanBusinessRules(businessRulesItems),
       faqs,
       routes: promptExtras.routes,
@@ -531,6 +562,7 @@ export function CaraSetupFormProvider({
     businessType,
     locationAddress,
     locationEircode,
+    baseTown,
     greetingIntro,
     greetingClosing,
     hoursNeverConfigured,
@@ -543,6 +575,7 @@ export function CaraSetupFormProvider({
     servicesItems,
     servicesNotOfferedItems,
     detailsToCollectItems,
+    detailsCollectMode,
     businessRulesItems,
     faqs,
   ]);
@@ -563,6 +596,8 @@ export function CaraSetupFormProvider({
     setLocationAddress,
     locationEircode,
     setLocationEircode,
+    baseTown,
+    setBaseTown,
     openingHoursSchedule,
     setOpeningHoursSchedule,
     openingHoursLegacy,
@@ -581,6 +616,8 @@ export function CaraSetupFormProvider({
     setServicesNotOfferedItems,
     detailsToCollectItems,
     setDetailsToCollectItems,
+    detailsCollectMode,
+    setDetailsCollectMode,
     businessRulesItems,
     setBusinessRulesItems,
     faqs,

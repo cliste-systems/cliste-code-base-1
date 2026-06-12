@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import type { GdprPortabilityPayload } from "@/lib/gdpr-portability";
 import {
   buildSecurityEventContext,
   logSecurityEvent,
@@ -40,6 +41,85 @@ function normalizePhoneOrNull(raw: string): string | null {
   const e164 = normalizeCustomerPhoneE164(trimmed);
   if (!/^\+\d{8,16}$/.test(e164)) return null;
   return e164;
+}
+
+export type GdprPortabilityResult =
+  | { ok: true; data: GdprPortabilityPayload }
+  | { ok: false; message: string };
+
+export type { GdprPortabilityPayload } from "@/lib/gdpr-portability";
+
+/**
+ * Article 20 data portability — structured export of all caller/contact records
+ * for the requesting organization (machine-readable JSON bundle).
+ */
+export async function exportOrganizationPortabilityData(): Promise<GdprPortabilityResult> {
+  const session = await requireDashboardSession();
+  const sb = session.supabase;
+
+  const [appts, calls, tickets] = await Promise.all([
+    sb
+      .from("appointments")
+      .select(
+        "id, customer_name, customer_phone, customer_email, service_id, start_time, end_time, status, source, payment_status, amount_cents, currency, booking_reference, created_at",
+      )
+      .eq("organization_id", session.organizationId)
+      .limit(5000),
+    sb
+      .from("call_logs")
+      .select(
+        "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at",
+      )
+      .eq("organization_id", session.organizationId)
+      .limit(5000),
+    sb
+      .from("action_tickets")
+      .select(
+        "id, status, summary, caller_number, caller_name, engineering_priority, created_at",
+      )
+      .eq("organization_id", session.organizationId)
+      .limit(5000),
+  ]);
+
+  if (appts.error || calls.error || tickets.error) {
+    console.error("[gdpr] portability export error", {
+      a: appts.error?.message,
+      c: calls.error?.message,
+      t: tickets.error?.message,
+    });
+    return { ok: false, message: "Could not assemble portability export." };
+  }
+
+  try {
+    const ctx = buildSecurityEventContext(await headers());
+    await logSecurityEvent(ctx, {
+      eventType: "gdpr_data_export",
+      outcome: "success",
+      actorUserId: session.user.id,
+      actorEmail: session.user.email ?? null,
+      metadata: {
+        organization_id: session.organizationId,
+        export_type: "art20_portability",
+        appointment_count: appts.data?.length ?? 0,
+        call_log_count: calls.data?.length ?? 0,
+        action_ticket_count: tickets.data?.length ?? 0,
+      },
+    });
+  } catch (err) {
+    console.warn("[gdpr] failed to record portability export event", err);
+  }
+
+  return {
+    ok: true,
+    data: {
+      format: "cliste-gdpr-portability-v1",
+      generated_at: new Date().toISOString(),
+      organization_id: session.organizationId,
+      appointments: appts.data ?? [],
+      call_logs: calls.data ?? [],
+      action_tickets: tickets.data ?? [],
+    },
+  };
 }
 
 /**

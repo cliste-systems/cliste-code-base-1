@@ -5,6 +5,7 @@ import {
   LegalSection,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
+import { CLISTE_COMPANY, companyRegistrationLine } from "@/lib/company-details";
 
 
 export function TermsDocument() {
@@ -114,7 +115,7 @@ export function TermsDocument() {
         <p>
           We may suspend or terminate for material breach, non-payment, or risk to
           the platform or other customers. On termination we delete or return data
-          within 90 days, subject to legal retention.
+          within 30 days, subject to legal retention.
         </p>
       </LegalSection>
 
@@ -133,8 +134,9 @@ export function TermsDocument() {
       </LegalSection>
 
       <LegalSection title="13. Contact">
+        <p>{companyRegistrationLine()}</p>
         <p>
-          <strong>hello@clistesystems.ie</strong>
+          <strong>{CLISTE_COMPANY.helloEmail}</strong>
         </p>
       </LegalSection>
     </>

@@ -71,7 +71,7 @@ Cliste will:
    Controller** by appropriate technical and organisational measures
    to fulfil its obligation to respond to data-subject requests
    (Articles 12-23 GDPR). The Controller's primary self-service tools
-   are at `/dashboard/privacy`.
+   are at `/dashboard/legal/data-requests`.
 6. **Assist the Controller** in ensuring compliance with Articles 32-36
    (security, breach notification, DPIA).
 7. **Notify** the Controller without undue delay (and in any event within
@@ -107,7 +107,7 @@ agreement.
 ## 8. Data subject rights
 
 The Controller's dashboard provides self-service tools at
-`/dashboard/privacy` for handling Article 15 (access) and Article 17
+`/dashboard/legal/data-requests` for handling Article 15 (access) and Article 17
 (erasure) requests. For Articles 18, 20, 21 and 22 requests, or where
 data spans multiple controllers, the Controller may request assistance
 by emailing **support@clistesystems.ie**.
@@ -139,7 +139,7 @@ have exclusive jurisdiction.
 | Processor              | Cliste Systems, Ireland                                     |
 | Processor contact      | privacy@clistesystems.ie                                    |
 | Frequency              | Continuous, for the duration of the subscription            |
-| Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); app & worker EU-hosted; see Annex III |
+| Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); Railway EU West; see Annex III |
 
 ## Annex II — Technical & organisational measures
 
@@ -165,17 +165,17 @@ in the customer dashboard (**Legal & privacy → Sub-processors**) and at
 is signed:
 
 - Supabase — EEA (AWS eu-west-1, Ireland); primary database
-- Vercel — EEA production region (dashboard & APIs)
-- Railway — EEA region (voice worker)
+- Vercel — EEA (dub1 Dublin); dashboard & APIs
+- Railway — EEA (EU West); voice worker
 - Stripe Payments Europe Ltd (Ireland)
-- Twilio Ireland (Ireland; SMS may route globally)
-- LiveKit Inc. (US — DPF / SCCs; real-time voice)
-- Deepgram Inc. (US — SCCs; speech-to-text, transient)
-- ElevenLabs Inc. (US — DPF / SCCs; text-to-speech, transient)
-- OpenAI Ireland Ltd (EU entity; US processing possible — DPF / SCCs)
-- SendGrid / Twilio (US — SCCs)
+- Twilio Ireland (Ireland; SIP/SMS may route globally)
+- LiveKit Inc. (EU SIP Frankfurt for inbound; WebRTC global until protocol pinning; DPF / SCCs)
+- ElevenLabs Inc. (US; EU residency on Enterprise — DPF / SCCs; transient TTS)
+- OpenRouter Inc. (US; EU in-region routing on Enterprise — SCCs; LLM routing)
+- SendGrid / Twilio (US global API today; EU residency available — SCCs)
+- Google Ireland Ltd (optional geocoding — SCCs)
 - Cloudflare Ireland (Ireland; global edge)
 
 ---
 
-_Last updated: 2026-04-18._
+_Last updated: 2026-06-12._

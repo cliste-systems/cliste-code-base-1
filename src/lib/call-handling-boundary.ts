@@ -85,9 +85,9 @@ const PAYMENT_SECURITY_BLOCK_PATTERNS: RegExp[] = [
 export const PAYMENT_SECURITY_BLOCK_MESSAGE =
   "Cara never collects payment or security details on a recorded call.";
 
-// --- Warn: sensitive personal data (rules + details) ---
+// --- Hard block: sensitive / special-category data (rules + details) ---
 
-const SENSITIVE_DATA_WARN_PATTERNS: RegExp[] = [
+const SENSITIVE_DATA_BLOCK_PATTERNS: RegExp[] = [
   /\bpps\b/i,
   /\bpassport\b/i,
   /\blicen[cs]e\s+number\b/i,
@@ -97,16 +97,35 @@ const SENSITIVE_DATA_WARN_PATTERNS: RegExp[] = [
   /\baccount\s+number\b/i,
   /\bdate\s+of\s+birth\b/i,
   /\bdob\b/i,
-  /\bsymptom/i,
-  /\bmedical\b/i,
+  /\bmedical\s+history\b/i,
   /\bhealth\s+information\b/i,
+  /\bmedical\s+condition\b/i,
   /\bmedication\b/i,
-  /\bcondition\b/i,
+  /\bpregnan(?:t|cy)\b/i,
+  /\ballerg(?:y|ies)\b/i,
+  /\bsymptom/i,
   /\bdiagnos/i,
+  /\bdisabilit/i,
+  /\bmental\s+health\b/i,
+  /\breligion\b/i,
+  /\bethnic/i,
+  /\bsexual\s+orientation\b/i,
+  /\b(?:ask|collect|get|take)\b[^.]{0,40}\b(?:medical|health|pregnancy|allerg)/i,
 ];
 
-export const SENSITIVE_DATA_WARN_MESSAGE =
-  "This is sensitive personal data — only collect it if you genuinely need it, and remember calls are recorded.";
+export const SENSITIVE_DATA_BLOCK_MESSAGE =
+  "Cara must not ask for medical history, pregnancy, allergies, PPS, bank details, or other sensitive personal data on a transcribed call.";
+
+/** Used by FAQ lint and other save-time checks. */
+export function matchesSensitiveDataCollection(text: string): boolean {
+  return SENSITIVE_DATA_BLOCK_PATTERNS.some((p) => p.test(text));
+}
+
+export const SPECIAL_CATEGORY_MINIMISATION_INSTRUCTION =
+  "I never ask for health information, pregnancy, allergies, medical history, religion, or other sensitive personal details — even if a business rule seems to ask for it.";
+
+export const VOLUNTEERED_SENSITIVE_INSTRUCTION =
+  "If a caller volunteers sensitive personal details, I acknowledge briefly without repeating them, I do not include them in summaries, and I steer back to why they called or taking a message.";
 
 export const DETAILS_SURVEY_WARNING_MESSAGE =
   "Long lists make calls feel like a survey — Cara works best with the essentials.";
@@ -304,11 +323,11 @@ export function validateCallHandlingAdd(
     return { ok: false, block: PAYMENT_SECURITY_BLOCK_MESSAGE };
   }
 
-  const warnings: string[] = [];
-
-  if (SENSITIVE_DATA_WARN_PATTERNS.some((p) => p.test(text))) {
-    warnings.push(SENSITIVE_DATA_WARN_MESSAGE);
+  if (matchesSensitiveDataCollection(text)) {
+    return { ok: false, block: SENSITIVE_DATA_BLOCK_MESSAGE };
   }
+
+  const warnings: string[] = [];
 
   warnings.push(...detectCapabilityWarnings(text, caps));
 

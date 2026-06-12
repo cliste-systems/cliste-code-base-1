@@ -87,35 +87,6 @@ export function OnboardingFormCard({
   );
 }
 
-export function OnboardingPanelCard({
-  children,
-  footer,
-  error,
-  className,
-}: {
-  children: ReactNode;
-  footer?: ReactNode;
-  error?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("w-full space-y-2", className)}>
-      {children}
-      {error ? (
-        <p className="text-center text-sm text-red-600" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {footer ? (
-        <OnboardingEnter className="flex items-center justify-center gap-3 pt-4">
-          <OnboardingStepBackButton />
-          {footer}
-        </OnboardingEnter>
-      ) : null}
-    </div>
-  );
-}
-
 export function OnboardingFieldRow({
   children,
   className,

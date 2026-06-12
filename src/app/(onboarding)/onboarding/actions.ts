@@ -4,7 +4,9 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { resolveAccountIdFromBillingMetadata } from "@/lib/account-billing";
 import {
+  activatePlatformSubscriptionGoLive,
   createPlatformSubscriptionCheckout,
   persistOrgBillingSelection,
   persistPlatformCheckoutSession,
@@ -20,11 +22,17 @@ import {
 /** Stripe plan checkout — off until billing is ready. Set `CLISTE_PLAN_CHECKOUT_ENABLED=true` to enable. */
 const PLAN_CHECKOUT_ENABLED =
   process.env.CLISTE_PLAN_CHECKOUT_ENABLED === "true";
+const PLAN_CHECKOUT_DEV_SKIP_ALLOWED =
+  process.env.NODE_ENV !== "production" && !PLAN_CHECKOUT_ENABLED;
 import { cleanAgentFaqs } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
 import { classifyBusinessDescription } from "@/lib/classify-business-description";
-import { nicheHasPhysicalLocation } from "@/lib/organization-niche";
+import {
+  nicheHasPhysicalLocation,
+  type OrganizationNiche,
+} from "@/lib/organization-niche";
 import {
   parseVerticalId,
+  profileDefaultsForVertical,
   resolveNicheForVerticalChoice,
 } from "@/lib/verticals";
 import { importBusinessFromWebsite } from "@/lib/website-import";
@@ -72,17 +80,27 @@ async function provisionPhoneForOrganization(organizationId: string): Promise<vo
   }
 }
 
-/** Flip an organisation live once payment + setup are done (go-live). */
+/** Flip an account + org live once payment + setup are done (go-live). */
 async function activateOrganization(organizationId: string): Promise<void> {
   const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
+  const activationPatch = {
+    status: "active",
+    launch_status: "completed",
+    updated_at: nowIso,
+  };
+
+  const accountId = await resolveAccountIdFromBillingMetadata({ organizationId });
+  if (accountId) {
+    await admin.from("accounts").update(activationPatch).eq("id", accountId);
+  }
+
   await admin
     .from("organizations")
     .update({
-      status: "active",
+      ...activationPatch,
       is_active: true,
       onboarding_step: ONBOARDING_STEPS.done,
-      launch_status: "completed",
-      updated_at: new Date().toISOString(),
     })
     .eq("id", organizationId);
 
@@ -167,7 +185,6 @@ export type SaveProfileResult =
   | { ok: false; message: string };
 
 export type SaveProfilePayload = {
-  businessDescription: string;
   address: string;
   eircode: string;
   firstName: string;
@@ -192,38 +209,10 @@ export async function saveProfileStep(
   const firstName = payload.firstName.trim();
   const lastName = payload.lastName.trim();
   const ownerNameFromForm = joinOwnerName(firstName, lastName);
-  const businessDescription = payload.businessDescription.trim();
 
-  if (businessDescription.length < 2) {
-    return { ok: false, message: "Describe what kind of business this is." };
-  }
-
-  if (looksLikeGibberish(businessDescription)) {
-    return {
-      ok: false,
-      message: "That doesn't look right — tell us what you do in a few words.",
-    };
-  }
-
-  const {
-    agentBusinessType,
-    niche: classifiedNiche,
-    regulated,
-  } = await classifyBusinessDescription(businessDescription);
-
-  // Honour the owner's explicit vertical choice: a "Salon & Beauty" pick keeps
-  // the tailored experience even if the free-text description is ambiguous.
-  const niche = resolveNicheForVerticalChoice(
-    parseVerticalId(payload.vertical),
-    classifiedNiche,
-  );
-
-  if (regulated && !isOnboardingFreeNavEnabled()) {
-    return {
-      ok: false,
-      message:
-        "We don't support medical, legal, or financial services yet — they need extra compliance. Email hello@clistesystems.ie and we'll let you know when that changes.",
-    };
+  const verticalChoice = parseVerticalId(payload.vertical);
+  if (!verticalChoice) {
+    return { ok: false, message: "Pick the option that fits you best." };
   }
 
   const admin = createAdminClient();
@@ -246,6 +235,37 @@ export async function saveProfileStep(
       ok: false,
       message:
         "Business name is missing from your account. Go back to signup or contact support.",
+    };
+  }
+
+  const existingRaw = String(org?.raw_business_description ?? "").trim();
+  const existingSummary = String(org?.business_knowledge_summary ?? "").trim();
+
+  let agentBusinessType: string;
+  let classifiedNiche: OrganizationNiche;
+  let regulated = false;
+
+  if (existingRaw.length >= 2 && !looksLikeGibberish(existingRaw)) {
+    const classified = await classifyBusinessDescription(existingRaw);
+    agentBusinessType = classified.agentBusinessType;
+    classifiedNiche = classified.niche;
+    regulated = classified.regulated;
+  } else {
+    const defaults = profileDefaultsForVertical(verticalChoice);
+    agentBusinessType = defaults.agentBusinessType;
+    classifiedNiche = defaults.niche;
+  }
+
+  // Honour the owner's explicit vertical choice: a "Salon & Beauty" pick keeps
+  // the tailored experience even if an imported description is ambiguous.
+  const niche = resolveNicheForVerticalChoice(verticalChoice, classifiedNiche);
+  const businessDescription = existingRaw || agentBusinessType;
+
+  if (regulated && !isOnboardingFreeNavEnabled()) {
+    return {
+      ok: false,
+      message:
+        "We don't support medical, legal, or financial services yet — they need extra compliance. Email hello@clistesystems.ie and we'll let you know when that changes.",
     };
   }
 
@@ -292,8 +312,6 @@ export async function saveProfileStep(
 
   const locationAddress = address || null;
   const locationEircode = eircode || null;
-  const existingRaw = String(org?.raw_business_description ?? "").trim();
-  const existingSummary = String(org?.business_knowledge_summary ?? "").trim();
   const seedKnowDraft = !existingRaw && !existingSummary;
 
   const { error } = await admin
@@ -542,6 +560,13 @@ export async function startPlanCheckout(
       message: "You must accept the Data Processing Agreement to continue.",
     };
   }
+  if (formData.get("acceptCallerPrivacy") !== "on") {
+    return {
+      ok: false,
+      message:
+        "Confirm you have added or will display caller privacy information before go-live.",
+    };
+  }
   const planTier: PlanTier = rawPlan;
   const launchTier = "diy" as const;
 
@@ -577,28 +602,57 @@ export async function startPlanCheckout(
     },
   });
 
-  if (!PLAN_CHECKOUT_ENABLED) {
-    // Billing not wired yet: record the chosen plan, ensure a number, and go live.
+  await adminForLegal
+    .from("organizations")
+    .update({
+      caller_privacy_acknowledged_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", session.organizationId);
+
+  if (PLAN_CHECKOUT_DEV_SKIP_ALLOWED) {
+    console.warn(
+      "[onboarding] CLISTE_PLAN_CHECKOUT_ENABLED is off — skipping Stripe checkout (dev only)",
+    );
     const admin = createAdminClient();
     const plan = PLANS[planTier];
+    const { data: orgRow } = await admin
+      .from("organizations")
+      .select("account_id")
+      .eq("id", session.organizationId)
+      .maybeSingle();
+    const accountId = orgRow?.account_id as string | undefined;
+    const billingPatch = {
+      plan_tier: planTier,
+      billing_interval: interval,
+      launch_tier: launchTier,
+      application_fee_bps: plan.applicationFeeBps,
+      platform_subscription_id: "dev_checkout_skipped",
+      status: "active",
+      launch_status: "completed",
+      updated_at: new Date().toISOString(),
+    };
     const { error } = await admin
       .from("organizations")
-      .update({
-        plan_tier: planTier,
-        billing_interval: interval,
-        launch_tier: launchTier,
-        application_fee_bps: plan.applicationFeeBps,
-        platform_subscription_id: "dev_checkout_skipped",
-        updated_at: new Date().toISOString(),
-      })
+      .update(billingPatch)
       .eq("id", session.organizationId);
 
     if (error) {
       return { ok: false, message: error.message };
     }
+    if (accountId) {
+      await admin.from("accounts").update(billingPatch).eq("id", accountId);
+    }
 
     await provisionPhoneForOrganization(session.organizationId);
     await completeOnboarding();
+  }
+
+  if (!PLAN_CHECKOUT_ENABLED) {
+    return {
+      ok: false,
+      message: "Billing is not available. Contact support.",
+    };
   }
 
   await persistOrgBillingSelection({
@@ -683,8 +737,7 @@ export async function finalisePlanCheckout(checkoutSessionId: string): Promise<v
     checkoutSessionId,
   );
 
-  await provisionPhoneForOrganization(session.organizationId);
-  await activateOrganization(session.organizationId);
+  await activatePlatformSubscriptionGoLive(session.organizationId);
 }
 
 /**
@@ -697,13 +750,28 @@ export async function completeOnboarding(): Promise<never> {
 
   const { data: org } = await admin
     .from("organizations")
-    .select("greeting, phone_number, platform_subscription_id")
+    .select(
+      "greeting, phone_number, platform_subscription_id, account_id",
+    )
     .eq("id", session.organizationId)
     .maybeSingle();
 
-  const hasSubscription = Boolean(
+  let hasSubscription = Boolean(
     String(org?.platform_subscription_id ?? "").trim(),
   );
+  if (!hasSubscription && org?.account_id) {
+    const { data: account } = await admin
+      .from("accounts")
+      .select("platform_subscription_id")
+      .eq("id", org.account_id as string)
+      .maybeSingle();
+    hasSubscription = Boolean(
+      String(account?.platform_subscription_id ?? "").trim(),
+    );
+  }
+  if (!hasSubscription && session.platformSubscriptionId?.trim()) {
+    hasSubscription = true;
+  }
   const hasGreeting = String(org?.greeting ?? "").trim().length > 0;
 
   // In enforced mode, never half-activate: bounce back to the right step.

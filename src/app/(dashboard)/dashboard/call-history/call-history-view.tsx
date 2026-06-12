@@ -29,11 +29,13 @@ import { cn } from "@/lib/utils";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
+  fullTranscriptForDisplay,
+  hasFullTranscript,
   matchesOutcomeFilter,
   matchesSearch,
   outcomeBadgeVariant,
+  reviewTranscriptForDisplay,
   summaryForDisplay,
-  transcriptForDisplay,
   whatHappenedNextLabel,
   type CallHistoryListItem,
   type CallHistoryMetrics,
@@ -271,8 +273,34 @@ function CallDetailPanel({
     );
   }
 
+  return (
+    <CallDetailPanelContent
+      key={call.id}
+      call={call}
+      copied={copied}
+      onCopySummary={onCopySummary}
+      contactHref={contactHref}
+    />
+  );
+}
+
+function CallDetailPanelContent({
+  call,
+  copied,
+  onCopySummary,
+  contactHref,
+}: {
+  call: CallHistoryListItem;
+  copied: boolean;
+  onCopySummary: () => void;
+  contactHref: string;
+}) {
+  const [showFullTranscript, setShowFullTranscript] = useState(false);
+
   const summary = summaryForDisplay(call);
-  const transcript = transcriptForDisplay(call);
+  const safeTranscript = reviewTranscriptForDisplay(call);
+  const fullTranscript = fullTranscriptForDisplay(call);
+  const showFull = showFullTranscript && fullTranscript != null;
   const name = callDisplayName(call);
   const whatHappenedNext = whatHappenedNextLabel(call.outcome, call.hasOpenAction);
   const showOutcomeBadge = call.outcome !== "answered";
@@ -345,13 +373,35 @@ function CallDetailPanel({
         </DetailSection>
 
         <DetailSection title="Transcript">
-          {transcript ? (
+          <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
+            Calls are transcribed for up to 30 days. Card numbers and IDs are
+            redacted automatically. Callers may mention personal details — use{" "}
+            <Link
+              href="/dashboard/legal/data-requests"
+              className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+            >
+              Legal → Data requests
+            </Link>{" "}
+            to erase if asked.
+          </p>
+          {safeTranscript || showFull ? (
             <pre className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-slate-800">
-              {transcript}
+              {showFull ? fullTranscript : safeTranscript}
             </pre>
           ) : (
             <p className="text-[13px] text-slate-500">No transcript available.</p>
           )}
+          {hasFullTranscript(call) ? (
+            <button
+              type="button"
+              onClick={() => setShowFullTranscript((v) => !v)}
+              className="mt-2 text-[12px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
+            >
+              {showFull
+                ? "Hide full transcript"
+                : "Show full transcript (30-day retention)"}
+            </button>
+          ) : null}
         </DetailSection>
       </DetailPanelBody>
 

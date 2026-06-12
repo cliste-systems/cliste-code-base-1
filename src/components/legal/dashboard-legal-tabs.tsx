@@ -15,7 +15,7 @@ export function DashboardLegalTabs() {
   return (
     <nav
       aria-label="Legal sections"
-      className="no-scrollbar flex w-full min-w-0 items-stretch overflow-x-auto rounded-full border border-[#e5eaf2] bg-white/70 p-1 shadow-[0_8px_30px_rgba(15,23,42,0.04)] backdrop-blur"
+      className="no-scrollbar flex w-full min-w-0 items-stretch overflow-x-auto overflow-y-hidden rounded-full border border-[#e5eaf2] bg-white/70 p-1 backdrop-blur"
     >
       {DASHBOARD_LEGAL_PAGES.map((page) => {
         const active = pathname === page.href;
@@ -34,11 +34,11 @@ export function DashboardLegalTabs() {
             {active && !reduceMotion ? (
               <motion.span
                 layoutId="legal-tab-pill"
-                className="absolute inset-0 rounded-full bg-[#0b1220] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_6px_rgba(15,23,42,0.12)]"
+                className="absolute inset-0 rounded-full bg-[#0b1220] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
                 transition={onboardingSpring}
               />
             ) : active ? (
-              <span className="absolute inset-0 rounded-full bg-[#0b1220] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_6px_rgba(15,23,42,0.12)]" />
+              <span className="absolute inset-0 rounded-full bg-[#0b1220] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]" />
             ) : null}
             <span className="relative z-[1]">{page.label}</span>
           </Link>

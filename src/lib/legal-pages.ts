@@ -1,5 +1,3 @@
-import { LEGAL_DOCUMENT_VERSIONS } from "@/lib/legal-documents";
-
 /** Public marketing/legal site paths (unauthenticated). */
 export const PUBLIC_LEGAL_PAGES = [
   { href: "/legal/privacy", label: "Privacy" },
@@ -23,7 +21,4 @@ export const DASHBOARD_LEGAL_PAGES = [
   { href: "/dashboard/legal/cookies", label: "Cookies" },
 ] as const;
 
-export const LEGAL_LAST_UPDATED = "31 May 2026";
-
-/** Bump `LEGAL_DOCUMENT_VERSIONS` in legal-documents.ts when any legal page changes. */
-export const LEGAL_DOCUMENT_VERSION = LEGAL_DOCUMENT_VERSIONS.terms;
+export const LEGAL_LAST_UPDATED = "12 June 2026";

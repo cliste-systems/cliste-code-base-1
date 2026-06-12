@@ -42,8 +42,8 @@ quickly. We will not pursue legal action against good-faith researchers who:
 - Reports of best-practice / hardening suggestions with no concrete
   exploit path (we welcome them, but they're not eligible for any bounty
   treatment).
-- Stripe / Twilio / Supabase / OpenAI / ElevenLabs / Deepgram / LiveKit /
-  SendGrid / Cloudflare platform issues — please report those upstream.
+- Stripe / Twilio / Supabase / OpenRouter / ElevenLabs / LiveKit /
+  SendGrid / Cloudflare / Google platform issues — please report those upstream.
 
 ## Acknowledgements
 

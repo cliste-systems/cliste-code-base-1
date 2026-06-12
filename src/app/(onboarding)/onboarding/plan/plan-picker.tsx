@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import {
   LegalAcceptanceCheckbox,
   LegalDocLink,
 } from "@/components/legal/legal-acceptance-checkbox";
 import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
-import { OnboardingStepBackButton } from "@/components/onboarding/onboarding-step-back-button";
+import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
 import {
   ONBOARDING_SELECTION_CARD,
   ONBOARDING_SELECTION_CARD_ACTIVE,
@@ -64,6 +65,7 @@ export function PlanPicker({
   const [plan, setPlan] = useState<PlanTier>(defaultSelfServe);
   const [interval, setInterval] = useState<BillingInterval>(defaultInterval);
   const [submittingTier, setSubmittingTier] = useState<PlanTier | null>(null);
+  const reduceMotion = useReducedMotion();
 
   const [state, formAction, pending] = useActionState(
     async (_prev: { ok: false; message: string }, formData: FormData) =>
@@ -80,7 +82,8 @@ export function PlanPicker({
   return (
     <form
       action={formAction}
-      className="flex w-full flex-col items-center gap-6"
+      noValidate
+      className="flex w-full flex-col items-center gap-4 text-center sm:gap-5"
     >
       <input type="hidden" name="interval" value={interval} />
 
@@ -114,7 +117,7 @@ export function PlanPicker({
         </button>
       </div>
 
-      <div className="grid w-full gap-3.5 md:grid-cols-3">
+      <div className="grid w-full gap-4 md:grid-cols-3 md:items-stretch">
         {selfServePlans.map((p) => {
           const selected = plan === p.tier;
           const popular = p.recommended;
@@ -124,10 +127,10 @@ export function PlanPicker({
             <div
               key={p.tier}
               className={cn(
-                "flex flex-col p-4 transition-[border-color,box-shadow,transform] duration-200",
+                "flex min-h-[22rem] flex-col p-5 transition-[border-color,box-shadow,transform,min-height] duration-300 ease-out sm:min-h-[23.5rem] sm:p-6",
                 ONBOARDING_SELECTION_CARD,
                 popular &&
-                  "border-[#0b1220]/20 shadow-[0_10px_32px_rgba(11,18,32,0.1)] md:-translate-y-0.5",
+                  "border-[#0b1220]/20 shadow-[0_10px_32px_rgba(11,18,32,0.1)]",
                 popular &&
                   selected &&
                   "border-[#0b1220]/30 shadow-[0_14px_40px_rgba(11,18,32,0.14)] ring-1 ring-[#0b1220]/12",
@@ -141,65 +144,90 @@ export function PlanPicker({
                 className="flex flex-1 flex-col text-left"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-sm font-medium text-[#0b1220]">
+                  <span className="text-[15px] font-medium text-[#0b1220]">
                     {p.name}
                   </span>
                   {popular ? (
-                    <span className="shrink-0 rounded-full bg-[#0b1220] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
+                    <span className="shrink-0 rounded-full bg-[#0b1220] px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
                       Popular
                     </span>
                   ) : null}
                 </div>
 
-                <p className="mt-1.5 text-[12px] font-light leading-snug text-slate-500">
+                <p className="mt-2 text-[12px] font-light leading-snug text-slate-500">
                   {p.tagline}
                 </p>
 
-                <div className="mt-3.5 flex items-baseline gap-1">
-                  <span className="text-[1.75rem] font-light leading-none tracking-tight text-[#0b1220]">
+                <div className="mt-4 flex items-baseline gap-1">
+                  <motion.span
+                    key={`${p.tier}-${interval}`}
+                    initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.28, ease: ONBOARDING_EASE }}
+                    className="text-[1.875rem] font-light leading-none tracking-tight text-[#0b1220] sm:text-[2rem]"
+                  >
                     {formatEuro(
                       interval === "year" ? p.annualCents / 12 : p.monthlyCents,
                     )}
-                  </span>
+                  </motion.span>
                   <span className="text-xs font-light text-slate-500">/mo</span>
                 </div>
 
-                <p className="mt-1 text-[10px] font-light text-slate-400">
-                  14-day free trial
-                  {interval === "year"
-                    ? ` · then ${formatEuro(p.annualCents)}/yr`
-                    : null}
-                </p>
+                <AnimatePresence initial={false}>
+                  {interval === "year" ? (
+                    <motion.div
+                      key={`${p.tier}-annual-billed`}
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { height: 0, opacity: 0, marginTop: 0 }
+                      }
+                      animate={{ height: "auto", opacity: 1, marginTop: 4 }}
+                      exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                      transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
+                      className="overflow-hidden"
+                    >
+                      <p className="text-[11px] font-light text-slate-400">
+                        Billed {formatEuro(p.annualCents)}/yr
+                      </p>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
-                <div className="mt-4 space-y-3">
-                  <div className="space-y-0.5">
-                    <p className="text-[11px] font-medium text-slate-600">
-                      {p.includedMinutes.toLocaleString()} min / mo
-                    </p>
-                    <p className="text-[11px] font-medium text-slate-600">
-                      {p.includedSms.toLocaleString()} SMS / mo
-                    </p>
-                  </div>
-                  <div className="space-y-0.5 border-t border-slate-100 pt-3">
-                    <p className="text-[10px] font-light text-slate-400">
-                      {formatEuro(p.overageRateCents)}/min overage
-                    </p>
-                    <p className="text-[10px] font-light text-slate-400">
-                      {formatEuro(p.smsOverageRateCents)}/SMS overage
-                    </p>
-                  </div>
-                </div>
+                <motion.div
+                  layout={!reduceMotion}
+                  transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
+                  className="mt-4 space-y-2 border-t border-slate-100 pt-4"
+                >
+                  <p className="text-[12px] font-medium text-slate-600">
+                    {p.includedMinutes.toLocaleString()} min ·{" "}
+                    {p.includedSms.toLocaleString()} SMS / mo
+                  </p>
+                  <p className="text-[11px] font-light text-slate-400">
+                    {formatEuro(p.overageRateCents)}/min ·{" "}
+                    {formatEuro(p.smsOverageRateCents)}/SMS overage
+                  </p>
+                </motion.div>
 
-                <ul className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-[12px] font-light leading-snug text-slate-600">
+                <motion.ul
+                  layout={!reduceMotion}
+                  transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
+                  className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-[12px] font-light leading-snug text-slate-600"
+                >
                   {p.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-1.5">
-                      <span className="mt-1.5 size-1 shrink-0 rounded-full bg-slate-400" />
+                    <li key={feature} className="flex items-start gap-2">
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-400" />
                       <span>{feature}</span>
                     </li>
                   ))}
-                </ul>
+                </motion.ul>
               </button>
 
+              <motion.div
+                layout={!reduceMotion}
+                transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
+                className="w-full"
+              >
               <PlanContinueButton
                 tier={p.tier}
                 disabled={pending}
@@ -209,14 +237,15 @@ export function PlanPicker({
                   setSubmittingTier(p.tier);
                 }}
               />
+              </motion.div>
             </div>
           );
         })}
       </div>
 
       {customPlan ? (
-        <div className="flex w-full flex-col items-start justify-between gap-3 rounded-xl border border-slate-200/75 bg-white/85 px-4 py-3 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center sm:px-5">
-          <div className="min-w-0 space-y-1">
+        <div className="flex w-full flex-col items-center justify-between gap-3 rounded-2xl border border-slate-200/75 bg-white/85 px-5 py-4 text-left shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center sm:px-6">
+          <div className="min-w-0 space-y-1 sm:text-left">
             <p className="text-[14px] font-medium text-[#0b1220]">
               {customPlan.name} — talk to our team
             </p>
@@ -234,28 +263,37 @@ export function PlanPicker({
         </div>
       ) : null}
 
-      <LegalAcceptanceCheckbox
-        id="acceptDpa"
-        name="acceptDpa"
-        className="w-full max-w-3xl"
-      >
-        I accept the{" "}
-        <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink>{" "}
-        so Cliste may process my callers&apos; data when I go live.
-      </LegalAcceptanceCheckbox>
+      <div className="grid w-full gap-2.5 text-left md:grid-cols-2">
+        <LegalAcceptanceCheckbox
+          id="acceptCallerPrivacy"
+          name="acceptCallerPrivacy"
+          required={false}
+          compact
+          className="h-full"
+        >
+          I confirm I have added (or will display before go-live) caller privacy
+          information on my website or in my premises — including that calls may be
+          handled by an AI assistant and may be recorded and transcribed.
+        </LegalAcceptanceCheckbox>
+
+        <LegalAcceptanceCheckbox
+          id="acceptDpa"
+          name="acceptDpa"
+          required={false}
+          compact
+          className="h-full"
+        >
+          I accept the{" "}
+          <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink>{" "}
+          so Cliste may process my callers&apos; data when I go live.
+        </LegalAcceptanceCheckbox>
+      </div>
 
       {errorMessage ? (
-        <p className="w-full max-w-lg rounded-md border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">
+        <p className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[12px] text-red-700">
           {errorMessage}
         </p>
       ) : null}
-
-      <div className="flex w-full flex-col items-center gap-2">
-        <OnboardingStepBackButton />
-        <p className="mx-auto max-w-xs text-center text-[11px] font-light leading-relaxed text-slate-500">
-          No charge for 14 days. Cancel anytime before your trial ends.
-        </p>
-      </div>
     </form>
   );
 }

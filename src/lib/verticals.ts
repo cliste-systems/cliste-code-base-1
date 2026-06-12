@@ -1,3 +1,4 @@
+import { businessDescriptionFromNiche } from "@/lib/onboarding-business-type";
 import {
   parseOrganizationNiche,
   type OrganizationNiche,
@@ -51,7 +52,7 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   selection: {
     label: "Salon & Beauty",
     description:
-      "Appointment-based beauty businesses — Cara is tuned for bookings, services and stylists.",
+      "Our first tailored vertical — Cara answers service questions, sends your booking link, and captures messages. She does not hold your live calendar.",
     examples: ["Hair salon", "Barber", "Nail bar", "Beauty salon", "Spa", "Lashes & brows"],
   },
   productNoun: "Salon",
@@ -65,7 +66,7 @@ const GENERIC_PACK: VerticalPack = {
   selection: {
     label: "Something else",
     description:
-      "Any other local business. Cara still answers calls, takes messages and shares your links.",
+      "Any other local business — Cara answers calls, sends your links, and captures messages. She does not hold your live calendar.",
     examples: ["Trades", "Hospitality", "Retail", "Professional services"],
   },
   productNoun: "Business",
@@ -124,6 +125,19 @@ export function parseVerticalId(
  *   pin it to the vertical's default so they still get the tailored experience.
  * - "Something else" (or no choice): trust the classifier as before.
  */
+/** Default niche + agent label when the owner only picks a vertical (no free-text description). */
+export function profileDefaultsForVertical(vertical: VerticalId): {
+  niche: OrganizationNiche;
+  agentBusinessType: string;
+} {
+  const pack = VERTICAL_PACKS[vertical];
+  return {
+    niche: pack.defaultNiche,
+    agentBusinessType:
+      businessDescriptionFromNiche(pack.defaultNiche) || pack.selection.label,
+  };
+}
+
 export function resolveNicheForVerticalChoice(
   choice: VerticalId | null,
   classifiedNiche: OrganizationNiche,

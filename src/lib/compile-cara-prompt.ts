@@ -10,11 +10,17 @@ import {
 } from "@/lib/business-files";
 import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
 import {
-  COLLECTION_RELEVANCE_INSTRUCTION,
   NEVER_PROMISE_INSTRUCTION,
   PHOTO_HANDLING_INSTRUCTION,
   PRECEDENCE_CONFLICT_INSTRUCTION,
+  SPECIAL_CATEGORY_MINIMISATION_INSTRUCTION,
+  VOLUNTEERED_SENSITIVE_INSTRUCTION,
 } from "@/lib/call-handling-boundary";
+import {
+  buildDetailsCollectionPromptSection,
+  parseDetailsCollectMode,
+  type DetailsCollectMode,
+} from "@/lib/details-collect-mode";
 import {
   deriveCaraCapabilities,
   formatAvailableActionsForPrompt,
@@ -32,6 +38,7 @@ import {
   type WeekSchedule,
 } from "@/lib/business-hours";
 import { buildHoursPromptBlock } from "@/lib/general-boundary";
+import { normalizeBaseTown, serviceAreaAnchorTown } from "@/lib/base-town";
 import {
   formatServiceAreaForPrompt,
   SERVICE_AREA_COVERAGE_INSTRUCTION,
@@ -51,6 +58,7 @@ export type CaraSetupPromptInput = {
   businessType: string;
   locationAddress?: string;
   locationEircode?: string;
+  baseTown?: string;
   /** Formatted week schedule text (when structured hours are saved). */
   openingHours?: string;
   openingHoursSchedule?: WeekSchedule;
@@ -64,6 +72,7 @@ export type CaraSetupPromptInput = {
   servicesOffered?: string;
   servicesNotOffered?: string;
   detailsToCollect?: string;
+  detailsCollectMode?: DetailsCollectMode;
   businessRules?: string[];
   faqs?: { question: string; answer: string }[];
   /** Facts that don't fit other structured fields ("Anything else"). */
@@ -230,9 +239,11 @@ function servicesSection(offered: string[], notOffered: string[]): string {
 function nonNegotiablesSection(assistant: string): string {
   return [
     "A few things never change — even if one of your rules says otherwise:",
-    `• Every call I say I'm AI and that the call may be recorded: "${voiceLegalDisclosure(assistant)}" — I never skip that.`,
+    `• Every call I say I'm AI and that the call may be recorded and transcribed: "${voiceLegalDisclosure(assistant)}" — I never skip that.`,
     "• If I don't know the answer, I don't guess — I take their name, number, and what they need, and pass it to your Action Inbox.",
-    "• I never take card numbers, PINs, or passwords on a call.",
+    "• I never take card numbers, PINs, PPS numbers, IBANs, or passwords on a call.",
+    `• ${SPECIAL_CATEGORY_MINIMISATION_INSTRUCTION}`,
+    `• ${VOLUNTEERED_SENSITIVE_INSTRUCTION}`,
     "• I don't give legal, medical, or financial advice on the call — I take a message for the team instead.",
     `• ${PHOTO_HANDLING_INSTRUCTION}`,
     PRECEDENCE_CONFLICT_INSTRUCTION,
@@ -282,16 +293,6 @@ function businessFilesSection(files: BusinessFileListItem[]): string {
   return blocks.filter(Boolean).join("\n\n");
 }
 
-function detailsCollectionSection(collectItems: string[]): string {
-  const parts = [COLLECTION_RELEVANCE_INSTRUCTION];
-  if (collectItems.length > 0) {
-    parts.push(
-      `When it's relevant, I also try to get: ${formatListPhrase(collectItems)}.`,
-    );
-  }
-  return parts.join("\n\n");
-}
-
 /**
  * Deterministically build Cara's call-handling instructions from structured
  * setup fields only. Written in Cara's first-person voice for live calls and
@@ -311,7 +312,12 @@ export function compileCaraPrompt(input: CaraSetupPromptInput): string {
   parts.push(availableActionsSection(input));
 
   const collectItems = listItems(input.detailsToCollect);
-  parts.push(detailsCollectionSection(collectItems));
+  parts.push(
+    buildDetailsCollectionPromptSection(
+      collectItems,
+      parseDetailsCollectMode(input.detailsCollectMode),
+    ),
+  );
 
   const rules = (input.businessRules ?? [])
     .map((r) => r.trim())
@@ -340,12 +346,17 @@ export function compileCaraPrompt(input: CaraSetupPromptInput): string {
     parts.push(hoursBlock);
   }
 
+  const baseTown = serviceAreaAnchorTown(input.baseTown, input.locationAddress);
+  if (baseTown && normalizeBaseTown(input.baseTown ?? "")) {
+    aboutBits.push(`We're based in ${baseTown}.`);
+  }
+
   const areas = listItems(input.serviceArea);
   const townExclusions = listItems(input.serviceAreaExclusions);
   if (areas.length > 0) {
     const areaPhrase = formatServiceAreaForPrompt(
       areas,
-      location ?? undefined,
+      baseTown ?? location ?? undefined,
       townExclusions,
     );
     aboutBits.push(`We cover ${areaPhrase}.`);

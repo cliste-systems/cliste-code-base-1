@@ -18,19 +18,14 @@ export function defaultVoiceGreetingIntro(businessName: string): string {
   return `You're through to ${businessNameLabel(businessName)} —`;
 }
 
-/** @deprecated Use defaultVoiceGreetingIntro */
-export function voiceGreetingIntro(businessName: string): string {
-  return defaultVoiceGreetingIntro(businessName);
-}
-
 /** Fixed GDPR / AI Act disclosure — callers always hear this; not editable in onboarding. */
 export function voiceLegalDisclosure(assistantDisplayName: string): string {
-  return `I'm ${assistantNameLabel(assistantDisplayName)}, the AI assistant. This call may be recorded.`;
+  return `I'm ${assistantNameLabel(assistantDisplayName)}, the AI assistant. This call may be recorded and transcribed.`;
 }
 
 /** Short UI copy explaining why the disclosure is locked. */
 export const VOICE_LEGAL_NOTICE_HINT =
-  "Fixed by law — under GDPR and the EU AI Act, callers must be told they're speaking to AI and that calls may be recorded.";
+  "Fixed by law — under GDPR and the EU AI Act, callers must be told they're speaking to AI and that calls may be recorded and transcribed.";
 
 export function buildFullVoiceGreeting(
   introLine: string,

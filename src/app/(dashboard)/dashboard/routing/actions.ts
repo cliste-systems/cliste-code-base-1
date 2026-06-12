@@ -2,17 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireDashboardSession } from "@/lib/dashboard-session";
+import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
-import { suggestRouteNaming } from "@/lib/route-naming-suggest";
 
 import { normalizeRoutingLink } from "./routing-owner-copy";
 import { parseRoutingLinks, type RoutingLink } from "./routing-links";
 import { validateRoutes, routesFromStoredLinks } from "./route-models";
-import type {
-  RouteNameSuggestionInput,
-  SuggestRouteNameResult,
-} from "./route-templates";
 
 type SaveResult = { ok: true } | { ok: false; message: string };
 
@@ -20,7 +15,7 @@ type SaveResult = { ok: true } | { ok: false; message: string };
  * Persist active routing capabilities (links, file, message, etc.).
  */
 export async function saveRoutingLinks(links: RoutingLink[]): Promise<SaveResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId } = await requireDashboardAdmin();
 
   if (!Array.isArray(links)) {
     return { ok: false, message: "Invalid routing payload." };
@@ -55,38 +50,4 @@ export async function saveRoutingLinks(links: RoutingLink[]): Promise<SaveResult
   revalidatePath("/dashboard/routing");
   revalidatePath("/dashboard/routing/routes");
   return { ok: true };
-}
-
-export async function loadRoutingLinks(): Promise<RoutingLink[]> {
-  const { supabase, organizationId } = await requireDashboardSession();
-  const { data } = await supabase
-    .from("organizations")
-    .select("routing_links")
-    .eq("id", organizationId)
-    .maybeSingle();
-  return parseRoutingLinks((data as { routing_links?: unknown } | null)?.routing_links);
-}
-
-/** AI-suggest a clear, caller-facing name for one action (optional helper). */
-export async function suggestRoutingActionName(
-  input: RouteNameSuggestionInput,
-): Promise<SuggestRouteNameResult> {
-  const { supabase, organizationId } = await requireDashboardSession();
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("name, agent_business_type, niche")
-    .eq("id", organizationId)
-    .maybeSingle();
-
-  const suggestion = await suggestRouteNaming(
-    {
-      businessName: String(org?.name ?? "").trim(),
-      businessType: String(org?.agent_business_type ?? "").trim(),
-      niche: String(org?.niche ?? "").trim(),
-    },
-    input,
-  );
-
-  if (!suggestion) return { ok: false };
-  return { ok: true, ...suggestion };
 }

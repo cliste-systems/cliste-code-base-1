@@ -12,18 +12,9 @@ import {
 import { normalizeRoutingLink } from "@/app/(dashboard)/dashboard/routing/routing-owner-copy";
 import { parseRoutingLinks } from "@/app/(dashboard)/dashboard/routing/routing-links";
 import {
-  generateCaraBusinessNotes,
-  type CaraKnowledgeExtraction,
-} from "@/lib/business-knowledge-summary";
-import {
   generateOnboardingUiCopy,
   type OnboardingUiCopy,
 } from "@/lib/onboarding-ui-copy";
-import {
-  processCaraKnowledgeTurn,
-  type CaraKnowledgeChatMessage,
-} from "@/lib/cara-knowledge-conversation";
-import type { CaraKnowledgeCollected } from "./train-cara-knowledge-checklist";
 import {
   persistBusinessKnowledge,
   type BusinessKnowledgePayload,
@@ -36,12 +27,12 @@ import { generateCaraCustomPrompt } from "@/lib/cara-custom-prompt";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-async function advanceToActionsStep(organizationId: string): Promise<never> {
+async function advanceToNumberStep(organizationId: string): Promise<never> {
   const admin = createAdminClient();
   const { error } = await admin
     .from("organizations")
     .update({
-      onboarding_step: ONBOARDING_STEPS.actions,
+      onboarding_step: ONBOARDING_STEPS.number,
       updated_at: new Date().toISOString(),
     })
     .eq("id", organizationId);
@@ -51,7 +42,7 @@ async function advanceToActionsStep(organizationId: string): Promise<never> {
   }
 
   revalidatePath("/onboarding", "layout");
-  redirect("/onboarding/actions");
+  redirect("/onboarding/number");
 }
 
 import {
@@ -78,55 +69,6 @@ export type TrainCaraPayload = BusinessKnowledgePayload & {
 };
 
 export type TrainCaraSaveResult = { ok: true } | { ok: false; message: string };
-
-export type GenerateCaraNotesResult =
-  | { ok: true; summary: string; extracted: CaraKnowledgeExtraction }
-  | { ok: false; message: string };
-
-export type CaraKnowledgeChatPayload = {
-  messages: CaraKnowledgeChatMessage[];
-  userMessage: string;
-  summary: string;
-  rawDescription: string;
-  collected: CaraKnowledgeCollected;
-};
-
-export type CaraKnowledgeChatResult =
-  | {
-      ok: true;
-      assistantMessage: string;
-      summary: string;
-      rawDescription: string;
-      collected: CaraKnowledgeCollected;
-      complete: boolean;
-      refinedBusinessType?: string;
-    }
-  | { ok: false; message: string };
-
-export async function continueCaraKnowledgeChat(
-  payload: CaraKnowledgeChatPayload,
-): Promise<CaraKnowledgeChatResult> {
-  const session = await requireOnboardingSession();
-  const admin = createAdminClient();
-  const { data: org } = await admin
-    .from("organizations")
-    .select("name, agent_business_type")
-    .eq("id", session.organizationId)
-    .maybeSingle();
-
-  const result = await processCaraKnowledgeTurn({
-    businessName: String(org?.name ?? "").trim() || "Your business",
-    businessType: (org?.agent_business_type as string | null) ?? null,
-    messages: payload.messages,
-    userMessage: payload.userMessage,
-    summary: payload.summary,
-    rawDescription: payload.rawDescription,
-    collected: payload.collected,
-  });
-
-  if (!result.ok) return result;
-  return result;
-}
 
 async function persistTrainCara(
   organizationId: string,
@@ -285,27 +227,6 @@ export async function ensureOnboardingUiCopy(
   return result;
 }
 
-export async function generateCaraNotesFromDescription(
-  description: string,
-): Promise<GenerateCaraNotesResult> {
-  const session = await requireOnboardingSession();
-  const admin = createAdminClient();
-  const { data: org } = await admin
-    .from("organizations")
-    .select("name, agent_business_type")
-    .eq("id", session.organizationId)
-    .maybeSingle();
-
-  const result = await generateCaraBusinessNotes({
-    businessName: String(org?.name ?? "").trim(),
-    businessType: (org?.agent_business_type as string | null) ?? null,
-    description,
-  });
-
-  if (!result.ok) return result;
-  return { ok: true, summary: result.summary, extracted: result.extracted };
-}
-
 export async function saveTrainCaraProgress(
   payload: TrainCaraPayload,
 ): Promise<TrainCaraSaveResult> {
@@ -331,7 +252,7 @@ export async function skipTrainCaraStep(): Promise<never> {
 
   revalidatePath("/onboarding", "layout");
   revalidatePath("/onboarding/knowledge");
-  return advanceToActionsStep(session.organizationId);
+  return advanceToNumberStep(session.organizationId);
 }
 
 export async function completeTrainCaraStep(
@@ -339,8 +260,7 @@ export async function completeTrainCaraStep(
   payload: TrainCaraPayload,
 ): Promise<TrainCaraSaveResult | never> {
   const session = await requireOnboardingSession();
-  // Routes + transfer are configured in the next two steps (Actions, Your
-  // number), so the call-handling prompt is compiled there, not here.
+  // Routes + transfer are configured in Your number and Routing in the dashboard.
   const saved = await persistTrainCara(session.organizationId, payload, {
     strictRoutes: false,
   });
@@ -358,5 +278,5 @@ export async function completeTrainCaraStep(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/onboarding", "layout");
-  return advanceToActionsStep(session.organizationId);
+  return advanceToNumberStep(session.organizationId);
 }

@@ -20,11 +20,19 @@ export type PlanDefinition = {
   overageRateCents: number;
   smsOverageRateCents: number;
   applicationFeeBps: number;
+  /** Locations included in the base subscription price. */
+  includedLocations: number;
+  /** Per extra location / month (Business+). Null = not available. */
+  locationAddonMonthlyCents: number | null;
   features: string[];
   recommended?: boolean;
   /** When false, checkout is blocked — contact sales (Custom / Enterprise). */
   selfServe: boolean;
 };
+
+/** Licensed Stripe price for each location beyond the first. */
+export const LOCATION_ADDON_MONTHLY_CENTS = 7900;
+export const LOCATION_ADDON_STRIPE_KEY = "cliste_location_addon_monthly";
 
 export const PLANS: Record<PlanTier, PlanDefinition> = {
   starter: {
@@ -39,6 +47,8 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
     overageRateCents: 59,
     smsOverageRateCents: 15,
     applicationFeeBps: 150,
+    includedLocations: 1,
+    locationAddonMonthlyCents: null,
     selfServe: true,
     features: [
       "Cara answers calls 24/7",
@@ -58,6 +68,8 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
     overageRateCents: 55,
     smsOverageRateCents: 15,
     applicationFeeBps: 100,
+    includedLocations: 1,
+    locationAddonMonthlyCents: null,
     recommended: true,
     selfServe: true,
     features: [
@@ -78,11 +90,14 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
     overageRateCents: 49,
     smsOverageRateCents: 15,
     applicationFeeBps: 50,
+    includedLocations: 1,
+    locationAddonMonthlyCents: LOCATION_ADDON_MONTHLY_CENTS,
     selfServe: true,
     features: [
       "Everything in Professional",
       "Lowest standard per-minute rate",
       "Priority phone support",
+      "Add extra locations from €79/site",
     ],
   },
   enterprise: {
@@ -90,13 +105,15 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
     name: "Custom",
     tagline:
       "Volume pricing, negotiated rates, and tailored setup for larger businesses.",
-    monthlyCents: 44900,
-    annualCents: 44900 * 10,
+    monthlyCents: 0,
+    annualCents: 0,
     includedMinutes: 2000,
     includedSms: 500,
     overageRateCents: 45,
     smsOverageRateCents: 15,
     applicationFeeBps: 25,
+    includedLocations: 1,
+    locationAddonMonthlyCents: LOCATION_ADDON_MONTHLY_CENTS,
     selfServe: false,
     features: [
       "Volume minutes and SMS",
@@ -149,18 +166,23 @@ export const LAUNCHES: Record<LaunchTier, LaunchDefinition> = {
   },
 };
 
-/** Self-serve tiers shown in checkout (excludes Custom). */
-export const SELF_SERVE_PLAN_TIERS: PlanTier[] = (
-  Object.values(PLANS) as PlanDefinition[]
-)
-  .filter((p) => p.selfServe)
-  .map((p) => p.tier);
-
 export function planFromPriceCents(cents: number): PlanTier | null {
+  if (cents <= 0) return null;
   for (const p of Object.values(PLANS)) {
     if (p.monthlyCents === cents || p.annualCents === cents) return p.tier;
   }
   return null;
+}
+
+/** Resolve plan tier from a Stripe Price lookup_key (cliste_plan_<tier>_monthly|annual). */
+export function planFromStripePriceId(lookupKey: string): PlanTier | null {
+  const key = lookupKey.trim();
+  const match = /^cliste_plan_(starter|pro|business|enterprise)_(monthly|annual)$/.exec(
+    key,
+  );
+  if (!match) return null;
+  const tier = match[1];
+  return isPlanTier(tier) ? tier : null;
 }
 
 export function isPlanTier(value: unknown): value is PlanTier {

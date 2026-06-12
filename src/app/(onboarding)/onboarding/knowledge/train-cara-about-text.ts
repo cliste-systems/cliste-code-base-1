@@ -15,14 +15,3 @@ export function aboutTextForStep(stored: string): string {
   return trimmed;
 }
 
-export type AboutStepCopy = {
-  title: string;
-  subtitle: string;
-};
-
-export function resolveAboutStepCopy(): AboutStepCopy {
-  return {
-    title: "Tell Cara about your business",
-    subtitle: "Who you are, what you do, and who you help.",
-  };
-}

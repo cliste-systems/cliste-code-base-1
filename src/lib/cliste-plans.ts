@@ -20,8 +20,8 @@ export type {
 export {
   PLANS,
   LAUNCHES,
-  SELF_SERVE_PLAN_TIERS,
   planFromPriceCents,
+  planFromStripePriceId,
   isPlanTier,
   isLaunchTier,
   normaliseLaunchTierForDb,

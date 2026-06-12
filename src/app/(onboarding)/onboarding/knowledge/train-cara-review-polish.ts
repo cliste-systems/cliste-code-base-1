@@ -139,12 +139,3 @@ export function polishFaqAnswer(raw: string): string {
   return joinPolishedFragments(fragments);
 }
 
-export function buildFaqReviewLine(question: string, answer: string): string {
-  const q = stripTrailingPunctuation(question);
-  const polished = polishFaqAnswer(answer);
-  if (!q) return polished;
-  if (!polished) {
-    return `If someone asks "${q}", I'll check with you before guessing.`;
-  }
-  return `If someone asks "${q}", I'll say: ${polished}`;
-}

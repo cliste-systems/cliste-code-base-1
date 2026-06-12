@@ -1,5 +1,3 @@
-import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
-
 /** Set when admin uses "Open dashboard"; sidebar shows "dev" instead of the salon user's name. */
 export const SUPPORT_DASHBOARD_COOKIE = "cliste_support_dashboard";
 const SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS = 60 * 60 * 8;
@@ -42,23 +40,6 @@ export async function createSupportDashboardCookieValue(): Promise<string | null
   const payload = `${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${expiresAt}`;
   const sig = await signSupportPayload(payload, secret);
   return `${expiresAt}.${sig}`;
-}
-
-export async function isValidSupportDashboardCookieValue(
-  raw: string | null | undefined
-): Promise<boolean> {
-  const token = raw?.trim();
-  if (!token) return false;
-  const secret = getSupportDashboardSigningSecret();
-  if (!secret) return false;
-  const [expiresAtRaw, sig] = token.split(".", 2);
-  if (!expiresAtRaw || !sig) return false;
-  const expiresAt = Number(expiresAtRaw);
-  if (!Number.isFinite(expiresAt)) return false;
-  if (expiresAt <= Math.floor(Date.now() / 1000)) return false;
-  const payload = `${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${expiresAt}`;
-  const expected = await signSupportPayload(payload, secret);
-  return timingSafeEqualUtf8(sig, expected);
 }
 
 export function supportDashboardCookieOptions(): {

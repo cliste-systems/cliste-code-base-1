@@ -4,6 +4,10 @@
  */
 export const PUBLIC_ASSETS = {
   logo: "/m8x4p2n7.png",
+  /** Dashboard main-pane background (cara05, 3840×2400). */
+  dashboard: {
+    background: { jpg: "/j6m3t9w2.jpg", webp: "/j6m3t9w2.webp" },
+  },
   onboarding: {
     default2x: { jpg: "/k3w9r1t5.jpg", webp: "/k3w9r1t5.webp" },
     source: "/s1c8e5t0.jpg",

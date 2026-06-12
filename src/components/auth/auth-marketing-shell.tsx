@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
@@ -11,7 +11,6 @@ import {
   OnboardingEnterProvider,
   useOnboardingAnimateIn,
 } from "@/components/onboarding/onboarding-enter";
-import { onboardingPageTransition } from "@/components/onboarding/onboarding-motion";
 import {
   ONBOARDING_GLASS_CARD,
   ONBOARDING_HEADLINE,
@@ -109,10 +108,6 @@ function SignupGlassShell({
   children: ReactNode;
   assets: PageBackground;
 }) {
-  const ready = useOnboardingAnimateIn();
-  const reduceMotion = useReducedMotion() ?? false;
-  const animatePage = !reduceMotion;
-
   const panel = (
     <div
       className={cn(
@@ -163,18 +158,7 @@ function SignupGlassShell({
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f6f5f3] p-4 antialiased sm:p-6">
       <AuthPageBackground assets={assets} />
-      {animatePage ? (
-        <motion.main
-          className="relative z-10 w-full max-w-lg"
-          initial={{ opacity: 0, y: 10 }}
-          animate={ready ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-          transition={onboardingPageTransition}
-        >
-          {panel}
-        </motion.main>
-      ) : (
-        <main className="relative z-10 w-full max-w-lg">{panel}</main>
-      )}
+      <main className="relative z-10 w-full max-w-lg">{panel}</main>
     </div>
   );
 }

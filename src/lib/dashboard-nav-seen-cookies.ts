@@ -6,6 +6,9 @@ export const DASHBOARD_CALL_HISTORY_SEEN_COOKIE =
 export const DASHBOARD_ACTION_INBOX_SEEN_COOKIE =
   "dashboard_action_inbox_seen_at";
 
+export const DASHBOARD_CARA_TRAINING_SEEN_COOKIE =
+  "dashboard_cara_training_seen_at";
+
 export function dashboardNavSeenCookieOptions() {
   return {
     path: "/dashboard",

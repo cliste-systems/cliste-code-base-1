@@ -11,16 +11,6 @@ export type CallOutcome =
   | "voicemail_or_no_speech"
   | "spam_or_abuse";
 
-export const CALL_OUTCOMES: readonly CallOutcome[] = [
-  "answered",
-  "link_sent",
-  "callback_requested",
-  "action_created",
-  "failed",
-  "voicemail_or_no_speech",
-  "spam_or_abuse",
-] as const;
-
 export type CallHistoryRow = {
   id: string;
   dateTimeLabel: string;

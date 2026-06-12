@@ -60,9 +60,27 @@ function formatDate(iso: string): string {
   });
 }
 
+type ComplianceEventRow = {
+  id: string;
+  created_at: string;
+  event_type: string;
+  organization_id: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
 export default async function AdminSecurityPage() {
   let loadError: string | null = null;
   let rows: SecurityEventRow[] = [];
+  let complianceRows: ComplianceEventRow[] = [];
+  let complianceError: string | null = null;
+  let pipelineIncidents: {
+    id: string;
+    occurred_at: string;
+    stage: string;
+    error_message: string;
+    called_number: string | null;
+  }[] = [];
+  let disclosureConfirmedPct: number | null = null;
 
   try {
     const admin = createAdminClient();
@@ -75,6 +93,43 @@ export default async function AdminSecurityPage() {
       .limit(300);
     if (error) throw new Error(error.message);
     rows = (data ?? []) as SecurityEventRow[];
+
+    const complianceRes = await admin
+      .from("compliance_events")
+      .select("id, created_at, event_type, organization_id, metadata")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (complianceRes.error) {
+      complianceError = complianceRes.error.message;
+    } else {
+      complianceRows = (complianceRes.data ?? []) as ComplianceEventRow[];
+    }
+
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: callRows } = await admin
+      .from("call_logs")
+      .select("id")
+      .gte("created_at", weekAgo);
+    const { count: disclosureMisses } = await admin
+      .from("compliance_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "voice_disclosure_not_confirmed")
+      .gte("created_at", weekAgo);
+    const totalCalls = callRows?.length ?? 0;
+    if (totalCalls > 0) {
+      const misses = disclosureMisses ?? 0;
+      disclosureConfirmedPct = Math.round(
+        ((totalCalls - misses) / totalCalls) * 100,
+      );
+    }
+
+    const { data: incidents } = await admin
+      .from("voice_pipeline_incidents")
+      .select("id, occurred_at, stage, error_message, called_number")
+      .gte("occurred_at", weekAgo)
+      .order("occurred_at", { ascending: false })
+      .limit(20);
+    pipelineIncidents = (incidents ?? []) as typeof pipelineIncidents;
   } catch (e) {
     loadError =
       e instanceof Error ? e.message : "Failed to load security events.";
@@ -179,6 +234,121 @@ export default async function AdminSecurityPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+                Disclosure confirmed (7d)
+              </p>
+              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
+                {disclosureConfirmedPct != null ? `${disclosureConfirmedPct}%` : "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
+                Pipeline incidents (7d)
+              </p>
+              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
+                {pipelineIncidents.length}
+              </p>
+            </div>
+          </section>
+
+          {pipelineIncidents.length > 0 ? (
+            <section className="mb-8 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="border-b border-gray-200 px-4 py-3">
+                <h2 className="text-sm font-medium text-gray-900">
+                  Voice pipeline health
+                </h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  Unrecoverable STT/LLM/TTS failures reported by the worker.
+                </p>
+              </div>
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-gray-100 text-xs text-gray-500 uppercase">
+                  <tr>
+                    <th className="px-4 py-2">When</th>
+                    <th className="px-4 py-2">Stage</th>
+                    <th className="px-4 py-2">DID</th>
+                    <th className="px-4 py-2">Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pipelineIncidents.map((inc) => (
+                    <tr key={inc.id} className="border-b border-gray-50">
+                      <td className="px-4 py-2 whitespace-nowrap text-gray-600">
+                        {formatDate(inc.occurred_at)}
+                      </td>
+                      <td className="px-4 py-2 font-medium text-gray-900">
+                        {inc.stage}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {inc.called_number ?? "—"}
+                      </td>
+                      <td className="max-w-md truncate px-4 py-2 text-gray-700">
+                        {inc.error_message}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : null}
+
+          <section className="mb-8 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-200 px-4 py-3">
+              <h2 className="text-sm font-medium text-gray-900">
+                Voice compliance signals
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Disclosure misses and other compliance telemetry from the voice pipeline.
+              </p>
+            </div>
+            {complianceError ? (
+              <p className="px-4 py-6 text-sm text-amber-800">
+                Compliance events unavailable: {complianceError}
+              </p>
+            ) : (
+              <table className="w-full min-w-[720px] border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-white">
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500">When</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500">Event</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500">Organization</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500">Metadata</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {complianceRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                        No compliance events recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    complianceRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50/40">
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {formatDate(row.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {row.event_type}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                          {row.organization_id ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {row.metadata
+                            ? JSON.stringify(row.metadata).slice(0, 120)
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             )}
           </section>
 

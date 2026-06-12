@@ -1,18 +1,15 @@
 import { createHash } from "crypto";
 
-type Scope = "authenticate" | "admin_unlock" | "dashboard_unlock";
+import { createAdminClient } from "@/utils/supabase/admin";
 
-type Bucket = {
-  firstFailureMs: number;
-  failureCount: number;
-  lockedUntilMs: number;
-};
+type Scope = "authenticate" | "admin_unlock" | "dashboard_unlock";
 
 type ScopeConfig = {
   windowMs: number;
   maxFailures: number;
   lockMs: number;
   captchaAfterFailures: number;
+  eventTypes: string[];
 };
 
 export type RateLimitStatus = {
@@ -30,30 +27,23 @@ const CONFIG: Record<Scope, ScopeConfig> = {
     maxFailures: 6,
     lockMs: 15 * 60 * 1000,
     captchaAfterFailures: 2,
+    eventTypes: ["auth_password_sign_in", "auth_signup"],
   },
   admin_unlock: {
     windowMs: 15 * 60 * 1000,
     maxFailures: 5,
     lockMs: 30 * 60 * 1000,
     captchaAfterFailures: 1,
+    eventTypes: ["admin_unlock"],
   },
   dashboard_unlock: {
     windowMs: 15 * 60 * 1000,
     maxFailures: 8,
     lockMs: 15 * 60 * 1000,
     captchaAfterFailures: 3,
+    eventTypes: ["dashboard_unlock"],
   },
 };
-
-const BUCKETS = new Map<string, Bucket>();
-
-function nowMs(): number {
-  return Date.now();
-}
-
-function key(scope: Scope, fingerprint: string): string {
-  return `${scope}:${fingerprint}`;
-}
 
 function getSalt(): string {
   return process.env.AUTH_RATE_LIMIT_SALT?.trim() || DEFAULT_SALT;
@@ -66,12 +56,6 @@ export function hashRateLimitIdentifier(raw: string): string {
 }
 
 function getClientIp(headersList: Headers): string {
-  // Prefer headers that are set by the trusted edge (Cloudflare, Vercel) and
-  // cannot be forged by the client. `x-forwarded-for` is appended by each hop
-  // — the leftmost entry is whatever the original caller claimed, so on
-  // platforms that don't sanitise XFF an attacker can forge "0.0.0.0" and get
-  // unlimited buckets. We only fall back to XFF when no trusted header exists,
-  // and we take the rightmost (closest-to-us) entry rather than the leftmost.
   const fromCf = headersList.get("cf-connecting-ip")?.trim();
   if (fromCf) return fromCf;
   const fromRealIp = headersList.get("x-real-ip")?.trim();
@@ -87,7 +71,7 @@ function getClientIp(headersList: Headers): string {
 
 export function rateLimitFingerprint(
   headersList: Headers,
-  hint?: string | null
+  hint?: string | null,
 ): string {
   const ip = getClientIp(headersList);
   const ua = headersList.get("user-agent")?.trim() || "unknown-ua";
@@ -95,73 +79,94 @@ export function rateLimitFingerprint(
   return hashRateLimitIdentifier(`${ip}:${ua}${extra}`);
 }
 
-function purgeExpired(scope: Scope, bucketKey: string, t: number): Bucket | null {
+async function countFailures(
+  scope: Scope,
+  fingerprint: string,
+): Promise<{ count: number; lastFailureMs: number | null }> {
   const cfg = CONFIG[scope];
-  const existing = BUCKETS.get(bucketKey);
-  if (!existing) return null;
-  if (existing.lockedUntilMs > 0 && existing.lockedUntilMs > t) return existing;
-  if (t - existing.firstFailureMs > cfg.windowMs) {
-    BUCKETS.delete(bucketKey);
-    return null;
+  const windowStart = new Date(Date.now() - cfg.windowMs).toISOString();
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("security_auth_events")
+      .select("created_at")
+      .in("event_type", cfg.eventTypes)
+      .in("outcome", ["failure", "rate_limited"])
+      .gte("created_at", windowStart)
+      .contains("metadata", { rate_limit_fingerprint: fingerprint })
+      .order("created_at", { ascending: false })
+      .limit(cfg.maxFailures + 1);
+    if (error) {
+      console.warn("[auth-rate-limit] count query failed", error.message);
+      return { count: 0, lastFailureMs: null };
+    }
+    const rows = data ?? [];
+    const last = rows[0]?.created_at;
+    return {
+      count: rows.length,
+      lastFailureMs: last ? new Date(last).getTime() : null,
+    };
+  } catch (e) {
+    console.warn("[auth-rate-limit] count failed", e);
+    return { count: 0, lastFailureMs: null };
   }
-  if (existing.lockedUntilMs > 0 && existing.lockedUntilMs <= t) {
-    BUCKETS.delete(bucketKey);
-    return null;
-  }
-  return existing;
 }
 
-export function getRateLimitStatus(
+export async function getRateLimitStatus(
   scope: Scope,
-  fingerprint: string
-): RateLimitStatus {
+  fingerprint: string,
+): Promise<RateLimitStatus> {
   const cfg = CONFIG[scope];
-  const t = nowMs();
-  const bucketKey = key(scope, fingerprint);
-  const b = purgeExpired(scope, bucketKey, t);
-  if (!b) {
-    return {
-      allowed: true,
-      requiresCaptcha: false,
-      retryAfterSeconds: 0,
-      failuresInWindow: 0,
-    };
-  }
-  const locked = b.lockedUntilMs > t;
+  const { count, lastFailureMs } = await countFailures(scope, fingerprint);
+  const locked =
+    count >= cfg.maxFailures &&
+    lastFailureMs != null &&
+    Date.now() < lastFailureMs + cfg.lockMs;
   const retryAfterSeconds = locked
-    ? Math.max(1, Math.ceil((b.lockedUntilMs - t) / 1000))
+    ? Math.max(1, Math.ceil((lastFailureMs! + cfg.lockMs - Date.now()) / 1000))
     : 0;
   return {
     allowed: !locked,
-    requiresCaptcha: b.failureCount >= cfg.captchaAfterFailures,
+    requiresCaptcha: count >= cfg.captchaAfterFailures,
     retryAfterSeconds,
-    failuresInWindow: b.failureCount,
+    failuresInWindow: count,
   };
 }
 
-export function recordRateLimitFailure(
+export async function recordRateLimitFailure(
   scope: Scope,
-  fingerprint: string
-): RateLimitStatus {
+  fingerprint: string,
+): Promise<RateLimitStatus> {
   const cfg = CONFIG[scope];
-  const t = nowMs();
-  const bucketKey = key(scope, fingerprint);
-  const existing = purgeExpired(scope, bucketKey, t);
-  const failureCount = (existing?.failureCount ?? 0) + 1;
-  const firstFailureMs =
-    existing && t - existing.firstFailureMs <= cfg.windowMs
-      ? existing.firstFailureMs
-      : t;
-  const lockedUntilMs =
-    failureCount >= cfg.maxFailures ? t + cfg.lockMs : existing?.lockedUntilMs ?? 0;
-  BUCKETS.set(bucketKey, {
-    firstFailureMs,
-    failureCount,
-    lockedUntilMs,
-  });
+  try {
+    const admin = createAdminClient();
+    await admin.from("security_auth_events").insert({
+      event_type: cfg.eventTypes[0],
+      outcome: "failure",
+      metadata: { rate_limit_fingerprint: fingerprint, rate_limit_only: true },
+    });
+  } catch (e) {
+    console.warn("[auth-rate-limit] record failure failed", e);
+  }
   return getRateLimitStatus(scope, fingerprint);
 }
 
-export function clearRateLimit(scope: Scope, fingerprint: string): void {
-  BUCKETS.delete(key(scope, fingerprint));
+export async function clearRateLimit(
+  scope: Scope,
+  fingerprint: string,
+): Promise<void> {
+  const cfg = CONFIG[scope];
+  try {
+    const admin = createAdminClient();
+    await admin
+      .from("security_auth_events")
+      .delete()
+      .in("event_type", cfg.eventTypes)
+      .contains("metadata", {
+        rate_limit_fingerprint: fingerprint,
+        rate_limit_only: true,
+      });
+  } catch (e) {
+    console.warn("[auth-rate-limit] clear failed", e);
+  }
 }

@@ -9,8 +9,14 @@ import { DashboardNavSeenSync } from "./dashboard-nav-seen-sync";
 
 /** Layout reads httpOnly “seen” cookies; must not be statically cached across navigations. */
 export const dynamic = "force-dynamic";
+import {
+  ALL_LOCATIONS_VIEW_COOKIE,
+  locationLabelForVertical,
+} from "@/lib/account-locations";
+import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
 import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import { verticalPackForNiche } from "@/lib/verticals";
 import { enforceDashboardLegalAcceptance } from "@/lib/legal-acceptance-gate";
 import { requireDashboardSession } from "@/lib/dashboard-session";
@@ -21,6 +27,7 @@ import {
 import {
   DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
   DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
+  DASHBOARD_CARA_TRAINING_SEEN_COOKIE,
   parseSeenAtCookie,
 } from "@/lib/dashboard-nav-seen-cookies";
 import { DashboardMobileNav } from "./dashboard-mobile-nav";
@@ -46,9 +53,16 @@ const navItems: {
   { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
   { href: DASHBOARD_ROUTES.caraSetup, label: "Cara Setup", section: "agent" },
+  {
+    href: DASHBOARD_ROUTES.caraTraining,
+    label: "Cara Training",
+    section: "agent",
+  },
   { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
   { href: DASHBOARD_ROUTES.support, label: "Support", section: "account" },
   { href: DASHBOARD_ROUTES.legalDataRequests, label: "Legal", section: "account" },
+  { href: DASHBOARD_ROUTES.locations, label: "Locations", section: "account" },
+  { href: DASHBOARD_ROUTES.team, label: "Team", section: "account" },
   { href: DASHBOARD_ROUTES.settings, label: "Settings", section: "account" },
 ];
 
@@ -70,20 +84,27 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const session = await requireDashboardSession();
-  const { supabase, organizationId, profile, user } = session;
+  const { supabase, organizationId, profile, user, accountId } = session;
 
   await enforceDashboardLegalAcceptance(session);
 
-  const [cookieStore, orgRow] = await Promise.all([
+  const [cookieStore, orgRow, locations, accountBilling] = await Promise.all([
     cookies(),
     getCachedDashboardOrganizationRow(),
+    loadAccountLocations(accountId),
+    loadAccountBilling(accountId),
   ]);
+  const viewAllLocations =
+    cookieStore.get(ALL_LOCATIONS_VIEW_COOKIE)?.value === "1";
   const navSeenAt = {
     callHistory: parseSeenAtCookie(
       cookieStore.get(DASHBOARD_CALL_HISTORY_SEEN_COOKIE)?.value,
     ),
     actionInbox: parseSeenAtCookie(
       cookieStore.get(DASHBOARD_ACTION_INBOX_SEEN_COOKIE)?.value,
+    ),
+    caraTraining: parseSeenAtCookie(
+      cookieStore.get(DASHBOARD_CARA_TRAINING_SEEN_COOKIE)?.value,
     ),
   };
 
@@ -92,7 +113,9 @@ export default async function DashboardLayout({
   // Legacy rows created before migration 027 default to status='active' so
   // existing dashboards are unaffected.
   const lifecycleStatus =
-    (orgRow?.status as string | undefined) ?? "active";
+    (accountBilling?.status as string | undefined) ??
+    (orgRow?.status as string | undefined) ??
+    "active";
   if (
     lifecycleStatus === "pending_verification" ||
     lifecycleStatus === "onboarding"
@@ -126,9 +149,18 @@ export default async function DashboardLayout({
     toNavItem(item, navBadges),
   );
 
-  const accountSummary = buildDashboardAccountSummary(profile, user, orgRow);
+  const accountSummary = buildDashboardAccountSummary(profile, user, {
+    name: accountBilling?.name ?? orgRow?.name ?? null,
+    slug: orgRow?.slug ?? null,
+  });
   const vertical = verticalPackForNiche(orgRow?.niche);
   const productNoun = vertical.id === "generic" ? null : vertical.productNoun;
+  const locationLabel = locationLabelForVertical(vertical.id);
+  const accountName =
+    resolveOrganizationDisplayName(
+      accountBilling?.name ?? orgRow?.name,
+      orgRow?.slug,
+    ) || "Your business";
 
   return (
     <>
@@ -145,6 +177,11 @@ export default async function DashboardLayout({
           adminNav={adminNav}
           needsPassword={needsPassword}
           account={accountSummary}
+          locations={locations}
+          activeOrganizationId={organizationId}
+          viewAllLocations={viewAllLocations}
+          locationLabel={locationLabel}
+          accountName={accountName}
           productNoun={productNoun}
         />
 
@@ -165,7 +202,10 @@ export default async function DashboardLayout({
           ) : null}
           <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-white">
             <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-white px-6 py-6 has-[>[data-dashboard-fill]]:overflow-hidden has-[>[data-dashboard-fill]]:p-0 sm:px-8 [scrollbar-gutter:stable] has-[>[data-dashboard-fill]]:[scrollbar-gutter:auto]">
-              <DashboardVerticalProvider niche={orgRow?.niche}>
+              <DashboardVerticalProvider
+                niche={orgRow?.niche}
+                businessType={orgRow?.agent_business_type}
+              >
                 {children}
               </DashboardVerticalProvider>
             </div>

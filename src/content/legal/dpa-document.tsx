@@ -1,8 +1,9 @@
 
 import {
-    LegalList,
+  LegalList,
   LegalPageHeader,
   LegalSection,
+  LegalTable,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
 
@@ -12,108 +13,326 @@ export function DpaDocument() {
     <>
       <LegalPageHeader
         title="Data Processing Agreement (DPA)"
-        description="Applies when Cliste processes personal data on your behalf under the GDPR. You remain the controller for your callers and contacts."
+        description="GDPR Article 28 agreement between Cliste Systems (processor) and your business (controller) for caller and contact data processed through the Cliste platform."
       />
 
       <p className="text-[15px] leading-relaxed text-slate-700">
-        The full legal text is maintained in{" "}
-        <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
-          docs/legal/DPA.md
-        </code>
-        . This page is the customer-facing summary. For a countersigned copy
-        before your first paid subscription, email{" "}
-        <a
-          href="mailto:privacy@clistesystems.ie"
-          className="font-medium text-emerald-800 underline-offset-2 hover:underline"
-        >
-          privacy@clistesystems.ie
-        </a>
-        .
+        <strong>Cliste Systems</strong> (&ldquo;Processor&rdquo;) and the customer
+        business (&ldquo;Controller&rdquo;) agree the following with respect to
+        processing of personal data carried out by Cliste Systems on behalf of
+        the Controller under the Cliste platform{" "}
+        <LegalInlineLink href="/legal/terms">Terms of Service</LegalInlineLink>.
+        This DPA forms part of the agreement between the parties and applies to
+        all processing of personal data carried out by Cliste under the
+        agreement.
       </p>
 
-      <LegalSection title="1. What we process and why">
+      <LegalSection title="1. Definitions">
         <p>
-          Cliste processes caller contact details, call metadata, redacted
-          transcripts, AI summaries, Action Inbox items, and related optional
-          appointment data solely to operate your AI receptionist, dashboard, and
-          notifications you configure.
+          Capitalised terms not defined here have the meaning given in the GDPR
+          (Regulation (EU) 2016/679).
+        </p>
+        <LegalList>
+          <li>
+            <strong>GDPR</strong> — Regulation (EU) 2016/679.
+          </li>
+          <li>
+            <strong>Personal data</strong>, <strong>processing</strong>,{" "}
+            <strong>controller</strong>, <strong>processor</strong>,{" "}
+            <strong>data subject</strong>,{" "}
+            <strong>special categories of personal data</strong> — as defined in
+            Article 4 GDPR.
+          </li>
+          <li>
+            <strong>Sub-processor</strong> — any third party engaged by Cliste
+            that processes Personal Data on the Controller&apos;s behalf.
+          </li>
+        </LegalList>
+      </LegalSection>
+
+      <LegalSection title="2. Subject matter and duration">
+        <p>
+          Cliste processes Personal Data to provide the Cliste platform — AI voice
+          receptionist, Action Inbox, optional appointments, SMS / email
+          notifications, and the operator dashboard — for the duration of the
+          customer&apos;s subscription, plus the retention periods set out in our{" "}
+          <LegalInlineLink href="/legal/privacy#retention">
+            privacy notice
+          </LegalInlineLink>
+          .
         </p>
       </LegalSection>
 
-      <LegalSection title="2. Your obligations as controller">
+      <LegalSection title="3. Nature, purpose and categories">
+        <LegalTable
+          headers={["Item", "Detail"]}
+          rows={[
+            [
+              "Nature of processing",
+              "Storage, structuring, transmission, transcription, summarisation, retrieval",
+            ],
+            [
+              "Purpose",
+              "Operating the business voice receptionist, Action Inbox, and related notifications",
+            ],
+            [
+              "Data subject categories",
+              "The Controller's customers and staff users (operators)",
+            ],
+            [
+              "Personal data categories",
+              "Name, mobile phone number, email, appointment metadata, voice call audio (transient), call transcripts (30 days), AI summaries (13 months)",
+            ],
+            [
+              "Special category data",
+              "None intended. Customers may volunteer health-related context during a call. Controller is responsible for not soliciting it.",
+            ],
+          ]}
+        />
+      </LegalSection>
+
+      <LegalSection title="4. Controller obligations">
+        <p>The Controller warrants that:</p>
         <LegalList>
-          <li>You have a lawful basis under Article 6 GDPR for data you share with Cliste.</li>
           <li>
-            You inform callers that calls may be handled by an AI and may be
-            recorded/transcribed, as required for your sector.
+            It has a lawful basis under Article 6 GDPR for every category of
+            Personal Data shared with Cliste — typically performance of a
+            contract (Art 6(1)(b)) for booking, and legitimate interests
+            (Art 6(1)(f)) for repeat-customer recognition.
           </li>
           <li>
-            You use{" "}
+            It has provided appropriate transparency information to its customers
+            under Articles 13 / 14 GDPR, including disclosure of the AI voice
+            assistant.
+          </li>
+          <li>
+            It will not upload special category data unless it has the relevant
+            Article 9 condition.
+          </li>
+        </LegalList>
+      </LegalSection>
+
+      <LegalSection title="5. Processor obligations">
+        <p>Cliste will:</p>
+        <LegalList ordered>
+          <li>
+            <strong>Process only on documented instructions</strong> from the
+            Controller, except where required by EU / Member State law.
+          </li>
+          <li>
+            Ensure persons authorised to process Personal Data are bound by
+            confidentiality.
+          </li>
+          <li>
+            Implement appropriate <strong>technical and organisational measures</strong>{" "}
+            (Article 32) — see Annex II.
+          </li>
+          <li>
+            Engage <strong>sub-processors</strong> only with the Controller&apos;s
+            authorisation (Section 7) and impose equivalent data-protection
+            obligations on them.
+          </li>
+          <li>
+            Assist the Controller with data-subject requests (Articles 12–23 GDPR)
+            using{" "}
             <LegalInlineLink href="/dashboard/legal/data-requests">
               Data request tools
             </LegalInlineLink>{" "}
-            in the dashboard to respond to access and erasure requests.
+            in the dashboard.
+          </li>
+          <li>
+            Assist the Controller in ensuring compliance with Articles 32–36
+            (security, breach notification, DPIA).
+          </li>
+          <li>
+            <strong>Notify</strong> the Controller without undue delay (and in any
+            event within 72 hours where feasible) of any Personal Data breach
+            affecting the Controller&apos;s data.
+          </li>
+          <li>
+            At the end of the agreement, <strong>delete or return</strong> all
+            Personal Data to the Controller (see Section 9).
+          </li>
+          <li>
+            Make available to the Controller all information necessary to
+            demonstrate compliance with Article 28 obligations and allow for
+            reasonable audits.
           </li>
         </LegalList>
       </LegalSection>
 
-      <LegalSection title="3. Our obligations as processor">
-        <LegalList>
-          <li>We process only on your documented instructions.</li>
-          <li>We implement appropriate security (encryption, access controls, logging).</li>
-          <li>We assist with data-subject requests using your dashboard tools.</li>
-          <li>
-            We notify you without undue delay (within 72 hours where feasible) of
-            breaches affecting your data.
-          </li>
-          <li>
-            At termination we delete or return data per our{" "}
-            <LegalInlineLink href="/legal/privacy#retention">
-              retention schedule
-            </LegalInlineLink>
-            , except where law requires longer storage.
-          </li>
-        </LegalList>
-      </LegalSection>
-
-      <LegalSection title="4. Sub-processors">
+      <LegalSection title="6. International transfers">
         <p>
-          Listed at{" "}
+          Several sub-processors are located in or transfer data to the United
+          States (see{" "}
+          <LegalInlineLink href="/legal/sub-processors">Sub-processors</LegalInlineLink>
+          ). Cliste relies on the <strong>EU-U.S. Data Privacy Framework</strong>{" "}
+          where the sub-processor is certified, and the EU Commission&apos;s{" "}
+          <strong>Standard Contractual Clauses</strong> (Module 3:
+          processor-to-processor) elsewhere, supplemented by the technical and
+          organisational measures in Annex II.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="7. Sub-processors">
+        <p>
+          The current list of sub-processors is published at{" "}
           <LegalInlineLink href="/legal/sub-processors">
             /legal/sub-processors
           </LegalInlineLink>
-          . We notify you before adding material sub-processors where required.
+          . The Controller provides general written authorisation for Cliste to
+          engage these and future sub-processors. Cliste will give at least{" "}
+          <strong>30 days&apos; notice</strong> of any new or replaced
+          sub-processor by updating that page and notifying the Controller&apos;s
+          primary admin user by email. The Controller may object on reasonable
+          grounds within that notice period; if Cliste cannot accommodate the
+          objection, the Controller may terminate the agreement.
         </p>
       </LegalSection>
 
-      <LegalSection title="5. International transfers">
+      <LegalSection title="8. Data subject rights">
         <p>
-          Primary application data is hosted in the EU where configured. Outside
-          the EEA we use DPF certification and/or SCCs as described on the
-          sub-processor page.
+          The Controller&apos;s dashboard provides self-service tools at{" "}
+          <LegalInlineLink href="/dashboard/legal/data-requests">
+            Data requests
+          </LegalInlineLink>{" "}
+          for handling Article 15 (access) and Article 17 (erasure) requests. For
+          Articles 18, 20, 21 and 22 requests, or where data spans multiple
+          controllers, the Controller may request assistance by emailing{" "}
+          <a
+            href="mailto:support@clistesystems.ie"
+            className="font-medium text-emerald-800 underline-offset-2 hover:underline"
+          >
+            support@clistesystems.ie
+          </a>
+          .
         </p>
       </LegalSection>
 
-      <LegalSection title="6. Retention">
+      <LegalSection title="9. Deletion / return">
         <p>
-          Automatic retention is described in the{" "}
-          <LegalInlineLink href="/legal/privacy#retention">privacy notice</LegalInlineLink>{" "}
-          (e.g. transcripts cleared after 30 days).
+          Within 30 days of the termination or expiry of the agreement, Cliste
+          will, at the Controller&apos;s choice, delete or return all Personal Data
+          processed on its behalf, except where retention is required by Union
+          or Member State law. Backups are overwritten within the standard backup
+          rotation (35 days at the time of writing).
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Related documents">
+      <LegalSection title="10. Liability">
+        <p>Liability is governed by the underlying agreement between the parties.</p>
+      </LegalSection>
+
+      <LegalSection title="11. Governing law">
+        <p>
+          This DPA is governed by the laws of Ireland and the courts of Ireland
+          have exclusive jurisdiction.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Annex I — Processing details">
+        <LegalTable
+          headers={["Field", "Value"]}
+          rows={[
+            ["Controller", "The customer business (account holder of the Cliste account)"],
+            ["Processor", "Cliste Systems, Ireland"],
+            [
+              "Processor contact",
+              <>
+                <a
+                  href="mailto:privacy@clistesystems.ie"
+                  className="font-medium text-emerald-800 underline-offset-2 hover:underline"
+                >
+                  privacy@clistesystems.ie
+                </a>
+              </>,
+            ],
+            ["Frequency", "Continuous, for the duration of the subscription"],
+            [
+              "Storage location",
+              "EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); Railway EU West; see Annex III",
+            ],
+          ]}
+        />
+      </LegalSection>
+
+      <LegalSection title="Annex II — Technical & organisational measures">
         <LegalList>
           <li>
-            <LegalInlineLink href="/legal/terms">Terms of service</LegalInlineLink>
+            <strong>Encryption</strong> — TLS 1.2+ in transit, AES-256 at rest
+            (Postgres, object storage).
           </li>
           <li>
-            <LegalInlineLink href="/legal/privacy">Privacy notice</LegalInlineLink>
+            <strong>Access control</strong> — Row-level security on every tenant
+            table; service role keys held only on the server.
           </li>
           <li>
-            <LegalInlineLink href="/legal/cookies">Cookies</LegalInlineLink>
+            <strong>Logging</strong> — Security audit log for privileged actions
+            (admin actions, GDPR exports / erasures).
+          </li>
+          <li>
+            <strong>Network</strong> — Production behind Cloudflare WAF +
+            Turnstile bot protection.
+          </li>
+          <li>
+            <strong>Backup</strong> — Supabase managed point-in-time recovery,
+            35-day window.
+          </li>
+          <li>
+            <strong>Retention</strong> — Daily cron at{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+              /api/cron/data-retention
+            </code>
+            .
           </li>
         </LegalList>
+      </LegalSection>
+
+      <LegalSection title="Annex III — Sub-processors and locations">
+        <p>
+          The authoritative named list with country, transfer mechanism and
+          purpose is in the customer dashboard (
+          <LegalInlineLink href="/dashboard/legal/sub-processors">
+            Legal &amp; privacy → Sub-processors
+          </LegalInlineLink>
+          ) and at{" "}
+          <LegalInlineLink href="/legal/sub-processors">
+            /legal/sub-processors
+          </LegalInlineLink>{" "}
+          (category summary). Snapshot as of the date this DPA is accepted:
+        </p>
+        <LegalList>
+          <li>Supabase — EEA (AWS eu-west-1, Ireland); primary database</li>
+          <li>Vercel — EEA (dub1 Dublin); dashboard &amp; APIs</li>
+          <li>Railway — EEA (EU West); voice worker</li>
+          <li>Stripe Payments Europe Ltd (Ireland)</li>
+          <li>Twilio Ireland (Ireland; SIP/SMS may route globally)</li>
+          <li>
+            LiveKit Inc. (EU SIP Frankfurt for inbound; WebRTC global until
+            protocol pinning; DPF / SCCs)
+          </li>
+          <li>
+            ElevenLabs Inc. (US; EU residency on Enterprise — DPF / SCCs;
+            transient TTS)
+          </li>
+          <li>
+            OpenRouter Inc. (US; EU in-region routing on Enterprise — SCCs; LLM
+            routing)
+          </li>
+          <li>SendGrid / Twilio (US global API today; EU residency available — SCCs)</li>
+          <li>Google Ireland Ltd (optional geocoding — SCCs)</li>
+          <li>Cloudflare Ireland (Ireland; global edge)</li>
+        </LegalList>
+        <p className="text-[13px] text-slate-600">
+          For a countersigned copy before your first paid subscription, email{" "}
+          <a
+            href="mailto:privacy@clistesystems.ie"
+            className="font-medium text-emerald-800 underline-offset-2 hover:underline"
+          >
+            privacy@clistesystems.ie
+          </a>
+          .
+        </p>
       </LegalSection>
     </>
   );

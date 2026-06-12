@@ -64,7 +64,8 @@ export default async function OnboardingPlanPage(props: {
 
   return (
     <OnboardingStepShell
-      variant="wide"
+      variant="plan"
+      compact
       title="Last step — go live"
       description="Pick a plan to put Cara on your number. 14-day free trial, cancel anytime."
     >

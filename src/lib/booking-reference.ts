@@ -23,12 +23,3 @@ export function normalizeCustomerPhoneE164(phone: string): string {
   }
   return t;
 }
-
-/**
- * After {@link normalizeCustomerPhoneE164}, rejects incomplete numbers (e.g. "+353" only).
- * E.164 allows up to 15 digits total including country code.
- */
-export function isPlausibleCustomerPhoneE164(phone: string): boolean {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 15;
-}

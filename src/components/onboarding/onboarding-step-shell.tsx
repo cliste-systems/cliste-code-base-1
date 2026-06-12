@@ -14,11 +14,17 @@ import { cn } from "@/lib/utils";
 import { OnboardingEnter, OnboardingEnterProvider } from "./onboarding-enter";
 import { OnboardingStepHeader } from "./onboarding-step-header";
 
-export type OnboardingStepShellVariant = "default" | "wide" | "training" | "profile";
+export type OnboardingStepShellVariant =
+  | "default"
+  | "wide"
+  | "plan"
+  | "training"
+  | "profile";
 
 const VARIANT_MAX_WIDTH: Record<OnboardingStepShellVariant, string> = {
   default: "max-w-lg",
   wide: "max-w-6xl",
+  plan: "max-w-6xl",
   training: "max-w-[720px]",
   profile: "max-w-lg lg:max-w-xl",
 };
@@ -32,6 +38,8 @@ type Props = {
   variant?: OnboardingStepShellVariant;
   /** Skip the shell header block; children supply per-step titles (Train Cara). */
   contentOnly?: boolean;
+  /** Tighter vertical rhythm for dense steps (plan picker). */
+  compact?: boolean;
 };
 
 export function OnboardingStepShell({
@@ -41,30 +49,46 @@ export function OnboardingStepShell({
   children,
   variant = "default",
   contentOnly = false,
+  compact = false,
 }: Props) {
   const pathname = usePathname();
   const showHeader = !contentOnly && Boolean(title?.trim());
   const isProfile = variant === "profile";
   const enterTone = isProfile ? "profile" : "default";
   const isKnowledge = pathname === "/onboarding/knowledge";
+  const isPlan = variant === "plan";
   const showShellLogo = !isKnowledge;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <OnboardingEnterProvider>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-          <div className="flex min-h-full flex-col items-center px-4 py-6 sm:px-8 sm:py-8">
+          <div
+            className={cn(
+              "flex min-h-full flex-col items-center px-4 sm:px-6",
+              isPlan
+                ? "pb-5 pt-8 sm:pb-6 sm:pt-10"
+                : compact
+                  ? "py-3 sm:py-4"
+                  : "py-6 sm:py-8",
+            )}
+          >
             <div
               className={cn(
-                "my-auto mx-auto flex w-full flex-col items-center",
+                "mx-auto flex w-full flex-col items-center",
+                !compact && !isPlan && "my-auto",
                 VARIANT_MAX_WIDTH[variant],
-                ONBOARDING_SHELL_SECTION_GAP,
+                isPlan ? "gap-4 sm:gap-5" : compact ? "gap-3 sm:gap-4" : ONBOARDING_SHELL_SECTION_GAP,
               )}
             >
               <div
                 className={cn(
                   "flex w-full shrink-0 flex-col items-center",
-                  showHeader ? ONBOARDING_SHELL_LOGO_GAP : "gap-0",
+                  showHeader
+                    ? isPlan
+                      ? "gap-4"
+                      : ONBOARDING_SHELL_LOGO_GAP
+                    : "gap-0",
                 )}
               >
                 {showShellLogo ? (
@@ -87,6 +111,7 @@ export function OnboardingStepShell({
                       firstName={firstName}
                       title={title!}
                       subtitle={description}
+                      subtitleClassName={isPlan ? "max-w-xl mx-auto" : undefined}
                     />
                   </OnboardingEnter>
                 ) : null}

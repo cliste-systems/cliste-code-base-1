@@ -5,9 +5,7 @@ import {
   DEFAULT_BUSINESS_RULE_SUGGESTIONS,
   DEFAULT_FAQ_SUGGESTIONS,
   FAQ_EXAMPLE_SUGGESTION_COUNT,
-  SALON_BUSINESS_RULE_SUGGESTIONS,
   SALON_FAQ_SUGGESTIONS,
-  TRADES_BUSINESS_RULE_SUGGESTIONS,
   TRADES_FAQ_SUGGESTIONS,
 } from "@/app/(onboarding)/onboarding/knowledge/train-cara-constants";
 import {
@@ -93,9 +91,7 @@ function packFaqSuggestions(pack: TradePack): readonly string[] {
   return DEFAULT_FAQ_SUGGESTIONS;
 }
 
-function packBusinessRuleSuggestions(pack: TradePack): readonly string[] {
-  if (pack === "salon") return SALON_BUSINESS_RULE_SUGGESTIONS;
-  if (pack === "trades") return TRADES_BUSINESS_RULE_SUGGESTIONS;
+function packBusinessRuleSuggestions(_pack: TradePack): readonly string[] {
   return DEFAULT_BUSINESS_RULE_SUGGESTIONS;
 }
 

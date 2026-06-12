@@ -4,6 +4,7 @@ export type SettingsInitial = {
   isActive: boolean;
   businessName: string;
   phoneNumber: string;
+  signupSegment: string;
   notificationEmail: string;
   notificationPhone: string;
   callRoutingMode: CallRoutingMode;

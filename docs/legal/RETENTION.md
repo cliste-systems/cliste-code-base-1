@@ -4,7 +4,7 @@ The authoritative public-facing version of this schedule is at
 `/legal/privacy`. This document is the operational mirror — what the
 system actually does, where, and how often.
 
-Last reviewed: 2026-05-31.
+Last reviewed: 2026-06-12.
 
 ---
 
@@ -12,11 +12,11 @@ Last reviewed: 2026-05-31.
 
 | Asset                                       | TTL                  | Mechanism                                                                                  |
 | ------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
-| `appointments`                              | 6 years (tax)         | Manual erasure via `/dashboard/privacy` (Art 17). Anonymised — name/phone/email replaced.   |
+| `appointments`                              | 6 years (tax)         | Manual erasure via `/dashboard/legal/data-requests` (Art 17). Anonymised — name/phone/email replaced.   |
 | `call_logs.transcript`, `transcript_review` | 30 days              | Daily cron `/api/cron/data-retention` nulls fields                                          |
 | `call_logs.ai_summary`, `caller_number`     | 13 months            | Same cron, longer cutoff                                                                   |
 | `call_logs` row itself                      | Indefinite (org-only) | Kept for ops reporting; contains only org id + duration + outcome after 13 months          |
-| `action_tickets`                            | Tied to parent call   | Erasable via `/dashboard/privacy`                                                          |
+| `action_tickets`                            | Tied to parent call   | Erasable via `/dashboard/legal/data-requests`                                                          |
 | Voice audio (LiveKit / SIP)                 | Not stored at rest   | LiveKit egress recording disabled; Twilio recording disabled                                |
 | `public_booking_otp_challenges` (legacy)    | 30 minutes           | Cron deletes stale rows only — public booking retired; no new writes                        |
 | `public_booking_rate_events` (legacy)       | 14 days              | Same — purge only                                                                          |
@@ -54,7 +54,7 @@ no-op.
 
 ## 5. Customer-driven erasure (Article 17)
 
-Businesses can use `/dashboard/privacy` to:
+Businesses can use `/dashboard/legal/data-requests` to:
 
 - Export everything Cliste holds for a phone number (Article 15).
 - Erase a customer — name, phone, email replaced with sentinel values;

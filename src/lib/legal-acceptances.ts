@@ -17,6 +17,8 @@ export {
   requiredLegalDocuments,
 } from "@/lib/legal-documents";
 
+export { getMissingBaseLegalAcceptances } from "@/lib/onboarding-legal-middleware";
+
 function isCurrentAcceptance(
   documentType: LegalDocumentType,
   documentVersion: string,

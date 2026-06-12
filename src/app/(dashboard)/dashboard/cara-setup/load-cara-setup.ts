@@ -8,6 +8,7 @@ import {
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { buildCaraSetupPromptInputFromOrg } from "@/lib/cara-prompt-from-org";
 import { normalizeServiceAreaCountyItems } from "@/lib/service-area-boundary";
+import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 import { VOICE_ASSISTANT_DEFAULT_NAME } from "@/lib/voice-greeting";
 
 import { listBusinessFiles } from "../agent-setup/business-files-actions";
@@ -33,7 +34,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "name, address, storefront_eircode, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_services_departments, agent_services_not_offered, agent_details_to_collect, agent_business_rules, agent_location_address, agent_location_eircode, business_hours, business_knowledge_summary, routing_links, fallback_number, call_routing_mode",
+      "name, address, storefront_eircode, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_location_address, agent_location_eircode, business_hours, business_knowledge_summary, routing_links, fallback_number, call_routing_mode",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -84,6 +85,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
       detailsToCollectItems: parseAgentKnowledgeList(
         (org?.agent_details_to_collect as string | null) ?? "",
       ),
+      detailsCollectMode: parseDetailsCollectMode(org?.agent_details_collect_mode),
       businessRules: parseAgentBusinessRules(org?.agent_business_rules),
       locationAddress:
         (org?.agent_location_address as string | null)?.trim() ||
@@ -93,6 +95,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
         (org?.agent_location_eircode as string | null)?.trim() ||
         (org?.storefront_eircode as string | null)?.trim() ||
         "",
+      baseTown: (org?.agent_base_town as string | null)?.trim() ?? "",
     },
   };
 }

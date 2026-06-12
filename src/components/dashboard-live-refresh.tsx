@@ -53,6 +53,7 @@ function shouldPoll(pathname: string | null): boolean {
     "/dashboard/calls",
     "/dashboard/call-history",
     "/dashboard/action-inbox",
+    "/dashboard/cara-training",
     "/dashboard/contacts",
     "/dashboard/clients",
     "/dashboard/support",
@@ -198,6 +199,26 @@ export function DashboardLiveRefresh({
           event: "UPDATE",
           schema: "public",
           table: "appointments",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "cara_training_items",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "cara_training_items",
           filter,
         },
         scheduleRealtimeRefresh,

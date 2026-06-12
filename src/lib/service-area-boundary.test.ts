@@ -72,6 +72,18 @@ describe("compound place chips", () => {
 });
 
 describe("compileCaraPrompt service area", () => {
+  it("includes based-in town in coverage block", () => {
+    const prompt = compileCaraPrompt({
+      businessName: "Acme",
+      assistantDisplayName: "Cara",
+      businessType: "Plumber",
+      baseTown: "Letterkenny",
+      serviceArea: "Donegal",
+    });
+    assert.match(prompt, /We're based in Letterkenny/);
+    assert.match(prompt, /We cover Donegal/);
+  });
+
   it("includes coverage ladder instruction", () => {
     const prompt = compileCaraPrompt({
       businessName: "Acme",

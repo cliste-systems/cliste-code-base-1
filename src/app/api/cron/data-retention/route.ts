@@ -130,6 +130,53 @@ async function run(request: Request) {
     return { count: data?.length ?? 0, error: error?.message };
   });
 
+  await step("action_tickets.pii", async () => {
+    const cutoff = iso(395 * 24 * 60 * 60 * 1000);
+    const { data, error } = await admin
+      .from("action_tickets")
+      .update({ caller_name: null, caller_number: null, summary: null })
+      .lt("created_at", cutoff)
+      .or("caller_name.not.is.null,caller_number.not.is.null,summary.not.is.null")
+      .select("id");
+    return { count: data?.length ?? 0, error: error?.message };
+  });
+
+  await step("cara_training_items.caller_context", async () => {
+    const cutoff = iso(395 * 24 * 60 * 60 * 1000);
+    const { data, error } = await admin
+      .from("cara_training_items")
+      .update({ caller_context: null })
+      .lt("created_at", cutoff)
+      .not("caller_context", "is", null)
+      .select("id");
+    return { count: data?.length ?? 0, error: error?.message };
+  });
+
+  await step("contacts.anonymize", async () => {
+    const cutoff = iso(730 * 24 * 60 * 60 * 1000);
+    const { data, error } = await admin
+      .from("contacts")
+      .update({
+        display_name: "Archived contact",
+        phone_number: null,
+        email: null,
+        notes: null,
+      })
+      .lt("updated_at", cutoff)
+      .select("id");
+    return { count: data?.length ?? 0, error: error?.message };
+  });
+
+  await step("sms_usage_records", async () => {
+    const cutoff = iso(395 * 24 * 60 * 60 * 1000);
+    const { data, error } = await admin
+      .from("sms_usage_records")
+      .delete()
+      .lt("created_at", cutoff)
+      .select("id");
+    return { count: data?.length ?? 0, error: error?.message };
+  });
+
   return NextResponse.json({
     ok: true,
     runAt: new Date(now).toISOString(),

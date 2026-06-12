@@ -219,25 +219,6 @@ export function isKnowledgeCollectionComplete(
   return true;
 }
 
-const EMERGENCY_PREFIX = /^Emergency callouts:\s*/i;
-
-export function parseStoredExtraNotes(stored: string): {
-  emergencyCallouts: string;
-  extraNotes: string;
-} {
-  const trimmed = stored.trim();
-  if (!trimmed) return { emergencyCallouts: "", extraNotes: "" };
-
-  const lines = trimmed.split("\n");
-  if (!EMERGENCY_PREFIX.test(lines[0] ?? "")) {
-    return { emergencyCallouts: "", extraNotes: trimmed };
-  }
-
-  const firstLine = lines[0]!.replace(EMERGENCY_PREFIX, "").trim();
-  const rest = lines.slice(1).join("\n").replace(/^\n+/, "").trim();
-  return { emergencyCallouts: firstLine, extraNotes: rest };
-}
-
 export function formatExtraNotesForStorage(
   collected: Pick<CaraKnowledgeCollected, "extraNotes" | "emergencyCallouts">,
 ): string {

@@ -29,7 +29,6 @@ import { createAdminClient } from "@/utils/supabase/admin";
 const DEFAULT_AREA_CODES_IE = ["01", "021", "091", "051", "064"] as const;
 const DEFAULT_LOW_WATER_MARK = 20;
 const DEFAULT_REFILL_BATCH = 10;
-const COOLDOWN_DAYS = 30;
 
 export function twilioIsConfigured(): boolean {
   return (
@@ -283,20 +282,10 @@ function devPlaceholderE164(organizationId: string): string {
   return `+3531555${digits}`;
 }
 
-/**
- * Ensure an organisation has an Irish Cliste number. Idempotent — safe to call
- * from Stripe webhooks and checkout return handlers.
- *
- * 1. Return immediately if already assigned.
- * 2. Claim from the pre-buy pool.
- * 3. If the pool is empty, buy one Irish DID from Twilio then claim.
- * 4. In local dev without Twilio, seed a manual placeholder number.
- */
-export async function provisionOrganizationPhoneNumber(
+async function findAssignedNumberForOrg(
+  admin: ReturnType<typeof createAdminClient>,
   organizationId: string,
-): Promise<AssignFromPoolResult> {
-  const admin = createAdminClient();
-
+): Promise<AssignFromPoolResult | null> {
   const { data: assigned } = await admin
     .from("phone_numbers")
     .select("id, e164")
@@ -311,6 +300,25 @@ export async function provisionOrganizationPhoneNumber(
       phoneNumberId: assigned.id,
     };
   }
+  return null;
+}
+
+/**
+ * Ensure an organisation has an Irish Cliste number. Idempotent — safe to call
+ * from Stripe webhooks and checkout return handlers.
+ *
+ * 1. Return immediately if already assigned.
+ * 2. Claim from the pre-buy pool.
+ * 3. If the pool is empty, buy one Irish DID from Twilio then claim.
+ * 4. In local dev without Twilio, seed a manual placeholder number.
+ */
+export async function provisionOrganizationPhoneNumber(
+  organizationId: string,
+): Promise<AssignFromPoolResult> {
+  const admin = createAdminClient();
+
+  const existing = await findAssignedNumberForOrg(admin, organizationId);
+  if (existing) return existing;
 
   let result = await assignFromPool(organizationId, "IE");
   if (result.ok) return result;
@@ -352,6 +360,9 @@ export async function provisionOrganizationPhoneNumber(
     result = await assignFromPool(organizationId, "IE");
     if (result.ok) return result;
   }
+
+  const raced = await findAssignedNumberForOrg(admin, organizationId);
+  if (raced) return raced;
 
   return result;
 }
@@ -398,6 +409,10 @@ export async function assignFromPool(
       .maybeSingle();
 
     if (claimErr) {
+      if (claimErr.code === "23505") {
+        const raced = await findAssignedNumberForOrg(admin, organizationId);
+        if (raced) return raced;
+      }
       return { ok: false, message: claimErr.message };
     }
     if (claimed?.id) {
@@ -411,39 +426,6 @@ export async function assignFromPool(
     message:
       "Could not claim a pool number after retries. Refresh and try again.",
   };
-}
-
-export type ReleaseToPoolResult =
-  | { ok: true; released: number }
-  | { ok: false; message: string };
-
-/**
- * Release any assigned numbers for an org into 30-day cooldown. Call on
- * churn / suspension; the org.phone_number cache is cleared via trigger.
- */
-export async function releaseToPool(
-  organizationId: string
-): Promise<ReleaseToPoolResult> {
-  const admin = createAdminClient();
-  const nowIso = new Date().toISOString();
-  const cooldownUntil = new Date(
-    Date.now() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000
-  ).toISOString();
-
-  const { data, error } = await admin
-    .from("phone_numbers")
-    .update({
-      status: "cooldown",
-      released_at: nowIso,
-      cooldown_until: cooldownUntil,
-      updated_at: nowIso,
-    })
-    .eq("organization_id", organizationId)
-    .eq("status", "assigned")
-    .select("id");
-
-  if (error) return { ok: false, message: error.message };
-  return { ok: true, released: data?.length ?? 0 };
 }
 
 /**

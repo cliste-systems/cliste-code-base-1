@@ -9,7 +9,7 @@
  *
  * This module removes patterns that almost certainly should not be
  * stored. It is intentionally conservative — false positives mean the
- * salon sees `[REDACTED-CARD]` instead of digits, which is fine.
+ * staff see `[REDACTED-CARD]` instead of digits, which is fine.
  */
 
 const PATTERNS: { name: string; re: RegExp; replace: string }[] = [
@@ -41,6 +41,12 @@ const PATTERNS: { name: string; re: RegExp; replace: string }[] = [
     name: "DOB",
     re: /\b(?:DOB|date\s+of\s+birth|born\s+on)[:\s]{0,10}[\d./-]{6,12}\b/gi,
     replace: "[REDACTED-DOB]",
+  },
+  // Volunteered health / special-category phrases (conservative — false positives OK).
+  {
+    name: "SENSITIVE",
+    re: /\b(?:i(?:'m| am)\s+pregnan\w+|my\s+medication|allergic\s+to|medical\s+history|health\s+condition)\b[^.]{0,80}/gi,
+    replace: "[REDACTED-SENSITIVE]",
   },
 ];
 

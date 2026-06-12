@@ -52,23 +52,8 @@ export const TRAIN_CARA_STEPS = [
   },
 ] as const;
 
-/**
- * Handle options surfaced in the onboarding Actions step. Advanced routes
- * (send a file, book a meeting) are configured later in the Routing dashboard.
- */
-export const ONBOARDING_HANDLE_PICKER_IDS = [
-  "send_link",
-  "capture_quote_requests",
-  "email_request",
-  "send_whatsapp",
-] as const;
-
-export const TRAIN_CARA_STEP_COUNT = TRAIN_CARA_STEPS.length;
-
 /** Parent shell owns max-width + horizontal centering. */
 export const TRAIN_CARA_CONTENT_WIDTH = "w-full";
-
-export const TRAIN_CARA_REVIEW_CONTENT_WIDTH = TRAIN_CARA_CONTENT_WIDTH;
 
 export type TrainCaraStepId = (typeof TRAIN_CARA_STEPS)[number]["id"];
 
@@ -76,12 +61,6 @@ export const MIN_ABOUT_LENGTH = 15;
 
 export const ABOUT_PLACEHOLDER =
   "Tell Cara what your business does, who you help, and what makes you different. The more detail, the more natural she'll sound on calls.";
-
-export const SERVICES_OFFERED_PLACEHOLDER =
-  "List the main things you offer, separated by commas.";
-
-export const SERVICES_NOT_OFFERED_PLACEHOLDER =
-  "Anything you don't do, so Cara never promises it.";
 
 export const OPENING_HOURS_PLACEHOLDER =
   "Mon–Fri 9am–6pm, Sat 10am–4pm, Sun closed.";
@@ -91,8 +70,6 @@ export const SERVICE_AREA_PLACEHOLDER =
 
 export const DEFAULT_DETAILS_TO_COLLECT =
   "Name, phone number, what they need, and the best time to call back.";
-
-export const DETAILS_TO_COLLECT_PLACEHOLDER = DEFAULT_DETAILS_TO_COLLECT;
 
 export const RULES_PLACEHOLDER =
   "e.g. never quote prices over the phone, always take a message if unsure, flag anything urgent.";
@@ -176,12 +153,6 @@ export const CARA_HANDLE_OPTIONS = [
   ...CARA_HANDLE_PICKER_OPTIONS,
 ] as const;
 
-export const REQUIRED_HANDLE_OPTIONS = CARA_BASELINE_HANDLE_OPTIONS;
-
-export const REQUIRED_HANDLE_OPTION_SET = new Set<CaraHandleOptionId>(
-  REQUIRED_HANDLE_OPTIONS,
-);
-
 export const HANDLE_OPTION_BY_ID = new Map(
   CARA_HANDLE_OPTIONS.map((option) => [option.id, option]),
 );
@@ -230,6 +201,3 @@ export const SALON_FAQ_SUGGESTIONS = [
   "How far ahead should I book?",
 ] as const;
 
-/** @deprecated Universal flow — kept for onboarding-ui-copy pack fallbacks. */
-export const SALON_BUSINESS_RULE_SUGGESTIONS = DEFAULT_BUSINESS_RULE_SUGGESTIONS;
-export const TRADES_BUSINESS_RULE_SUGGESTIONS = DEFAULT_BUSINESS_RULE_SUGGESTIONS;

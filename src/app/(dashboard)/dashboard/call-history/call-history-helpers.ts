@@ -1,11 +1,6 @@
 import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
 import { resolveCallerDisplayName } from "@/lib/caller-identity";
-import {
-  normalizeCallOutcome,
-  type CallOutcome,
-} from "@/lib/call-history-types";
-import { isRoutedCallOutcome } from "@/lib/dashboard-routed-outcomes";
-
+import type { CallOutcome } from "@/lib/call-history-types";
 export type CallFollowUp = {
   id: string;
   summary: string;
@@ -49,12 +44,25 @@ export function summaryForDisplay(item: CallHistoryListItem): string | null {
   return null;
 }
 
-export function transcriptForDisplay(item: CallHistoryListItem): string | null {
+/** Staff-facing transcript — prefers review/summary over raw verbatim STT. */
+export function reviewTranscriptForDisplay(
+  item: CallHistoryListItem,
+): string | null {
   const review = item.transcriptReview?.trim();
   if (review) return review;
-  const verbatim = item.transcriptVerbatim.trim();
-  if (verbatim && verbatim !== "No transcript on file.") return verbatim;
+  if (item.aiSummary?.trim()) return item.aiSummary.trim();
   return null;
+}
+
+/** Full verbatim STT text when still retained (up to 30 days). */
+export function fullTranscriptForDisplay(item: CallHistoryListItem): string | null {
+  const verbatim = item.transcriptVerbatim.trim();
+  if (!verbatim || verbatim === "No transcript on file.") return null;
+  return verbatim;
+}
+
+export function hasFullTranscript(item: CallHistoryListItem): boolean {
+  return fullTranscriptForDisplay(item) != null;
 }
 
 function truncatePreview(text: string, max: number): string {
@@ -88,21 +96,6 @@ export function whatHappenedNextLabel(
   }
 }
 
-export function actionStatusLabel(
-  hasOpenAction: boolean,
-  outcome: CallOutcome,
-): string {
-  if (hasOpenAction) return "Needs attention";
-  if (outcome === "action_created" || outcome === "callback_requested") {
-    return "Follow-up added";
-  }
-  return "Handled";
-}
-
-export function isNeedsAttentionCall(item: CallHistoryListItem): boolean {
-  return item.hasOpenAction;
-}
-
 /** Quiet colour for an outcome chip — colour conveys meaning only. */
 export function outcomeBadgeVariant(outcome: CallOutcome): StatusVariant {
   switch (outcome) {
@@ -119,10 +112,6 @@ export function outcomeBadgeVariant(outcome: CallOutcome): StatusVariant {
     default:
       return "neutral";
   }
-}
-
-export function isRoutedCall(item: CallHistoryListItem): boolean {
-  return isRoutedCallOutcome(item.outcome);
 }
 
 export function averageDurationSeconds(calls: CallHistoryListItem[]): number {
@@ -184,10 +173,6 @@ export function matchesSearch(item: CallHistoryListItem, query: string): boolean
     return true;
   }
   return false;
-}
-
-export function normalizeOutcomeForMetrics(raw: string | null | undefined): CallOutcome {
-  return normalizeCallOutcome(String(raw ?? ""));
 }
 
 export type CallHistoryMetrics = {

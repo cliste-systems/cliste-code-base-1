@@ -2,7 +2,12 @@ import "server-only";
 
 import { MAX_GREETING_SCRIPT_LENGTH } from "@/lib/voice-greeting-security";
 
-const ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech";
+function elevenLabsTtsBaseUrl(): string {
+  return (
+    process.env.ELEVENLABS_API_BASE_URL?.trim().replace(/\/$/, "") ||
+    "https://api.elevenlabs.io/v1/text-to-speech"
+  );
+}
 
 export async function synthesizeElevenLabsSpeech(input: {
   text: string;
@@ -22,7 +27,7 @@ export async function synthesizeElevenLabsSpeech(input: {
   }
 
   const response = await fetch(
-    `${ELEVENLABS_TTS_URL}/${encodeURIComponent(input.voiceId)}`,
+    `${elevenLabsTtsBaseUrl()}/${encodeURIComponent(input.voiceId)}`,
     {
       method: "POST",
       headers: {

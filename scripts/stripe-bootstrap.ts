@@ -29,7 +29,12 @@
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-import { LAUNCHES, PLANS } from "../src/lib/cliste-plans.data";
+import {
+  LAUNCHES,
+  LOCATION_ADDON_MONTHLY_CENTS,
+  LOCATION_ADDON_STRIPE_KEY,
+  PLANS,
+} from "../src/lib/cliste-plans.data";
 
 type UpsertRow = {
   key: string;
@@ -146,6 +151,32 @@ async function main() {
       row(`cliste_plan_${plan.tier}_overage_sms`, plan.tier, "metered", product.id, smsOverage.id, plan.smsOverageRateCents),
     );
   }
+
+  const locationProduct = await upsertProduct(stripe, {
+    lookupKey: "cliste_location_addon",
+    name: "Cliste extra location",
+    description: "Monthly fee for each additional business location on Business+ plans.",
+    metadata: { cliste_kind: "location_addon" },
+  });
+  const locationAddon = await upsertPrice(stripe, {
+    lookupKey: LOCATION_ADDON_STRIPE_KEY,
+    product: locationProduct.id,
+    unitAmount: LOCATION_ADDON_MONTHLY_CENTS,
+    currency: "eur",
+    interval: "month",
+    nickname: "Extra location (monthly)",
+    metadata: { cliste_kind: "location_addon" },
+  });
+  rows.push(
+    row(
+      LOCATION_ADDON_STRIPE_KEY,
+      null,
+      "month",
+      locationProduct.id,
+      locationAddon.id,
+      LOCATION_ADDON_MONTHLY_CENTS,
+    ),
+  );
 
   for (const launch of Object.values(LAUNCHES)) {
     if (launch.priceCents === 0) continue; // Nothing to charge for DIY.

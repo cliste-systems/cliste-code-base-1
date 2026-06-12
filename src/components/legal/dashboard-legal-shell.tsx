@@ -24,7 +24,7 @@ export function DashboardLegalShell({ children }: DashboardLegalShellProps) {
         />
       </header>
 
-      <div className="shrink-0 border-b border-slate-200 pb-2">
+      <div className="shrink-0 pb-2">
         <DashboardLegalTabs />
       </div>
 

@@ -120,10 +120,6 @@ export function createRouteFromTemplate(template: RouteTemplate): SavedRoute {
   };
 }
 
-export function createEmptyRouteList(): SavedRoute[] {
-  return [];
-}
-
 export function isFallbackRoute(route: Pick<SavedRoute, "templateId">): boolean {
   return (
     route.templateId === FALLBACK_TEMPLATE_ID || route.templateId === "general"
@@ -169,10 +165,6 @@ export function createSpeakToPersonBuiltin(): SavedRoute {
 
 export function customRoutes(routes: SavedRoute[]): SavedRoute[] {
   return routes.filter(isCustomRoute);
-}
-
-export function speakToPersonRoute(routes: SavedRoute[]): SavedRoute | null {
-  return routes.find(isSpeakToPersonBuiltin) ?? null;
 }
 
 /** The owner-facing action type for a saved route (drives the editor chooser). */
@@ -334,26 +326,6 @@ export function routeDestinationLabel(route: SavedRoute): string {
 
 export function routeSummary(route: SavedRoute): string {
   return routeDestinationLabel(route);
-}
-
-/** @deprecated Use routeDestinationLabel — kept for callers needing raw values. */
-export function routeSummaryRaw(route: SavedRoute): string {
-  switch (route.outcome) {
-    case "send_link":
-      return route.url.trim() || "Add a link";
-    case "send_file":
-      return route.businessFileId ? "File selected" : "Choose a file";
-    case "action_inbox":
-      return isFallbackRoute(route) ? "Take a message" : "Action Inbox";
-    case "email":
-      return route.email.trim() || "Add email";
-    case "whatsapp":
-      return route.whatsapp.trim() || "Add WhatsApp";
-    case "transfer":
-      return "Transfer to your team";
-    default:
-      return "";
-  }
 }
 
 export function routeNeedsSetup(route: SavedRoute): boolean {

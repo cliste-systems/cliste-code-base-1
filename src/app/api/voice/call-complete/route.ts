@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import {
   APPOINTMENT_OVERLAP_MESSAGE,
@@ -10,7 +10,11 @@ import { generateBookingReference, normalizeCustomerPhoneE164 } from "@/lib/book
 import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
+import { ingestCallKnowledgeGaps } from "@/lib/cara-training-ingest";
+import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
 import { redactCallText } from "@/lib/transcript-redaction";
+import { captureObservedError } from "@/lib/observability";
+import { logDisclosureCompliance } from "@/lib/voice-compliance";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +42,10 @@ type VoiceCallCompleteBody = {
   organization_id?: string;
   /** E.164 of the SIP DID the call landed on. REQUIRED — used to look up the tenant. */
   called_number?: string;
+  /** Stable Twilio/LiveKit call id — required for idempotent webhook retries. */
+  call_sid?: string;
+  /** LiveKit room name when available. */
+  room_name?: string | null;
   caller_number: string;
   /** Optional display name for Contacts / call history when the worker knows it. */
   caller_name?: string | null;
@@ -51,8 +59,12 @@ type VoiceCallCompleteBody = {
   transcript?: string | null;
   transcript_review?: string | null;
   ai_summary?: string | null;
+  /** When true, worker confirms AI + recording/transcription disclosure was spoken. */
+  disclosure_confirmed?: boolean;
   /** When set, creates a native appointment tied to this call log. */
   booking?: BookingPayload | null;
+  /** Optional knowledge gaps Cara could not answer — creates Cara Training items. */
+  knowledge_gaps?: KnowledgeGapPayload[] | null;
 };
 
 function unauthorized() {
@@ -137,10 +149,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const callerNumber = String(body.caller_number ?? "").trim();
-  if (!callerNumber) {
+  const callerNumberRaw = String(body.caller_number ?? "").trim();
+  if (!callerNumberRaw) {
     return NextResponse.json(
       { ok: false, error: "caller_number is required" },
+      { status: 400 },
+    );
+  }
+  const callerNumber =
+    normalizeCustomerPhoneE164(callerNumberRaw) || callerNumberRaw;
+
+  const callSid = String(body.call_sid ?? "").trim() || null;
+  const roomName =
+    typeof body.room_name === "string" ? body.room_name.trim().slice(0, 200) || null : null;
+
+  const requireCallSid =
+    process.env.NODE_ENV === "production" ||
+    process.env.CLISTE_VOICE_REQUIRE_CALLED_NUMBER?.trim().toLowerCase() === "1" ||
+    process.env.CLISTE_VOICE_REQUIRE_CALLED_NUMBER?.trim().toLowerCase() === "true";
+  if (requireCallSid && !callSid) {
+    return NextResponse.json(
+      { ok: false, error: "call_sid is required" },
       { status: 400 },
     );
   }
@@ -258,7 +287,47 @@ export async function POST(request: Request) {
     );
   }
 
-  // Server-side redaction. The agent prompt already discourages reading
+  const { data: orgRow, error: orgActiveErr } = await admin
+    .from("organizations")
+    .select("is_active, status")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (orgActiveErr) {
+    await captureObservedError(orgActiveErr, { route: "voice/call-complete", orgId });
+    return NextResponse.json(
+      { ok: false, error: "Database error" },
+      { status: 500 },
+    );
+  }
+  if (!orgRow?.is_active) {
+    return NextResponse.json(
+      { ok: false, code: "org_suspended", error: "Organization is not active" },
+      { status: 403 },
+    );
+  }
+
+  if (callSid) {
+    const { data: existing } = await admin
+      .from("call_logs")
+      .select("id")
+      .eq("call_sid", callSid)
+      .maybeSingle();
+    if (existing?.id) {
+      return NextResponse.json({
+        ok: true,
+        call_log_id: existing.id,
+        idempotent: true,
+      });
+    }
+  }
+
+  logDisclosureCompliance({
+    confirmed: body.disclosure_confirmed === true,
+    organizationId: orgId,
+    calledNumber: calledNumberRaw || undefined,
+  });
+
+  // Server-side redaction.
   // back card / PPS / DOB; this is the belt-and-braces step that runs
   // even if the agent slips. Hits are logged (without the matched text)
   // so we can spot patterns of callers volunteering sensitive data.
@@ -271,12 +340,12 @@ export async function POST(request: Request) {
     ...summaryRedacted.hits,
   ];
   if (allHits.length > 0) {
-    console.warn(
-      "[voice/call-complete] redacted sensitive tokens",
-      Array.from(new Set(allHits)),
-      "org",
-      orgId,
-    );
+    const uniqueHits = Array.from(new Set(allHits));
+    console.warn("[voice/call-complete] redacted sensitive tokens", {
+      hits: uniqueHits,
+      org: orgId,
+      sensitive_content_redacted: uniqueHits.includes("SENSITIVE"),
+    });
   }
 
   const callerName = String(body.caller_name ?? "").trim().slice(0, 120) || null;
@@ -292,12 +361,34 @@ export async function POST(request: Request) {
       transcript: transcriptRedacted.text,
       transcript_review: reviewRedacted.text,
       ai_summary: summaryRedacted.text,
+      ...(callSid ? { call_sid: callSid } : {}),
+      ...(roomName ? { room_name: roomName } : {}),
     })
     .select("id")
     .single();
 
-  if (callErr || !insertedCall?.id) {
-    console.error("[voice/call-complete] call_logs insert", callErr);
+  if (callErr) {
+    if (callSid && callErr.code === "23505") {
+      const { data: existing } = await admin
+        .from("call_logs")
+        .select("id")
+        .eq("call_sid", callSid)
+        .maybeSingle();
+      if (existing?.id) {
+        return NextResponse.json({
+          ok: true,
+          call_log_id: existing.id,
+          idempotent: true,
+        });
+      }
+    }
+    await captureObservedError(callErr, { route: "voice/call-complete", orgId });
+    return NextResponse.json(
+      { ok: false, error: "Failed to save call log" },
+      { status: 500 },
+    );
+  }
+  if (!insertedCall?.id) {
     return NextResponse.json(
       { ok: false, error: "Failed to save call log" },
       { status: 500 },
@@ -467,19 +558,57 @@ export async function POST(request: Request) {
     appointmentId = appt.id;
   }
 
-  if (outcome === "action_created") {
-    const notifySummary =
-      summaryRedacted.text?.trim() ||
-      reviewRedacted.text?.trim() ||
-      "A caller needs follow-up in your Action Inbox.";
-    void notifyActionInboxOwner(admin, orgId, {
-      summary: notifySummary,
-      callerNumber,
-      callerName,
-    }).catch((e) => {
-      console.error("[voice/call-complete] action inbox notify", e);
+  const knowledgeGaps = Array.isArray(body.knowledge_gaps)
+    ? body.knowledge_gaps.filter(
+        (g): g is KnowledgeGapPayload =>
+          g != null &&
+          typeof g === "object" &&
+          String((g as KnowledgeGapPayload).topic ?? "").trim().length > 0,
+      )
+    : [];
+
+  if (outcome === "spam_or_abuse") {
+    const { error: abuseErr } = await admin.rpc("increment_caller_abuse_hit", {
+      p_org_id: orgId,
+      p_caller: callerNumber,
     });
+    if (abuseErr) {
+      console.warn("[voice/call-complete] abuse signal", abuseErr.message);
+    }
   }
+
+  after(async () => {
+    if (outcome === "action_created") {
+      const notifySummary =
+        summaryRedacted.text?.trim() ||
+        reviewRedacted.text?.trim() ||
+        "A caller needs follow-up in your Action Inbox.";
+      try {
+        await notifyActionInboxOwner(admin, orgId, {
+          summary: notifySummary,
+          callerNumber,
+          callerName,
+        });
+      } catch (e) {
+        await captureObservedError(e, {
+          route: "voice/call-complete",
+          sideEffect: "action_inbox_notify",
+          orgId,
+        });
+      }
+    }
+    if (knowledgeGaps.length > 0) {
+      try {
+        await ingestCallKnowledgeGaps(admin, orgId, callLogId, knowledgeGaps);
+      } catch (e) {
+        await captureObservedError(e, {
+          route: "voice/call-complete",
+          sideEffect: "knowledge_gaps",
+          orgId,
+        });
+      }
+    }
+  });
 
   revalidateAfterWrite();
 
@@ -495,4 +624,5 @@ function revalidateAfterWrite() {
   revalidatePath("/dashboard/calls");
   revalidatePath("/dashboard/call-history");
   revalidatePath("/dashboard/action-inbox");
+  revalidatePath("/dashboard/cara-training");
 }

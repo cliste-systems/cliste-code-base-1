@@ -1,19 +1,9 @@
-/** Cliste mark fill — matches the logo asset in `public-assets.ts`. */
-export const CLISTE_LOGO = "#353D42";
-
-/** Sparingly used for primary actions and focused links. */
-export const CLISTE_ACCENT = "#0b1220";
-
 /**
  * Shared card surface — white with a defined edge and a soft, premium
  * elevation so cards read as real surfaces (not faint hairline outlines).
  */
 export const DASHBOARD_CARD_SURFACE =
   "rounded-[22px] border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-28px_rgba(15,23,42,0.22)]";
-
-/** Card variant that lifts on hover (metric tiles, clickable cards). */
-export const DASHBOARD_CARD_INTERACTIVE =
-  "transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-slate-300 hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_24px_50px_-26px_rgba(15,23,42,0.28)]";
 
 /** Stacked form sections: one outer border, no grey gaps between blocks. */
 export const DASHBOARD_FORM_STACK =
@@ -23,20 +13,9 @@ export const DASHBOARD_FORM_STACK =
 export const DASHBOARD_VIEWPORT_LAYOUT =
   "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white";
 
-/** Uppercase labels on cards and metrics. */
-export const DASHBOARD_LABEL_CLASS =
-  "font-medium uppercase tracking-[0.09em] text-slate-500";
-
 /** Pointer on links, buttons, and other click targets across the dashboard. */
 export const DASHBOARD_INTERACTIVE_CURSOR =
   "[&_a[href]:not([aria-disabled=true])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_[role=button]:not([aria-disabled=true])]:cursor-pointer [&_summary]:cursor-pointer [&_label:has(input[type=checkbox])]:cursor-pointer [&_label:has(input[type=radio])]:cursor-pointer";
-
-/** Scrollable dashboard pages — padding comes from `dashboard/layout.tsx`. */
-export const DASHBOARD_PAGE_SHELL = "flex w-full flex-col space-y-6";
-
-/** Home page — fills viewport; lists scroll inside bottom panels. */
-export const DASHBOARD_PAGE_SHELL_FILL =
-  "flex h-full min-h-0 w-full flex-col gap-4 bg-slate-50 p-4 sm:p-5 lg:px-8 lg:py-6";
 
 /** Master/detail pages (Calls, Inbox) — white canvas, no grey gutters between cards. */
 export const DASHBOARD_PAGE_SHELL_FILL_WHITE =
@@ -45,18 +24,6 @@ export const DASHBOARD_PAGE_SHELL_FILL_WHITE =
 /** Canonical home card — white, rounded, soft elevation. */
 export const DASHBOARD_HOME_CARD =
   "rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-22px_rgba(15,23,42,0.30)] sm:p-5";
-
-/** Rail + preview cards share the canonical card surface. */
-export const DASHBOARD_HOME_RAIL_CARD = DASHBOARD_HOME_CARD;
-export const DASHBOARD_HOME_PREVIEW_CARD = DASHBOARD_HOME_CARD;
-
-/** Home Cara status — same elevation as preview cards, tighter padding. */
-export const DASHBOARD_HOME_CARA_STATUS_CARD =
-  "rounded-2xl border border-slate-200 bg-white px-3 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-22px_rgba(15,23,42,0.30)] sm:px-3.5";
-
-/** Home Needs attention — one card, Cliste logo tint (same shape as other home cards). */
-export const DASHBOARD_HOME_ATTENTION_CARD =
-  "rounded-2xl border border-[#353D42]/22 bg-[#353D42]/[0.07] p-4 shadow-[0_1px_2px_rgba(53,61,66,0.06),0_10px_30px_-22px_rgba(53,61,66,0.14)] sm:p-5";
 
 /**
  * Shared icon chip — border (not ring) so strokes are not clipped by overflow parents.
@@ -89,9 +56,6 @@ export const DASHBOARD_ICON_CHIP_ROW =
 /** Large page header (Settings, Usage, Cara setup). */
 export const DASHBOARD_ICON_CHIP_HEADER =
   `mt-1 flex size-11 shrink-0 items-center justify-center rounded-2xl p-2 ${DASHBOARD_ICON_CHIP_FILL}`;
-
-/** @deprecated Use {@link DASHBOARD_ICON_CHIP_SM} — kept for home attention rows. */
-export const DASHBOARD_HOME_ATTENTION_ICON_CHIP = DASHBOARD_ICON_CHIP_SM;
 
 export const DASHBOARD_HOME_ATTENTION_ROW_HOVER = "hover:bg-[#353D42]/[0.06]";
 
@@ -200,16 +164,3 @@ export type AccentTone =
   | "sky"
   | "violet"
   | "rose";
-
-const ACCENT_CHIP_UNIFIED =
-  "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 ring-1 ring-slate-200/80";
-
-export const ACCENT_CHIP_CLASSES: Record<AccentTone, string> = {
-  slate: ACCENT_CHIP_UNIFIED,
-  indigo: ACCENT_CHIP_UNIFIED,
-  emerald: ACCENT_CHIP_UNIFIED,
-  amber: ACCENT_CHIP_UNIFIED,
-  sky: ACCENT_CHIP_UNIFIED,
-  violet: ACCENT_CHIP_UNIFIED,
-  rose: ACCENT_CHIP_UNIFIED,
-};

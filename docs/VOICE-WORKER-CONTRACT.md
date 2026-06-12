@@ -4,6 +4,58 @@ The LiveKit/voice worker reports each finished call to the Cliste app. This is
 the single integration point between the worker and the dashboard. Keep the
 worker aligned with this document.
 
+## Org status gate (mandatory)
+
+Before answering a call, load `organizations.is_active` and account `status`. If the
+org is suspended, churned, or `is_active = false`, **do not** start the LLM session —
+play a short unavailable message and hang up. The dashboard API returns `403`
+`org_suspended` if a webhook arrives for an inactive org.
+
+## Caller handling
+
+- **E.164:** Normalize `caller_number` to E.164 before POST (the app re-normalizes).
+- **Anonymous/withheld:** Send `caller_number: "+anonymous"`.
+- **Landline / no SMS:** If the callee cannot receive SMS, do not promise a text —
+  use `action_created`, read the link aloud, or take a message.
+
+## Idempotent retries
+
+`POST /api/voice/call-complete` is idempotent on `call_sid`. Retries with the same
+`call_sid` return `200` with the existing `call_log_id`.
+
+**Production requirement:** `call_sid` is mandatory in production (and when
+`CLISTE_VOICE_REQUIRE_CALLED_NUMBER=1`). Requests without it return `400`. Every
+worker build must send the stable Twilio/LiveKit call identifier.
+
+## Compliance requirements (mandatory)
+
+These settings are **not optional** — they implement GDPR transparency, EU AI Act
+Art 50, and Cliste's DPA commitments.
+
+1. **AI disclosure on first turn** — Speak the compiled greeting from
+   `organizations.greeting`, which always includes the fixed legal segment from
+   `voiceLegalDisclosure()` (`src/lib/voice-greeting.ts`). Never skip or paraphrase
+   away the AI / recording-transcription notice.
+2. **No audio retention** — Twilio call recording OFF; LiveKit egress recording OFF;
+   do not write raw audio to disk or object storage.
+3. **EU routing** — Deploy worker in Railway EU West; prefer EU endpoints for
+   ElevenLabs (`api.eu.residency.elevenlabs.io`) and OpenRouter (`eu.openrouter.ai`)
+   when available. See `SUB_PROCESSOR_EU_MIGRATION_NOTES` in
+   `src/lib/sub-processors.data.ts`.
+4. **Report disclosure delivery** — Set `disclosure_confirmed: true` on
+   `POST /api/voice/call-complete` when the legal segment was spoken on the call.
+   The app logs a warning when this field is absent or false.
+5. **Review-first post-call text** — When a transcript exists, always send:
+   - `transcript_review` — business-relevant narrative **without** repeating
+     volunteered health, payment, or government-ID details. The dashboard shows
+     this by default.
+   - `ai_summary` — short operational summary (intent/outcome only); no special-category
+     echo.
+   - `transcript` — verbatim STT (the app redacts again server-side). Staff must
+     expand “Show full transcript” to view it.
+
+Operational verification checklist: `docs/legal/VOICE-COMPLIANCE-CHECKLIST.md`.
+
 ## Endpoint
 
 ```
@@ -31,20 +83,56 @@ worker. If it is unset on the app side the route returns `503` (fail-closed).
 | Field                | Type            | Required | Notes |
 |----------------------|-----------------|----------|-------|
 | `called_number`      | string (E.164)  | yes¹     | The Cliste DID the caller dialled. Used to resolve the tenant — the secret alone must **not** decide the org. |
-| `caller_number`      | string          | yes      | The caller's number (stored as-is; used for Contacts grouping). |
+| `call_sid`           | string          | yes      | Stable Twilio/LiveKit call identifier. **Required** for idempotent `call-complete` retries. |
+| `room_name`          | string \| null  | no       | LiveKit room name when available. |
+| `caller_number`      | string          | yes      | Caller number in **E.164** when possible. Use `+anonymous` for withheld caller ID. |
 | `caller_name`        | string \| null  | no       | Display name when known (optional; improves Contacts and call history). |
 | `outcome`            | string          | yes      | Canonical value preferred (see below). Free text is accepted and normalized. |
 | `duration_seconds`   | number          | no       | Whole seconds. Drives Home minutes used. |
-| `transcript`         | string \| null  | no       | Verbatim transcript. Server-side redaction runs before storage. |
-| `transcript_review`  | string \| null  | no       | Cleaned/reviewed transcript. |
-| `ai_summary`         | string \| null  | no       | Short summary shown in Calls / activity. |
+| `transcript`         | string \| null  | no       | Verbatim STT text. Server-side redaction runs before storage. Hidden by default in dashboard. |
+| `transcript_review`  | string \| null  | no       | **Required when `transcript` is sent.** Staff-facing narrative without sensitive echo — shown by default in Calls. |
+| `ai_summary`         | string \| null  | no       | Short operational summary (intent/outcome). Must not repeat health, payment, or ID details. |
+| `disclosure_confirmed` | boolean       | no       | `true` when the AI + recording/transcription disclosure was spoken on the call. Logged for compliance monitoring. |
 | `organization_id`    | string (uuid)   | no       | **Deprecated.** Legacy compat only; if sent it must match the `called_number` lookup or the request is rejected. |
+| `knowledge_gaps`     | array           | no       | Topics Cara could not answer from current training. Each item creates a **Cara Training** queue entry for the owner. See below. |
 
 ¹ `called_number` is required unless `CLISTE_VOICE_ALLOW_LEGACY_ORG_ID=1` is set
 for a temporary rollout, in which case `organization_id` may be sent instead.
 
 > Note: the `booking` sub-object is legacy (native salon booking) and is not part
 > of the v1 product. The worker should not send it.
+
+### `knowledge_gaps` (Cara Training)
+
+Optional array on `POST /api/voice/call-complete`. Send when post-call review
+finds moments where Cara took a message or could not answer from FAQs, services,
+or business rules. The app redacts `caller_context`, dedupes open items, notifies
+the owner, and surfaces items at `/dashboard/cara-training`.
+
+Each element:
+
+| Field               | Type   | Required | Notes |
+|---------------------|--------|----------|-------|
+| `topic`             | string | yes      | Short label, e.g. `"Emergency weekend callouts"`. |
+| `caller_context`    | string | no       | Staff-facing excerpt (no health/payment/ID echo). |
+| `cara_question`     | string | no       | Plain-English question for the business owner. If omitted, the app generates one from `topic`. |
+| `suggested_section` | string | no       | Hint only: `faq`, `services`, `services_not_offered`, `business_rules`. |
+
+Example:
+
+```json
+"knowledge_gaps": [{
+  "topic": "Emergency weekend callouts",
+  "caller_context": "Caller asked if a plumber was available on Sunday.",
+  "cara_question": "Do you offer emergency or weekend callouts? What should I tell callers?",
+  "suggested_section": "faq"
+}]
+```
+
+Unclear or follow-up **Action Inbox** tickets (`POST /api/voice/action-ticket`)
+also create Cara Training items automatically — you do not need to duplicate
+those in `knowledge_gaps` when an action ticket was already created for the same
+gap.
 
 ## Canonical outcomes (preferred)
 
@@ -81,6 +169,7 @@ curl -sS -X POST "$APP_URL/api/voice/call-complete" \
   -H "Content-Type: application/json" \
   -d '{
     "called_number": "+353749389378",
+    "call_sid": "CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "caller_number": "+353871234567",
     "duration_seconds": 142,
     "outcome": "link_sent",

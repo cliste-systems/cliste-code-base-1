@@ -4,9 +4,9 @@ export type LegalDocumentType = "terms" | "privacy" | "dpa";
 
 /** ISO date aligned with `LEGAL_LAST_UPDATED` in legal-pages.ts — bump when documents change. */
 export const LEGAL_DOCUMENT_VERSIONS: Record<LegalDocumentType, string> = {
-  terms: "2026-05-31",
-  privacy: "2026-05-31",
-  dpa: "2026-05-31",
+  terms: "2026-06-12",
+  privacy: "2026-06-12",
+  dpa: "2026-06-12",
 };
 
 export const LEGAL_DOCUMENT_LABELS: Record<LegalDocumentType, string> = {
@@ -23,9 +23,13 @@ export const LEGAL_DOCUMENT_PATHS: Record<LegalDocumentType, string> = {
 
 export const DASHBOARD_LEGAL_ACCEPT_PATH = "/dashboard/legal/accept";
 
+/** Onboarding users accept terms + privacy here before other setup steps. */
+export const ONBOARDING_LEGAL_ACCEPT_PATH = "/onboarding/legal";
+
 /** Paths reachable while contractual acceptances are still outstanding. */
 export const LEGAL_ACCEPTANCE_BYPASS_PREFIXES = [
   DASHBOARD_LEGAL_ACCEPT_PATH,
+  ONBOARDING_LEGAL_ACCEPT_PATH,
   "/dashboard/legal/terms",
   "/dashboard/legal/privacy",
   "/dashboard/legal/dpa",

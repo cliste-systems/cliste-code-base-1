@@ -4,7 +4,7 @@ GDPR Article 30(1) record for **Cliste Systems** as **controller** of
 its own platform data (sales, billing, support, marketing) and
 Article 30(2) record as **processor** of customer-salon data.
 
-Last reviewed: 2026-04-18.
+Last reviewed: 2026-06-12.
 
 ---
 
@@ -88,9 +88,9 @@ salon**. Cliste's processing is governed by the DPA at `docs/legal/DPA.md`.
 
 | Field             | Value                                                                            |
 | ----------------- | -------------------------------------------------------------------------------- |
-| Categories        | Caller phone number, call duration, outcome, raw transcript, salon-friendly transcript review, AI summary, call recording (transient via LiveKit; not retained at rest) |
+| Categories        | Caller phone number, call duration, outcome, raw transcript, staff-facing transcript review, AI summary, call recording (transient via LiveKit; not retained at rest) |
 | Subjects          | People calling the salon's line                                                   |
-| Recipients        | LiveKit (real-time voice transport), Deepgram (STT), OpenAI / OpenRouter (LLM), ElevenLabs (TTS), Twilio (SIP) |
+| Recipients        | LiveKit (real-time voice + in-call STT), OpenRouter (LLM routing), ElevenLabs (TTS), Twilio (SIP/SMS) |
 | International     | See DPA Annex III                                                                |
 | Retention         | Transcripts: 30 days. AI summaries + caller numbers: 13 months. (Daily cron.)    |
 

@@ -99,11 +99,6 @@ function readWeekScheduleMeta(raw: Record<string, unknown>): WeekScheduleMeta {
   };
 }
 
-/** Merge stored JSONB with defaults so missing days still render. */
-export function parseBusinessHoursFromDb(raw: unknown): WeekSchedule {
-  return parseBusinessHoursBundle(raw).schedule;
-}
-
 export function parseBusinessHoursBundle(raw: unknown): {
   schedule: WeekSchedule;
   meta: WeekScheduleMeta;

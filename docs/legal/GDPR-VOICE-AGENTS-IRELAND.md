@@ -67,7 +67,7 @@ When the salon has a valid **Article 6** basis (usually **contract** or **legiti
 | Send **transactional** SMS/email (confirmations, reminders, pay links) | Twilio / SendGrid — terms prohibit using Cliste for bulk marketing |
 | Transfer data to **US sub-processors** with **DPF and/or SCCs** | Listed at `/legal/sub-processors` |
 | **Anonymise** a customer on erasure while keeping appointment **time/price** for Revenue | `eraseCustomerData` in `src/app/(dashboard)/dashboard/privacy/actions.ts` |
-| Provide salons **Article 15 export** and **Article 17 erasure** tools | `/dashboard/privacy` (RLS-scoped export; admin-scoped erasure) |
+| Provide salons **Article 15 export** and **Article 17 erasure** tools | `/dashboard/legal/data-requests` (RLS-scoped export; admin-scoped erasure) |
 | Log GDPR exports/erasures in `security_auth_events` | `gdpr_data_export`, `gdpr_erasure` event types |
 | Isolate tenants (RLS, resolve org from `called_number` not body `organization_id`) | `src/app/api/voice/call-complete/route.ts` |
 | Run security/rate-limit processing with **legitimate interest** | OTP/rate tables + cron purge; see ROPA §2.3 |
@@ -150,7 +150,7 @@ For **inbound** booking calls, the salon (controller) typically relies on:
 
 ## 7. International transfers
 
-Cliste uses EU hosting (Supabase) but several **voice AI stack** vendors process in the **US** (LiveKit, Deepgram, ElevenLabs, OpenAI, Railway worker hosting, etc.).
+Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compute (Vercel dub1), and the voice worker (Railway EU West). **LiveKit Cloud** uses global nearest-region routing (EU edges for Irish callers; US possible without EU pinning). **ElevenLabs** and **OpenRouter** process in the **United States** — see `/legal/sub-processors`.
 
 | Mechanism | Use when |
 | --------- | -------- |
@@ -240,19 +240,16 @@ Cliste uses EU hosting (Supabase) but several **voice AI stack** vendors process
 sequenceDiagram
   participant Caller
   participant Twilio as Twilio SIP
-  participant Worker as Voice worker Railway
-  participant STT as Deepgram US
-  participant LLM as OpenAI OpenRouter
+  participant Worker as Voice worker Railway EU
+  participant LLM as OpenRouter
   participant TTS as ElevenLabs US
-  participant LK as LiveKit US
-  participant App as Cliste Next.js EU edge
+  participant LK as LiveKit Cloud
+  participant App as Cliste Next.js dub1
   participant DB as Supabase EU
 
   Caller->>Twilio: Inbound call
   Twilio->>LK: SIP media
-  LK->>Worker: Real-time audio stream
-  Worker->>STT: Audio transient
-  STT->>Worker: Text
+  LK->>Worker: Real-time audio + in-call STT
   Worker->>LLM: Transcript context
   LLM->>Worker: Tool calls booking
   Worker->>TTS: Response text
@@ -270,7 +267,7 @@ Before going live with the AI line, the salon should confirm:
 
 - [ ] Privacy notice (or leaflet) mentions **AI phone answering**, categories of data, retention, and sub-processors (or link to Cliste’s sub-processor page).
 - [ ] Lawful basis documented (usually contract / legitimate interests for inbound booking).
-- [ ] Staff know how to run **export** and **erasure** at `/dashboard/privacy`.
+- [ ] Staff know how to run **export** and **erasure** at `/dashboard/legal/data-requests`.
 - [ ] **No marketing** use of caller lists via Cliste SMS/voice.
 - [ ] Published number routes to Cliste DID; callers expect automated handling.
 - [ ] Optional: signage — “Calls may be handled by our AI assistant [name].”
@@ -282,7 +279,7 @@ Before going live with the AI line, the salon should confirm:
 
 Short-term (compliance hygiene):
 
-1. Add **Privacy tools** to dashboard navigation → `/dashboard/privacy`.
+1. Add **Privacy tools** to dashboard navigation → `/dashboard/legal/data-requests`.
 2. Include **transcripts** in GDPR export when present.
 3. Remove **legacy org-id-only** voice webhook path after worker upgrade.
 4. Reconcile **6 vs 7 year** appointment retention in public privacy table.

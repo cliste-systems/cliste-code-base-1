@@ -15,7 +15,7 @@ export function RouteKeywordsChipEditor({
   value,
   onChange,
   inputId,
-  placeholder = "e.g. emergency callout",
+  placeholder = "e.g. book an appointment",
   maxItems = 20,
 }: Props) {
   return (

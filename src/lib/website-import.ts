@@ -1,6 +1,7 @@
 import "server-only";
 
 import { completeOpenRouterChat } from "@/lib/openrouter-chat";
+import { normalisePublicWebsiteUrl } from "@/lib/website-import-ssrf";
 import { isRegulatedBusinessText } from "@/lib/classify-business-description";
 
 export type WebsiteImportFaq = { question: string; answer: string };
@@ -25,35 +26,6 @@ const FETCH_TIMEOUT_MS = 9000;
 const MAX_TEXT_CHARS = 7000;
 const EXTRA_PATHS = ["about", "about-us", "contact", "services"];
 
-/** Normalise to an absolute http(s) URL; reject anything that isn't a public site. */
-function normaliseUrl(raw: string): URL | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  let url: URL;
-  try {
-    url = new URL(withScheme);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-  const host = url.hostname.toLowerCase();
-  if (
-    host === "localhost" ||
-    host.endsWith(".local") ||
-    host === "127.0.0.1" ||
-    host === "0.0.0.0" ||
-    host.startsWith("192.168.") ||
-    host.startsWith("10.") ||
-    host.startsWith("169.254.") ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    !host.includes(".")
-  ) {
-    return null;
-  }
-  return url;
-}
-
 function htmlToText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -67,16 +39,26 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-async function fetchText(url: string): Promise<string | null> {
+async function fetchText(url: string, hops = 0): Promise<string | null> {
+  if (hops > 5) return null;
+  const parsed = await normalisePublicWebsiteUrl(url);
+  if (!parsed) return null;
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    const res = await fetch(parsed.toString(), {
       signal: controller.signal,
-      redirect: "follow",
+      redirect: "manual",
       headers: { "User-Agent": "ClisteBot/1.0 (+https://clistesystems.ie)" },
       cache: "no-store",
     });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) return null;
+      const next = new URL(location, parsed).toString();
+      return fetchText(next, hops + 1);
+    }
     if (!res.ok) return null;
     const contentType = res.headers.get("content-type") ?? "";
     if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
@@ -124,7 +106,7 @@ function asFaqs(value: unknown, max: number): WebsiteImportFaq[] {
 export async function importBusinessFromWebsite(
   rawUrl: string,
 ): Promise<WebsiteImportResult> {
-  const url = normaliseUrl(rawUrl);
+  const url = await normalisePublicWebsiteUrl(rawUrl);
   if (!url) {
     return { ok: false, message: "That doesn't look like a valid website address." };
   }

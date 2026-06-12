@@ -53,7 +53,6 @@ export type RoutingLink = {
   description?: string | null;
 };
 
-export const MAX_ROUTING_LINKS = 25;
 export const MAX_ROUTING_FIELD_LEN = 500;
 
 function isRecord(v: unknown): v is Record<string, unknown> {

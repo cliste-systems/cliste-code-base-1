@@ -28,16 +28,3 @@ export function formatAverageCallLengthValue(
   if (averageSeconds === null) return "—";
   return formatDurationLabel(averageSeconds);
 }
-
-export function formatAverageCallLengthSubtext(
-  callCount: number,
-  periodPhrase: string,
-): string {
-  if (callCount === 0) {
-    return periodPhrase === "today"
-      ? "No calls today"
-      : `No calls ${periodPhrase}`;
-  }
-  if (callCount === 1) return `${periodPhrase} · 1 call`;
-  return `${periodPhrase} · ${callCount} calls`;
-}

@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
+import { ingestActionInboxTraining } from "@/lib/cara-training-ingest";
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
@@ -121,6 +122,19 @@ export async function POST(request: Request) {
   }
 
   const orgId = phoneRow.organization_id as string;
+
+  const { data: orgRow } = await admin
+    .from("organizations")
+    .select("is_active")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (!orgRow?.is_active) {
+    return NextResponse.json(
+      { ok: false, code: "org_suspended", error: "Organization is not active" },
+      { status: 403 },
+    );
+  }
+
   const summaryRedacted = redactCallText(summaryRaw);
   const callerName =
     String(body.caller_name ?? "").trim().slice(0, 120) || null;
@@ -155,8 +169,20 @@ export async function POST(request: Request) {
     console.error("[voice/action-ticket] notify failed", e);
   }
 
+  try {
+    await ingestActionInboxTraining(
+      admin,
+      orgId,
+      inserted.id as string,
+      summaryRedacted.text ?? summaryRaw,
+    );
+  } catch (e) {
+    console.error("[voice/action-ticket] training ingest failed", e);
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/action-inbox");
+  revalidatePath("/dashboard/cara-training");
 
   return NextResponse.json({ ok: true, action_ticket_id: inserted.id });
 }

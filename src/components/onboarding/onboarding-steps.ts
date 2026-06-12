@@ -1,14 +1,21 @@
-export const ONBOARDING_TOTAL_STEPS = 7;
+export const ONBOARDING_TOTAL_STEPS = 6;
 
 export const ONBOARDING_STEPS_META = [
   { path: "/onboarding/profile", label: "Profile", shortLabel: "Profile" },
   { path: "/onboarding/voice", label: "Voice", shortLabel: "Voice" },
   { path: "/onboarding/knowledge", label: "Train Cara", shortLabel: "Cara" },
-  { path: "/onboarding/actions", label: "Actions", shortLabel: "Actions" },
   { path: "/onboarding/number", label: "Your number", shortLabel: "Number" },
   { path: "/onboarding/test-call", label: "Test call", shortLabel: "Test" },
   { path: "/onboarding/plan", label: "Go live", shortLabel: "Plan" },
 ] as const;
+
+/** Maps legacy DB steps (actions was step 4) to the current funnel. */
+export function normalizeOnboardingDbStep(step: number): number {
+  if (!Number.isFinite(step)) return 1;
+  const n = Math.trunc(step);
+  if (n >= 5) return n - 1;
+  return n;
+}
 
 export type OnboardingStepPath = (typeof ONBOARDING_STEPS_META)[number]["path"];
 
@@ -27,12 +34,6 @@ export function onboardingStepIndex(pathname: string): number {
   if (!normalized) return 1;
   const idx = ONBOARDING_STEP_PATHS.indexOf(normalized);
   return idx >= 0 ? idx + 1 : 1;
-}
-
-/** Map DB `onboarding_step` (1–7) to footer step index (1–7). */
-export function onboardingProgressFromDbStep(dbStep: number): number {
-  if (!Number.isFinite(dbStep)) return 1;
-  return Math.min(Math.max(Math.trunc(dbStep), 1), ONBOARDING_TOTAL_STEPS);
 }
 
 export function onboardingPreviousPath(pathname: string): string | null {

@@ -97,15 +97,6 @@ export function formatBusinessFileDate(iso: string): string {
   });
 }
 
-export function processingStatusLabel(
-  status: BusinessFileProcessingStatus,
-  hasExtractedText: boolean,
-): string {
-  if (status === "processing") return "Processing";
-  if (status === "needs_processing" || !hasExtractedText) return "Needs processing";
-  return "Ready";
-}
-
 export function fileSupportsAnswerToggle(file: {
   processingStatus: BusinessFileProcessingStatus;
   extractedText: string | null;

@@ -1,11 +1,7 @@
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 import { listSendableBusinessFiles } from "../agent-setup/business-files-actions";
-import {
-  ensureAccountRoutes,
-  customRoutes,
-  routesFromStoredLinks,
-} from "./route-models";
+import { ensureAccountRoutes, routesFromStoredLinks } from "./route-models";
 import { routingCaraContextFromOrg } from "./routing-cara-context";
 import { parseRoutingLinks } from "./routing-links";
 import { routingSetupContextFromOrg } from "./routing-setup-context";
@@ -43,15 +39,5 @@ export async function loadRoutingPageData(): Promise<RoutingPageData> {
     sendableFiles,
     caraContext: routingCaraContextFromOrg(org),
     setupContext: routingSetupContextFromOrg(org),
-  };
-}
-
-export function routingHeaderCounts(routes: SavedRoute[]): {
-  routeCount: number;
-  builtinOn: boolean;
-} {
-  return {
-    routeCount: customRoutes(routes).length,
-    builtinOn: true,
   };
 }

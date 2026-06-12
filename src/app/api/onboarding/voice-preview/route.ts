@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     request.headers,
     `voice-preview:${user.id}`,
   );
-  const rateLimit = getVoiceApiRateLimitStatus("voice_preview", fingerprint);
+  const rateLimit = await getVoiceApiRateLimitStatus("voice_preview", fingerprint);
 
   if (!rateLimit.allowed) {
     if (organizationId) {
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: GUARDRAIL_MESSAGE }, { status: 400 });
   }
 
-  recordVoiceApiRequest("voice_preview", fingerprint);
+  await recordVoiceApiRequest("voice_preview", fingerprint);
 
   try {
     const audio = await synthesizeElevenLabsSpeech({

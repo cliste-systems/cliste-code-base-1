@@ -1,7 +1,11 @@
 import "server-only";
 
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
+import type Stripe from "stripe";
 
+import { patchAccountAndLocations } from "@/lib/account-billing";
+import { resolveAccountIdForOrganization } from "@/lib/account-access";
 import {
   isLaunchTier,
   isPlanTier,
@@ -10,8 +14,16 @@ import {
   type PlanTier,
 } from "@/lib/cliste-plans";
 import { LOCAL_DEV_APP_ORIGIN, resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { ONBOARDING_STEPS } from "@/lib/onboarding-session";
+import { assertPlatformCheckoutSessionComplete } from "@/lib/platform-checkout-session-validation";
+import { provisionOrganizationPhoneNumber } from "@/lib/phone-pool";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
+
+export {
+  assertPlatformCheckoutSessionComplete,
+  PlatformCheckoutNotCompleteError,
+} from "@/lib/platform-checkout-session-validation";
 
 export type PlatformCheckoutResult =
   | { ok: true; mode: "redirect"; url: string }
@@ -27,7 +39,7 @@ export async function resolveCheckoutReturnOrigin(): Promise<string> {
   return host ? `${proto}://${host}` : LOCAL_DEV_APP_ORIGIN;
 }
 
-/** Persist plan / launch / interval on the org before Checkout. */
+/** Persist plan / launch / interval on the account before Checkout. */
 export async function persistOrgBillingSelection(input: {
   organizationId: string;
   planTier: PlanTier;
@@ -35,15 +47,20 @@ export async function persistOrgBillingSelection(input: {
   interval: "month" | "year";
 }): Promise<void> {
   const admin = createAdminClient();
-  await admin
-    .from("organizations")
-    .update({
-      plan_tier: input.planTier,
-      launch_tier: normaliseLaunchTierForDb(input.launchTier),
-      billing_interval: input.interval,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.organizationId);
+  const accountId = await resolveAccountIdForOrganization(input.organizationId);
+  if (!accountId) {
+    throw new Error("Organisation is not linked to an account.");
+  }
+
+  const payload = {
+    plan_tier: input.planTier,
+    launch_tier: normaliseLaunchTierForDb(input.launchTier),
+    billing_interval: input.interval,
+    updated_at: new Date().toISOString(),
+  };
+
+  await admin.from("accounts").update(payload).eq("id", accountId);
+  await admin.from("organizations").update(payload).eq("account_id", accountId);
 }
 
 type PlatformCheckoutBaseInput = {
@@ -73,6 +90,11 @@ type EmbeddedCheckoutInput = PlatformCheckoutBaseInput & {
 export async function createPlatformSubscriptionCheckout(
   input: RedirectCheckoutInput | EmbeddedCheckoutInput,
 ): Promise<PlatformCheckoutResult> {
+  const accountId = await resolveAccountIdForOrganization(input.organizationId);
+  if (!accountId) {
+    return { ok: false, message: "Organisation is not linked to an account." };
+  }
+
   await persistOrgBillingSelection({
     organizationId: input.organizationId,
     planTier: input.planTier,
@@ -140,6 +162,7 @@ export async function createPlatformSubscriptionCheckout(
     subscription_data: {
       trial_period_days: 14,
       metadata: {
+        cliste_account_id: accountId,
         cliste_organization_id: input.organizationId,
         cliste_plan_tier: input.planTier,
         cliste_launch_tier: input.launchTier,
@@ -149,6 +172,7 @@ export async function createPlatformSubscriptionCheckout(
         : {}),
     },
     metadata: {
+      cliste_account_id: accountId,
       cliste_organization_id: input.organizationId,
       cliste_plan_tier: input.planTier,
       cliste_launch_tier: input.launchTier,
@@ -207,7 +231,15 @@ export async function persistPlatformCheckoutSession(
     expand: ["subscription", "customer"],
   });
 
-  if (co.metadata?.cliste_organization_id !== organizationId) {
+  assertPlatformCheckoutSessionComplete(co);
+
+  const accountId = await resolveAccountIdForOrganization(organizationId);
+  const metaOrg = (co.metadata?.cliste_organization_id ?? "").trim();
+  const metaAccount = (co.metadata?.cliste_account_id ?? "").trim();
+  if (
+    metaOrg !== organizationId &&
+    (!accountId || metaAccount !== accountId)
+  ) {
     throw new Error("Checkout session does not belong to this organisation.");
   }
 
@@ -219,14 +251,100 @@ export async function persistPlatformCheckoutSession(
     typeof co.customer === "string" ? co.customer : co.customer?.id ?? null;
 
   const admin = createAdminClient();
+  if (!accountId) {
+    throw new Error("Organisation is not linked to an account.");
+  }
+  const billingPatch = {
+    platform_subscription_id: subscriptionId,
+    platform_customer_id: customerId,
+    updated_at: new Date().toISOString(),
+  };
+  await admin.from("accounts").update(billingPatch).eq("id", accountId);
+  await admin.from("organizations").update(billingPatch).eq("account_id", accountId);
+}
+
+/**
+ * Activate an account + org after a paid platform subscription checkout.
+ * Idempotent — safe from both the browser return handler and Stripe webhooks.
+ */
+export async function activatePlatformSubscriptionGoLive(
+  organizationId: string,
+): Promise<void> {
+  const accountId = await resolveAccountIdForOrganization(organizationId);
+  if (!accountId) {
+    throw new Error("Organisation is not linked to an account.");
+  }
+
+  const admin = createAdminClient();
+  const { data: account } = await admin
+    .from("accounts")
+    .select("platform_subscription_id, platform_customer_id")
+    .eq("id", accountId)
+    .maybeSingle();
+
+  const subscriptionId = String(
+    account?.platform_subscription_id ?? "",
+  ).trim();
+  if (!subscriptionId) {
+    throw new Error("No platform subscription found for this organisation.");
+  }
+
+  const nowIso = new Date().toISOString();
+  const activationPatch = {
+    platform_subscription_id: subscriptionId,
+    platform_customer_id:
+      (account?.platform_customer_id as string | null) ?? null,
+    status: "active",
+    launch_status: "completed",
+    updated_at: nowIso,
+  };
+
+  await patchAccountAndLocations(accountId, activationPatch, {
+    primaryOrganizationId: organizationId,
+  });
+
   await admin
     .from("organizations")
     .update({
-      platform_subscription_id: subscriptionId,
-      platform_customer_id: customerId,
-      updated_at: new Date().toISOString(),
+      is_active: true,
+      onboarding_step: ONBOARDING_STEPS.done,
+      updated_at: nowIso,
     })
     .eq("id", organizationId);
+
+  try {
+    const phoneResult = await provisionOrganizationPhoneNumber(organizationId);
+    if (!phoneResult.ok) {
+      console.warn(
+        "[platform-billing] phone provision failed",
+        organizationId,
+        phoneResult.message,
+      );
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("23505") ||
+      msg.includes("phone_numbers_one_assigned_per_org")
+    ) {
+      return;
+    }
+    console.error(
+      "[platform-billing] phone provision error",
+      organizationId,
+      err,
+    );
+  }
+
+  revalidatePath("/onboarding", "layout");
+  revalidatePath("/dashboard", "layout");
+}
+
+/** Validate a Checkout Session payload from a Stripe webhook event. */
+export function assertWebhookPlatformCheckoutSessionComplete(
+  session: Stripe.Checkout.Session,
+): void {
+  assertPlatformCheckoutSessionComplete(session);
 }
 
 export function parseOrgBillingSelection(org: {

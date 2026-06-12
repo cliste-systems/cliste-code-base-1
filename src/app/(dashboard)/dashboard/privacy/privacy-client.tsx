@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { Download, FileJson, Trash2 } from "lucide-react";
 
 import { DashboardAnimatedGroup } from "@/components/dashboard/dashboard-animated-group";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -18,9 +18,12 @@ import { cn } from "@/lib/utils";
 import {
   eraseCustomerData,
   exportCustomerData,
+  exportOrganizationPortabilityData,
   type GdprErasureCounts,
   type GdprExportPayload,
+  type GdprPortabilityPayload,
 } from "./actions";
+import { portabilityPayloadToCsv } from "@/lib/gdpr-portability";
 
 type ExportState =
   | { status: "idle" }
@@ -41,6 +44,13 @@ export function PrivacyToolsClient() {
   const [eraseConfirm, setEraseConfirm] = useState("");
   const [eraseState, setEraseState] = useState<EraseState>({ status: "idle" });
   const [erasePending, startErase] = useTransition();
+
+  const [portabilityState, setPortabilityState] = useState<
+    | { status: "idle" }
+    | { status: "error"; message: string }
+    | { status: "ready"; data: GdprPortabilityPayload }
+  >({ status: "idle" });
+  const [portabilityPending, startPortability] = useTransition();
 
   const fieldClass = cn(DASHBOARD_INPUT_CLASS, "text-[13px] text-[#0b1220]");
 
@@ -71,6 +81,39 @@ export function PrivacyToolsClient() {
       .slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function onPortabilityExport(format: "json" | "csv") {
+    startPortability(async () => {
+      const r = await exportOrganizationPortabilityData();
+      if (!r.ok) {
+        setPortabilityState({ status: "error", message: r.message });
+        return;
+      }
+      setPortabilityState({ status: "ready", data: r.data });
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === "json") {
+        const blob = new Blob([JSON.stringify(r.data, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cliste-portability-export-${stamp}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const blob = new Blob([portabilityPayloadToCsv(r.data)], {
+          type: "text/csv;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cliste-portability-export-${stamp}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
   }
 
   function onErase(e: React.FormEvent<HTMLFormElement>) {
@@ -155,6 +198,45 @@ export function PrivacyToolsClient() {
               Download JSON
             </Button>
           </div>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard
+        flat
+        icon={FileJson}
+        title="Export all customer records (Article 20)"
+        description="GDPR Article 20 — data portability. Download every appointment, call log, and action ticket for your business in a structured JSON or CSV bundle."
+      >
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            type="button"
+            disabled={portabilityPending}
+            onClick={() => onPortabilityExport("json")}
+            className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "w-full sm:w-auto")}
+          >
+            {portabilityPending ? "Preparing…" : "Download JSON bundle"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={portabilityPending}
+            onClick={() => onPortabilityExport("csv")}
+            className={cn(DASHBOARD_SECONDARY_BUTTON_CLASS, "w-full sm:w-auto")}
+          >
+            Download CSV bundle
+          </Button>
+        </div>
+        {portabilityState.status === "error" ? (
+          <p className="text-[13px] text-red-600" role="alert">
+            {portabilityState.message}
+          </p>
+        ) : null}
+        {portabilityState.status === "ready" ? (
+          <p className="text-[13px] text-slate-600">
+            Last export: {portabilityState.data.appointments.length} appointments,{" "}
+            {portabilityState.data.call_logs.length} call logs,{" "}
+            {portabilityState.data.action_tickets.length} action tickets.
+          </p>
         ) : null}
       </SectionCard>
 

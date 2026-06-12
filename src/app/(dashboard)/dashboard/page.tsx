@@ -29,7 +29,10 @@ import {
 import { sumBillableMinutesFromDurations } from "@/lib/billable-minutes";
 import { buildHomeAttentionItems } from "@/lib/dashboard-home-attention";
 import { isRoutedCallOutcome } from "@/lib/dashboard-routed-outcomes";
+import { ALL_LOCATIONS_VIEW_COOKIE } from "@/lib/account-locations";
+import { resolveDashboardOrganizationScope } from "@/lib/dashboard-scope";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { cookies } from "next/headers";
 import { cn } from "@/lib/utils";
 
 type DashboardHomePageProps = {
@@ -51,6 +54,13 @@ type TicketRow = {
   created_at: string;
   caller_name?: string | null;
   caller_number?: string | null;
+};
+
+type TrainingRow = {
+  id: string;
+  gap_summary: string | null;
+  status: string | null;
+  updated_at: string;
 };
 
 /** Per-source cap when merging calls + tickets into recent activity. */
@@ -109,11 +119,30 @@ function applyRangeEnd<T extends { gte: (col: string, v: string) => T; lt: (col:
   return query;
 }
 
+function applyOrganizationScope<T>(query: T, organizationIds: string[]): T {
+  const scoped = query as {
+    eq: (column: string, value: string) => T;
+    in: (column: string, values: string[]) => T;
+  };
+  if (organizationIds.length === 1) {
+    return scoped.eq("organization_id", organizationIds[0]!);
+  }
+  return scoped.in("organization_id", organizationIds);
+}
+
 export default async function DashboardHomePage({
   searchParams,
 }: DashboardHomePageProps) {
-  const { supabase, organizationId, profile } =
-    await requireDashboardSession();
+  const session = await requireDashboardSession();
+  const { supabase, organizationId, profile } = session;
+  const cookieStore = await cookies();
+  const viewAllLocations =
+    cookieStore.get(ALL_LOCATIONS_VIEW_COOKIE)?.value === "1";
+  const scope = await resolveDashboardOrganizationScope(
+    session,
+    viewAllLocations,
+  );
+  const scopedOrgIds = scope.organizationIds;
 
   const sp = searchParams ? await searchParams : {};
   const metricRange: DashboardMetricRangeKey = parseDashboardMetricRange(sp.range);
@@ -125,54 +154,64 @@ export default async function DashboardHomePage({
     getDashboardMetricRangeUpperExclusiveIso(metricRange);
 
   const callsInMetricRangeQuery = applyRangeEnd(
-    supabase
-      .from("call_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .gte("created_at", metricRangeStartIso),
+    applyOrganizationScope(
+      supabase
+        .from("call_logs")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", metricRangeStartIso),
+      scopedOrgIds,
+    ),
     metricRangeEndExclusiveIso,
   );
 
   const actionsInMetricRangeQuery = applyRangeEnd(
-    supabase
-      .from("action_tickets")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .gte("created_at", metricRangeStartIso),
+    applyOrganizationScope(
+      supabase
+        .from("action_tickets")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", metricRangeStartIso),
+      scopedOrgIds,
+    ),
     metricRangeEndExclusiveIso,
   );
 
   const callsForMetricRollupsQuery = applyRangeEnd(
-    supabase
-      .from("call_logs")
-      .select("outcome, duration_seconds")
-      .eq("organization_id", organizationId)
-      .gte("created_at", metricRangeStartIso),
+    applyOrganizationScope(
+      supabase
+        .from("call_logs")
+        .select("outcome, duration_seconds")
+        .gte("created_at", metricRangeStartIso),
+      scopedOrgIds,
+    ),
     metricRangeEndExclusiveIso,
   );
 
   /** Calls in the selected metric range (activity, attention, outcome charts). */
   const callsForPanelsQuery = applyRangeEnd(
-    supabase
-      .from("call_logs")
-      .select(
-        "id, created_at, outcome, caller_number, caller_name, duration_seconds",
-      )
-      .eq("organization_id", organizationId)
-      .gte("created_at", metricRangeStartIso)
-      .order("created_at", { ascending: false })
-      .limit(DASHBOARD_HOME_ACTIVITY_SOURCE_FETCH_LIMIT * 2),
+    applyOrganizationScope(
+      supabase
+        .from("call_logs")
+        .select(
+          "id, created_at, outcome, caller_number, caller_name, duration_seconds",
+        )
+        .gte("created_at", metricRangeStartIso)
+        .order("created_at", { ascending: false })
+        .limit(DASHBOARD_HOME_ACTIVITY_SOURCE_FETCH_LIMIT * 2),
+      scopedOrgIds,
+    ),
     metricRangeEndExclusiveIso,
   );
 
   const recentTicketsForPanelsQuery = applyRangeEnd(
-    supabase
-      .from("action_tickets")
-      .select("id, summary, created_at, caller_name, caller_number")
-      .eq("organization_id", organizationId)
-      .gte("created_at", metricRangeStartIso)
-      .order("created_at", { ascending: false })
-      .limit(DASHBOARD_HOME_ACTIVITY_SOURCE_FETCH_LIMIT),
+    applyOrganizationScope(
+      supabase
+        .from("action_tickets")
+        .select("id, summary, created_at, caller_name, caller_number")
+        .gte("created_at", metricRangeStartIso)
+        .order("created_at", { ascending: false })
+        .limit(DASHBOARD_HOME_ACTIVITY_SOURCE_FETCH_LIMIT),
+      scopedOrgIds,
+    ),
     metricRangeEndExclusiveIso,
   );
 
@@ -184,26 +223,40 @@ export default async function DashboardHomePage({
     callsForPanelsRes,
     recentTicketsForPanelsRes,
     openTicketsRes,
+    openTrainingRes,
     orgRes,
     latestCallRes,
   ] = await Promise.all([
     callsInMetricRangeQuery,
     actionsInMetricRangeQuery,
-    supabase
-      .from("action_tickets")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("status", "open"),
+    applyOrganizationScope(
+      supabase
+        .from("action_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open"),
+      scopedOrgIds,
+    ),
     callsForMetricRollupsQuery,
     callsForPanelsQuery,
     recentTicketsForPanelsQuery,
-    supabase
-      .from("action_tickets")
-      .select("id, summary, created_at, caller_name, caller_number")
-      .eq("organization_id", organizationId)
-      .eq("status", "open")
-      .order("created_at", { ascending: false })
-      .limit(DASHBOARD_HOME_ATTENTION_ROW_LIMIT),
+    applyOrganizationScope(
+      supabase
+        .from("action_tickets")
+        .select("id, summary, created_at, caller_name, caller_number")
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .limit(DASHBOARD_HOME_ATTENTION_ROW_LIMIT),
+      scopedOrgIds,
+    ),
+    applyOrganizationScope(
+      supabase
+        .from("cara_training_items")
+        .select("id, gap_summary, status, updated_at")
+        .in("status", ["awaiting_answer", "draft_ready"])
+        .order("updated_at", { ascending: false })
+        .limit(DASHBOARD_HOME_ATTENTION_ROW_LIMIT),
+      scopedOrgIds,
+    ),
     supabase
       .from("organizations")
       .select("is_active, status, phone_number")
@@ -264,8 +317,13 @@ export default async function DashboardHomePage({
     ? []
     : (openTicketsRes.data ?? [])) as TicketRow[];
 
+  const openTrainingRows = (openTrainingRes.error
+    ? []
+    : (openTrainingRes.data ?? [])) as TrainingRow[];
+
   const attentionItems = buildHomeAttentionItems({
     openTickets: openTicketRows,
+    openTraining: openTrainingRows,
     calls: callsForPanels,
     callerLabel: (row) =>
       callerLabelFor({ ...row, duration_seconds: null }),

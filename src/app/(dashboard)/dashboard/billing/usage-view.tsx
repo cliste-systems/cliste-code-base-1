@@ -17,6 +17,7 @@ import {
   formatBillingPeriodRenewal,
   formatDate,
   formatDateTime,
+  formatStripeSyncStatus,
   formatEuro,
   formatEuroFromCents,
   formatMinutes,
@@ -57,17 +58,6 @@ export function UsageView({
         title="Usage"
         icon={Gauge}
         description="Minutes used this billing period and what your plan includes."
-        summary={[
-          { value: data.planName, label: "plan" },
-          { value: formatMinutes(data.usedMinutes), label: "used" },
-          {
-            value:
-              data.includedMinutes > 0
-                ? formatMinutes(data.includedMinutes)
-                : "—",
-            label: "included",
-          },
-        ]}
         actions={
           data.canManageBilling ? (
             <OpenBillingPortalButton className={portalButtonClass} />
@@ -100,7 +90,7 @@ export function UsageView({
         </UsageAlert>
       ) : null}
 
-      <section className={cn(DASHBOARD_HOME_CARD, "shrink-0")}>
+      <section className={cn(DASHBOARD_HOME_CARD, "shrink-0 space-y-5")}>
         <DashboardStatStrip
           compact
           stats={[
@@ -113,7 +103,7 @@ export function UsageView({
                   : "—",
             },
             {
-              label: "Remaining",
+              label: "Minutes remaining",
               value:
                 data.includedMinutes > 0
                   ? formatMinutes(data.remainingMinutes)
@@ -121,6 +111,18 @@ export function UsageView({
             },
             { label: "Extra minutes", value: formatMinutes(data.extraMinutes) },
             { label: "Calls counted", value: String(data.callsCounted) },
+          ]}
+        />
+        <DashboardStatStrip
+          compact
+          className="border-t border-slate-100 pt-5 sm:grid-cols-3 lg:grid-cols-3 lg:divide-x lg:divide-slate-100"
+          stats={[
+            { label: "SMS sent", value: String(data.usedSms) },
+            {
+              label: "SMS included",
+              value: data.includedSms > 0 ? String(data.includedSms) : "—",
+            },
+            { label: "Extra SMS", value: String(data.extraSms) },
           ]}
         />
       </section>
@@ -147,10 +149,10 @@ export function UsageView({
             </p>
             <p className="mt-1 text-[13px] leading-snug text-slate-500">
               {summary.secondary}
-            </p>
-            <p className="mt-2 text-[12px] leading-snug text-slate-500">
-              Minutes are based on actual call length (to the second), not
-              rounded up per call.
+              <span className="text-slate-400">
+                {" "}
+                Talk time is billed to the second.
+              </span>
             </p>
 
             <div className="mt-5">
@@ -180,10 +182,16 @@ export function UsageView({
             <PeriodFact label="Period start" value={formatDate(data.periodStart)} />
             <PeriodFact label="Renews" value={renewalDate} />
             <PeriodFact
-              label="Last sync"
-              value={formatDateTime(data.lastUsageSync)}
+              label="Last call counted"
+              value={formatDateTime(data.lastCallAt)}
             />
-            <PeriodFact label="Source" value="Cara call records" />
+            <PeriodFact
+              label="Stripe sync"
+              value={formatStripeSyncStatus(
+                data.lastStripeSync,
+                data.hasBillingPortal,
+              )}
+            />
           </dl>
         </section>
 
@@ -266,6 +274,44 @@ export function UsageView({
           </div>
         </section>
       </div>
+
+      {data.locationCount > 1 && data.locationBreakdown.length > 0 ? (
+        <section className={cn(DASHBOARD_HOME_CARD, "shrink-0")}>
+          <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
+            Usage by location
+          </h2>
+          <p className="mt-1 text-[13px] text-slate-500">
+            Minutes and SMS are pooled on your account. This breakdown shows
+            where usage came from.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-500">
+                  <th className="py-2 pr-4 font-medium">Location</th>
+                  <th className="py-2 pr-4 font-medium">Minutes</th>
+                  <th className="py-2 pr-4 font-medium">SMS</th>
+                  <th className="py-2 font-medium">Calls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.locationBreakdown.map((row) => (
+                  <tr key={row.organizationId} className="border-b border-slate-50">
+                    <td className="py-2.5 pr-4 font-medium text-[#0b1220]">
+                      {row.locationName}
+                    </td>
+                    <td className="py-2.5 pr-4 tabular-nums">
+                      {formatMinutes(row.usedMinutes)}
+                    </td>
+                    <td className="py-2.5 pr-4 tabular-nums">{row.usedSms}</td>
+                    <td className="py-2.5 tabular-nums">{row.callsCounted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
       </DashboardAnimatedPageSections>
     </div>
   );

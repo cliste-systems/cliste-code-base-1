@@ -43,17 +43,21 @@ export function SubProcessorsDocument({
           <strong>Primary business and caller data</strong> (database records,
           transcripts, contacts, action-inbox items) is stored in the{" "}
           <strong>EEA</strong> — Supabase on AWS <strong>eu-west-1 (Ireland)</strong>.
-          The dashboard and voice worker run on <strong>EU-region hosting</strong>{" "}
-          (Vercel and Railway).
+          The dashboard APIs run on Vercel in <strong>dub1 (Dublin)</strong> and the
+          voice worker on <strong>Railway EU West</strong>.
         </p>
         <p>
-          The <strong>voice AI stack</strong> (real-time telephony, speech-to-text,
-          text-to-speech, LLM) is largely US-based. There are no practical EU-only
-          equivalents for this stack today. We rely on{" "}
-          <strong>EU–US Data Privacy Framework</strong> certification and/or{" "}
-          <strong>Standard Contractual Clauses</strong>, plus technical measures:
-          TLS, no voice-audio retention, and transcript redaction. This is standard
-          for AI voice products and is documented in our DPA.
+          <strong>LiveKit Cloud</strong> receives inbound Irish calls on an{" "}
+          <strong>EU SIP endpoint (Frankfurt)</strong> via our Twilio trunk.
+          WebRTC media between the worker and LiveKit still uses global routing
+          until LiveKit <strong>protocol region pinning</strong> is enabled
+          (Scale plan + Support request).
+          Text-to-speech and LLM routing use United States vendors (ElevenLabs,
+          OpenRouter). Transactional email (SendGrid) uses the global API today; EU
+          residency is available when configured. Where processing leaves the EEA we
+          rely on <strong>EU–US Data Privacy Framework</strong> certification
+          and/or <strong>Standard Contractual Clauses</strong>, plus technical
+          measures: TLS, no voice-audio retention, and transcript redaction.
         </p>
       </LegalSection>
 

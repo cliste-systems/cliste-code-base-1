@@ -40,6 +40,7 @@ type Props = {
   routes?: RoutingActionSummary[];
   transferNumber?: string;
   onMoveToServicesExclusion?: (item: string) => void;
+  hideChipList?: boolean;
 };
 
 export function CallHandlingChipEditor({
@@ -52,6 +53,7 @@ export function CallHandlingChipEditor({
   routes,
   transferNumber,
   onMoveToServicesExclusion,
+  hideChipList,
 }: Props) {
   const skipWrongHomeRef = useRef<string | null>(null);
   const caps = buildCaraCapabilitiesFromPromptExtras(routes, transferNumber);
@@ -102,6 +104,7 @@ export function CallHandlingChipEditor({
           <p className="text-[12.5px] text-amber-800">{surveyWarning}</p>
         ) : null
       }
+      hideChipList={hideChipList}
       renderInterruptDialog={({
         kind: interruptKind,
         item,

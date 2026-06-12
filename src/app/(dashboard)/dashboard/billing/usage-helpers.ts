@@ -1,5 +1,13 @@
 import type { PlanDefinition } from "@/lib/cliste-plans";
 
+export type UsageLocationBreakdown = {
+  organizationId: string;
+  locationName: string;
+  usedMinutes: number;
+  usedSms: number;
+  callsCounted: number;
+};
+
 export type UsagePageData = {
   planName: string;
   plan: PlanDefinition | null;
@@ -12,7 +20,10 @@ export type UsagePageData = {
   periodStart: string;
   periodEnd: string | null;
   callsCounted: number;
-  lastUsageSync: string | null;
+  /** Most recent finished call included in this period's total. */
+  lastCallAt: string | null;
+  /** When usage was last forwarded to Stripe (meter events). */
+  lastStripeSync: string | null;
   /** Stripe customer id stored on the org (portal opens immediately). */
   hasBillingPortal: boolean;
   /** Subscription id on the org — portal can recover customer id from Stripe. */
@@ -21,6 +32,11 @@ export type UsagePageData = {
   canManageBilling: boolean;
   suspended: boolean;
   suspendedReason: string | null;
+  usedSms: number;
+  includedSms: number;
+  extraSms: number;
+  locationCount: number;
+  locationBreakdown: UsageLocationBreakdown[];
 };
 
 export function buildUsageSummary(data: UsagePageData): {
@@ -127,4 +143,13 @@ export function formatDateTime(iso: string | null | undefined): string {
   } catch {
     return "—";
   }
+}
+
+export function formatStripeSyncStatus(
+  lastStripeSync: string | null,
+  hasBillingPortal: boolean,
+): string {
+  if (lastStripeSync?.trim()) return formatDateTime(lastStripeSync);
+  if (!hasBillingPortal) return "Set up billing first";
+  return "Pending";
 }

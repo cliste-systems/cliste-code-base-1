@@ -35,7 +35,7 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
   const h = await headers();
   const securityCtx = buildSecurityEventContext(h);
   const fingerprint = rateLimitFingerprint(h, "admin-unlock");
-  const before = getRateLimitStatus("admin_unlock", fingerprint);
+  const before = await getRateLimitStatus("admin_unlock", fingerprint);
   if (!before.allowed) {
     console.warn("[security] admin_unlock_rate_limited", {
       retryAfterSeconds: before.retryAfterSeconds,
@@ -51,7 +51,7 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
 
   const password = formData.get("password");
   if (typeof password !== "string") {
-    recordRateLimitFailure("admin_unlock", fingerprint);
+    await recordRateLimitFailure("admin_unlock", fingerprint);
     console.warn("[security] admin_unlock_bad_payload");
     await logSecurityEvent(securityCtx, {
       eventType: "admin_unlock",
@@ -63,7 +63,7 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
 
   const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
   if (!secret) {
-    recordRateLimitFailure("admin_unlock", fingerprint);
+    await recordRateLimitFailure("admin_unlock", fingerprint);
     console.warn("[security] admin_unlock_config_missing");
     await logSecurityEvent(securityCtx, {
       eventType: "admin_unlock",
@@ -73,7 +73,7 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
     redirect("/admin-unlock?error=config");
   }
   if (!(await timingSafeEqualUtf8(password, secret))) {
-    const afterFailure = recordRateLimitFailure("admin_unlock", fingerprint);
+    const afterFailure = await recordRateLimitFailure("admin_unlock", fingerprint);
     console.warn("[security] admin_unlock_wrong_password", {
       retryAfterSeconds: afterFailure.retryAfterSeconds,
     });
@@ -89,7 +89,7 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
     redirect("/admin-unlock?error=1");
   }
 
-  clearRateLimit("admin_unlock", fingerprint);
+  await clearRateLimit("admin_unlock", fingerprint);
   const cookieValue = await createGateCookieValue(
     ADMIN_GATE_COOKIE_PREFIX,
     secret,

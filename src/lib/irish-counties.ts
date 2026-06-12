@@ -40,7 +40,3 @@ export function resolveCountyName(text: string): IrishCounty | null {
   if (!normalized) return null;
   return COUNTY_LOOKUP.get(normalized) ?? null;
 }
-
-export function isIrishCounty(text: string): boolean {
-  return resolveCountyName(text) !== null;
-}

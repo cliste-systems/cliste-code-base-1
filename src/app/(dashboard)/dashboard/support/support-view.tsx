@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { LifeBuoy, Plus, Search } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
@@ -72,16 +72,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [formMsg, setFormMsg] = useState<string | null>(null);
-  const [selectAfterCreate, setSelectAfterCreate] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (!selectAfterCreate) return;
-    if (initialTickets.some((t) => t.id === selectAfterCreate)) {
-      setSelectedId(selectAfterCreate);
-      setSelectAfterCreate(null);
-    }
-  }, [initialTickets, selectAfterCreate]);
 
   const metrics = useMemo(() => buildSupportMetrics(initialTickets), [initialTickets]);
 
@@ -124,7 +115,7 @@ export function SupportView({ initialTickets, className }: SupportViewProps) {
           setFormMsg(null);
           setNewOpen(false);
           setStatusFilter("all");
-          setSelectAfterCreate(result.ticketId);
+          setSelectedId(result.ticketId);
           router.refresh();
         } else {
           setFormMsg(result.message);

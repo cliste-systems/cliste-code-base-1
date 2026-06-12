@@ -38,16 +38,3 @@ export function formatCallSuccessRateValue(percent: number | null): string {
   if (percent === null) return "—";
   return `${percent}%`;
 }
-
-export function formatCallSuccessRateSubtext(
-  eligibleCount: number,
-  periodPhrase: string,
-): string {
-  if (eligibleCount === 0) {
-    return periodPhrase === "today"
-      ? "No calls today"
-      : `No calls ${periodPhrase}`;
-  }
-  if (eligibleCount === 1) return `${periodPhrase} · 1 call`;
-  return `${periodPhrase} · ${eligibleCount} calls`;
-}

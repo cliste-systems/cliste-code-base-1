@@ -49,23 +49,10 @@ const DEFAULT_CAPTURE_OPTIONS: CaptureFieldOption[] = [
   { id: "email", label: "Email", hint: "For confirmations or quotes" },
 ];
 
-const OPTION_LABEL_BY_ID = new Map<string, string>(
-  [
-    ...CAPTURE_REQUIRED_FIELDS,
-    ...TRADES_CAPTURE_OPTIONS,
-    ...SALON_CAPTURE_OPTIONS,
-    ...DEFAULT_CAPTURE_OPTIONS,
-  ].map((option) => [option.id, option.label]),
-);
-
 export function captureOptionsForPack(pack: TradePack): CaptureFieldOption[] {
   if (pack === "trades") return TRADES_CAPTURE_OPTIONS;
   if (pack === "salon") return SALON_CAPTURE_OPTIONS;
   return DEFAULT_CAPTURE_OPTIONS;
-}
-
-export function captureOptionsForBusinessType(businessType: string): CaptureFieldOption[] {
-  return captureOptionsForPack(detectTradePack(businessType));
 }
 
 export function defaultCaptureFieldsForBusinessType(
@@ -100,17 +87,6 @@ export function defaultCaptureFieldsForBusinessType(
     { id: "location", label: "Location" },
     { id: "urgency", label: "Urgency" },
   ];
-}
-
-export function captureStepHint(businessType: string): string {
-  const pack = detectTradePack(businessType);
-  if (pack === "trades") {
-    return "Plumbers and trades usually need the job location, what's wrong, and how urgent it is.";
-  }
-  if (pack === "salon") {
-    return "Salons and barbers usually need the service they want and when they'd like to come in.";
-  }
-  return "Pick what Cara should gather before she passes the call to you or adds it to your inbox.";
 }
 
 function slugifyCustomLabel(label: string): string {
@@ -207,29 +183,3 @@ export function createCustomCaptureField(label: string): CaraCaptureField | null
   };
 }
 
-export function toggleCaptureField(
-  fields: CaraCaptureField[],
-  option: CaptureFieldOption,
-): CaraCaptureField[] {
-  const exists = fields.some((field) => field.id === option.id);
-  if (exists) {
-    return ensureRequiredCaptureFields(
-      fields.filter((field) => field.id !== option.id),
-    );
-  }
-  return ensureRequiredCaptureFields([
-    ...fields,
-    { id: option.id, label: option.label },
-  ]);
-}
-
-export function isCaptureFieldSelected(
-  fields: CaraCaptureField[],
-  optionId: string,
-): boolean {
-  return fields.some((field) => field.id === optionId);
-}
-
-export function labelForCaptureFieldId(id: string): string {
-  return OPTION_LABEL_BY_ID.get(id) ?? id.replace(/_/g, " ");
-}

@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bot,
   ChevronRight,
+  GraduationCap,
   Gauge,
   Inbox,
   LayoutDashboard,
@@ -21,6 +22,8 @@ import { usePathname } from "next/navigation";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import { cn } from "@/lib/utils";
 
+import { LocationSwitcher } from "@/components/dashboard/location-switcher";
+import type { AccountLocationRow } from "@/lib/account-locations";
 import type { DashboardAccountSummary } from "@/lib/dashboard-account-summary";
 
 import { DashboardSignOutButton } from "./dashboard-sign-out-button";
@@ -35,6 +38,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/routing": Share2,
   "/dashboard/cara-setup": Bot,
   "/dashboard/agent-setup": Bot,
+  "/dashboard/cara-training": GraduationCap,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
   "/dashboard/support": LifeBuoy,
@@ -56,6 +60,11 @@ type DashboardSidebarProps = {
   adminNav: DashboardSidebarNavItem[];
   needsPassword: boolean;
   account: DashboardAccountSummary;
+  locations: AccountLocationRow[];
+  activeOrganizationId: string;
+  viewAllLocations: boolean;
+  locationLabel: string;
+  accountName: string;
   /** Short word beside the wordmark; falls back to "Connect" when not tailored. */
   productNoun?: string | null;
 };
@@ -149,6 +158,11 @@ export function DashboardSidebar({
   adminNav,
   needsPassword,
   account,
+  locations,
+  activeOrganizationId,
+  viewAllLocations,
+  locationLabel,
+  accountName,
   productNoun,
 }: DashboardSidebarProps) {
   return (
@@ -196,6 +210,13 @@ export function DashboardSidebar({
         </nav>
 
         <div className="mt-auto shrink-0 space-y-2 border-t border-[#e8ecf0] pt-4">
+          <LocationSwitcher
+            locations={locations}
+            activeOrganizationId={activeOrganizationId}
+            viewAllLocations={viewAllLocations}
+            locationLabel={locationLabel}
+            accountName={accountName}
+          />
           <Link
             href="/dashboard/settings"
             className="flex items-center gap-2.5 rounded-[18px] border border-slate-200/80 bg-white px-3 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-white/70 transition-colors hover:border-slate-300 hover:bg-[#fcfcfd]"

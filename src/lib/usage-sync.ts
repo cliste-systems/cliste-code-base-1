@@ -2,6 +2,8 @@ import "server-only";
 
 import Stripe from "stripe";
 
+import { loadPlatformCustomerIdsForOrganizations } from "@/lib/account-billing";
+import { captureObservedError } from "@/lib/observability";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 /**
@@ -31,10 +33,8 @@ type UnsyncedRow = {
   minutes_billable: number | null;
 };
 
-type OrgRow = {
-  id: string;
+type OrgCustomerRow = {
   platform_customer_id: string | null;
-  platform_subscription_id: string | null;
 };
 
 export type UsageSyncResult = {
@@ -83,16 +83,13 @@ export async function syncUsageToStripe(): Promise<UsageSyncResult> {
   }
 
   const orgIds = [...new Set(batch.map((r) => r.organization_id))];
-  const { data: orgs, error: orgErr } = await admin
-    .from("organizations")
-    .select("id, platform_customer_id, platform_subscription_id")
-    .in("id", orgIds);
-  if (orgErr) {
-    throw new Error(`Failed to query organizations: ${orgErr.message}`);
+  const customerByOrg = await loadPlatformCustomerIdsForOrganizations(orgIds);
+  const orgIndex = new Map<string, OrgCustomerRow>();
+  for (const orgId of orgIds) {
+    orgIndex.set(orgId, {
+      platform_customer_id: customerByOrg.get(orgId) ?? null,
+    });
   }
-  const orgIndex = new Map<string, OrgRow>(
-    (orgs ?? []).map((o) => [o.id as string, o as OrgRow]),
-  );
 
   for (const row of batch) {
     const org = orgIndex.get(row.organization_id);
@@ -104,11 +101,9 @@ export async function syncUsageToStripe(): Promise<UsageSyncResult> {
     if (!org?.platform_customer_id) {
       result.rowsSkipped += 1;
       bumpOrgBucket(result, row.organization_id, minutes, "no_customer");
-      // Mark as synced so we don't keep scanning these rows — once the org
-      // attaches a platform_customer_id via webhook, new rows will sync.
       await admin
         .from("usage_records")
-        .update({ synced_to_stripe_at: new Date().toISOString() })
+        .update({ sync_skip_reason: "no_customer" })
         .eq("id", row.id);
       continue;
     }
@@ -154,6 +149,13 @@ export async function syncUsageToStripe(): Promise<UsageSyncResult> {
         err instanceof Error ? err.message : err,
       );
     }
+  }
+
+  if (result.rowsFailed > 0) {
+    await captureObservedError(new Error("usage-sync rows failed"), {
+      rowsFailed: result.rowsFailed,
+      rowsProcessed: result.rowsProcessed,
+    });
   }
 
   return result;

@@ -1,12 +1,13 @@
 
 import {
-  LegalCallout,
+    LegalCallout,
   LegalList,
   LegalPageHeader,
   LegalSection,
   LegalTable,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
+import { companyRegistrationLine } from "@/lib/company-details";
 
 
 export function PrivacyNoticeDocument() {
@@ -25,6 +26,7 @@ export function PrivacyNoticeDocument() {
       </LegalCallout>
 
       <LegalSection title="1. Who we are and our roles under GDPR">
+        <p className="text-[14px] text-slate-600">{companyRegistrationLine()}</p>
         <LegalList>
           <li>
             <strong>You, the business owner</strong>, are the{" "}
@@ -131,10 +133,15 @@ export function PrivacyNoticeDocument() {
       <LegalSection title="5. International transfers">
         <p>
           Your business and caller records are stored in the{" "}
-          <strong>EEA</strong> (Ireland). Some processing — mainly the{" "}
-          <strong>live voice AI pipeline</strong> (speech, telephony, LLM) — uses
-          US-based sub-processors under the EU&ndash;US Data Privacy Framework
-          and/or Standard Contractual Clauses. Audio is not retained at rest; see{" "}
+          <strong>EEA</strong> (Ireland). Dashboard hosting runs in{" "}
+          <strong>Dublin (dub1)</strong>, and the voice worker in{" "}
+          <strong>Railway EU West</strong>. Live calls use{" "}
+          <strong>LiveKit Cloud</strong> (EU SIP for inbound calls). Some processing
+          — mainly{" "}
+          <strong>text-to-speech and LLM routing</strong> (ElevenLabs, OpenRouter)
+          and transactional email — may still use US-based sub-processors under the
+          EU&ndash;US Data Privacy Framework and/or Standard Contractual Clauses.
+          Audio is not retained at rest; see{" "}
           <LegalInlineLink href="/legal/sub-processors">sub-processors</LegalInlineLink>.
         </p>
       </LegalSection>
@@ -178,8 +185,9 @@ export function PrivacyNoticeDocument() {
         <p>
           We encrypt data in transit (TLS) and at rest (managed database
           encryption). Production database access is restricted and logged.
-          Transcripts are redacted for card numbers and obvious government IDs
-          before storage.
+          Voice calls are transcribed for up to 30 days; transcripts are redacted
+          for card numbers, government IDs, and obvious volunteered sensitive
+          phrases before storage. Audio is not retained after the call.
         </p>
       </LegalSection>
 
@@ -208,16 +216,16 @@ export function PrivacyNoticeDocument() {
             ["AI summary & caller number", "13 months, then nulled", "Reporting window"],
             [
               "Appointments (if used)",
-              "Account lifetime + 7 years where tax law requires",
-              "Business records",
+              "Account lifetime + 6 years where tax law requires",
+              "Business records (Revenue)",
             ],
             [
               "Legacy public-booking security rows",
               "Purged by cron (30 min / 14 days)",
               "Leftover tables from retired feature; no new writes",
             ],
-            ["Security audit log", "2 years", "Incident investigation"],
-            ["Business account", "Account lifetime + 90 days", "Closure handling"],
+            ["Security audit log", "24 months", "Incident investigation"],
+            ["Business account", "Account lifetime + 30 days", "Closure handling"],
           ]}
         />
       </LegalSection>

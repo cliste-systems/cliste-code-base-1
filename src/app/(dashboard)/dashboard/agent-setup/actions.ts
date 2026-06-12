@@ -27,6 +27,9 @@ import {
   VOICE_ASSISTANT_DEFAULT_NAME,
 } from "@/lib/voice-greeting";
 import { validateVoiceGreetingGuardrails } from "@/lib/voice-greeting-guardrails";
+import { captureFieldsFromDetailsText } from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-text";
+import { normalizeBaseTown } from "@/lib/base-town";
+import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 
 import { cleanAgentFaqs, type AgentFaq } from "./agent-faqs";
 
@@ -44,9 +47,11 @@ export type AgentSetupPayload = {
   servicesDepartments: string;
   servicesNotOffered: string;
   detailsToCollect: string;
+  detailsCollectMode?: string;
   businessRules: string[];
   locationAddress: string;
   locationEircode: string;
+  baseTown: string;
 };
 
 type SaveResult = { ok: true } | { ok: false; message: string };
@@ -60,6 +65,7 @@ const MAX_SERVICES_NOT_OFFERED = 2000;
 const MAX_DETAILS_TO_COLLECT = 2000;
 const MAX_LOCATION_ADDRESS = 500;
 const MAX_EIRCODE = 16;
+const MAX_BASE_TOWN = 80;
 
 const CARA_SETUP_PATHS = [
   "/dashboard/cara-setup",
@@ -147,8 +153,10 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   const servicesDepartments = String(payload?.servicesDepartments ?? "").trim();
   const servicesNotOffered = String(payload?.servicesNotOffered ?? "").trim();
   const detailsToCollect = String(payload?.detailsToCollect ?? "").trim();
+  const detailsCollectMode = parseDetailsCollectMode(payload?.detailsCollectMode);
   const businessRules = cleanBusinessRules(payload?.businessRules);
   const locationAddress = String(payload?.locationAddress ?? "").trim();
+  const baseTown = normalizeBaseTown(String(payload?.baseTown ?? ""));
   let locationEircode = String(payload?.locationEircode ?? "").trim();
   const faqs = cleanAgentFaqs(payload?.faqs);
 
@@ -198,6 +206,9 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   if (locationEircode.length > MAX_EIRCODE) {
     return { ok: false, message: "Eircode looks too long." };
   }
+  if (baseTown.length > MAX_BASE_TOWN) {
+    return { ok: false, message: "Based-in town is too long." };
+  }
 
   const update: Record<string, unknown> = {
     assistant_display_name: assistantDisplayName,
@@ -213,9 +224,14 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     agent_services_departments: servicesDepartments || null,
     agent_services_not_offered: servicesNotOffered || null,
     agent_details_to_collect: detailsToCollect || null,
+    agent_details_collect_mode: detailsCollectMode,
+    agent_capture_fields: detailsToCollect
+      ? captureFieldsFromDetailsText(detailsToCollect)
+      : [],
     agent_business_rules: businessRules,
     agent_location_address: locationAddress || null,
     agent_location_eircode: locationEircode || null,
+    agent_base_town: baseTown || null,
     updated_at: new Date().toISOString(),
   };
 

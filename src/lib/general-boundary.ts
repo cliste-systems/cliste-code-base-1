@@ -7,7 +7,6 @@ import { detectCanonicalQuestion } from "@/lib/answers-boundary";
 import { stripBusinessRulesFromSummary } from "@/lib/agent-business-rules";
 import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
 import {
-  DAY_KEYS,
   type WeekSchedule,
   weekScheduleHasOpenDay,
 } from "@/lib/business-hours";
@@ -280,8 +279,4 @@ export function buildHoursPromptBlock(input: {
   }
   parts.push(HOURS_CLOSED_DAY_INSTRUCTION);
   return parts.join("\n\n");
-}
-
-export function weekScheduleAllClosed(schedule: WeekSchedule): boolean {
-  return DAY_KEYS.every((day) => !schedule[day].open);
 }

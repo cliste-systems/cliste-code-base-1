@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { CanonicalQuestionBlocked } from "./canonical-question-blocked";
 
@@ -54,13 +54,14 @@ export function AddQuestionDialog({
   const [answer, setAnswer] = useState("");
   const [canonicalStep, setCanonicalStep] = useState(false);
 
-  useEffect(() => {
-    if (!open) {
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
       setQuestion("");
       setAnswer("");
       setCanonicalStep(false);
     }
-  }, [open]);
+    onOpenChange(next);
+  };
 
   const caps = buildCaraCapabilitiesFromPromptExtras(routes, transferNumber);
   const smsConfigured = caps.sendLink || caps.sendFile;
@@ -93,13 +94,13 @@ export function AddQuestionDialog({
     }
 
     onAdd({ question: q, answer: answer.trim() });
-    onOpenChange(false);
+    handleOpenChange(false);
   }
 
   const showingCanonical = canonicalStep && canonicalMatch;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton
         overlayClassName="bg-black/30 backdrop-blur-sm"

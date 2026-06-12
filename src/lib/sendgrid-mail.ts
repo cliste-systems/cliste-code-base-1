@@ -12,6 +12,8 @@
  * - `SENDGRID_API_KEY` — API key with Mail Send permission
  * - `SENDGRID_FROM_EMAIL` — verified sender (Single Sender or domain auth)
  * - `SENDGRID_FROM_NAME` — optional display name
+ * - `SENDGRID_API_URL` — optional; defaults to global API. Use
+ *   `https://api.eu.sendgrid.com` only with an EU-designated SendGrid subuser.
  */
 
 export function isSendGridConfigured(): boolean {
@@ -66,7 +68,11 @@ export async function sendTransactionalEmail(
       : []),
   ];
 
-  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+  const apiBase =
+    process.env.SENDGRID_API_URL?.trim().replace(/\/$/, "") ||
+    "https://api.sendgrid.com";
+
+  const res = await fetch(`${apiBase}/v3/mail/send`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,

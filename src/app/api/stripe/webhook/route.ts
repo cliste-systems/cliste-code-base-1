@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 
-import { ONBOARDING_STEPS } from "@/lib/onboarding-session";
-import { provisionOrganizationPhoneNumber } from "@/lib/phone-pool";
+import {
+  activatePlatformSubscriptionGoLive,
+  assertWebhookPlatformCheckoutSessionComplete,
+} from "@/lib/platform-billing-checkout";
+import {
+  patchAccountAndLocations,
+  resolveAccountIdFromBillingMetadata,
+} from "@/lib/account-billing";
+import { captureObservedError } from "@/lib/observability";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -37,9 +44,12 @@ export async function POST(req: NextRequest) {
       return new NextResponse("invalid signature", { status: 400 });
     }
   } else {
-    if (process.env.CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS !== "1") {
+    const allowUnsignedDevOnly =
+      process.env.NODE_ENV !== "production" &&
+      process.env.CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS === "1";
+    if (!allowUnsignedDevOnly) {
       console.error(
-        "[stripe webhook] STRIPE_WEBHOOK_SECRET not set — rejecting. Set CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS=1 for local fixture testing only.",
+        "[stripe webhook] STRIPE_WEBHOOK_SECRET not set — rejecting. Set CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS=1 for local fixture testing only (non-production).",
       );
       return new NextResponse("webhook secret not configured", { status: 500 });
     }
@@ -52,13 +62,32 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
+  const { data: dedupeRow, error: dedupeErr } = await admin
+    .from("stripe_webhook_events")
+    .insert({ event_id: event.id, event_type: event.type })
+    .select("event_id")
+    .maybeSingle();
+  if (dedupeErr) {
+    if (dedupeErr.code === "23505") {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    await captureObservedError(dedupeErr, {
+      route: "stripe/webhook",
+      eventId: event.id,
+    });
+    return new NextResponse("dedupe error", { status: 500 });
+  }
+  if (!dedupeRow) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode === "subscription") {
-          await handlePlatformCheckoutCompleted(admin, session);
+          await handlePlatformCheckoutCompleted(session);
         }
         break;
       }
@@ -77,7 +106,11 @@ export async function POST(req: NextRequest) {
         break;
     }
   } catch (err) {
-    console.error("[stripe webhook] handler error", event.type, err);
+    await captureObservedError(err, {
+      route: "stripe/webhook",
+      eventType: event.type,
+      eventId: event.id,
+    });
     return new NextResponse("handler error", { status: 500 });
   }
 
@@ -91,12 +124,17 @@ export async function GET() {
 type AdminClient = ReturnType<typeof createAdminClient>;
 
 async function handlePlatformCheckoutCompleted(
-  admin: AdminClient,
   session: Stripe.Checkout.Session,
 ) {
+  assertWebhookPlatformCheckoutSessionComplete(session);
+
   const orgId =
     (session.metadata?.cliste_organization_id ?? "").trim() || null;
-  if (!orgId) return;
+  const accountId = await resolveAccountIdFromBillingMetadata({
+    accountId: session.metadata?.cliste_account_id,
+    organizationId: orgId,
+  });
+  if (!accountId || !orgId) return;
   const subscriptionId =
     typeof session.subscription === "string"
       ? session.subscription
@@ -106,31 +144,24 @@ async function handlePlatformCheckoutCompleted(
       ? session.customer
       : (session.customer?.id ?? null);
 
-  // Payment is the final go-live step now: activate the org on successful checkout.
-  await admin
-    .from("organizations")
-    .update({
+  await patchAccountAndLocations(
+    accountId,
+    {
       platform_subscription_id: subscriptionId,
       platform_customer_id: customerId,
-      status: "active",
-      is_active: true,
-      onboarding_step: ONBOARDING_STEPS.done,
-      launch_status: "completed",
       updated_at: new Date().toISOString(),
-    })
-    .eq("id", orgId);
+    },
+    { primaryOrganizationId: orgId },
+  );
 
   try {
-    const phoneResult = await provisionOrganizationPhoneNumber(orgId);
-    if (!phoneResult.ok) {
-      console.warn(
-        "[stripe webhook] phone provision failed",
-        orgId,
-        phoneResult.message,
-      );
-    }
+    await activatePlatformSubscriptionGoLive(orgId);
   } catch (err) {
-    console.error("[stripe webhook] phone provision error", orgId, err);
+    await captureObservedError(err, {
+      route: "stripe/webhook",
+      sideEffect: "platform_go_live",
+      orgId,
+    });
   }
 }
 
@@ -139,7 +170,11 @@ async function handlePlatformSubscriptionChange(
   sub: Stripe.Subscription,
 ) {
   const orgId = (sub.metadata?.cliste_organization_id ?? "").trim() || null;
-  if (!orgId) return;
+  const accountId = await resolveAccountIdFromBillingMetadata({
+    accountId: sub.metadata?.cliste_account_id,
+    organizationId: orgId,
+  });
+  if (!accountId) return;
 
   const isHealthy =
     sub.status === "active" ||
@@ -150,12 +185,12 @@ async function handlePlatformSubscriptionChange(
     sub.status === "incomplete_expired" ||
     sub.status === "canceled";
 
-  const { data: org } = await admin
-    .from("organizations")
+  const { data: account } = await admin
+    .from("accounts")
     .select("status")
-    .eq("id", orgId)
+    .eq("id", accountId)
     .maybeSingle();
-  const currentStatus = (org?.status as string | undefined) ?? "active";
+  const currentStatus = (account?.status as string | undefined) ?? "active";
 
   const patch: Record<string, unknown> = {
     platform_subscription_id: sub.id,
@@ -166,17 +201,26 @@ async function handlePlatformSubscriptionChange(
 
   if (shouldSuspend && currentStatus === "active") {
     patch.status = "suspended";
-    patch.is_active = false;
     patch.suspended_reason = `stripe_subscription_${sub.status}`;
     patch.suspended_at = new Date().toISOString();
   } else if (isHealthy && currentStatus === "suspended") {
     patch.status = "active";
-    patch.is_active = true;
     patch.suspended_reason = null;
     patch.suspended_at = null;
   }
 
-  await admin.from("organizations").update(patch).eq("id", orgId);
+  await patchAccountAndLocations(accountId, patch);
+  if (shouldSuspend && currentStatus === "active") {
+    await admin
+      .from("organizations")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("account_id", accountId);
+  } else if (isHealthy && currentStatus === "suspended") {
+    await admin
+      .from("organizations")
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq("account_id", accountId);
+  }
 }
 
 async function handlePlatformSubscriptionDeleted(
@@ -184,15 +228,22 @@ async function handlePlatformSubscriptionDeleted(
   sub: Stripe.Subscription,
 ) {
   const orgId = (sub.metadata?.cliste_organization_id ?? "").trim() || null;
-  if (!orgId) return;
+  const accountId = await resolveAccountIdFromBillingMetadata({
+    accountId: sub.metadata?.cliste_account_id,
+    organizationId: orgId,
+  });
+  if (!accountId) return;
+  await patchAccountAndLocations(accountId, {
+    status: "churned",
+    suspended_reason: "platform_subscription_cancelled",
+    suspended_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
   await admin
     .from("organizations")
     .update({
-      status: "churned",
       is_active: false,
-      suspended_reason: "platform_subscription_cancelled",
-      suspended_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", orgId);
+    .eq("account_id", accountId);
 }

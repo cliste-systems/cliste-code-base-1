@@ -1,18 +1,3 @@
-import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
-
-export function extractAreaHintFromAbout(about: string): string {
-  const basedIn = about.match(/\bbased in ([^.,\n]+)/i);
-  if (basedIn?.[1]) return basedIn[1].trim();
-
-  const cover = about.match(/\bcover(?:s|ing)?\s+([^.,\n]+)/i);
-  if (cover?.[1]) return cover[1].trim();
-
-  const inMatch = about.match(/\bin ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/);
-  if (inMatch?.[1]) return inMatch[1].trim();
-
-  return "";
-}
-
 export type FaqSuggestionContext = {
   businessType: string;
   niche: string;
@@ -71,20 +56,3 @@ export function deterministicFaqSuggestions(
   }).slice(0, 5);
 }
 
-export function mergeFaqSuggestions(
-  existing: AgentFaq[],
-  suggestions: string[],
-): AgentFaq[] {
-  const used = new Set(
-    existing.map((faq) => faq.question.trim().toLowerCase()),
-  );
-  const additions: AgentFaq[] = [];
-  for (const question of suggestions) {
-    const key = question.toLowerCase();
-    if (used.has(key)) continue;
-    used.add(key);
-    additions.push({ question, answer: "" });
-    if (additions.length >= 5) break;
-  }
-  return [...existing, ...additions];
-}

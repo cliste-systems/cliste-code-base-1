@@ -76,17 +76,17 @@ const PLAN_BACKGROUND: BackgroundAssets = {
   fallback: PUBLIC_ASSETS.onboarding.heroPlan.jpg,
 };
 
-const ACTIONS_ONWARD_INDEX = ONBOARDING_STEP_PATHS.indexOf("/onboarding/actions");
+const NUMBER_ONWARD_INDEX = ONBOARDING_STEP_PATHS.indexOf("/onboarding/number");
 const PLAN_INDEX = ONBOARDING_STEP_PATHS.indexOf("/onboarding/plan");
 
-function usesActionsOnwardBackground(pathname: string): boolean {
+function usesNumberOnwardBackground(pathname: string): boolean {
   const base = pathname.split("?")[0]?.replace(/\/$/, "") ?? "";
   if (base === "/onboarding/payments") return true;
 
   const normalized = normalizeOnboardingPath(pathname);
   if (!normalized) return false;
   const idx = ONBOARDING_STEP_PATHS.indexOf(normalized);
-  return idx >= ACTIONS_ONWARD_INDEX && idx >= 0 && idx < PLAN_INDEX;
+  return idx >= NUMBER_ONWARD_INDEX && idx >= 0 && idx < PLAN_INDEX;
 }
 
 function heroBackgroundConfig(
@@ -126,7 +126,7 @@ function backgroundForPath(pathname: string): BackgroundConfig {
     return heroBackgroundConfig(PLAN_BACKGROUND, "50% 45%");
   }
 
-  if (usesActionsOnwardBackground(pathname)) {
+  if (usesNumberOnwardBackground(pathname)) {
     return heroBackgroundConfig(ACTIONS_ONWARD_BACKGROUND, "50% 45%");
   }
 
@@ -206,7 +206,6 @@ export function HeroPhotoEnter({
   const [phase, setPhase] = useState<"hidden" | "enter">("hidden");
 
   useEffect(() => {
-    setPhase("hidden");
     if (!animateIn) return;
     const id = requestAnimationFrame(() => setPhase("enter"));
     return () => cancelAnimationFrame(id);
@@ -214,7 +213,7 @@ export function HeroPhotoEnter({
 
   return (
     <motion.img
-      key={resetKey}
+      key={`${resetKey}-${animateIn ? "in" : "out"}`}
       src={src}
       alt=""
       aria-hidden

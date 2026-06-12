@@ -25,6 +25,11 @@ export default function LegalDataRequestsPage() {
           </p>
           <ul className="list-disc space-y-2 pl-5 text-[13px] leading-relaxed text-slate-600">
             <li>
+              <strong className="font-medium text-[#0b1220]">Export all records</strong>{" "}
+              — Article 20 portability bundle (JSON or CSV) for every customer record
+              in your account.
+            </li>
+            <li>
               <strong className="font-medium text-[#0b1220]">Export</strong> —
               every appointment, call log (including transcripts and AI summaries
               where still retained), and action-inbox ticket for that phone number
@@ -46,6 +51,24 @@ export default function LegalDataRequestsPage() {
               . You remain the data controller; we act as processor.
             </li>
           </ul>
+
+          <h3 className="pt-2 text-[14px] font-semibold tracking-tight text-[#0b1220]">
+            Call transcription &amp; personal details
+          </h3>
+          <ul className="list-disc space-y-2 pl-5 text-[13px] leading-relaxed text-slate-600">
+            <li>
+              Do not configure Cara to <strong>ask</strong> for medical history,
+              pregnancy, allergies, PPS, or bank details — calls are transcribed.
+            </li>
+            <li>
+              If a caller <strong>volunteers</strong> sensitive information, use{" "}
+              <strong>Erase</strong> above when they ask for deletion.
+            </li>
+            <li>
+              Mention AI answering and transcription in your own website privacy
+              notice (see snippet on the right).
+            </li>
+          </ul>
         </div>
 
         <div className="space-y-3 border-t border-slate-100 px-5 py-5 lg:border-t-0">
@@ -59,9 +82,9 @@ export default function LegalDataRequestsPage() {
           <blockquote className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[12px] leading-relaxed text-slate-700">
             When you call [Business name], your call may be answered by our AI
             phone assistant provided by Cliste Systems. Calls may be recorded and
-            transcribed to handle your request. We use Cliste to process this data
-            on our behalf. For privacy requests, contact us directly or email
-            privacy@clistesystems.ie.
+            transcribed to handle your request; audio is not kept after the call.
+            We use Cliste to process this data on our behalf. For privacy requests,
+            contact us directly or email privacy@clistesystems.ie.
           </blockquote>
           <p className="text-[12px] text-slate-500">
             Full legal documents are in the tabs above. Need help?{" "}

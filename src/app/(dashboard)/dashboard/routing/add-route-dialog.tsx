@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Bot } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { DashboardSelect } from "@/components/dashboard/dashboard-select";
@@ -23,7 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { BusinessFileListItem } from "@/lib/business-files";
 import { onboardingPageVariants } from "@/components/onboarding/onboarding-motion";
-import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
+import type { DashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 import { cn } from "@/lib/utils";
 
 import {
@@ -56,13 +57,12 @@ import type { RouteLintWarning } from "./routing-validation";
 
 const HINT_STORAGE_KEY = "cliste.routing.routeAiHintDismissed";
 
-function triggerPresetsForNiche(niche: string): {
+function triggerPresetsFromCopy(copy: DashboardVerticalCopy): {
   id: string;
   label: string;
   name: string;
   actionType: RouteActionType;
 }[] {
-  const copy = dashboardVerticalCopy(niche);
   return [
     {
       id: "book",
@@ -70,18 +70,28 @@ function triggerPresetsForNiche(niche: string): {
       name: copy.routing.bookPresetName,
       actionType: "send_link",
     },
-    { id: "menu", label: "View menu", name: "View the menu", actionType: "send_file" },
-    { id: "quote", label: "Get a quote", name: "Get a quote", actionType: "take_message" },
+    {
+      id: "menu",
+      label: copy.routing.menuPresetLabel,
+      name: copy.routing.menuPresetName,
+      actionType: "send_file",
+    },
+    {
+      id: "quote",
+      label: copy.routing.quotePresetLabel,
+      name: copy.routing.quotePresetName,
+      actionType: "take_message",
+    },
     {
       id: "directions",
-      label: "Get directions",
-      name: "Where are you based",
+      label: copy.routing.directionsPresetLabel,
+      name: copy.routing.directionsPresetName,
       actionType: "directions",
     },
     {
       id: "speak",
-      label: "Speak to someone",
-      name: "Speak to someone",
+      label: copy.routing.speakPresetLabel,
+      name: copy.routing.speakPresetName,
       actionType: "transfer",
     },
   ];
@@ -160,35 +170,35 @@ export function AddRouteDialog({
   const descId = useId();
   const rulesId = useId();
   const reduceMotion = useReducedMotion();
-  const verticalCopy = useMemo(
-    () => dashboardVerticalCopy(setupContext.niche),
-    [setupContext.niche],
-  );
+  const { copy: verticalCopy } = useDashboardVertical();
   const triggerPresets = useMemo(
-    () => triggerPresetsForNiche(setupContext.niche),
-    [setupContext.niche],
+    () => triggerPresetsFromCopy(verticalCopy),
+    [verticalCopy],
   );
 
-  const [stage, setStage] = useState<Stage>("flow");
-  const [triggerId, setTriggerId] = useState("");
-
-  useEffect(() => {
-    if (!open) {
-      setStage("flow");
-      setTriggerId("");
-      return;
-    }
-    if (isNew) {
-      setStage("flow");
-      setTriggerId("");
-      return;
-    }
-    setStage("details");
+  const [stage, setStage] = useState<Stage>(() => (isNew ? "flow" : "details"));
+  const [triggerId, setTriggerId] = useState(() => {
+    if (isNew) return "";
     const match = triggerPresets.find((p) => p.name === route?.name.trim());
-    setTriggerId(match?.id ?? "");
-    // Only reset when the dialog opens — not when route fields update mid-flow.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- route?.name intentionally omitted
-  }, [open, isNew, route?.id, triggerPresets]);
+    return match?.id ?? "";
+  });
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      if (isNew) {
+        setStage("flow");
+        setTriggerId("");
+      } else {
+        setStage("details");
+        const match = triggerPresets.find((p) => p.name === route?.name.trim());
+        setTriggerId(match?.id ?? "");
+      }
+    } else {
+      setStage("flow");
+      setTriggerId("");
+    }
+    onOpenChange(next);
+  };
 
   const caraPov = useMemo(
     () =>
@@ -273,8 +283,9 @@ export function AddRouteDialog({
       };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        key={`${isNew}-${route.id}`}
         showCloseButton
         overlayClassName="bg-black/30 backdrop-blur-sm"
         className="gap-0 overflow-hidden border border-slate-200 bg-white p-0 sm:max-w-lg"

@@ -44,36 +44,6 @@ export function formatBusinessLocation(
   return eircode?.trim() ?? "";
 }
 
-function callerTopicsForBusinessType(businessType: string): string[] {
-  const type = businessType.toLowerCase();
-
-  if (type.includes("plumb") || type.includes("heating")) {
-    return [
-      "leaks",
-      "heating issues",
-      "emergency callouts",
-      "repairs",
-      "pricing",
-      "availability",
-      "areas covered",
-    ];
-  }
-
-  return [
-    "services offered",
-    "pricing",
-    "availability",
-    "opening hours",
-    "areas covered",
-    "urgent requests",
-  ];
-}
-
-function joinTopics(topics: string[]): string {
-  if (topics.length <= 1) return topics[0] ?? "";
-  return `${topics.slice(0, -1).join(", ")}, and ${topics[topics.length - 1]}`;
-}
-
 /** How the business is described in the step-1 opener (company, not sole-trader trade label). */
 export function describeBusinessKind(businessType: string): string {
   const raw = businessType.trim();
@@ -117,21 +87,4 @@ export function buildBusinessOpener(input: CaraStarterNotesInput): string {
     return `${businessName} is a ${businessKind} based in ${location}.`;
   }
   return `${businessName} is a ${businessKind}.`;
-}
-
-/** Step 1 draft — about the business (who / where / what), not Cara's call script. */
-export function buildStarterCaraNotes(input: CaraStarterNotesInput): string {
-  const businessType = input.businessType?.trim() || "local";
-  const opener = buildBusinessOpener(input);
-  const serviceArea = input.serviceArea?.trim();
-
-  const topicLine = `Callers often ask about ${joinTopics(callerTopicsForBusinessType(businessType))}.`;
-
-  const areaLine = serviceArea ? `The business covers ${serviceArea}.` : "";
-
-  return [opener, topicLine, areaLine]
-    .filter(Boolean)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
 }

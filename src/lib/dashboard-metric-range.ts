@@ -1,4 +1,4 @@
-import { addDays, startOfDay, subDays } from "date-fns";
+import { startOfDay, subDays } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 export type DashboardMetricRangeKey = "today" | "7d" | "4w";
@@ -40,16 +40,6 @@ export function getDashboardMetricRangeUpperExclusiveIso(
   _now: Date = new Date(),
 ): string | null {
   return null;
-}
-
-/** Start of tomorrow in Dublin (UTC ISO), for `lt created_at` “end of calendar today”. */
-export function getDublinCalendarDayEndExclusiveIso(
-  now: Date = new Date(),
-): string {
-  const zonedNow = toZonedTime(now, DUBLIN);
-  const startTodayZoned = startOfDay(zonedNow);
-  const startTomorrowZoned = addDays(startTodayZoned, 1);
-  return fromZonedTime(startTomorrowZoned, DUBLIN).toISOString();
 }
 
 export function dashboardMetricRangePeriodPhrase(

@@ -8,6 +8,10 @@ import { cn } from "@/lib/utils";
 export type OnboardingSelectOption<T extends string> = {
   value: T;
   label: string;
+  /** Shown under the label in rich option rows. */
+  description?: string;
+  /** Example chips — helps differentiate similar-looking labels. */
+  examples?: readonly string[];
 };
 
 type OnboardingSelectProps<T extends string> = {
@@ -33,6 +37,9 @@ export function OnboardingSelect<T extends string>({
   const rootRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const selected = options.find((option) => option.value === value);
+  const richOptions = options.some(
+    (option) => option.description || (option.examples?.length ?? 0) > 0,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -103,10 +110,73 @@ export function OnboardingSelect<T extends string>({
             role="listbox"
             aria-labelledby={id}
             aria-hidden={!open}
-            className="border-t border-slate-100 pt-1.5"
+            className={cn(
+              "border-t border-slate-100 pt-2",
+              richOptions && "space-y-2",
+            )}
           >
             {options.map((option) => {
               const isSelected = option.value === value;
+              const isRich =
+                richOptions &&
+                (option.description || (option.examples?.length ?? 0) > 0);
+
+              if (isRich) {
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      onValueChange(option.value);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full cursor-pointer flex-col items-start gap-1.5 rounded-xl border px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow]",
+                      isSelected
+                        ? "border-[#0b1220]/25 bg-[#0b1220]/[0.04] shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-[#0b1220]/10"
+                        : "border-slate-200/80 bg-slate-50/70 hover:border-slate-300 hover:bg-white",
+                    )}
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className="text-[15px] font-semibold text-[#0b1220]">
+                        {option.label}
+                      </span>
+                      <Check
+                        className={cn(
+                          "size-4 shrink-0 text-[#0b1220]/50 transition-opacity",
+                          isSelected ? "opacity-100" : "opacity-0",
+                        )}
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    </span>
+                    {option.description ? (
+                      <span className="text-[12px] leading-snug text-slate-500">
+                        {option.description}
+                      </span>
+                    ) : null}
+                    {option.examples && option.examples.length > 0 ? (
+                      <span className="flex flex-wrap gap-1">
+                        {option.examples.map((example) => (
+                          <span
+                            key={example}
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[11px]",
+                              isSelected
+                                ? "bg-white/80 text-slate-600"
+                                : "bg-white text-slate-500",
+                            )}
+                          >
+                            {example}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              }
 
               return (
                 <button

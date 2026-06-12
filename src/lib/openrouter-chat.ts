@@ -1,6 +1,11 @@
 import "server-only";
 
-const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
+function openRouterChatUrl(): string {
+  const base =
+    process.env.OPENROUTER_API_BASE_URL?.trim().replace(/\/$/, "") ||
+    "https://openrouter.ai/api/v1";
+  return `${base}/chat/completions`;
+}
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -23,7 +28,7 @@ export async function completeOpenRouterChat(input: {
     process.env.CARA_OPENROUTER_MODEL?.trim() ||
     "google/gemini-2.5-flash-lite";
 
-  const response = await fetch(OPENROUTER_CHAT_URL, {
+  const response = await fetch(openRouterChatUrl(), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,

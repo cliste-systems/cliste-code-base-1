@@ -53,12 +53,6 @@ async function resolveAdminAuth(): Promise<ResolveAdminAuth> {
   return { tag: "ok", user };
 }
 
-export const getOptionalAdminSessionUser = cache(async (): Promise<User | null> => {
-  const r = await resolveAdminAuth();
-  if (r.tag === "ok") return r.user;
-  return null;
-});
-
 export const requireAdminSessionUser = cache(async (): Promise<User> => {
   const r = await resolveAdminAuth();
   if (r.tag === "ok") return r.user;

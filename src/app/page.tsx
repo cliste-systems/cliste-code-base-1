@@ -55,6 +55,13 @@ export default function Home() {
             DPA
           </Link>
           {" · "}
+          <Link
+            href="/legal/sub-processors"
+            className="underline-offset-2 hover:underline"
+          >
+            Sub-processors
+          </Link>
+          {" · "}
           <Link href="/legal/cookies" className="underline-offset-2 hover:underline">
             Cookies
           </Link>

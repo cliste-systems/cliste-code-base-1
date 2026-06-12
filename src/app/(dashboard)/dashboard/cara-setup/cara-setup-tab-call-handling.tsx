@@ -8,12 +8,16 @@ import { SectionCard } from "@/components/dashboard/section-card";
 import { MAX_BUSINESS_RULES } from "@/lib/agent-business-rules";
 import { dedupeServiceChips } from "@/lib/services-boundary";
 
+import { useDashboardVertical } from "../dashboard-vertical-context";
+
 import { CallHandlingChipEditor } from "./call-handling-chip-editor";
 import { CaraWhenUnsureCallout } from "./cara-when-unsure-callout";
+import { DetailsToCollectEditor } from "./details-to-collect-editor";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 
 export function CaraSetupTabCallHandling() {
   const form = useCaraSetupForm();
+  const vertical = useDashboardVertical();
 
   return (
     <SectionCard
@@ -59,14 +63,15 @@ export function CaraSetupTabCallHandling() {
         <Field
           label="Details to collect from callers"
           htmlFor="cara-details-to-collect"
-          hint="Type a detail, then comma — or press Enter or Add. Name and phone number are always collected."
+          hint="Type a detail, then comma — or press Enter or Add. Name and phone are always collected."
         >
-          <CallHandlingChipEditor
-            kind="detail"
+          <DetailsToCollectEditor
             inputId="cara-details-to-collect"
-            value={form.detailsToCollectItems}
-            onChange={form.setDetailsToCollectItems}
-            placeholder="e.g. Service they want, preferred day, best time to call back"
+            items={form.detailsToCollectItems}
+            onItemsChange={form.setDetailsToCollectItems}
+            mode={form.detailsCollectMode}
+            onModeChange={form.setDetailsCollectMode}
+            placeholder={vertical.copy.caraSetup.detailsToCollectPlaceholder}
             maxItems={12}
             routes={form.promptExtras.routes}
             transferNumber={form.promptExtras.transferNumber}

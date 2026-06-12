@@ -211,9 +211,23 @@ export function CaraSetupTabGeneral() {
         flat
         icon={MapPin}
         title="Service area"
-        description="Counties you cover — add town exclusions below for places you don't serve."
+        description="Where you're based and the counties you cover — add town exclusions for places you don't serve."
       >
         <div className="space-y-5">
+          <Field
+            label="Based in"
+            htmlFor="cara-base-town"
+            hint="The town your business is based in — Cara uses this for coverage and distance answers."
+          >
+            <Input
+              id="cara-base-town"
+              value={form.baseTown}
+              placeholder="e.g. Letterkenny"
+              onChange={(e) => form.setBaseTown(e.target.value)}
+              className={DASHBOARD_INPUT_CLASS}
+              autoComplete="address-level2"
+            />
+          </Field>
           <Field
             label="Counties covered"
             htmlFor="cara-service-area-counties"

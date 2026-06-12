@@ -8,6 +8,9 @@ import {
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
+import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
 import { recordLegalAcceptances } from "@/lib/legal-acceptances";
 import { scoreSignupFraud, shouldRouteToReview } from "@/lib/signup-security";
@@ -57,11 +60,12 @@ async function uniqueSlug(
   return `${seed}-${Date.now().toString(36)}`;
 }
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
 /**
- * Self-serve signup. Creates an auth user (with email already confirmed — the
- * real fraud gate is Stripe KYC later in the wizard, not email verification),
- * an organisation in `status='onboarding'`, and a profile linking them. The
- * caller is then signed in and redirected into the onboarding wizard.
+ * Self-serve signup. Creates an auth user, organisation (`status='onboarding'`),
+ * and profile. Production requires Turnstile + email confirmation before onboarding;
+ * dev auto-confirms and signs in for local iteration.
  *
  * Rate-limited by IP via the existing auth rate limiter so signup abuse
  * reuses the same throttle surface as login.
@@ -105,8 +109,32 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   const h = await headers();
   const securityCtx = buildSecurityEventContext(h);
+  if (IS_PRODUCTION && !process.env.TURNSTILE_SECRET_KEY?.trim()) {
+    console.error("[signup] TURNSTILE_SECRET_KEY is required in production");
+    return {
+      ok: false,
+      message: "Signup is temporarily unavailable. Please try again later.",
+    };
+  }
+  if (IS_PRODUCTION && !isSendGridConfigured()) {
+    console.error("[signup] SendGrid is required in production for confirmation email");
+    return {
+      ok: false,
+      message: "Signup is temporarily unavailable. Please try again later.",
+    };
+  }
+  const turnstileEnabled =
+    IS_PRODUCTION || Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
+  if (turnstileEnabled) {
+    const turnstileToken = String(formData.get("turnstileToken") ?? "").trim();
+    const ts = await verifyTurnstileToken(turnstileToken || null);
+    if (!ts.ok) {
+      return { ok: false, message: ts.message };
+    }
+  }
+
   const ipFp = rateLimitFingerprint(h, "signup-ip");
-  const ipStatus = getRateLimitStatus("authenticate", ipFp);
+  const ipStatus = await getRateLimitStatus("authenticate", ipFp);
   if (!ipStatus.allowed) {
     return {
       ok: false,
@@ -136,7 +164,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: !IS_PRODUCTION,
     user_metadata: {
       full_name: ownerName,
       first_name: firstName,
@@ -151,14 +179,14 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   if (authError || !authData.user?.id) {
     const raw = authError?.message?.toLowerCase() ?? "";
     if (raw.includes("already") || raw.includes("duplicate") || raw.includes("exists")) {
-      recordRateLimitFailure("authenticate", ipFp);
+      await recordRateLimitFailure("authenticate", ipFp);
       return {
         ok: false,
         message:
           "An account with this email already exists. Log in instead, or use a different email.",
       };
     }
-    recordRateLimitFailure("authenticate", ipFp);
+    await recordRateLimitFailure("authenticate", ipFp);
     return {
       ok: false,
       message: authError?.message ?? "Could not create account.",
@@ -167,9 +195,38 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   const userId = authData.user.id;
 
+  const accountPayload = {
+    name: salonName,
+    slug,
+    status: "onboarding" as const,
+    launch_status: "not_started" as const,
+    billing_period_start: new Date().toISOString().slice(0, 10),
+    signup_ip: signupIp,
+    signup_user_agent: ua ?? null,
+    ...(planTier ? { plan_tier: planTier, billing_interval: billingInterval } : {}),
+  };
+
+  const { data: accountRow, error: accountErr } = await admin
+    .from("accounts")
+    .insert(accountPayload)
+    .select("id")
+    .single();
+
+  if (accountErr || !accountRow?.id) {
+    await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+    await recordRateLimitFailure("authenticate", ipFp);
+    return {
+      ok: false,
+      message: accountErr?.message ?? "Could not create account.",
+    };
+  }
+  const accountId = accountRow.id;
+
   const { data: orgRow, error: orgErr } = await admin
     .from("organizations")
     .insert({
+      account_id: accountId,
+      is_primary_location: true,
       name: salonName,
       slug,
       tier: "native",
@@ -188,7 +245,8 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   if (orgErr || !orgRow?.id) {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
-    recordRateLimitFailure("authenticate", ipFp);
+    await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
+    await recordRateLimitFailure("authenticate", ipFp);
     return {
       ok: false,
       message: orgErr?.message ?? "Could not create organisation.",
@@ -198,18 +256,27 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   const { error: profileErr } = await admin.from("profiles").insert({
     id: userId,
+    account_id: accountId,
     organization_id: orgId,
+    active_organization_id: orgId,
     role: "admin",
     name: ownerName,
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(userId).catch(() => undefined);
     await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
+    await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
     return {
       ok: false,
       message: `Profile not created: ${profileErr.message}`,
     };
   }
+
+  await admin.from("account_memberships").insert({
+    user_id: userId,
+    account_id: accountId,
+    role: "admin",
+  });
 
   const willReview = shouldRouteToReview(fraud.score);
   await admin
@@ -253,18 +320,53 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     },
   });
 
-  // Auto sign-in via user-scoped client so the wizard sees the session.
+  if (IS_PRODUCTION) {
+    const origin =
+      resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+    const { data: linkData, error: linkError } =
+      await admin.auth.admin.generateLink({
+        type: "signup",
+        email,
+        password,
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+        },
+      });
+    const actionLink = linkData?.properties?.action_link?.trim();
+    if (linkError || !actionLink) {
+      await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+      await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
+      await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
+      return {
+        ok: false,
+        message: linkError?.message ?? "Could not send confirmation email.",
+      };
+    }
+    const sent = await sendTransactionalEmail({
+      to: email,
+      subject: "Confirm your Cliste account",
+      text: `Thanks for signing up for Cliste.\n\nConfirm your email to continue setup:\n${actionLink}\n\nIf you did not create this account, you can ignore this email.`,
+      html: `<p>Thanks for signing up for Cliste.</p><p><a href="${actionLink}">Confirm your email</a> to continue setting up Cara.</p><p>If you did not create this account, you can ignore this email.</p>`,
+    });
+    if (!sent.ok) {
+      await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+      await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
+      await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
+      return { ok: false, message: sent.message };
+    }
+    redirect(`/signup/check-email?email=${encodeURIComponent(email)}`);
+  }
+
+  // Dev: auto sign-in so the wizard sees the session immediately.
   const userClient = await createClient();
   const { error: signInErr } = await userClient.auth.signInWithPassword({
     email,
     password,
   });
   if (signInErr) {
-    // They can still log in manually; don't fail the whole signup.
     console.warn("[signup] post-signup auto sign-in failed", signInErr.message);
   }
 
-  // Swallow unused import — `cookies` is indirectly consumed by createClient().
   void cookies;
 
   redirect("/onboarding");

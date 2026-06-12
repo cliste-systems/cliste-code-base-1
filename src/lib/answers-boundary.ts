@@ -6,6 +6,8 @@ import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faq
 import {
   buildCaraCapabilitiesFromPromptExtras,
   detectCapabilityWarnings,
+  matchesSensitiveDataCollection,
+  SENSITIVE_DATA_BLOCK_MESSAGE,
 } from "@/lib/call-handling-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import { findNearDuplicateChip } from "@/lib/cara-setup-chips";
@@ -13,8 +15,6 @@ import {
   businessFileKindLabel,
   type BusinessFileListItem,
 } from "@/lib/business-files";
-import { splitExtractedLines } from "@/lib/business-file-prompt";
-
 export const FAQ_ANSWER_WORD_WARNING_THRESHOLD = 70;
 
 export const FAQ_MATCHING_INSTRUCTION =
@@ -281,29 +281,19 @@ export function lintFaqFields(input: {
         href: "/dashboard/routing",
       });
     }
+
+    if (matchesSensitiveDataCollection(faq.answer)) {
+      warnings.push({
+        id: `sensitive-${input.index}`,
+        index: input.index,
+        field: "answer",
+        kind: "capability",
+        message: SENSITIVE_DATA_BLOCK_MESSAGE,
+        href: "/dashboard/cara-setup/call-handling",
+      });
+    }
   }
 
-  return warnings;
-}
-
-export function lintAllFaqs(input: {
-  faqs: AgentFaq[];
-  routes?: RoutingActionSummary[];
-  transferNumber?: string;
-  forcedCanonicalIndexes?: Set<number>;
-}): FaqFieldWarning[] {
-  const warnings: FaqFieldWarning[] = [];
-  for (let i = 0; i < input.faqs.length; i++) {
-    warnings.push(
-      ...lintFaqFields({
-        faqs: input.faqs,
-        index: i,
-        routes: input.routes,
-        transferNumber: input.transferNumber,
-        forcedCanonical: input.forcedCanonicalIndexes?.has(i),
-      }),
-    );
-  }
   return warnings;
 }
 
@@ -388,11 +378,6 @@ export function faqsForPrompt(faqs: AgentFaq[]): AgentFaq[] {
   return faqs.filter((f) => f.question.trim() && f.answer.trim());
 }
 
-export function fileIsActiveOnCalls(file: BusinessFileListItem): boolean {
-  if (!file.extractedText?.trim()) return false;
-  return file.answerEnabled || file.sendEnabled;
-}
-
 export function fileReadinessLabel(file: BusinessFileListItem): string {
   if (!file.extractedText?.trim()) return "Couldn't read";
   if (file.answerEnabled || file.sendEnabled) return "Active";
@@ -401,8 +386,4 @@ export function fileReadinessLabel(file: BusinessFileListItem): string {
 
 export function fileCouldNotReadMessage(): string {
   return "Cara couldn't read anything from this file — it may be a scanned image. Try a text-based PDF, CSV, or TXT.";
-}
-
-export function summarizeFileRows(text: string): number {
-  return splitExtractedLines(text).length;
 }

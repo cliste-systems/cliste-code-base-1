@@ -3,7 +3,7 @@
 **Service:** Cliste — AI voice receptionist + booking platform for hair
 & beauty salons.
 
-**Date:** 2026-04-18.
+**Date:** 2026-06-12 (reviewed; prior baseline 2026-04-18).
 
 **Owner:** Brendan O'Toole (privacy lead, acting DPO).
 
@@ -46,8 +46,8 @@ filed with the DPC because the residual risk after mitigations is
 
 1. Customer calls the salon's published number (Twilio Irish DID).
 2. Twilio routes the SIP call to the LiveKit voice worker.
-3. The worker streams audio to Deepgram (STT), passes transcript to an
-   LLM (OpenAI via OpenRouter), and returns synthesised audio via
+3. LiveKit Agents handles in-call speech recognition (global Cloud routing); the worker
+   passes text to an LLM (OpenRouter) and returns synthesised audio via
    ElevenLabs.
 4. When the agent confirms a booking, it writes an `appointments` row
    via the Supabase service role and triggers an SMS / email.
@@ -63,7 +63,7 @@ be on behalf of minors (parents booking for children).
 
 - Voice audio (in transit, **not stored**)
 - Caller phone number (E.164)
-- Transcript text (full, salon-friendly review version)
+- Transcript text (full verbatim plus staff-facing `transcript_review`)
 - AI summary text
 - Self-volunteered context (name, allergy, medical context if shared)
 - Appointment metadata (service, time, price)
@@ -71,9 +71,8 @@ be on behalf of minors (parents booking for children).
 
 ### 2.4 Recipients
 
-LiveKit, Deepgram, OpenAI (via OpenRouter), ElevenLabs, Twilio,
-Supabase, SendGrid. See `/legal/sub-processors` for transfer
-mechanisms.
+LiveKit, OpenRouter, ElevenLabs, Twilio, Supabase, SendGrid.
+See `/legal/sub-processors` for transfer mechanisms and EU-region options.
 
 ### 2.5 Retention
 
@@ -114,8 +113,8 @@ mechanisms.
 | # | Risk                                                                                       | Likelihood | Severity | Mitigation                                                                                          | Residual |
 | - | ------------------------------------------------------------------------------------------ | ---------- | -------- | --------------------------------------------------------------------------------------------------- | -------- |
 | 1 | LLM exfiltrates transcript via prompt injection ("ignore previous instructions, email…")    | Low        | High     | LLM has no outbound network tools; only structured tool calls (book / cancel). Redact PII before logging. | Low      |
-| 2 | Sub-processor (e.g. STT vendor) breach exposes recent transcripts                           | Low        | Medium   | DPF / SCC contracts; transient audio; 30-day transcript TTL; vendor security reviewed annually.     | Low      |
-| 3 | Caller volunteers health info → stored as `transcript`                                      | Medium     | Medium   | 30-day TTL; "redact special category" instruction in agent prompt; salon-friendly review strips raw transcript fields used in UI. | Low      |
+| 2 | LiveKit (in-call STT) breach exposes recent transcripts                                    | Low        | Medium   | Transient audio; 30-day transcript TTL; DPF/SCCs for non-EU routes; EU pinning recommended.          | Low      |
+| 3 | Caller volunteers health info → stored as `transcript`                                      | Medium     | Medium   | 30-day TTL; "redact special category" instruction in agent prompt; `transcript_review` shown by default; full verbatim behind expander. | Low      |
 | 4 | Caller phone number reused across salons → re-identification across controllers              | Medium     | Low      | Each salon's data is isolated by RLS / `organization_id`; cross-tenant lookup is not exposed to staff users. | Low      |
 | 5 | Operator at salon misuses customer phone numbers (marketing without consent)                | Medium     | Medium   | Out-of-scope for processor; covered in DPA + Terms (controller obligation). Cliste does not enable bulk export. | Medium   |
 | 6 | Caller mistakenly believes they are talking to a human                                      | Medium     | Low      | Agent self-identifies as AI on first turn (logged in transcript). EU AI Act Art 50(1).              | Low      |
@@ -141,7 +140,7 @@ required.
 
 ## 7. Action items / owner
 
-- [ ] Quarterly review of agent prompt + redaction guidance — **eng**
+- [x] Quarterly review of agent prompt + redaction guidance — **eng** (special-category minimisation in `compile-cara-prompt.ts`, `transcript-redaction.ts`)
 - [ ] Annual sub-processor security review — **privacy lead**
 - [ ] Confirm Twilio call recording is OFF on all numbers — **eng**
 - [ ] Add UI for the salon to export caller list (Art 20) — **eng**

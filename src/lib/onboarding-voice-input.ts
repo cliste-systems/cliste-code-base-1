@@ -67,7 +67,10 @@ export async function prepareOnboardingVoiceGreetingInput(
       h,
       `${options.rateLimitScope}:${ctx.session.organizationId}`,
     );
-    const rateLimit = getVoiceApiRateLimitStatus(options.rateLimitScope, fingerprint);
+    const rateLimit = await getVoiceApiRateLimitStatus(
+      options.rateLimitScope,
+      fingerprint,
+    );
     if (!rateLimit.allowed) {
       await auditVoiceGreetingSecurityEvent({
         source: ctx.source,
@@ -82,7 +85,7 @@ export async function prepareOnboardingVoiceGreetingInput(
         rateLimited: true,
       };
     }
-    recordVoiceApiRequest(options.rateLimitScope, fingerprint);
+    await recordVoiceApiRequest(options.rateLimitScope, fingerprint);
   }
 
   const sanitized = sanitizeVoiceGreetingPayload({

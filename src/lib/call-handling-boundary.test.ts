@@ -40,12 +40,19 @@ describe("call-handling-boundary", () => {
     }
   });
 
-  it("warns on sensitive data without blocking", () => {
-    const result = validateCallHandlingAdd("PPS number", "detail", emptyCaps);
-    assert.equal(result.ok, true);
-    if (result.ok) {
-      assert.match(result.warnings?.join(" ") ?? "", /sensitive personal data/i);
+  it("blocks sensitive data collection on details and rules", () => {
+    for (const kind of ["detail", "rule"] as const) {
+      const result = validateCallHandlingAdd("PPS number", kind, emptyCaps);
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.match(result.block, /must not ask/i);
+      }
     }
+  });
+
+  it("blocks medical history in details to collect", () => {
+    const result = validateCallHandlingAdd("Medical history", "detail", emptyCaps);
+    assert.equal(result.ok, false);
   });
 
   it("warns when booking is mentioned without capability", () => {
@@ -99,7 +106,9 @@ describe("compileCaraPrompt call handling", () => {
       routes: [{ trigger: "directions", action: "text them the saved link" }],
     });
     assert.match(prompt, /never change/);
-    assert.match(prompt, /AI and that the call may be recorded/);
+    assert.match(prompt, /AI and that the call may be recorded and transcribed/);
+    assert.match(prompt, /never ask for health information/i);
+    assert.match(prompt, /If a caller volunteers sensitive personal details/i);
     assert.match(prompt, /don't guess/);
     assert.match(prompt, /On a call, I can only promise/);
     assert.match(prompt, /only promise what's listed above/);
@@ -116,6 +125,21 @@ describe("compileCaraPrompt call handling", () => {
     });
     assert.match(prompt, /fits what they called about/);
     assert.match(prompt, /never read a list like a form/);
+  });
+
+  it("includes fixed-order collection when mode is fixed", () => {
+    const prompt = compileCaraPrompt({
+      businessName: "Example Co",
+      assistantDisplayName: "Cara",
+      businessType: "Business",
+      detailsToCollect: "Preferred service, Preferred day, Stylist preference",
+      detailsCollectMode: "fixed",
+    });
+    assert.match(prompt, /in this order/);
+    assert.match(prompt, /1\. Preferred service/);
+    assert.match(prompt, /2\. Preferred day/);
+    assert.match(prompt, /3\. Stylist preference/);
+    assert.doesNotMatch(prompt, /never read a list like a form/);
   });
 
   it("omits empty business rules section", () => {

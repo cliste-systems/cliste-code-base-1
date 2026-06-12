@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import {
   DASHBOARD_CARD_SURFACE,
-  DASHBOARD_HOME_PREVIEW_CARD,
+  DASHBOARD_HOME_CARD,
 } from "@/components/dashboard/dashboard-surface";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +49,7 @@ export function DetailPanelShell({
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden",
         surface === "embedded" && "bg-white",
-        surface === "home" && DASHBOARD_HOME_PREVIEW_CARD,
+        surface === "home" && DASHBOARD_HOME_CARD,
         surface === "default" && DASHBOARD_CARD_SURFACE,
       )}
     >

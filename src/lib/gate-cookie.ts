@@ -65,6 +65,5 @@ export async function isValidGateCookieValue(
   return timingSafeEqualUtf8(sig, expected);
 }
 
-export const DASHBOARD_GATE_COOKIE_PREFIX = "dashboard-gate";
 export const ADMIN_GATE_COOKIE_PREFIX = "admin-gate";
 export const DEFAULT_GATE_TTL_SECONDS = DEFAULT_TTL_SECONDS;

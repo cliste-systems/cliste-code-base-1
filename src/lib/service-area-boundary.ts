@@ -8,8 +8,6 @@ import { resolveCountyName } from "@/lib/irish-counties";
 export const SERVICE_AREA_RADIUS_PATTERN =
   /^within\s+(\d{1,3})\s*km$/i;
 
-export const SERVICE_AREA_PRESETS = ["Within 30km", "Nationwide"] as const;
-
 export const SERVICE_AREA_COVERAGE_INSTRUCTION = `Coverage is defined by county, not every town. Listed town exclusions are never covered even if their county is covered. When a caller mentions a location:
 • If it's a listed excluded town or area, I politely say we don't cover there.
 • If it's clearly in a covered county and not excluded, I confirm coverage naturally.

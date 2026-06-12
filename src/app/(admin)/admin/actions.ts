@@ -297,9 +297,31 @@ export async function createOrganization(payload: {
   let userId: string | null = null;
 
   try {
+    const { data: accountRow, error: accountError } = await admin
+      .from("accounts")
+      .insert({
+        name,
+        slug,
+        status: "active",
+        launch_status: "not_started",
+      })
+      .select("id")
+      .single();
+
+    if (accountError || !accountRow?.id) {
+      return {
+        ok: false,
+        message: accountError?.message ?? "Could not create account.",
+      };
+    }
+
+    const accountId = accountRow.id as string;
+
     const { data: orgRow, error: orgError } = await admin
       .from("organizations")
       .insert({
+        account_id: accountId,
+        is_primary_location: true,
         name,
         slug,
         tier,
@@ -314,6 +336,7 @@ export async function createOrganization(payload: {
       .single();
 
     if (orgError || !orgRow?.id) {
+      await admin.from("accounts").delete().eq("id", accountId);
       return {
         ok: false,
         message: orgError?.message ?? "Could not create organization.",
@@ -349,7 +372,9 @@ export async function createOrganization(payload: {
 
     const { error: profileError } = await admin.from("profiles").insert({
       id: userId,
+      account_id: accountId,
       organization_id: organizationId,
+      active_organization_id: organizationId,
       role: "admin",
       name: ownerName,
     });
@@ -357,11 +382,18 @@ export async function createOrganization(payload: {
     if (profileError) {
       await admin.auth.admin.deleteUser(userId);
       await admin.from("organizations").delete().eq("id", organizationId);
+      await admin.from("accounts").delete().eq("id", accountId);
       return {
         ok: false,
         message: `Profile could not be created: ${profileError.message}`,
       };
     }
+
+    await admin.from("account_memberships").insert({
+      user_id: userId,
+      account_id: accountId,
+      role: "admin",
+    });
 
     revalidatePath("/admin");
     await recordAdminEvent(operator, {

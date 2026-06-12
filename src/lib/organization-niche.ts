@@ -73,12 +73,6 @@ export function parseOrganizationNiche(
   return "other";
 }
 
-export function productNameForNiche(
-  raw: string | null | undefined,
-): string {
-  return PRODUCT_NAME_BY_NICHE[parseOrganizationNiche(raw)];
-}
-
 export function nicheAdminLabel(raw: string | null | undefined): string {
   return ORGANIZATION_NICHE_ADMIN_LABELS[parseOrganizationNiche(raw)];
 }

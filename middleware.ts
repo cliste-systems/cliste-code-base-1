@@ -5,8 +5,12 @@ import {
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
 import { LEGACY_DASHBOARD_REDIRECTS } from "./src/lib/dashboard-routes";
-import { DASHBOARD_LEGAL_ACCEPT_PATH } from "./src/lib/legal-documents";
+import {
+  DASHBOARD_LEGAL_ACCEPT_PATH,
+  LEGAL_DOCUMENT_VERSIONS,
+} from "./src/lib/legal-documents";
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
+import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
 import { pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
 import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
@@ -104,12 +108,22 @@ function buildForwardRequestHeaders(request: NextRequest): Headers {
   return headers;
 }
 
-async function dashboardLegalAcceptRedirect(
+const LEGAL_OK_COOKIE = "cliste_legal_ok";
+const LEGAL_OK_VERSION = Object.values(LEGAL_DOCUMENT_VERSIONS).join("|");
+
+async function legalAcceptRedirect(
   request: NextRequest,
   response: NextResponse,
   userId: string | undefined,
 ): Promise<NextResponse | null> {
   if (!userId) return null;
+
+  const pathname = request.nextUrl.pathname;
+  if (pathname.startsWith("/api/")) return null;
+
+  if (request.cookies.get(LEGAL_OK_COOKIE)?.value === LEGAL_OK_VERSION) {
+    return null;
+  }
 
   const admin = createAdminClient();
   const { data: profile } = await admin
@@ -121,29 +135,48 @@ async function dashboardLegalAcceptRedirect(
   const organizationId = profile?.organization_id;
   if (!organizationId) return null;
 
-  const needsAcceptance = await dashboardPathNeedsLegalAcceptance({
-    pathname: request.nextUrl.pathname,
+  const onboardingNeeds = await onboardingPathNeedsLegalAcceptance({
+    pathname,
     userId,
     organizationId,
   });
-  if (!needsAcceptance) return null;
+  if (onboardingNeeds) {
+    const redirectRes = NextResponse.redirect(
+      new URL("/onboarding/legal", request.url),
+    );
+    copySessionCookies(response, redirectRes);
+    return redirectRes;
+  }
 
-  const redirectRes = NextResponse.redirect(
-    new URL(DASHBOARD_LEGAL_ACCEPT_PATH, request.url),
-  );
-  copySessionCookies(response, redirectRes);
-  return redirectRes;
+  const dashboardNeeds = await dashboardPathNeedsLegalAcceptance({
+    pathname,
+    userId,
+    organizationId,
+  });
+  if (dashboardNeeds) {
+    const redirectRes = NextResponse.redirect(
+      new URL(DASHBOARD_LEGAL_ACCEPT_PATH, request.url),
+    );
+    copySessionCookies(response, redirectRes);
+    return redirectRes;
+  }
+
+  response.cookies.set(LEGAL_OK_COOKIE, LEGAL_OK_VERSION, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60,
+    path: "/",
+  });
+
+  return null;
 }
 
 export async function middleware(request: NextRequest) {
   const forwardHeaders = buildForwardRequestHeaders(request);
   const { response, user } = await updateSession(request, forwardHeaders);
 
-  const legalRedirect = await dashboardLegalAcceptRedirect(
-    request,
-    response,
-    user?.id,
-  );
+  const legalRedirect = await legalAcceptRedirect(request, response, user?.id);
   if (legalRedirect) return legalRedirect;
 
   const maybeRootRedirect = rootToLoginRedirect(request, response);

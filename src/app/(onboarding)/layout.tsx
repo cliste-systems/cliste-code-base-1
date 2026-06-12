@@ -1,7 +1,5 @@
 import { OnboardingCanvasBackground } from "@/components/onboarding/onboarding-canvas-background";
-import { OnboardingDevBanner } from "@/components/onboarding/onboarding-dev-banner";
 import { OnboardingKnowledgeNavProvider } from "@/components/onboarding/onboarding-knowledge-nav";
-import { OnboardingLogoutButton } from "@/components/onboarding/onboarding-logout-button";
 import { OnboardingMotionShell } from "@/components/onboarding/onboarding-motion-shell";
 import { OnboardingProgressProvider } from "@/components/onboarding/onboarding-progress";
 import { OnboardingStepDots } from "@/components/onboarding/onboarding-step-dots";
@@ -33,8 +31,6 @@ export default async function OnboardingLayout({
             freeNav={freeNav}
           >
             <OnboardingKnowledgeNavProvider>
-              <OnboardingDevBanner />
-              <OnboardingLogoutButton />
               <OnboardingMotionShell>{children}</OnboardingMotionShell>
               <OnboardingStepDots />
             </OnboardingKnowledgeNavProvider>

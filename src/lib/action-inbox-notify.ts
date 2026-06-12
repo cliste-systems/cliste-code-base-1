@@ -72,7 +72,10 @@ export async function notifyActionInboxOwner(
 
   if (phone) {
     const sms = `${biz}: new Action Inbox item from ${caller}. Open Cliste to review.`;
-    const res = await sendTwilioBookingSms(phone, sms);
+    const res = await sendTwilioBookingSms(phone, sms, {
+      organizationId,
+      purpose: "action_inbox_notify",
+    });
     if (!res.ok) {
       console.error("[action-inbox-notify] sms failed", res.message);
     }

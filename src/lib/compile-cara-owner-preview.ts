@@ -5,10 +5,12 @@ import {
   type BusinessFileListItem,
 } from "@/lib/business-files";
 import { CARA_WHEN_UNSURE_LOCKED_COPY } from "@/lib/call-handling-boundary";
+import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 import type { CaraSetupPromptInput } from "@/lib/compile-cara-prompt";
 import { emptyWeekSchedule } from "@/lib/business-hours";
 import { buildHoursPromptBlock } from "@/lib/general-boundary";
 import { routePhraseForPrompt } from "@/lib/cara-capabilities";
+import { serviceAreaAnchorTown } from "@/lib/base-town";
 import {
   formatServiceAreaForPrompt,
   SERVICE_AREA_COVERAGE_INSTRUCTION,
@@ -144,12 +146,17 @@ export function compileCaraOwnerPreview(
     parts.push(hoursBlock);
   }
 
+  const baseTown = serviceAreaAnchorTown(input.baseTown, input.locationAddress);
+  if (baseTown && input.baseTown?.trim()) {
+    aboutBits.push(`We're based in ${baseTown}.`);
+  }
+
   const areas = listItems(input.serviceArea);
   const townExclusions = listItems(input.serviceAreaExclusions);
   if (areas.length > 0) {
     const areaPhrase = formatServiceAreaForPrompt(
       areas,
-      location ?? undefined,
+      baseTown ?? location ?? undefined,
       townExclusions,
     );
     aboutBits.push(`We cover ${areaPhrase}.`);
@@ -175,10 +182,17 @@ export function compileCaraOwnerPreview(
   }
 
   const collectItems = listItems(input.detailsToCollect);
+  const collectMode = parseDetailsCollectMode(input.detailsCollectMode);
   if (collectItems.length > 0) {
-    parts.push(
-      `I always get name and number. When it fits the call, I also try to learn: ${formatListPhrase(collectItems)}.`,
-    );
+    if (collectMode === "fixed") {
+      parts.push(
+        `I always get name and number first. When it's relevant, I ask in this order: ${collectItems.join(" → ")}.`,
+      );
+    } else {
+      parts.push(
+        `I always get name and number. When it fits the call, I also try to learn: ${formatListPhrase(collectItems)}.`,
+      );
+    }
   }
 
   const rules = (input.businessRules ?? [])

@@ -1,8 +1,6 @@
 import {
   DEFAULT_GREETING_CLOSING,
   defaultVoiceGreetingIntro,
-  parseGreetingParts,
-  VOICE_ASSISTANT_DEFAULT_NAME,
 } from "@/lib/voice-greeting";
 import { sanitizeGreetingLine } from "@/lib/voice-greeting-security";
 
@@ -212,41 +210,6 @@ export function validateVoiceGreetingGuardrails(input: {
       : {}),
     ...(closingIssue ? { suggestedClosing: DEFAULT_GREETING_CLOSING } : {}),
   };
-}
-
-/** Validate a stored full greeting (e.g. Cara Setup). */
-export function validateStoredGreetingGuardrails(input: {
-  greeting: string;
-  businessName: string;
-  assistantDisplayName?: string;
-}): VoiceGreetingGuardrailResult {
-  const greeting = sanitizeGreetingLine(input.greeting);
-  const assistant =
-    input.assistantDisplayName?.trim() || VOICE_ASSISTANT_DEFAULT_NAME;
-
-  if (greetingLineIsInappropriate(greeting)) {
-    return {
-      ok: false,
-      message: INAPPROPRIATE_MESSAGE,
-      introIssue: true,
-      closingIssue: true,
-      suggestedIntro: defaultVoiceGreetingIntro(input.businessName),
-      suggestedClosing: DEFAULT_GREETING_CLOSING,
-    };
-  }
-
-  const defaultIntro = defaultVoiceGreetingIntro(input.businessName);
-  const { intro, closing } = parseGreetingParts(
-    greeting,
-    assistant,
-    defaultIntro,
-  );
-
-  return validateVoiceGreetingGuardrails({
-    greetingIntro: intro,
-    greetingClosing: closing,
-    businessName: input.businessName,
-  });
 }
 
 export function sanitizeGreetingSuggestionLine(

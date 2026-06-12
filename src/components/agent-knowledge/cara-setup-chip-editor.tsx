@@ -45,6 +45,8 @@ export type CaraSetupChipEditorProps = {
   beforeAdd: (item: string) => ChipBeforeAddResult;
   nearDupLists?: string[][];
   listBanner?: ReactNode;
+  /** Hide tag list when a parent renders ordered items (e.g. fixed collect order). */
+  hideChipList?: boolean;
   renderInterruptDialog?: (ctx: {
     kind: string;
     item: string;
@@ -64,6 +66,7 @@ export function CaraSetupChipEditor({
   beforeAdd,
   nearDupLists = [],
   listBanner,
+  hideChipList = false,
   renderInterruptDialog,
 }: CaraSetupChipEditorProps) {
   const [draft, setDraft] = useState("");
@@ -252,7 +255,7 @@ export function CaraSetupChipEditor({
           <p className="text-[12.5px] text-slate-500">{lengthHint}</p>
         ) : null}
 
-        {value.length > 0 ? (
+        {!hideChipList && value.length > 0 ? (
           <motion.ul
             layout
             className="flex flex-wrap gap-2"

@@ -1,11 +1,7 @@
 import type { AgentFaq } from "./agent-faqs";
 import type { WeekSchedule } from "@/lib/business-hours";
-import {
-  assistantNameLabel,
-  buildDefaultVoiceGreeting,
-  businessNameLabel,
-  DEFAULT_GREETING_CLOSING,
-} from "@/lib/voice-greeting";
+import type { DetailsCollectMode } from "@/lib/details-collect-mode";
+import { assistantNameLabel, businessNameLabel } from "@/lib/voice-greeting";
 
 export type AgentSetupInitial = {
   businessName: string;
@@ -23,34 +19,11 @@ export type AgentSetupInitial = {
   servicesItems: string[];
   servicesNotOfferedItems: string[];
   detailsToCollectItems: string[];
+  detailsCollectMode: DetailsCollectMode;
   businessRules: string[];
   locationAddress: string;
   locationEircode: string;
+  baseTown: string;
 };
 
 export { assistantNameLabel, businessNameLabel };
-
-/** Compliant default: AI + recording disclosure (Irish / EU AI Act). */
-export function buildDefaultGreeting(
-  businessName: string,
-  assistantDisplayName: string,
-): string {
-  return buildDefaultVoiceGreeting(
-    businessName,
-    assistantDisplayName,
-    DEFAULT_GREETING_CLOSING,
-  );
-}
-
-export function defaultGreetingPreview(
-  businessName: string,
-  assistantDisplayName: string,
-): string {
-  return buildDefaultGreeting(businessName, assistantDisplayName);
-}
-
-export function greetingPreview(greeting: string): string | null {
-  const t = greeting.trim();
-  if (!t) return null;
-  return t;
-}

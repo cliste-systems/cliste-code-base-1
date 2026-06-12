@@ -1,9 +1,6 @@
 import type { BillingInterval, PlanTier } from "./cliste-plans.data";
 import { isPlanTier } from "./cliste-plans.data";
 
-/** Query keys used by the marketing site → app deep links. */
-export const SIGNUP_PLAN_QUERY_KEYS = ["plan", "interval"] as const;
-
 const PLAN_ALIASES: Record<string, PlanTier> = {
   starter: "starter",
   pro: "pro",
@@ -48,19 +45,4 @@ export function planIntentLabel(planTier: PlanTier): string {
     default:
       return planTier;
   }
-}
-
-/** Marketing site CTAs → app signup with plan pre-selected. */
-export function signupUrlForPlan(
-  planTier: PlanTier,
-  interval: BillingInterval = "month",
-): string {
-  const slug =
-    planTier === "enterprise"
-      ? "custom"
-      : planTier === "pro"
-        ? "professional"
-        : planTier;
-  const params = new URLSearchParams({ plan: slug, interval });
-  return `/signup?${params.toString()}`;
 }

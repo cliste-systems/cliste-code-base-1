@@ -1,12 +1,10 @@
-import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
-import { defaultBusinessDescription } from "@/lib/onboarding-business-type";
 import { guardOnboardingPage } from "@/lib/onboarding-page-guard";
 import { ownerNameNeedsCapture } from "@/lib/profile-display-name";
 import { requireOnboardingSession } from "@/lib/onboarding-session";
 import { verticalIdForNiche } from "@/lib/verticals";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-import { ProfileForm } from "./profile-form";
+import { ProfileOnboardingView } from "./profile-onboarding-view";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +29,6 @@ export default async function OnboardingProfilePage() {
   const businessName = (org?.name as string | null) ?? "";
   const profileName = (profile?.name as string | null) ?? "";
   const needsOwnerName = ownerNameNeedsCapture(profileName, businessName);
-  const businessDescriptionDefault = defaultBusinessDescription({
-    niche: (org?.niche as string | null) ?? null,
-    agentBusinessType: (org?.agent_business_type as string | null) ?? null,
-  });
   // Seed the picker only when a real classification already happened. Fresh
   // signups default to niche "other", which shouldn't pre-answer the question.
   const storedNiche = (org?.niche as string | null) ?? null;
@@ -44,21 +38,14 @@ export default async function OnboardingProfilePage() {
       : "";
 
   return (
-    <OnboardingStepShell
-      variant="profile"
-      title="Tell us about your business"
-      description="A few details so Cara can answer calls the way you would."
-    >
-      <ProfileForm
-        businessName={businessName}
-        needsOwnerName={needsOwnerName}
-        defaultFirstName=""
-        defaultLastName=""
-        defaultBusinessDescription={businessDescriptionDefault}
-        defaultVertical={defaultVertical}
-        defaultAddress={(org?.address as string | null) ?? ""}
-        defaultEircode={(org?.storefront_eircode as string | null) ?? ""}
-      />
-    </OnboardingStepShell>
+    <ProfileOnboardingView
+      businessName={businessName}
+      needsOwnerName={needsOwnerName}
+      defaultFirstName=""
+      defaultLastName=""
+      defaultVertical={defaultVertical}
+      defaultAddress={(org?.address as string | null) ?? ""}
+      defaultEircode={(org?.storefront_eircode as string | null) ?? ""}
+    />
   );
 }

@@ -16,11 +16,6 @@ import {
 import { SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
 import { createClient } from "@/utils/supabase/server";
 
-/** Normal password sign-in is the salon user, not platform support — drop the support label. */
-export async function clearSupportDashboardCookie() {
-  (await cookies()).delete(SUPPORT_DASHBOARD_COOKIE);
-}
-
 export type PasswordSignInResult =
   | { ok: true }
   | {
@@ -80,8 +75,8 @@ export async function passwordSignIn(payload: {
   const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
   const ipFingerprint = rateLimitFingerprint(h, "auth-ip");
   const emailFingerprint = rateLimitFingerprint(h, `auth-email:${email}`);
-  const ipStatus = getRateLimitStatus("authenticate", ipFingerprint);
-  const emailStatus = getRateLimitStatus("authenticate", emailFingerprint);
+  const ipStatus = await getRateLimitStatus("authenticate", ipFingerprint);
+  const emailStatus = await getRateLimitStatus("authenticate", emailFingerprint);
   const preRequiresCaptcha =
     ipStatus.requiresCaptcha || emailStatus.requiresCaptcha;
 
@@ -136,8 +131,8 @@ export async function passwordSignIn(payload: {
   });
 
   if (signError) {
-    const afterIp = recordRateLimitFailure("authenticate", ipFingerprint);
-    const afterEmail = recordRateLimitFailure("authenticate", emailFingerprint);
+    const afterIp = await recordRateLimitFailure("authenticate", ipFingerprint);
+    const afterEmail = await recordRateLimitFailure("authenticate", emailFingerprint);
     const retryAfterSeconds = Math.max(
       afterIp.retryAfterSeconds,
       afterEmail.retryAfterSeconds
@@ -173,8 +168,8 @@ export async function passwordSignIn(payload: {
     };
   }
 
-  clearRateLimit("authenticate", ipFingerprint);
-  clearRateLimit("authenticate", emailFingerprint);
+  await clearRateLimit("authenticate", ipFingerprint);
+  await clearRateLimit("authenticate", emailFingerprint);
   (await cookies()).delete(SUPPORT_DASHBOARD_COOKIE);
   console.info("[security] auth_sign_in_success", { email: maskEmailForLog(email) });
   await logSecurityEvent(securityCtx, {

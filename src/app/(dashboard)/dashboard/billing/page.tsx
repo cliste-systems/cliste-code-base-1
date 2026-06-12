@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { PLANS, isPlanTier, type PlanTier } from "@/lib/cliste-plans";
+import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
+import { PLANS, type PlanTier } from "@/lib/cliste-plans";
 
 import { finaliseBillingCheckout } from "./actions";
 import { UsageView } from "./usage-view";
@@ -38,59 +40,106 @@ export default async function BillingPage({ searchParams }: PageProps) {
     redirect("/dashboard/usage?billing=ready");
   }
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, accountId } = await requireDashboardSession();
+  const [accountBilling, locations] = await Promise.all([
+    loadAccountBilling(accountId),
+    loadAccountLocations(accountId),
+  ]);
+  const locationIds = locations.map((location) => location.id);
 
-  const { data: org } = await supabase
-    .from("organizations")
-    .select(
-      [
-        "status",
-        "plan_tier",
-        "billing_period_start",
-        "platform_customer_id",
-        "platform_subscription_id",
-        "suspended_reason",
-      ].join(", "),
-    )
-    .eq("id", organizationId)
-    .maybeSingle<{
-      status: string;
-      plan_tier: string | null;
-      billing_period_start: string | null;
-      platform_customer_id: string | null;
-      platform_subscription_id: string | null;
-      suspended_reason: string | null;
-    }>();
-
-  const planTier: PlanTier | null = isPlanTier(org?.plan_tier) ? org!.plan_tier : null;
+  const planTier: PlanTier | null = accountBilling?.planTier ?? null;
   const plan = planTier ? PLANS[planTier] : null;
 
   const periodStart =
-    org?.billing_period_start ??
+    accountBilling?.billingPeriodStart ??
     new Date(
       Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
     )
       .toISOString()
       .slice(0, 10);
 
-  const { data: usageRows } = await supabase
-    .from("usage_records")
-    .select("minutes_billable, synced_to_stripe_at")
-    .eq("organization_id", organizationId)
-    .gte("billing_period_start", periodStart);
+  const [{ data: usageRows }, { data: smsRows }] = await Promise.all([
+    supabase
+      .from("usage_records")
+      .select("organization_id, minutes_billable, synced_to_stripe_at, ended_at")
+      .in("organization_id", locationIds.length > 0 ? locationIds : [accountId])
+      .gte("billing_period_start", periodStart),
+    supabase
+      .from("sms_usage_records")
+      .select("organization_id, segments, sent_at")
+      .in("organization_id", locationIds.length > 0 ? locationIds : [accountId])
+      .gte("sent_at", `${periodStart}T00:00:00.000Z`),
+  ]);
+
+  const breakdownByOrg = new Map<
+    string,
+    { usedMinutes: number; usedSms: number; callsCounted: number }
+  >();
+  for (const location of locations) {
+    breakdownByOrg.set(location.id, {
+      usedMinutes: 0,
+      usedSms: 0,
+      callsCounted: 0,
+    });
+  }
 
   let usedMinutes = 0;
-  let lastUsageSync: string | null = null;
+  let lastStripeSync: string | null = null;
+  let lastCallAt: string | null = null;
   for (const row of usageRows ?? []) {
-    const m = (row as { minutes_billable: number | null }).minutes_billable;
-    usedMinutes += typeof m === "number" ? m : 0;
-    const synced = (row as { synced_to_stripe_at: string | null }).synced_to_stripe_at;
-    if (synced && (!lastUsageSync || synced > lastUsageSync)) {
-      lastUsageSync = synced;
+    const record = row as {
+      organization_id: string;
+      minutes_billable: number | null;
+      synced_to_stripe_at: string | null;
+      ended_at: string | null;
+    };
+    const m = record.minutes_billable;
+    const minutes = typeof m === "number" ? m : Number(m) || 0;
+    usedMinutes += minutes;
+    const bucket = breakdownByOrg.get(record.organization_id);
+    if (bucket) {
+      bucket.usedMinutes += minutes;
+      bucket.callsCounted += 1;
+    }
+    const synced = record.synced_to_stripe_at;
+    if (synced && (!lastStripeSync || synced > lastStripeSync)) {
+      lastStripeSync = synced;
+    }
+    const ended = record.ended_at;
+    if (ended && (!lastCallAt || ended > lastCallAt)) {
+      lastCallAt = ended;
     }
   }
 
+  let usedSms = 0;
+  for (const row of smsRows ?? []) {
+    const record = row as { organization_id: string; segments?: number };
+    const segments = typeof record.segments === "number" ? record.segments : 0;
+    usedSms += segments;
+    const bucket = breakdownByOrg.get(record.organization_id);
+    if (bucket) bucket.usedSms += segments;
+  }
+
+  const locationBreakdown = locations.map((location) => {
+    const bucket = breakdownByOrg.get(location.id) ?? {
+      usedMinutes: 0,
+      usedSms: 0,
+      callsCounted: 0,
+    };
+    return {
+      organizationId: location.id,
+      locationName:
+        resolveOrganizationDisplayName(location.name, location.slug) ||
+        "Location",
+      usedMinutes: bucket.usedMinutes,
+      usedSms: bucket.usedSms,
+      callsCounted: bucket.callsCounted,
+    };
+  });
+
   const includedMinutes = plan?.includedMinutes ?? 0;
+  const includedSms = plan?.includedSms ?? 0;
+  const extraSms = Math.max(0, usedSms - includedSms);
   const extraMinutes = Math.max(0, usedMinutes - includedMinutes);
   const remainingMinutes = Math.max(0, includedMinutes - usedMinutes);
   const progressPct =
@@ -101,9 +150,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
     ? extraMinutes * plan.overageRateCents
     : 0;
 
-  const hasBillingPortal = Boolean(org?.platform_customer_id?.trim());
-  const hasSubscription = Boolean(org?.platform_subscription_id?.trim());
-  const suspended = suspendedQuery || org?.status === "suspended";
+  const hasBillingPortal = Boolean(accountBilling?.platformCustomerId?.trim());
+  const hasSubscription = Boolean(accountBilling?.platformSubscriptionId?.trim());
+  const suspended = suspendedQuery || accountBilling?.status === "suspended";
   const canManageBilling = hasBillingPortal || hasSubscription || suspended;
 
   const data: UsagePageData = {
@@ -118,12 +167,18 @@ export default async function BillingPage({ searchParams }: PageProps) {
     periodStart,
     periodEnd: null,
     callsCounted: usageRows?.length ?? 0,
-    lastUsageSync,
+    lastCallAt,
+    lastStripeSync,
     hasBillingPortal,
     hasSubscription,
     canManageBilling,
     suspended,
-    suspendedReason: org?.suspended_reason ?? null,
+    suspendedReason: null,
+    usedSms,
+    includedSms,
+    extraSms,
+    locationCount: locations.length,
+    locationBreakdown,
   };
 
   const billingReady = firstParam(sp.billing) === "ready";

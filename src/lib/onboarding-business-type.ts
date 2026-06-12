@@ -7,12 +7,6 @@ export const ONBOARDING_BUSINESS_TYPE_OPTIONS = [
 export type OnboardingBusinessType =
   (typeof ONBOARDING_BUSINESS_TYPE_OPTIONS)[number]["value"];
 
-export function isOnboardingBusinessType(
-  value: string,
-): value is OnboardingBusinessType {
-  return ONBOARDING_BUSINESS_TYPE_OPTIONS.some((o) => o.value === value);
-}
-
 const NICHE_DESCRIPTION_FALLBACK: Record<string, string> = {
   hair_salon: "Hair salon",
   barber: "Barber",
@@ -46,29 +40,4 @@ export function businessDescriptionFromNiche(
 ): string {
   const key = String(niche ?? "").trim();
   return NICHE_DESCRIPTION_FALLBACK[key] ?? "";
-}
-
-export function defaultOnboardingBusinessType(input: {
-  niche: string | null | undefined;
-  agentBusinessType: string | null | undefined;
-}): {
-  businessType: OnboardingBusinessType;
-  businessTypeOther: string;
-} {
-  if (input.niche === "barber") {
-    return { businessType: "barber", businessTypeOther: "" };
-  }
-
-  const other = String(input.agentBusinessType ?? "").trim();
-  if (other) {
-    return { businessType: "other", businessTypeOther: other };
-  }
-
-  return { businessType: "hair_salon", businessTypeOther: "" };
-}
-
-export function nicheFromOnboardingBusinessType(
-  businessType: OnboardingBusinessType,
-): "hair_salon" | "barber" {
-  return businessType === "barber" ? "barber" : "hair_salon";
 }

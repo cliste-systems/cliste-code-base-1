@@ -38,11 +38,6 @@ export function callRoutingAllowsHumanTransfer(mode: CallRoutingMode): boolean {
   return mode === "cliste_number";
 }
 
-/** Did the business keep their own published number (i.e. set up forwarding)? */
-export function callRoutingUsesForwarding(mode: CallRoutingMode): boolean {
-  return mode === "forward_all" || mode === "forward_missed";
-}
-
 export type CallRoutingModeMeta = {
   id: CallRoutingMode;
   title: string;

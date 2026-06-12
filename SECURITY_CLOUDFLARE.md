@@ -52,13 +52,16 @@ Last applied: 2026-04-17 via `scripts/cloudflare-harden.py` and direct API.
 
 ### Rate limit (phase `http_ratelimit`)
 
-1. **Brute-force lockout** for `/admin-unlock`, `/dashboard-unlock`, and
-   `/authenticate` POSTs: 5 hits in 10 s per IP → 429 for 10 s.
+1. **Brute-force lockout** for `/admin-unlock`, `/dashboard-unlock`,
+   `/authenticate`, `/signup`, and `POST /api/onboarding/voice-preview`:
+   5 hits in 10 s per IP → 429 for 10 s.
 
    The free plan caps both `period` and `mitigation_timeout` at 10 s and
    allows only 1 rule, so this rule only stops fast credential-stuffing.
-   **Slow brute-force is covered in-app** by `src/lib/auth-rate-limit.ts`
-   which locks for 15–30 minutes after a handful of failures.
+   **Slow brute-force** is covered by Postgres-backed counters in
+   `src/lib/auth-rate-limit.ts` (via `security_auth_events`), which locks for
+   15–30 minutes after a handful of failures. The free plan allows only one
+   rate-limit rule — broader path coverage trades off per-path granularity.
 
 ## What still needs a human click (3 items)
 

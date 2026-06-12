@@ -1,5 +1,6 @@
 import { parseCallRoutingMode } from "@/lib/call-routing";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { signupSegmentLabel } from "@/lib/signup-segment-label";
 
 import { SettingsView } from "./settings-view";
 
@@ -11,7 +12,7 @@ export default async function SettingsPage() {
   const { data: org, error } = await supabase
     .from("organizations")
     .select(
-      "is_active, status, name, phone_number, notification_email, notification_phone, call_routing_mode, fallback_number",
+      "is_active, status, name, phone_number, niche, agent_business_type, notification_email, notification_phone, call_routing_mode, fallback_number",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -44,6 +45,10 @@ export default async function SettingsPage() {
         isActive: org.is_active ?? true,
         businessName: org.name ?? "",
         phoneNumber: org.phone_number ?? "",
+        signupSegment: signupSegmentLabel({
+          niche: org.niche,
+          businessType: org.agent_business_type,
+        }),
         notificationEmail: org.notification_email ?? "",
         notificationPhone: org.notification_phone ?? "",
         callRoutingMode: parseCallRoutingMode(org.call_routing_mode),

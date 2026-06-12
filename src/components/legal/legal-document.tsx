@@ -10,6 +10,13 @@ import { useLegalPathVariant } from "@/components/legal/legal-path-context";
 import { cn } from "@/lib/utils";
 import { LEGAL_LAST_UPDATED } from "@/lib/legal-pages";
 
+/** ISO date for `<time dateTime>` from LEGAL_LAST_UPDATED (e.g. "12 June 2026" → "2026-06-12"). */
+function legalLastUpdatedIso(): string {
+  const parsed = new Date(LEGAL_LAST_UPDATED);
+  if (Number.isNaN(parsed.getTime())) return "2026-06-12";
+  return parsed.toISOString().slice(0, 10);
+}
+
 export { LEGAL_LAST_UPDATED };
 
 type LegalPageHeaderProps = {
@@ -35,7 +42,7 @@ export function LegalPageHeader({
         ) : null}
         <p className="text-[12px] text-slate-500">
           Last updated{" "}
-          <time dateTime="2026-05-31" className="font-medium text-slate-600">
+          <time dateTime={legalLastUpdatedIso()} className="font-medium text-slate-600">
             {lastUpdated}
           </time>
         </p>
@@ -44,21 +51,21 @@ export function LegalPageHeader({
   }
 
   return (
-    <header className="space-y-2 border-b border-slate-200 pb-6">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
+    <header className="space-y-2 border-b border-slate-100 pb-6">
+      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-slate-400">
         Legal document
       </p>
-      <h1 className="text-[22px] font-semibold tracking-tight text-[#0b1220] sm:text-2xl">
+      <h1 className="text-[1.375rem] font-semibold tracking-tight text-[#0b1220] sm:text-[1.5rem]">
         {title}
       </h1>
       {description ? (
-        <p className="max-w-2xl text-[13px] leading-relaxed text-slate-600">
+        <p className="text-[14px] leading-relaxed text-slate-600">
           {description}
         </p>
       ) : null}
       <p className="text-[12px] text-slate-500">
         Last updated{" "}
-        <time dateTime="2026-05-31" className="font-medium text-slate-700">
+        <time dateTime={legalLastUpdatedIso()} className="font-medium text-slate-600">
           {lastUpdated}
         </time>
       </p>
@@ -78,7 +85,7 @@ export function LegalSection({ id, title, children }: LegalSectionProps) {
       <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
         {title}
       </h2>
-      <div className="space-y-2.5 text-[13px] leading-relaxed text-slate-700">
+      <div className="space-y-2.5 text-slate-700 [&_p]:leading-relaxed">
         {children}
       </div>
     </section>
@@ -129,7 +136,20 @@ export function LegalTable({ headers, rows }: LegalTableProps) {
   );
 }
 
-export function LegalList({ children }: { children: ReactNode }) {
+export function LegalList({
+  children,
+  ordered,
+}: {
+  children: ReactNode;
+  ordered?: boolean;
+}) {
+  if (ordered) {
+    return (
+      <ol className="list-decimal space-y-1.5 pl-5 marker:text-slate-500">
+        {children}
+      </ol>
+    );
+  }
   return (
     <ul className="list-disc space-y-1.5 pl-5 marker:text-slate-400">{children}</ul>
   );
@@ -157,5 +177,15 @@ export function LegalCallout({
 }
 
 export function LegalDocumentBody({ children }: { children: ReactNode }) {
-  return <div className="space-y-8">{children}</div>;
+  const variant = useLegalPathVariant();
+  return (
+    <div
+      className={cn(
+        "space-y-8",
+        variant === "public" && "max-w-none text-[14px] leading-relaxed",
+      )}
+    >
+      {children}
+    </div>
+  );
 }

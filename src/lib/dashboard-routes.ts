@@ -6,6 +6,7 @@ export const DASHBOARD_ROUTES = {
   contacts: "/dashboard/contacts",
   routing: "/dashboard/routing",
   caraSetup: "/dashboard/cara-setup",
+  caraTraining: "/dashboard/cara-training",
   usage: "/dashboard/usage",
   support: "/dashboard/support",
   legal: "/dashboard/legal",
@@ -14,6 +15,8 @@ export const DASHBOARD_ROUTES = {
   /** @deprecated Use legalDataRequests */
   gdpr: "/dashboard/legal/data-requests",
   settings: "/dashboard/settings",
+  locations: "/dashboard/locations",
+  team: "/dashboard/team",
 } as const;
 
 /** Legacy paths → canonical (middleware + bookmarks). */
@@ -27,7 +30,6 @@ export const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
   "/dashboard/bookings": DASHBOARD_ROUTES.home,
   "/dashboard/payments": DASHBOARD_ROUTES.home,
   "/dashboard/services": DASHBOARD_ROUTES.home,
-  "/dashboard/team": DASHBOARD_ROUTES.home,
   "/dashboard/storefront": DASHBOARD_ROUTES.home,
   "/dashboard/reports": DASHBOARD_ROUTES.home,
 };

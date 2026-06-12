@@ -25,6 +25,13 @@ export type HomeAttentionTicketRow = {
   caller_number?: string | null;
 };
 
+export type HomeAttentionTrainingRow = {
+  id: string;
+  gap_summary: string | null;
+  status: string | null;
+  updated_at: string;
+};
+
 export function isCallNeedingHomeAttention(outcome: string | null | undefined): boolean {
   return CALL_ATTENTION_OUTCOMES.includes(
     normalizeCallOutcome(String(outcome ?? "")),
@@ -45,6 +52,7 @@ function attentionBadgeForCall(outcome: string | null): string {
 /** Open tickets + calls that still need a follow-up (callback / missed). */
 export function buildHomeAttentionItems(input: {
   openTickets: HomeAttentionTicketRow[];
+  openTraining?: HomeAttentionTrainingRow[];
   calls: HomeAttentionCallRow[];
   callerLabel: (row: HomeAttentionCallRow) => string;
   callOutcomeLabel: (outcome: string | null) => string;
@@ -53,6 +61,23 @@ export function buildHomeAttentionItems(input: {
   type Row = TimelineFeedRow & { timestamp: number };
 
   const items: Row[] = [];
+
+  for (const row of input.openTraining ?? []) {
+    const ts = new Date(row.updated_at).getTime();
+    if (!Number.isFinite(ts)) continue;
+    const summary =
+      row.gap_summary?.replace(/\s+/g, " ").trim() || "Cara needs training input";
+    items.push({
+      id: `training-${row.id}`,
+      title: "Cara needs training input",
+      subtitle: summary,
+      time: input.formatTime(row.updated_at),
+      href: `${DASHBOARD_ROUTES.caraTraining}?item=${encodeURIComponent(row.id)}`,
+      badge: row.status === "draft_ready" ? "Confirm" : "Answer",
+      urgent: true,
+      timestamp: ts,
+    });
+  }
 
   for (const row of input.openTickets) {
     const ts = new Date(row.created_at).getTime();

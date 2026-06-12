@@ -99,45 +99,6 @@ export function buildCaraLastCallSnapshot(
   };
 }
 
-/** When the last call happened — shown under the caller on the Cara card. */
-export function formatLastCallWhen(
-  lastCallAtIso: string,
-  now: Date = new Date(),
-): string {
-  const mins = minutesAgo(lastCallAtIso, now);
-  if (mins === null) return "Time unavailable";
-
-  if (mins < 1) return "Just now";
-
-  if (mins < 60) {
-    return mins === 1 ? "1 min ago" : `${mins} min ago`;
-  }
-
-  if (mins < 24 * 60) {
-    const hrs = Math.floor(mins / 60);
-    return hrs === 1 ? "1 hr ago" : `${hrs} hr ago`;
-  }
-
-  const callDate = new Date(lastCallAtIso);
-  if (callDate.toDateString() === now.toDateString()) {
-    const t = formatShortTime(lastCallAtIso);
-    return t ? `Today at ${t}` : "Today";
-  }
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (callDate.toDateString() === yesterday.toDateString()) {
-    const t = formatShortTime(lastCallAtIso);
-    return t ? `Yesterday at ${t}` : "Yesterday";
-  }
-
-  return callDate.toLocaleDateString("en-IE", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 /** Line status pill from online state + how recently the last call ended. */
 export function caraLineStatusPill(
   isOnline: boolean,
@@ -186,6 +147,3 @@ export function caraLineStatusPill(
   });
   return { label: dayLabel, variant: "neutral" };
 }
-
-/** @deprecated Use caraLineStatusPill */
-export const caraLastCallPill = caraLineStatusPill;

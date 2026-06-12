@@ -6,15 +6,20 @@ import { cookies } from "next/headers";
 import {
   DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
   DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
+  DASHBOARD_CARA_TRAINING_SEEN_COOKIE,
   dashboardNavSeenCookieOptions,
 } from "@/lib/dashboard-nav-seen-cookies";
 import { createClient } from "@/utils/supabase/server";
 
-export type DashboardNavSeenKey = "call-history" | "action-inbox";
+export type DashboardNavSeenKey =
+  | "call-history"
+  | "action-inbox"
+  | "cara-training";
 
 const COOKIE_NAME: Record<DashboardNavSeenKey, string> = {
   "call-history": DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
   "action-inbox": DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
+  "cara-training": DASHBOARD_CARA_TRAINING_SEEN_COOKIE,
 };
 
 /**

@@ -14,6 +14,7 @@ function pathnameToSeenKey(pathname: string | null): DashboardNavSeenKey | null 
     { prefix: "/dashboard/call-history", key: "call-history" },
     { prefix: "/dashboard/calls", key: "call-history" },
     { prefix: "/dashboard/action-inbox", key: "action-inbox" },
+    { prefix: "/dashboard/cara-training", key: "cara-training" },
   ];
   for (const { prefix, key } of routes) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {

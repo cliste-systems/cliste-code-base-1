@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
+import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -13,6 +14,7 @@ export type DashboardSessionProfile = {
 export type DashboardSession = {
   supabase: Awaited<ReturnType<typeof createClient>>;
   user: User;
+  accountId: string;
   organizationId: string;
   /**
    * The caller's row from `public.profiles`. Loaded as part of the same
@@ -58,8 +60,8 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
 
     let profileQuery = admin
       .from("profiles")
-      .select("id, organization_id, name, role")
-      .not("organization_id", "is", null)
+      .select("id, account_id, organization_id, active_organization_id, name, role")
+      .not("account_id", "is", null)
       .order("created_at", { ascending: true })
       .limit(1);
 
@@ -71,7 +73,9 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
 
     const { data: profiles, error } = await profileQuery;
     const profile = profiles?.[0];
-    if (error || !profile?.organization_id) return null;
+    const orgId =
+      profile?.active_organization_id ?? profile?.organization_id ?? null;
+    if (error || !profile?.account_id || !orgId) return null;
 
     return {
       supabase: admin,
@@ -80,7 +84,8 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
         name: profile.name ?? null,
         role: profile.role ?? null,
       }),
-      organizationId: profile.organization_id,
+      accountId: profile.account_id,
+      organizationId: orgId,
       profile: {
         name: profile.name ?? null,
         role: profile.role ?? null,
@@ -104,14 +109,17 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
     if (previewSession) return { tag: "ok", session: previewSession };
     return { tag: "no_session" };
   }
+  redirectIfEmailUnconfirmed(user);
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("organization_id, name, role")
+    .select("account_id, organization_id, active_organization_id, name, role")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError || !profile?.organization_id) {
+  const organizationId =
+    profile?.active_organization_id ?? profile?.organization_id ?? null;
+  if (profileError || !profile?.account_id || !organizationId) {
     return { tag: "user_no_org" };
   }
 
@@ -120,7 +128,8 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
     session: {
       supabase,
       user,
-      organizationId: profile.organization_id,
+      accountId: profile.account_id,
+      organizationId,
       profile: {
         name: profile.name ?? null,
         role: profile.role ?? null,
@@ -128,14 +137,6 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
     },
   };
 }
-
-export const getOptionalDashboardSession = cache(
-  async (): Promise<DashboardSession | null> => {
-    const r = await resolveDashboardAuth();
-    if (r.tag === "ok") return r.session;
-    return null;
-  }
-);
 
 export const requireDashboardSession = cache(
   async (): Promise<DashboardSession> => {

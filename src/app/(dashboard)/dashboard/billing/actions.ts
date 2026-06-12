@@ -18,43 +18,9 @@ export type BillingPortalResult =
   | { ok: true; url: string }
   | { ok: false; message: string };
 
-export type BillingCheckoutResult =
-  | { ok: true; url: string }
-  | { ok: false; message: string };
-
 export type EmbeddedBillingCheckoutResult =
   | { ok: true; clientSecret: string }
   | { ok: false; message: string };
-
-/**
- * Opens Stripe Billing Portal when the org already has a subscription; otherwise
- * callers should route to `/dashboard/usage/checkout` for embedded Checkout.
- */
-export async function startBillingCheckout(): Promise<BillingCheckoutResult> {
-  if (!stripeIsConfigured()) {
-    return {
-      ok: false,
-      message: "Billing is not configured for this environment.",
-    };
-  }
-
-  const { supabase, organizationId } = await requireDashboardSession();
-
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("platform_subscription_id")
-    .eq("id", organizationId)
-    .maybeSingle<{ platform_subscription_id: string | null }>();
-
-  if (org?.platform_subscription_id?.trim()) {
-    return openBillingPortal();
-  }
-
-  return {
-    ok: false,
-    message: "Continue to checkout to set up billing.",
-  };
-}
 
 /**
  * Embedded Stripe Checkout (in-app) for dashboard orgs without a subscription.

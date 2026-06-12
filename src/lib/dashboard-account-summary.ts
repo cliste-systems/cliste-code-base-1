@@ -29,19 +29,19 @@ export function formatDashboardProfileRole(
 export function buildDashboardAccountSummary(
   profile: DashboardSessionProfile,
   user: User,
-  organization: { name: string | null; slug: string | null } | null,
+  account: { name: string | null; slug: string | null } | null,
 ): DashboardAccountSummary {
   const displayName =
     profile.name?.trim() ||
     user.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim() ||
     "Account";
-  const organizationName =
-    resolveOrganizationDisplayName(organization?.name, organization?.slug) ||
+  const accountName =
+    resolveOrganizationDisplayName(account?.name, account?.slug) ||
     "Your business";
 
   return {
     initials: initialsFromName(displayName),
     displayName,
-    subtitle: `${formatDashboardProfileRole(profile.role)} · ${organizationName}`,
+    subtitle: `${formatDashboardProfileRole(profile.role)} · ${accountName}`,
   };
 }
