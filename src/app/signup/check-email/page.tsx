@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
+import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 
-import { ResendConfirmationButton } from "./resend-confirmation-button";
+import { VerifyCodeForm } from "./verify-code-form";
 
 export const metadata: Metadata = {
   title: "Confirm your email — Cliste Systems",
-  description: "Check your inbox to confirm your Cliste account.",
+  description: "Enter the verification code to confirm your Cliste account.",
 };
 
 type CheckEmailPageProps = {
@@ -23,35 +24,41 @@ export default async function SignupCheckEmailPage({
 
   return (
     <AuthMarketingShell
-      title="Check your email"
-      subtitle="We sent a confirmation link so we know this inbox is yours."
+      title="Enter your code"
+      subtitle="Confirm your inbox to continue setting up Cara."
       pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
+      compact
     >
-      <div className="space-y-4 text-sm">
+      <div className="space-y-5 text-center">
+        <OnboardingEnter tone="profile">
+          <p className="text-[13px] leading-relaxed text-slate-500">
+            {email ? (
+              <>
+                We sent a 6-digit code to{" "}
+                <span className="font-medium text-[#0b1220]">{email}</span>.
+                Enter it below, or use the link in the email.
+              </>
+            ) : (
+              <>Open the confirmation email and enter the 6-digit code below.</>
+            )}
+          </p>
+        </OnboardingEnter>
+
         {email ? (
-          <p className="text-muted-foreground">
-            Open the link we sent to{" "}
-            <span className="text-foreground font-medium">{email}</span> to
-            continue setting up Cara.
-          </p>
-        ) : (
-          <p className="text-muted-foreground">
-            Open the confirmation link in your inbox to continue setting up Cara.
-          </p>
-        )}
-        <p className="text-muted-foreground">
-          The link expires after a while. If you do not see the email, check spam
-          or request another link below.
-        </p>
-        {email ? <ResendConfirmationButton email={email} /> : null}
-        <p>
+          <OnboardingEnter tone="profile">
+            <VerifyCodeForm email={email} />
+          </OnboardingEnter>
+        ) : null}
+
+        <OnboardingEnter tone="profile" className="text-[12px] text-slate-500">
+          Already confirmed?{" "}
           <Link
             href="/authenticate"
-            className="text-primary font-medium underline-offset-4 hover:underline"
+            className="font-medium text-[#0b1220] underline underline-offset-2"
           >
-            Back to sign in
+            Sign in
           </Link>
-        </p>
+        </OnboardingEnter>
       </div>
     </AuthMarketingShell>
   );

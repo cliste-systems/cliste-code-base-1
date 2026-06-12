@@ -14,8 +14,10 @@ type Props = {
 };
 
 /**
- * Compact Turnstile in a glass field — parent should unmount once onSuccess fires
- * so the "Success!" state never sits in the form.
+ * Compact Turnstile in a glass field. Keep this mounted for the life of the form
+ * (the parent visually hides it after success) so a fresh single-use token can be
+ * read on submit and the widget can be reset in place after a server rejection.
+ * Do NOT unmount on success — remounting replays the challenge and burns tokens.
  */
 export const AuthTurnstileField = forwardRef<TurnstileInstance, Props>(
   function AuthTurnstileField(

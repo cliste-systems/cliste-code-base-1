@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
@@ -34,10 +41,22 @@ const SIGNUP_FIELD_BOX = "px-3.5 py-2.5";
 
 type SignupFieldErrors = Partial<
   Record<
-    "firstName" | "lastName" | "salonName" | "email" | "password" | "acceptLegal",
+    | "firstName"
+    | "lastName"
+    | "salonName"
+    | "email"
+    | "phone"
+    | "password"
+    | "acceptLegal",
     string
   >
 >;
+
+const PHONE_COMPACT_RE = /^\+?\d{7,15}$/;
+
+function compactPhone(raw: string): string {
+  return raw.replace(/[\s\-().]/g, "");
+}
 
 function validateSignupFields(formData: FormData): SignupFieldErrors {
   const errors: SignupFieldErrors = {};
@@ -54,6 +73,10 @@ function validateSignupFields(formData: FormData): SignupFieldErrors {
   }
   if (!email || !EMAIL_RE.test(email)) {
     errors.email = "Enter a valid email address.";
+  }
+  const phone = compactPhone(String(formData.get("phone") ?? "").trim());
+  if (!phone || !PHONE_COMPACT_RE.test(phone)) {
+    errors.phone = "Enter a valid phone number.";
   }
   if (password.length < 8) {
     errors.password = "Password must be at least 8 characters.";
@@ -90,8 +113,8 @@ export function SignupForm({
 
   const [showPw, setShowPw] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileMountKey, setTurnstileMountKey] = useState(0);
+  const [turnstileVerified, setTurnstileVerified] = useState(false);
+  const [submittingSecurity, setSubmittingSecurity] = useState(false);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const turnstileSiteKey =
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
@@ -100,9 +123,12 @@ export function SignupForm({
   useEffect(() => {
     if (state.ok) return;
     const message = "message" in state ? state.message : "";
-    if (!message.includes("Security check")) return;
-    setTurnstileToken(null);
-    setTurnstileMountKey((key) => key + 1);
+    // Any server rejection means the token we submitted was already consumed by
+    // Cloudflare (tokens are single-use). Reset the widget so the next attempt
+    // gets a fresh token instead of replaying a burned one.
+    if (!message) return;
+    setTurnstileVerified(false);
+    turnstileRef.current?.reset();
   }, [state]);
 
   function clearFieldError(field: keyof SignupFieldErrors) {
@@ -114,7 +140,7 @@ export function SignupForm({
     });
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -124,19 +150,45 @@ export function SignupForm({
       return;
     }
 
-    if (turnstileSiteKey && !turnstileToken) {
-      setFieldErrors({
-        email: "Complete the security check below the terms checkbox.",
-      });
-      return;
-    }
+    if (turnstileSiteKey) {
+      if (!turnstileVerified) {
+        setFieldErrors({
+          email: "Complete the security check below the terms checkbox.",
+        });
+        return;
+      }
 
-    if (turnstileToken) {
-      formData.set("turnstileToken", turnstileToken);
+      setSubmittingSecurity(true);
+      try {
+        let token = turnstileRef.current?.getResponse();
+        if (!token || turnstileRef.current?.isExpired()) {
+          setTurnstileVerified(false);
+          turnstileRef.current?.reset();
+          token = await turnstileRef.current?.getResponsePromise(30_000);
+        }
+        if (!token) {
+          throw new Error("missing turnstile token");
+        }
+        formData.set("turnstileToken", token);
+      } catch {
+        setFieldErrors({
+          email: "Security check expired. Tick the box again, then retry.",
+        });
+        setTurnstileVerified(false);
+        turnstileRef.current?.reset();
+        setSubmittingSecurity(false);
+        return;
+      }
+      setSubmittingSecurity(false);
     }
 
     setFieldErrors({});
-    formAction(formData);
+    // Manual dispatch of a useActionState action MUST be wrapped in
+    // startTransition — otherwise Next.js drops the server action's
+    // redirect() and the user silently stays on this page.
+    startTransition(() => {
+      formAction(formData);
+    });
   }
 
   return (
@@ -240,6 +292,25 @@ export function SignupForm({
         </OnboardingFieldBox>
 
         <OnboardingFieldBox
+          label="Phone number"
+          htmlFor="phone"
+          error={fieldErrors.phone}
+          className={SIGNUP_FIELD_BOX}
+        >
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="+353 87 123 4567"
+            aria-invalid={Boolean(fieldErrors.phone)}
+            onChange={() => clearFieldError("phone")}
+            className={ONBOARDING_FIELD_INPUT}
+          />
+        </OnboardingFieldBox>
+
+        <OnboardingFieldBox
           label="Password"
           htmlFor="password"
           error={fieldErrors.password}
@@ -298,16 +369,20 @@ export function SignupForm({
           </div>
         </OnboardingEnter>
 
-        {turnstileSiteKey && !turnstileToken ? (
-          <OnboardingEnter tone="profile">
+        {turnstileSiteKey ? (
+          <div className={turnstileVerified ? "sr-only" : undefined}>
             <AuthTurnstileField
-              key={turnstileMountKey}
               ref={turnstileRef}
               siteKey={turnstileSiteKey}
-              onSuccess={setTurnstileToken}
-              onExpire={() => setTurnstileToken(null)}
+              onSuccess={() => setTurnstileVerified(true)}
+              onExpire={() => setTurnstileVerified(false)}
             />
-          </OnboardingEnter>
+          </div>
+        ) : null}
+        {turnstileSiteKey && turnstileVerified ? (
+          <p className="text-center text-[11px] text-slate-500">
+            Security check passed
+          </p>
         ) : null}
 
         <AuthFormAlert message={errorMessage || null} />
@@ -315,10 +390,14 @@ export function SignupForm({
         <OnboardingEnter tone="profile" className="flex justify-center pt-0.5">
           <OnboardingPrimaryButton
             type="submit"
-            pending={pending}
+            pending={pending || submittingSecurity}
             className="w-full max-w-none sm:min-w-[14rem]"
           >
-            {pending ? "Creating your account…" : "Create account"}
+            {submittingSecurity
+              ? "Verifying…"
+              : pending
+                ? "Creating your account…"
+                : "Create account"}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </OnboardingPrimaryButton>
         </OnboardingEnter>

@@ -83,6 +83,13 @@ export async function sendTransactionalEmail(
       from: { email: fromEmail, name: fromName },
       subject,
       content: body,
+      // Click tracking rewrites links through a SendGrid tracking domain
+      // (url####.clistesystems.ie) which we don't have DNS for, breaking
+      // auth links. These are transactional emails — no tracking needed.
+      tracking_settings: {
+        click_tracking: { enable: false, enable_text: false },
+        open_tracking: { enable: false },
+      },
     }),
   });
 

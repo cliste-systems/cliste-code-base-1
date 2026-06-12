@@ -10,20 +10,32 @@ export function signupConfirmationRedirectOrigin(): string {
   return resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
 }
 
-export function buildSignupConfirmationEmailBodies(actionLink: string): {
+export function buildSignupConfirmationEmailBodies(
+  actionLink: string,
+  emailOtp?: string,
+): {
   subject: string;
   text: string;
   html: string;
 } {
-  const subject = "Confirm your Cliste account";
+  const subject = emailOtp
+    ? `${emailOtp} is your Cliste verification code`
+    : "Confirm your Cliste account";
   const text = [
     "Thanks for signing up for Cliste.",
     "",
-    "Confirm your email to continue setting up Cara:",
+    ...(emailOtp
+      ? [`Your verification code: ${emailOtp}`, "", "Or confirm via this link:"]
+      : ["Confirm your email to continue setting up Cara:"]),
     actionLink,
     "",
-    "This link expires after a while. If you did not create this account, you can ignore this email.",
+    "This code and link expire after a while. If you did not create this account, you can ignore this email.",
   ].join("\n");
+
+  const codeBlock = emailOtp
+    ? `<p style="margin:0 0 8px;font-size:13px;color:#64748b;">Enter this code on the verification page:</p>
+                <p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:0.35em;color:#0b1220;">${emailOtp}</p>`
+    : "";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -36,17 +48,14 @@ export function buildSignupConfirmationEmailBodies(actionLink: string): {
               <td>
                 <p style="margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">Cliste</p>
                 <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:600;">Confirm your email</h1>
-                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#475569;">
-                  Thanks for signing up. Tap the button below to verify this inbox and continue setting up Cara.
+                ${codeBlock}
+                <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;">
+                  ${emailOtp ? "Or tap the button below to confirm in one click." : "Tap the button below to verify this inbox and continue setting up Cara."}
                 </p>
                 <p style="margin:0 0 24px;">
                   <a href="${actionLink}" style="display:inline-block;background:#0b1220;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 20px;border-radius:999px;">
                     Confirm email and continue
                   </a>
-                </p>
-                <p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
-                  Or copy this link into your browser:<br />
-                  <a href="${actionLink}" style="color:#0b1220;word-break:break-all;">${actionLink}</a>
                 </p>
                 <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">
                   If you did not create this account, you can ignore this email.
@@ -93,6 +102,7 @@ export async function sendSignupConfirmationEmail(
     };
   }
 
+  const linkType = input.password ? "signup" : "magiclink";
   const { data: linkData, error: linkError } = input.password
     ? await admin.auth.admin.generateLink({
         type: "signup",
@@ -105,17 +115,36 @@ export async function sendSignupConfirmationEmail(
         email,
         options: { redirectTo },
       });
-  const actionLink = linkData?.properties?.action_link?.trim();
-  if (linkError || !actionLink) {
+  if (linkError) {
     return {
       ok: false,
       message:
-        linkError?.message ??
+        linkError.message ??
         "Could not create a confirmation link. Check Supabase Auth redirect URLs.",
     };
   }
 
-  const bodies = buildSignupConfirmationEmailBodies(actionLink);
+  // Build a clean first-party link straight to our callback page, which
+  // verifies via token_hash + type. This avoids the long Supabase
+  // /auth/v1/verify action link bouncing through a third-party domain.
+  const hashedToken = linkData?.properties?.hashed_token?.trim();
+  const fallbackActionLink = linkData?.properties?.action_link?.trim();
+  const actionLink = hashedToken
+    ? `${redirectTo}?token_hash=${encodeURIComponent(hashedToken)}&type=${linkType}`
+    : fallbackActionLink;
+  if (!actionLink) {
+    return {
+      ok: false,
+      message:
+        "Could not create a confirmation link. Check Supabase Auth redirect URLs.",
+    };
+  }
+
+  // 6-digit code for the same token — lets the user type it on the
+  // check-email page instead of opening the link.
+  const emailOtp = linkData?.properties?.email_otp?.trim() || undefined;
+
+  const bodies = buildSignupConfirmationEmailBodies(actionLink, emailOtp);
   return sendTransactionalEmail({
     to: email,
     subject: bodies.subject,

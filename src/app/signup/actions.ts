@@ -26,6 +26,12 @@ const MAX_SALON_NAME = 120;
 const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 128;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_COMPACT_RE = /^\+?\d{7,15}$/;
+
+/** Strip spaces and punctuation so "+353 87 123 4567" validates and stores compactly. */
+function compactPhone(raw: string): string {
+  return raw.replace(/[\s\-().]/g, "");
+}
 
 export type SignupResult =
   | { ok: true }
@@ -76,6 +82,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   const lastName = String(formData.get("lastName") ?? "").trim();
   const ownerName = [firstName, lastName].filter(Boolean).join(" ");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = compactPhone(String(formData.get("phone") ?? "").trim());
   const password = String(formData.get("password") ?? "");
   const rawPlan = String(formData.get("planTier") ?? "").trim();
   const rawInterval = String(formData.get("billingInterval") ?? "").trim();
@@ -93,6 +100,9 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   }
   if (!email || !EMAIL_RE.test(email)) {
     return { ok: false, message: "Enter a valid email address." };
+  }
+  if (!phone || !PHONE_COMPACT_RE.test(phone)) {
+    return { ok: false, message: "Enter a valid phone number." };
   }
   if (password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) {
     return {
@@ -169,6 +179,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       full_name: ownerName,
       first_name: firstName,
       last_name: lastName,
+      phone,
       source: "self_signup",
     },
     app_metadata: {
@@ -238,6 +249,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       signup_ip: signupIp,
       signup_user_agent: ua ?? null,
       niche: "other",
+      notification_phone: phone,
       ...(planTier ? { plan_tier: planTier, billing_interval: billingInterval } : {}),
     })
     .select("id")
