@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, type FormEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
@@ -91,11 +91,18 @@ export function SignupForm({
   const [showPw, setShowPw] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [verifyingSecurity, setVerifyingSecurity] = useState(false);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const turnstileSiteKey =
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
   const errorMessage = !state.ok && state.message ? state.message : null;
+  const turnstilePending = Boolean(turnstileSiteKey && !turnstileToken);
+
+  useEffect(() => {
+    if (!state.ok && state.message?.includes("Security check")) {
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
+    }
+  }, [state.ok, state.message]);
 
   function clearFieldError(field: keyof SignupFieldErrors) {
     setFieldErrors((current) => {
@@ -106,7 +113,7 @@ export function SignupForm({
     });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -116,30 +123,16 @@ export function SignupForm({
       return;
     }
 
-    let token = turnstileToken;
-    if (turnstileSiteKey) {
-      if (!token) {
-        setVerifyingSecurity(true);
-        try {
-          turnstileRef.current?.execute();
-          const verified = await turnstileRef.current?.getResponsePromise(20_000);
-          if (!verified) {
-            throw new Error("missing token");
-          }
-          token = verified;
-          setTurnstileToken(token);
-        } catch {
-          setFieldErrors({
-            email: "Security check failed. Please try again.",
-          });
-          turnstileRef.current?.reset();
-          setTurnstileToken(null);
-          setVerifyingSecurity(false);
-          return;
-        }
-        setVerifyingSecurity(false);
-      }
-      formData.set("turnstileToken", token);
+    if (turnstileSiteKey && !turnstileToken) {
+      setFieldErrors({
+        email: "Security check is still loading. Wait a moment and try again.",
+      });
+      turnstileRef.current?.reset();
+      return;
+    }
+
+    if (turnstileToken) {
+      formData.set("turnstileToken", turnstileToken);
     }
 
     setFieldErrors({});
@@ -305,26 +298,32 @@ export function SignupForm({
           </div>
         </OnboardingEnter>
 
-        {turnstileSiteKey ? (
-          <AuthInvisibleTurnstile
-            ref={turnstileRef}
-            siteKey={turnstileSiteKey}
-            onSuccess={setTurnstileToken}
-            onExpire={() => setTurnstileToken(null)}
-            onError={() => setTurnstileToken(null)}
-          />
-        ) : null}
-
         <AuthFormAlert message={errorMessage || null} />
+
+        {turnstileSiteKey ? (
+          <div className="empty:hidden" aria-hidden>
+            <AuthInvisibleTurnstile
+              ref={turnstileRef}
+              siteKey={turnstileSiteKey}
+              onSuccess={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => {
+                setTurnstileToken(null);
+                turnstileRef.current?.reset();
+              }}
+            />
+          </div>
+        ) : null}
 
         <OnboardingEnter tone="profile" className="flex justify-center pt-0.5">
           <OnboardingPrimaryButton
             type="submit"
-            pending={pending || verifyingSecurity}
+            pending={pending}
+            disabled={turnstilePending}
             className="w-full max-w-none sm:min-w-[14rem]"
           >
-            {verifyingSecurity
-              ? "Verifying…"
+            {turnstilePending
+              ? "Loading…"
               : pending
                 ? "Creating your account…"
                 : "Create account"}

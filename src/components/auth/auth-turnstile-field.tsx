@@ -8,16 +8,15 @@ type Props = {
   onSuccess: (token: string) => void;
   onExpire: () => void;
   onError?: () => void;
-  onReady?: () => void;
 };
 
 /**
- * Invisible Turnstile — no checkbox in the form. Challenge runs on execute();
- * Cloudflare only surfaces UI when interaction is required.
+ * Turnstile with interaction-only appearance — no inline checkbox for most users.
+ * Cloudflare only surfaces UI when a manual challenge is required.
  */
 export const AuthInvisibleTurnstile = forwardRef<TurnstileInstance, Props>(
   function AuthInvisibleTurnstile(
-    { siteKey, onSuccess, onExpire, onError, onReady },
+    { siteKey, onSuccess, onExpire, onError },
     ref,
   ) {
     return (
@@ -27,12 +26,10 @@ export const AuthInvisibleTurnstile = forwardRef<TurnstileInstance, Props>(
         onSuccess={onSuccess}
         onExpire={onExpire}
         onError={onError}
-        onWidgetLoad={onReady}
         options={{
-          execution: "execute",
+          theme: "light",
           appearance: "interaction-only",
         }}
-        className="sr-only"
       />
     );
   },
