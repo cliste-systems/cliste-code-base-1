@@ -40,8 +40,9 @@ export default async function SignupPage(props: { searchParams?: SearchParams })
   return (
     <AuthMarketingShell
       title="Create your account"
-      subtitle="Set up Cara in a few guided steps — your AI phone agent for Irish businesses."
+      subtitle="Your AI phone agent for Irish businesses."
       pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
+      compact
     >
       <SignupForm
         planTier={intent.planTier}

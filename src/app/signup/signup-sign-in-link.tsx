@@ -8,7 +8,7 @@ export function SignupSignInLink() {
   return (
     <OnboardingEnter
       tone="profile"
-      className="mt-5 text-center text-[13px] text-slate-500"
+      className="mt-3 text-center text-[12px] text-slate-500"
     >
       Already have an account?{" "}
       <Link

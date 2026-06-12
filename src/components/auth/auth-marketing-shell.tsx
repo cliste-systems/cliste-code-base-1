@@ -37,6 +37,8 @@ type Props = {
   marketingBody?: string;
   marketingBullets?: string[];
   pageBackground?: PageBackground;
+  /** Tighter card padding and header spacing (signup). */
+  compact?: boolean;
   urlError?: string | null;
   children: ReactNode;
 };
@@ -102,39 +104,60 @@ function SignupGlassShell({
   urlError,
   children,
   assets,
+  compact = false,
 }: {
   title: string;
   subtitle: string;
   urlError?: string | null;
   children: ReactNode;
   assets: PageBackground;
+  compact?: boolean;
 }) {
   const panel = (
     <div
       className={cn(
         ONBOARDING_GLASS_CARD,
-        "w-full rounded-[28px] px-6 py-8 sm:px-9 sm:py-10",
+        compact
+          ? "w-full rounded-[24px] px-5 py-5 sm:px-7 sm:py-6"
+          : "w-full rounded-[28px] px-6 py-8 sm:px-9 sm:py-10",
       )}
     >
       <OnboardingEnterProvider>
         <div
           className={cn(
             "mx-auto flex w-full max-w-md flex-col items-center",
-            ONBOARDING_SHELL_SECTION_GAP,
+            compact ? "gap-3.5 sm:gap-4" : ONBOARDING_SHELL_SECTION_GAP,
           )}
         >
           <div
             className={cn(
               "flex w-full flex-col items-center",
-              ONBOARDING_SHELL_LOGO_GAP,
+              compact ? "gap-2" : ONBOARDING_SHELL_LOGO_GAP,
             )}
           >
             <OnboardingEnter tone="profile" className="flex justify-center">
-              <ClisteLogoMark size={ONBOARDING_LOGO_SIZE} priority />
+              <ClisteLogoMark
+                size={compact ? 40 : ONBOARDING_LOGO_SIZE}
+                priority
+              />
             </OnboardingEnter>
             <OnboardingEnter tone="profile" className="w-full text-center">
-              <h1 className={ONBOARDING_HEADLINE}>{title}</h1>
-              <p className={cn(ONBOARDING_SUBHEADLINE, "mt-2")}>{subtitle}</p>
+              <h1
+                className={cn(
+                  ONBOARDING_HEADLINE,
+                  compact && "text-[1.5rem] sm:text-[1.625rem]",
+                )}
+              >
+                {title}
+              </h1>
+              <p
+                className={cn(
+                  ONBOARDING_SUBHEADLINE,
+                  compact ? "mt-1 text-[12px] leading-snug" : "mt-2",
+                )}
+              >
+                {subtitle}
+              </p>
             </OnboardingEnter>
           </div>
 
@@ -256,6 +279,7 @@ export function AuthMarketingShell({
   marketingBody,
   marketingBullets,
   pageBackground,
+  compact = false,
   urlError,
   children,
 }: Props) {
@@ -266,6 +290,7 @@ export function AuthMarketingShell({
         subtitle={subtitle}
         urlError={urlError}
         assets={pageBackground}
+        compact={compact}
       >
         {children}
       </SignupGlassShell>

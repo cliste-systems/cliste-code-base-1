@@ -2,8 +2,8 @@
 
 import { useActionState, useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
-import { Turnstile } from "@marsidev/react-turnstile";
 
+import { AuthTurnstileField } from "@/components/auth/auth-turnstile-field";
 import {
   OnboardingFieldBox,
   OnboardingFieldRow,
@@ -14,6 +14,7 @@ import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-prim
 import {
   ONBOARDING_FIELD_INPUT,
   ONBOARDING_GLASS_PREVIEW,
+  ONBOARDING_PROFILE_FIELD_BOX,
 } from "@/components/onboarding/onboarding-ui";
 import {
   LegalAcceptanceCheckbox,
@@ -28,6 +29,8 @@ import { startSignup, type SignupResult } from "./actions";
 const INITIAL: SignupResult = { ok: false, message: "" };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const SIGNUP_FIELD_BOX = "px-3.5 py-2.5";
 
 type SignupFieldErrors = Partial<
   Record<
@@ -124,7 +127,7 @@ export function SignupForm({
         action={formAction}
         onSubmit={handleSubmit}
         noValidate
-        className="w-full space-y-3"
+        className="w-full space-y-2"
       >
         {planTier ? (
           <input type="hidden" name="planTier" value={planTier} />
@@ -145,11 +148,12 @@ export function SignupForm({
           </OnboardingEnter>
         ) : null}
 
-        <OnboardingFieldRow className="grid gap-3 sm:grid-cols-2">
+        <OnboardingFieldRow className="grid gap-2 sm:grid-cols-2">
           <OnboardingFieldBox
             label="First name"
             htmlFor="firstName"
             error={fieldErrors.firstName}
+            className={SIGNUP_FIELD_BOX}
           >
             <input
               id="firstName"
@@ -166,6 +170,7 @@ export function SignupForm({
             label="Last name"
             htmlFor="lastName"
             error={fieldErrors.lastName}
+            className={SIGNUP_FIELD_BOX}
           >
             <input
               id="lastName"
@@ -184,6 +189,7 @@ export function SignupForm({
           label="Business name"
           htmlFor="salonName"
           error={fieldErrors.salonName}
+          className={SIGNUP_FIELD_BOX}
         >
           <input
             id="salonName"
@@ -201,6 +207,7 @@ export function SignupForm({
           label="Email address"
           htmlFor="email"
           error={fieldErrors.email}
+          className={SIGNUP_FIELD_BOX}
         >
           <input
             id="email"
@@ -218,6 +225,7 @@ export function SignupForm({
           label="Password"
           htmlFor="password"
           error={fieldErrors.password}
+          className={SIGNUP_FIELD_BOX}
         >
           <div className="relative">
             <input
@@ -247,15 +255,21 @@ export function SignupForm({
         </OnboardingFieldBox>
 
         <OnboardingEnter tone="profile">
-          <div className="space-y-1.5">
+          <div
+            className={cn(
+              ONBOARDING_PROFILE_FIELD_BOX,
+              "space-y-2 px-3.5 py-2.5",
+            )}
+          >
             <LegalAcceptanceCheckbox
               id="acceptLegal"
               name="acceptLegal"
               required={false}
+              compact
               onCheckedChange={() => clearFieldError("acceptLegal")}
               className={cn(
-                fieldErrors.acceptLegal &&
-                  "border-red-300/90 bg-red-50/60 ring-1 ring-red-200",
+                "border-0 bg-transparent p-0 shadow-none",
+                fieldErrors.acceptLegal && "text-red-700",
               )}
             >
               I agree to the{" "}
@@ -264,28 +278,25 @@ export function SignupForm({
               <LegalDocLink href="/legal/privacy">privacy notice</LegalDocLink>.
             </LegalAcceptanceCheckbox>
             {fieldErrors.acceptLegal ? (
-              <p className="px-1 text-[12px] font-medium leading-snug text-red-600">
+              <p className="text-[11px] font-medium leading-snug text-red-600">
                 {fieldErrors.acceptLegal}
               </p>
+            ) : null}
+            {turnstileSiteKey ? (
+              <AuthTurnstileField
+                siteKey={turnstileSiteKey}
+                token={turnstileToken}
+                onSuccess={setTurnstileToken}
+                onExpire={() => setTurnstileToken(null)}
+                className="border-0 bg-white/35 px-0 py-0 shadow-none ring-0"
+              />
             ) : null}
           </div>
         </OnboardingEnter>
 
         <AuthFormAlert message={errorMessage || null} />
 
-        {turnstileSiteKey ? (
-          <OnboardingEnter tone="profile" className="flex justify-center">
-            <input type="hidden" name="turnstileToken" value={turnstileToken ?? ""} />
-            <Turnstile
-              siteKey={turnstileSiteKey}
-              onSuccess={setTurnstileToken}
-              onExpire={() => setTurnstileToken(null)}
-              options={{ theme: "light", size: "normal" }}
-            />
-          </OnboardingEnter>
-        ) : null}
-
-        <OnboardingEnter tone="profile" className="flex justify-center pt-2">
+        <OnboardingEnter tone="profile" className="flex justify-center pt-0.5">
           <OnboardingPrimaryButton
             type="submit"
             pending={pending}
