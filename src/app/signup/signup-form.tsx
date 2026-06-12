@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState, type FormEvent } from "rea
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
-import { AuthInvisibleTurnstile } from "@/components/auth/auth-turnstile-field";
+import { AuthTurnstileField } from "@/components/auth/auth-turnstile-field";
 import {
   OnboardingFieldBox,
   OnboardingFieldRow,
@@ -91,19 +91,18 @@ export function SignupForm({
   const [showPw, setShowPw] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileMountKey, setTurnstileMountKey] = useState(0);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const turnstileSiteKey =
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
   const errorMessage = !state.ok && state.message ? state.message : null;
-  const turnstilePending = Boolean(turnstileSiteKey && !turnstileToken);
 
   useEffect(() => {
     if (state.ok) return;
     const message = "message" in state ? state.message : "";
-    if (message.includes("Security check")) {
-      setTurnstileToken(null);
-      turnstileRef.current?.reset();
-    }
+    if (!message.includes("Security check")) return;
+    setTurnstileToken(null);
+    setTurnstileMountKey((key) => key + 1);
   }, [state]);
 
   function clearFieldError(field: keyof SignupFieldErrors) {
@@ -127,9 +126,8 @@ export function SignupForm({
 
     if (turnstileSiteKey && !turnstileToken) {
       setFieldErrors({
-        email: "Security check is still loading. Wait a moment and try again.",
+        email: "Complete the security check below the terms checkbox.",
       });
-      turnstileRef.current?.reset();
       return;
     }
 
@@ -300,35 +298,27 @@ export function SignupForm({
           </div>
         </OnboardingEnter>
 
-        <AuthFormAlert message={errorMessage || null} />
-
-        {turnstileSiteKey ? (
-          <div className="empty:hidden" aria-hidden>
-            <AuthInvisibleTurnstile
+        {turnstileSiteKey && !turnstileToken ? (
+          <OnboardingEnter tone="profile">
+            <AuthTurnstileField
+              key={turnstileMountKey}
               ref={turnstileRef}
               siteKey={turnstileSiteKey}
               onSuccess={setTurnstileToken}
               onExpire={() => setTurnstileToken(null)}
-              onError={() => {
-                setTurnstileToken(null);
-                turnstileRef.current?.reset();
-              }}
             />
-          </div>
+          </OnboardingEnter>
         ) : null}
+
+        <AuthFormAlert message={errorMessage || null} />
 
         <OnboardingEnter tone="profile" className="flex justify-center pt-0.5">
           <OnboardingPrimaryButton
             type="submit"
             pending={pending}
-            disabled={turnstilePending}
             className="w-full max-w-none sm:min-w-[14rem]"
           >
-            {turnstilePending
-              ? "Loading…"
-              : pending
-                ? "Creating your account…"
-                : "Create account"}
+            {pending ? "Creating your account…" : "Create account"}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </OnboardingPrimaryButton>
         </OnboardingEnter>

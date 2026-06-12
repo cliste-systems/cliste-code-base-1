@@ -3,34 +3,44 @@
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { forwardRef } from "react";
 
+import { ONBOARDING_PROFILE_FIELD_BOX } from "@/components/onboarding/onboarding-ui";
+import { cn } from "@/lib/utils";
+
 type Props = {
   siteKey: string;
   onSuccess: (token: string) => void;
   onExpire: () => void;
-  onError?: () => void;
+  className?: string;
 };
 
 /**
- * Turnstile with interaction-only appearance — no inline checkbox for most users.
- * Cloudflare only surfaces UI when a manual challenge is required.
+ * Compact Turnstile in a glass field — parent should unmount once onSuccess fires
+ * so the "Success!" state never sits in the form.
  */
-export const AuthInvisibleTurnstile = forwardRef<TurnstileInstance, Props>(
-  function AuthInvisibleTurnstile(
-    { siteKey, onSuccess, onExpire, onError },
+export const AuthTurnstileField = forwardRef<TurnstileInstance, Props>(
+  function AuthTurnstileField(
+    { siteKey, onSuccess, onExpire, className },
     ref,
   ) {
     return (
-      <Turnstile
-        ref={ref}
-        siteKey={siteKey}
-        onSuccess={onSuccess}
-        onExpire={onExpire}
-        onError={onError}
-        options={{
-          theme: "light",
-          appearance: "interaction-only",
-        }}
-      />
+      <div
+        className={cn(
+          ONBOARDING_PROFILE_FIELD_BOX,
+          "flex justify-center px-2 py-2",
+          className,
+        )}
+      >
+        <Turnstile
+          ref={ref}
+          siteKey={siteKey}
+          onSuccess={onSuccess}
+          onExpire={onExpire}
+          options={{
+            theme: "light",
+            size: "compact",
+          }}
+        />
+      </div>
     );
   },
 );
