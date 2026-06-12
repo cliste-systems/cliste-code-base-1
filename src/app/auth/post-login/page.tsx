@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { canAccessAdminConsole } from "@/lib/admin-session";
+import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
 import { createClient } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ export default async function PostLoginRoutePage() {
   if (!user) {
     redirect("/authenticate");
   }
+
+  redirectIfEmailUnconfirmed(user);
 
   if (canAccessAdminConsole(user)) {
     redirect("/admin");

@@ -34,8 +34,17 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 |----------|----------|-------|
 | `SENDGRID_API_KEY` | Production | Sends signup confirmation link (with `SENDGRID_FROM_EMAIL`) |
 | `SENDGRID_FROM_EMAIL` | Production | Verified sender |
+| `SENDGRID_FROM_NAME` | Optional | From name (defaults to Cliste) |
+| `NEXT_PUBLIC_APP_URL` | Production | `https://app.clistesystems.ie` — used in confirmation links |
 
 Production signups use `email_confirm: false` and email a confirmation link before onboarding.
+
+**Supabase Auth URLs:** production site URL `https://app.clistesystems.ie`, redirect `https://app.clistesystems.ie/auth/callback`. Agent/script patch (not dashboard):
+
+```bash
+# After `supabase login` or with SUPABASE_ACCESS_TOKEN in .env.local
+npx tsx scripts/patch-supabase-auth-urls.ts
+```
 
 ## Stripe webhooks
 

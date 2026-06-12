@@ -4,6 +4,8 @@ import Link from "next/link";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 
+import { ResendConfirmationButton } from "./resend-confirmation-button";
+
 export const metadata: Metadata = {
   title: "Confirm your email — Cliste Systems",
   description: "Check your inbox to confirm your Cliste account.",
@@ -39,8 +41,9 @@ export default async function SignupCheckEmailPage({
         )}
         <p className="text-muted-foreground">
           The link expires after a while. If you do not see the email, check spam
-          or try signing in — we can send another link from there.
+          or request another link below.
         </p>
+        {email ? <ResendConfirmationButton email={email} /> : null}
         <p>
           <Link
             href="/authenticate"

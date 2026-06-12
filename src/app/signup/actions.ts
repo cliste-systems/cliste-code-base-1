@@ -8,8 +8,8 @@ import {
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
-import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isSendGridConfigured } from "@/lib/sendgrid-mail";
+import { sendSignupConfirmationEmail } from "@/lib/signup-confirmation-email";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
 import { recordLegalAcceptances } from "@/lib/legal-acceptances";
@@ -321,32 +321,10 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   });
 
   if (IS_PRODUCTION) {
-    const origin =
-      resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
-    const { data: linkData, error: linkError } =
-      await admin.auth.admin.generateLink({
-        type: "signup",
-        email,
-        password,
-        options: {
-          redirectTo: `${origin}/auth/callback`,
-        },
-      });
-    const actionLink = linkData?.properties?.action_link?.trim();
-    if (linkError || !actionLink) {
-      await admin.auth.admin.deleteUser(userId).catch(() => undefined);
-      await admin.from("organizations").delete().eq("id", orgId).then(() => undefined);
-      await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
-      return {
-        ok: false,
-        message: linkError?.message ?? "Could not send confirmation email.",
-      };
-    }
-    const sent = await sendTransactionalEmail({
-      to: email,
-      subject: "Confirm your Cliste account",
-      text: `Thanks for signing up for Cliste.\n\nConfirm your email to continue setup:\n${actionLink}\n\nIf you did not create this account, you can ignore this email.`,
-      html: `<p>Thanks for signing up for Cliste.</p><p><a href="${actionLink}">Confirm your email</a> to continue setting up Cara.</p><p>If you did not create this account, you can ignore this email.</p>`,
+    const sent = await sendSignupConfirmationEmail({
+      email,
+      password,
+      admin,
     });
     if (!sent.ok) {
       await admin.auth.admin.deleteUser(userId).catch(() => undefined);

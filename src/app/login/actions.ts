@@ -160,9 +160,12 @@ export async function passwordSignIn(payload: {
         reason: signError.message,
       },
     });
+    const unconfirmed = /email not confirmed/i.test(signError.message);
     return {
       ok: false,
-      message: genericAuthFailureMessage(retryAfterSeconds),
+      message: unconfirmed
+        ? "Confirm your email first — check your inbox for the link we sent when you signed up."
+        : genericAuthFailureMessage(retryAfterSeconds),
       requiresCaptcha,
       retryAfterSeconds: retryAfterSeconds || undefined,
     };
