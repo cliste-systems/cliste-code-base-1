@@ -1,3 +1,7 @@
+import {
+  ACTION_CATEGORY_LABELS,
+  type ActionCategory,
+} from "@/app/(dashboard)/dashboard/action-inbox/categories";
 import { trainCaraVerticalCopy } from "@/app/(onboarding)/onboarding/knowledge/train-cara-vertical-copy";
 import {
   packServicesStepCopy,
@@ -8,8 +12,8 @@ import {
   type OrganizationNiche,
 } from "@/lib/organization-niche";
 import {
-  verticalIdForNiche,
   verticalPackForNiche,
+  type VerticalId,
   type VerticalPack,
 } from "@/lib/verticals";
 
@@ -24,27 +28,42 @@ export type DashboardVerticalCopy = {
   vertical: VerticalPack;
   niche: string;
   customerNoun: { singular: string; plural: string };
+  nav: {
+    contactsLabel: string;
+  };
+  home: {
+    heroSubheading: string;
+    greetingSubline: string;
+    goLiveChecklistSuffix: string;
+  };
+  calls: {
+    emptyDescription: string;
+  };
   contacts: {
     pageDescription: string;
     emptyDescription: string;
+    selectDescription: string;
     savedContactLabel: string;
     savedContactNoCalls: string;
     savedContactNoCallsRecorded: string;
   };
+  actionInbox: {
+    categoryLabels: Record<ActionCategory, string>;
+  };
   routing: {
     bookPresetLabel: string;
     bookPresetName: string;
-    /** “If customer wants to…” preset — sends a file (SMS link to PDF, etc.). */
-    menuPresetLabel: string;
-    menuPresetName: string;
-    quotePresetLabel: string;
-    quotePresetName: string;
     directionsPresetLabel: string;
     directionsPresetName: string;
     speakPresetLabel: string;
     speakPresetName: string;
     starterBookLabel: string;
     starterBookDescription: string;
+    starterEnquiryLabel: string;
+    starterEnquiryDescription: string;
+    starterEnquiryPlaceholder: string;
+    goLiveBookingLinkLabel: string;
+    goLiveEnquiryLinkLabel: string;
     keywordPlaceholder: string;
     namePlaceholder: string;
     descriptionPlaceholder: string;
@@ -64,6 +83,22 @@ export type DashboardVerticalCopy = {
     servicesEmptyWarning: string;
     callHandlingRulesPlaceholder: string;
     detailsToCollectPlaceholder: string;
+    generalBasicsTitle: string;
+    greetingHint: string;
+    locationHint: string;
+    commonQuestionsTitle: string;
+  };
+  training: {
+    description: string;
+  };
+  team: {
+    accessDescription: string;
+  };
+  locations: {
+    subline: string;
+  };
+  settings: {
+    businessIdentityTitle: string;
   };
   privacy: {
     exportNoun: string;
@@ -176,8 +211,6 @@ const ROUTING_OVERRIDES_BY_NICHE: Partial<
   },
   hospitality: {
     exampleBlock: HOSPITALITY_ROUTING_EXAMPLE,
-    menuPresetLabel: "View menu",
-    menuPresetName: "See the menu",
     keywordPlaceholder: "e.g. book a table",
     namePlaceholder: "e.g. Table bookings",
     descriptionPlaceholder:
@@ -276,25 +309,13 @@ const ROUTING_OVERRIDES_BY_NICHE: Partial<
 function routingCopyForNiche(
   niche: OrganizationNiche,
   base: DashboardVerticalCopy["routing"],
-  isSalon: boolean,
-  businessType?: string,
 ): DashboardVerticalCopy["routing"] {
-  if (isSalon) return base;
-  const overrides = ROUTING_OVERRIDES_BY_NICHE[niche];
-  let routing = overrides
-    ? { ...base, ...overrides }
-    : { ...base, exampleBlock: DEFAULT_ROUTING_EXAMPLE };
-
-  const bt = businessType?.trim().toLowerCase() ?? "";
-  if (niche === "professional_services" && bt.includes("law")) {
-    routing = { ...routing, ...PROFESSIONAL_SERVICES_ROUTING_EXAMPLE_ROUTING };
-  }
-
-  return routing;
+  const override = ROUTING_OVERRIDES_BY_NICHE[niche] ?? {};
+  return { ...base, ...override };
 }
 
 /** Extra routing field hints when business type narrows professional services. */
-const PROFESSIONAL_SERVICES_ROUTING_EXAMPLE_ROUTING: RoutingNicheOverrides = {
+const _PROFESSIONAL_SERVICES_ROUTING_EXAMPLE_ROUTING: RoutingNicheOverrides = {
   exampleBlock: PROFESSIONAL_SERVICES_ROUTING_EXAMPLE,
   namePlaceholder: "e.g. New client consultations",
   keywordPlaceholder: "e.g. consultation",
@@ -304,35 +325,77 @@ const PROFESSIONAL_SERVICES_ROUTING_EXAMPLE_ROUTING: RoutingNicheOverrides = {
     "e.g. Don't give advice on the call — take details for a callback",
 };
 
-const SALON_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"> & {
+const SALON_ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
+  booking_request: "Booking request — callback needed",
+  callback: "Callback",
+  urgent: "Urgent",
+  confirm: "Booking to confirm",
+  quote: "Price enquiry",
+  lead: "New client enquiry",
+  complaint: "Complaint",
+  unclear: "Unclear request",
+  failed: "Missed call",
+  follow_up: "Follow-up needed",
+};
+
+type VerticalCopyBase = Omit<
+  DashboardVerticalCopy,
+  "vertical" | "niche" | "caraSetup"
+> & {
   caraSetupBase: Pick<
     DashboardVerticalCopy["caraSetup"],
-    "servicesEmptyWarning" | "callHandlingRulesPlaceholder" | "detailsToCollectPlaceholder"
+    | "servicesEmptyWarning"
+    | "callHandlingRulesPlaceholder"
+    | "detailsToCollectPlaceholder"
+    | "generalBasicsTitle"
+    | "greetingHint"
+    | "locationHint"
+    | "commonQuestionsTitle"
   >;
-} = {
+};
+
+const SALON_COPY: VerticalCopyBase = {
   customerNoun: { singular: "client", plural: "clients" },
+  nav: {
+    contactsLabel: "Clients",
+  },
+  home: {
+    heroSubheading: "Here's how the salon's looking today.",
+    greetingSubline: "What Cara handled at the salon today.",
+    goLiveChecklistSuffix: "can handle real client calls confidently.",
+  },
+  calls: {
+    emptyDescription:
+      "When Cara answers your salon line, calls appear here with summaries and outcomes.",
+  },
   contacts: {
     pageDescription:
       "People who have called or are saved on your client list — with call history and open follow-ups.",
     emptyDescription:
       "When Cara answers calls, contacts appear here. Saved clients from bookings show up too.",
+    selectDescription:
+      "Choose a client to see how to reach them, their visits, and open follow-ups.",
     savedContactLabel: "Saved client",
     savedContactNoCalls: "Saved client · no calls yet",
     savedContactNoCallsRecorded: "Saved client · no calls recorded yet",
   },
+  actionInbox: {
+    categoryLabels: SALON_ACTION_CATEGORY_LABELS,
+  },
   routing: {
     bookPresetLabel: "Book appointment",
     bookPresetName: "Book an appointment",
-    menuPresetLabel: "Services & prices",
-    menuPresetName: "See services and prices",
-    quotePresetLabel: "Ask about pricing",
-    quotePresetName: "Ask how much something costs",
     directionsPresetLabel: "Get directions",
     directionsPresetName: "Where are you based",
     speakPresetLabel: "Speak to someone",
     speakPresetName: "Speak to someone",
     starterBookLabel: "Book an appointment",
     starterBookDescription: "Text a booking link when callers want to schedule.",
+    starterEnquiryLabel: "Online booking link",
+    starterEnquiryDescription: "Text a booking link when callers want to schedule.",
+    starterEnquiryPlaceholder: "booksy.com/… or fresha.com/…",
+    goLiveBookingLinkLabel: "Booking link",
+    goLiveEnquiryLinkLabel: "Booking link",
     keywordPlaceholder: "e.g. balayage",
     namePlaceholder: "e.g. Colour bookings",
     descriptionPlaceholder:
@@ -363,6 +426,25 @@ const SALON_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"
       "e.g. 48 hours notice to cancel, Don't book new clients on Mondays",
     detailsToCollectPlaceholder:
       "e.g. Service they want, preferred day, stylist if they have one",
+    generalBasicsTitle: "Salon basics",
+    greetingHint:
+      "Introduce your salon — the AI and recording notice is added automatically.",
+    locationHint:
+      "The town your salon is in — Cara uses this for coverage and distance answers.",
+    commonQuestionsTitle: "What clients always ask",
+  },
+  training: {
+    description:
+      "Fill the gaps clients hit on calls — preview what Cara learns, then confirm.",
+  },
+  team: {
+    accessDescription: "Share access to calls, Action Inbox, and clients.",
+  },
+  locations: {
+    subline: "Each salon gets its own number and Cara setup.",
+  },
+  settings: {
+    businessIdentityTitle: "Salon details",
   },
   privacy: {
     exportNoun: "appointment",
@@ -375,29 +457,37 @@ const SALON_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"
   },
 };
 
-const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"> & {
-  caraSetupBase: Pick<
-    DashboardVerticalCopy["caraSetup"],
-    "servicesEmptyWarning" | "callHandlingRulesPlaceholder" | "detailsToCollectPlaceholder"
-  >;
-} = {
-  customerNoun: { singular: "caller", plural: "callers" },
+const GENERIC_COPY: VerticalCopyBase = {
+  customerNoun: { singular: "contact", plural: "contacts" },
+  nav: {
+    contactsLabel: "Contacts",
+  },
+  home: {
+    heroSubheading: "Here is how we are looking today.",
+    greetingSubline: "Here is how we are looking today.",
+    goLiveChecklistSuffix: "can handle real calls confidently.",
+  },
+  calls: {
+    emptyDescription:
+      "When Cara answers, calls will appear here with summaries and outcomes.",
+  },
   contacts: {
     pageDescription:
       "People who have called or are saved in your contacts — with call history and open follow-ups.",
     emptyDescription:
       "When Cara answers calls, contacts appear here. Saved contacts show up here too.",
+    selectDescription:
+      "Choose someone from the directory to see how to reach them, their calls, and open follow-ups.",
     savedContactLabel: "Saved contact",
     savedContactNoCalls: "Saved contact · no calls yet",
     savedContactNoCallsRecorded: "Saved contact · no calls recorded yet",
   },
+  actionInbox: {
+    categoryLabels: ACTION_CATEGORY_LABELS,
+  },
   routing: {
     bookPresetLabel: "Book an appointment",
     bookPresetName: "Book an appointment",
-    menuPresetLabel: "Brochure or price list",
-    menuPresetName: "Get a brochure or price list",
-    quotePresetLabel: "Get a quote",
-    quotePresetName: "Get a quote",
     directionsPresetLabel: "Get directions",
     directionsPresetName: "Where are you based",
     speakPresetLabel: "Speak to someone",
@@ -405,6 +495,12 @@ const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetu
     starterBookLabel: "Book an appointment",
     starterBookDescription:
       "Text a booking or scheduling link when callers want an appointment.",
+    starterEnquiryLabel: "Website or enquiry link",
+    starterEnquiryDescription:
+      "Cara can text this when callers want more information or to start an enquiry — she won't promise availability she can't see.",
+    starterEnquiryPlaceholder: "yoursite.com/contact or calendly.com/…",
+    goLiveBookingLinkLabel: "Booking link",
+    goLiveEnquiryLinkLabel: "Scheduling or enquiry link",
     keywordPlaceholder: "e.g. book an appointment",
     namePlaceholder: "e.g. Appointment requests",
     descriptionPlaceholder:
@@ -414,7 +510,7 @@ const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetu
     exampleBlock: DEFAULT_ROUTING_EXAMPLE,
     fieldHintExample: "booking vs general enquiry",
     flowTestPhrases: [
-      "I need a quote",
+      "Can someone call me back?",
       "Can someone call me back?",
       "Can I speak to someone?",
     ],
@@ -430,11 +526,30 @@ const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetu
   },
   caraSetupBase: {
     servicesEmptyWarning:
-      "Cara can't confirm any work until you add what you offer — she'll take a message for every job request.",
+      "Cara can't confirm what you offer until you add it — until then she'll take a message for every request.",
     callHandlingRulesPlaceholder:
-      "e.g. Never quote a price over the phone, No same-day jobs without a deposit",
+      "e.g. Never give prices over the phone, Always take a message if no one's free, Flag anything urgent",
     detailsToCollectPlaceholder:
-      "e.g. What they need, address or area, best time to call back",
+      "e.g. Their name, what they need, and the best time to reach them",
+    generalBasicsTitle: "Business basics",
+    greetingHint:
+      "Introduce your business — the AI and recording notice is added automatically.",
+    locationHint:
+      "The town your business is based in — Cara uses this for coverage and distance answers.",
+    commonQuestionsTitle: "Common questions",
+  },
+  training: {
+    description:
+      "Answer gaps from calls in plain English — preview what Cara adds, then confirm.",
+  },
+  team: {
+    accessDescription: "Share access to calls, Action Inbox, and contacts.",
+  },
+  locations: {
+    subline: "Each site gets its own phone number and Cara setup.",
+  },
+  settings: {
+    businessIdentityTitle: "Business identity",
   },
   privacy: {
     exportNoun: "record",
@@ -447,6 +562,11 @@ const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetu
   },
 };
 
+const VERTICAL_COPY: Record<VerticalId, VerticalCopyBase> = {
+  salon_beauty: SALON_COPY,
+  generic: GENERIC_COPY,
+};
+
 /** Dashboard user-facing copy keyed off the org's vertical (salon vs generic). */
 export function dashboardVerticalCopy(
   rawNiche: string | null | undefined,
@@ -454,21 +574,27 @@ export function dashboardVerticalCopy(
 ): DashboardVerticalCopy {
   const niche = parseOrganizationNiche(rawNiche);
   const vertical = verticalPackForNiche(niche);
-  const isSalon = verticalIdForNiche(niche) === "salon_beauty";
-  const base = isSalon ? SALON_COPY : GENERIC_COPY;
-  const bt = businessType?.trim() ?? "";
+  const base = VERTICAL_COPY[vertical.id] ?? GENERIC_COPY;
 
   return {
     vertical,
     niche,
     customerNoun: vertical.customerNoun,
+    nav: base.nav,
+    home: base.home,
+    calls: base.calls,
     contacts: base.contacts,
-    routing: routingCopyForNiche(niche, base.routing, isSalon, bt || undefined),
+    actionInbox: base.actionInbox,
+    routing: routingCopyForNiche(niche, base.routing),
     caraSetup: {
       trainCara: trainCaraVerticalCopy(niche),
-      services: packServicesStepCopy(bt, niche),
+      services: packServicesStepCopy(businessType?.trim() ?? "", niche),
       ...base.caraSetupBase,
     },
+    training: base.training,
+    team: base.team,
+    locations: base.locations,
+    settings: base.settings,
     privacy: base.privacy,
     setupSteps: base.setupSteps,
   };

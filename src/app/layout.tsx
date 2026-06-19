@@ -17,6 +17,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Cliste Systems",
   description: "AI voice receptionist control plane for Irish salons",
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "512x512" }],
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  },
+  openGraph: {
+    title: "Cliste Systems",
+    description: "AI phone agent for Irish businesses",
+    siteName: "Cliste Systems",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cliste Systems",
+    description: "AI phone agent for Irish businesses",
+  },
 };
 
 export default function RootLayout({

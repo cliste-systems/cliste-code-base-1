@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ComponentType } from "react";
+import { useCallback, useMemo, useState, useTransition, type ComponentType } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Ban,
+  CalendarCheck,
   Check,
   CheckCircle2,
   CircleHelp,
@@ -20,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import {
   DASHBOARD_CARD_SURFACE,
   DASHBOARD_HOME_ATTENTION_DIVIDER,
@@ -43,10 +47,16 @@ import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-import { markTicketReopen, markTicketResolved } from "./actions";
 import {
-  ACTION_CATEGORY_FILTER_OPTIONS,
+  ANONYMOUS_CALLER_E164,
+  normalizeBlockedCallerE164,
+} from "@/lib/blocked-callers";
+
+import { blockCallerAndDismissTicket } from "../settings/blocked-numbers-actions";
+import { markTicketReopen, markTicketResolved } from "./actions";
+import { useDashboardVertical } from "../dashboard-vertical-context";
+import {
+  actionCategoryFilterOptions,
   categoryStatusVariant,
   type ActionCategory,
   type ActionCategoryFilter,
@@ -58,6 +68,7 @@ import {
   inboxCallerMetaLine,
   inboxListSummaryPreview,
   normalizeContactEmail,
+  parseStructuredCaptureSummary,
   type ActionInboxItem,
   type ActionInboxMetrics,
   matchesActionSearch,
@@ -66,6 +77,7 @@ import {
 } from "./action-inbox-helpers";
 
 const CATEGORY_ICONS: Record<ActionCategory, ComponentType<{ className?: string }>> = {
+  booking_request: CalendarCheck,
   callback: PhoneForwarded,
   urgent: Siren,
   confirm: CheckCircle2,
@@ -83,6 +95,7 @@ type ActionInboxViewProps = {
   items: ActionInboxItem[];
   metrics: ActionInboxMetrics;
   initialSelectedTicketId?: string | null;
+  blockedCallerE164s: string[];
   className?: string;
 };
 
@@ -90,8 +103,15 @@ export function ActionInboxView({
   items,
   metrics: _metrics,
   initialSelectedTicketId = null,
+  blockedCallerE164s,
   className,
 }: ActionInboxViewProps) {
+  const router = useRouter();
+  const { copy } = useDashboardVertical();
+  const categoryFilterOptions = useMemo(
+    () => actionCategoryFilterOptions(copy.actionInbox.categoryLabels),
+    [copy.actionInbox.categoryLabels],
+  );
   const [statusTab, setStatusTab] = useState<StatusTab>(() => {
     if (
       initialSelectedTicketId &&
@@ -229,7 +249,7 @@ export function ActionInboxView({
                   aria-label="Filter by type"
                   className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-[10.5rem] shrink-0")}
                 >
-                  {ACTION_CATEGORY_FILTER_OPTIONS.map((o) => (
+                  {categoryFilterOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -283,6 +303,8 @@ export function ActionInboxView({
               item={selected}
               copied={copied}
               onCopyDetails={copyDetails}
+              blockedCallerE164s={blockedCallerE164s}
+              onRefresh={() => router.refresh()}
             />
           }
         />
@@ -373,10 +395,14 @@ function ActionDetailPanel({
   item,
   copied,
   onCopyDetails,
+  blockedCallerE164s,
+  onRefresh,
 }: {
   item: ActionInboxItem | null;
   copied: boolean;
   onCopyDetails: () => void;
+  blockedCallerE164s: string[];
+  onRefresh: () => void;
 }) {
   if (!item) {
     return (
@@ -393,6 +419,31 @@ function ActionDetailPanel({
     );
   }
 
+  return (
+    <ActionDetailPanelContent
+      key={item.id}
+      item={item}
+      copied={copied}
+      onCopyDetails={onCopyDetails}
+      blockedCallerE164s={blockedCallerE164s}
+      onRefresh={onRefresh}
+    />
+  );
+}
+
+function ActionDetailPanelContent({
+  item,
+  copied,
+  onCopyDetails,
+  blockedCallerE164s,
+  onRefresh,
+}: {
+  item: ActionInboxItem;
+  copied: boolean;
+  onCopyDetails: () => void;
+  blockedCallerE164s: string[];
+  onRefresh: () => void;
+}) {
   const Icon = CATEGORY_ICONS[item.category] ?? Inbox;
   const hasPhone = item.callerNumber.trim().length > 0;
   const tel = hasPhone ? `tel:${item.callerNumber.replace(/[^\d+]/g, "")}` : null;
@@ -402,6 +453,33 @@ function ActionDetailPanel({
   const primary = inboxPrimaryLabel(item);
   const isOpen = item.status === "open";
   const summaryText = item.summary.trim();
+  const structuredCapture = parseStructuredCaptureSummary(summaryText);
+  const callerE164 = normalizeBlockedCallerE164(item.callerNumber);
+  const canBlockAndDismiss =
+    isOpen &&
+    callerE164 != null &&
+    item.callerNumber.trim() !== ANONYMOUS_CALLER_E164 &&
+    !blockedCallerE164s.includes(callerE164);
+  const [blockDismissOpen, setBlockDismissOpen] = useState(false);
+  const [blockMsg, setBlockMsg] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onBlockAndDismiss() {
+    if (!callerE164) return;
+    setBlockMsg(null);
+    startTransition(async () => {
+      const result = await blockCallerAndDismissTicket({
+        ticketId: item.id,
+        phone: callerE164,
+      });
+      setBlockDismissOpen(false);
+      if (!result.ok) {
+        setBlockMsg(result.message);
+        return;
+      }
+      onRefresh();
+    });
+  }
 
   return (
     <DetailPanelShell surface="embedded">
@@ -481,9 +559,34 @@ function ActionDetailPanel({
 
       <DetailPanelBody>
         <DetailSection title="What Cara captured">
-          <p className="text-[14px] leading-relaxed text-slate-800">
-            {summaryText || "No additional details were captured for this item."}
-          </p>
+          {structuredCapture ? (
+            <div className="space-y-3">
+              <p className="text-[14px] font-medium text-slate-800">
+                {structuredCapture.header}
+              </p>
+              <dl className="space-y-2.5">
+                {structuredCapture.fields.map((field) => (
+                  <div key={field.label} className="flex flex-wrap items-start gap-x-2 gap-y-1">
+                    <dt className="text-[13px] font-medium text-slate-600">
+                      {field.label}
+                    </dt>
+                    <dd className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] text-slate-800">
+                      <span>{field.value}</span>
+                      {field.unconfirmed ? (
+                        <StatusPill variant="attention" dot>
+                          Unconfirmed
+                        </StatusPill>
+                      ) : null}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : (
+            <p className="text-[14px] leading-relaxed text-slate-800">
+              {summaryText || "No additional details were captured for this item."}
+            </p>
+          )}
         </DetailSection>
 
         <DetailSection title="Next step">
@@ -511,6 +614,16 @@ function ActionDetailPanel({
       </DetailPanelBody>
 
       <DetailPanelFooter>
+        {canBlockAndDismiss ? (
+          <DetailActionButton
+            type="button"
+            onClick={() => setBlockDismissOpen(true)}
+            disabled={pending}
+          >
+            <Ban className="size-3.5" aria-hidden />
+            Block + dismiss
+          </DetailActionButton>
+        ) : null}
         {item.status === "open" ? (
           <form action={markTicketResolved}>
             <input type="hidden" name="ticketId" value={item.id} />
@@ -548,6 +661,21 @@ function ActionDetailPanel({
           Open contact
         </DetailActionButton>
       </DetailPanelFooter>
+
+      {blockMsg ? (
+        <p className="px-5 pb-3 text-[12px] text-red-600">{blockMsg}</p>
+      ) : null}
+
+      <ConfirmDialog
+        open={blockDismissOpen}
+        onOpenChange={setBlockDismissOpen}
+        title="Block caller and dismiss?"
+        description="This number will be blocked from future calls and this follow-up will be marked resolved."
+        confirmLabel="Block + dismiss"
+        onConfirm={onBlockAndDismiss}
+        pending={pending}
+        destructive
+      />
     </DetailPanelShell>
   );
 }

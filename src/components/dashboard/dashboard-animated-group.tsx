@@ -53,7 +53,7 @@ export function DashboardAnimatedGroup({
             "min-w-0",
             growLast &&
               index === items.length - 1 &&
-              "flex min-h-0 flex-1 flex-col",
+              "flex min-h-0 flex-1 flex-col overflow-hidden",
           )}
         >
           {child}
@@ -67,9 +67,16 @@ export function DashboardAnimatedGroup({
 export function DashboardAnimatedStack({
   children,
   className,
-}: DashboardAnimatedGroupProps) {
+  /** Inside `DashboardFormScrollRegion` — omits outer border (parent provides frame). */
+  embedded = false,
+}: DashboardAnimatedGroupProps & { embedded?: boolean }) {
   return (
-    <DashboardAnimatedGroup className={cn(DASHBOARD_FORM_STACK, className)}>
+    <DashboardAnimatedGroup
+      className={cn(
+        embedded ? "divide-y divide-slate-100" : DASHBOARD_FORM_STACK,
+        className,
+      )}
+    >
       {children}
     </DashboardAnimatedGroup>
   );

@@ -90,7 +90,7 @@ describe("buildHoursPromptBlock", () => {
     assert.match(block ?? "", /not been provided/i);
   });
 
-  it("states all closed when schedule saved with no open days", () => {
+  it("uses legacy plain-text hours when schedule has no open days", () => {
     const schedule = defaultWeekSchedule();
     for (const day of Object.keys(schedule) as (keyof typeof schedule)[]) {
       schedule[day] = { ...schedule[day], open: false };
@@ -100,6 +100,21 @@ describe("buildHoursPromptBlock", () => {
       open24_7: false,
       schedule,
       formattedHours: "Closed all week",
+    });
+    assert.match(block ?? "", /Our opening hours are/i);
+    assert.match(block ?? "", /Closed all week/i);
+  });
+
+  it("states all closed when schedule saved with no open days and no legacy text", () => {
+    const schedule = defaultWeekSchedule();
+    for (const day of Object.keys(schedule) as (keyof typeof schedule)[]) {
+      schedule[day] = { ...schedule[day], open: false };
+    }
+    const block = buildHoursPromptBlock({
+      neverConfigured: false,
+      open24_7: false,
+      schedule,
+      formattedHours: "",
     });
     assert.match(block ?? "", /closed every day/i);
   });

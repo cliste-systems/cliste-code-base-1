@@ -26,7 +26,9 @@ export function deriveCaraCapabilities(
     book: false,
     sendLink:
       actionBlob.includes("text them the saved link") ||
-      actionBlob.includes("saved link"),
+      actionBlob.includes("saved link") ||
+      actionBlob.includes("offer the booking link") ||
+      actionBlob.includes("booking link"),
     sendFile: actionBlob.includes("saved file"),
     email: actionBlob.includes("email"),
     whatsapp: actionBlob.includes("whatsapp"),
@@ -68,7 +70,11 @@ export function routePhraseForPrompt(
   const topic = trigger.trim();
   const lower = action.trim().toLowerCase();
   let line: string;
-  if (lower.includes("link")) {
+  if (lower.includes("tell them the address")) {
+    line = `If they ask about ${topic}, I say the address out loud first, then offer to send the maps link the way they prefer.`;
+  } else if (lower.includes("offer the booking link")) {
+    line = `If they ask about ${topic}, I offer the booking link and send it by text or email the way they prefer.`;
+  } else if (lower.includes("link")) {
     line = `If they ask about ${topic}, I can text them the link.`;
   } else if (lower.includes("file")) {
     line = `If they ask about ${topic}, I can text them the file.`;

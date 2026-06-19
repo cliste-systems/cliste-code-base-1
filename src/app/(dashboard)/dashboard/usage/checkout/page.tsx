@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 import { StripeEmbeddedCheckout } from "@/components/billing/stripe-embedded-checkout";
-import { DASHBOARD_PAGE_SHELL_FILL_WHITE } from "@/components/dashboard/dashboard-surface";
+import {
+  DASHBOARD_HOME_CONTENT_COLUMN,
+  DASHBOARD_PAGE_SHELL_FILL_WHITE,
+} from "@/components/dashboard/dashboard-surface";
+import { PLATFORM_TRIAL_DAYS } from "@/lib/cliste-plans";
 import { stripePublishableConfigured } from "@/lib/stripe-publishable";
 
 import { prepareEmbeddedBillingCheckout } from "../../billing/actions";
@@ -38,25 +42,27 @@ export default async function UsageCheckoutPage() {
 
 function CheckoutShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE}>
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-              Set up billing
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              14-day free trial, then your plan renews monthly. Cancel anytime.
-            </p>
+    <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+                Set up billing
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                {PLATFORM_TRIAL_DAYS}-day free trial, then your plan renews monthly. Cancel anytime.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/usage"
+              className="shrink-0 text-sm font-medium text-slate-600 hover:text-slate-900"
+            >
+              Back to usage
+            </Link>
           </div>
-          <Link
-            href="/dashboard/usage"
-            className="shrink-0 text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            Back to usage
-          </Link>
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );

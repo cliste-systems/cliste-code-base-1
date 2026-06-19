@@ -2,8 +2,9 @@ import { AlertTriangle, Gauge } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardPageScrollBody } from "@/components/dashboard/dashboard-form-scroll-region";
+import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-summary";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
-import { DashboardStatStrip } from "@/components/dashboard/dashboard-stat-strip";
 import {
   DASHBOARD_HOME_CARD,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
@@ -52,7 +53,8 @@ export function UsageView({
         className,
       )}
     >
-      <DashboardAnimatedPageSections className="overflow-y-auto overscroll-y-contain">
+      <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-hidden">
+      <div className="shrink-0">
       <DashboardPageHeader
         eyebrow="Usage"
         title="Usage"
@@ -64,6 +66,10 @@ export function UsageView({
           ) : null
         }
       />
+
+      </div>
+
+      <DashboardPageScrollBody scrollClassName="flex flex-col gap-4 pt-4">
 
       {data.suspended ? (
         <UsageAlert tone="warning" icon={AlertTriangle}>
@@ -90,110 +96,123 @@ export function UsageView({
         </UsageAlert>
       ) : null}
 
-      <section className={cn(DASHBOARD_HOME_CARD, "shrink-0 space-y-5")}>
-        <DashboardStatStrip
-          compact
-          stats={[
-            { label: "Minutes used", value: formatMinutes(data.usedMinutes) },
-            {
-              label: "Included",
-              value:
-                data.includedMinutes > 0
-                  ? formatMinutes(data.includedMinutes)
-                  : "—",
-            },
-            {
-              label: "Minutes remaining",
-              value:
-                data.includedMinutes > 0
-                  ? formatMinutes(data.remainingMinutes)
-                  : "—",
-            },
-            { label: "Extra minutes", value: formatMinutes(data.extraMinutes) },
-            { label: "Calls counted", value: String(data.callsCounted) },
-          ]}
-        />
-        <DashboardStatStrip
-          compact
-          className="border-t border-slate-100 pt-5 sm:grid-cols-3 lg:grid-cols-3 lg:divide-x lg:divide-slate-100"
-          stats={[
-            { label: "SMS sent", value: String(data.usedSms) },
-            {
-              label: "SMS included",
-              value: data.includedSms > 0 ? String(data.includedSms) : "—",
-            },
-            { label: "Extra SMS", value: String(data.extraSms) },
-          ]}
-        />
-      </section>
-
       <div className="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <section className={DASHBOARD_HOME_CARD}>
-          <h2 className="shrink-0 text-[15px] font-semibold tracking-tight text-[#0b1220]">
-            Minutes this period
-          </h2>
+          <section className={DASHBOARD_HOME_CARD}>
+            <h2 className="shrink-0 text-[15px] font-semibold tracking-tight text-[#0b1220]">
+              Minutes this period
+            </h2>
 
-          <div className="mt-4">
-            <div className="flex items-end gap-2">
-              <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums text-[#0b1220] sm:text-[48px]">
-                {formatMinutes(data.usedMinutes)}
-              </p>
-              {data.includedMinutes > 0 ? (
-                <p className="mb-1.5 text-[16px] font-medium tabular-nums text-slate-400">
-                  / {formatMinutes(data.includedMinutes)}
+            <div className="mt-4">
+              <div className="flex items-end gap-2">
+                <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums text-[#0b1220] sm:text-[48px]">
+                  {formatMinutes(data.usedMinutes)}
                 </p>
-              ) : null}
-            </div>
-            <p className="mt-2 text-[14px] font-medium text-[#0b1220]">
-              {summary.primary}
-            </p>
-            <p className="mt-1 text-[13px] leading-snug text-slate-500">
-              {summary.secondary}
-              <span className="text-slate-400">
-                {" "}
-                Talk time is billed to the second.
-              </span>
-            </p>
-
-            <div className="mt-5">
-              <div className="mb-2 flex items-center justify-between gap-2 text-[12px]">
-                <span className="font-medium text-slate-600">Period usage</span>
-                <span className="tabular-nums text-slate-500">
-                  {data.progressPct}%
-                </span>
+                {data.includedMinutes > 0 ? (
+                  <p className="mb-1.5 text-[16px] font-medium tabular-nums text-slate-400">
+                    / {formatMinutes(data.includedMinutes)}
+                  </p>
+                ) : null}
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-[width]",
-                    data.progressPct >= 90
-                      ? "bg-amber-600"
-                      : "bg-[#0b1220]",
-                  )}
-                  style={{
-                    width: `${Math.max(data.progressPct, data.usedMinutes > 0 ? 2 : 0)}%`,
-                  }}
+              <p className="mt-2 text-[14px] font-medium text-[#0b1220]">
+                {summary.primary}
+              </p>
+              <p className="mt-1 text-[13px] leading-snug text-slate-500">
+                {summary.secondary}
+                <span className="text-slate-400">
+                  {" "}
+                  Talk time is billed to the second.
+                </span>
+              </p>
+
+              <div className="mt-5">
+                <div className="mb-2 flex items-center justify-between gap-2 text-[12px]">
+                  <span className="font-medium text-slate-600">Period usage</span>
+                  <span className="tabular-nums text-slate-500">
+                    {data.progressPct}%
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-[width]",
+                      data.progressPct >= 90
+                        ? "bg-amber-600"
+                        : "bg-[#0b1220]",
+                    )}
+                    style={{
+                      width: `${Math.max(data.progressPct, data.usedMinutes > 0 ? 2 : 0)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
+              <PeriodFact label="Period start" value={formatDate(data.periodStart)} />
+              <PeriodFact label="Renews" value={renewalDate} />
+              <PeriodFact
+                label="Last call counted"
+                value={formatDateTime(data.lastCallAt)}
+              />
+              <PeriodFact
+                label="Stripe sync"
+                value={formatStripeSyncStatus(
+                  data.lastStripeSync,
+                  data.hasBillingPortal,
+                )}
+              />
+            </dl>
+
+            <div className="mt-4 border-t border-slate-100 pt-3 space-y-2">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Calls & minutes
+                </p>
+                <DashboardInlineSummary
+                  className="mt-1"
+                  segments={[
+                    { value: formatMinutes(data.usedMinutes), label: "used" },
+                    {
+                      value:
+                        data.includedMinutes > 0
+                          ? formatMinutes(data.includedMinutes)
+                          : "—",
+                      label: "included",
+                    },
+                    {
+                      value:
+                        data.includedMinutes > 0
+                          ? formatMinutes(data.remainingMinutes)
+                          : "—",
+                      label: "remaining",
+                    },
+                    {
+                      value: formatMinutes(data.extraMinutes),
+                      label: "extra",
+                    },
+                    { value: String(data.callsCounted), label: "calls" },
+                  ]}
+                />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  SMS
+                </p>
+                <DashboardInlineSummary
+                  className="mt-1"
+                  segments={[
+                    { value: String(data.usedSms), label: "sent" },
+                    {
+                      value:
+                        data.includedSms > 0 ? String(data.includedSms) : "—",
+                      label: "included",
+                    },
+                    { value: String(data.extraSms), label: "extra" },
+                  ]}
                 />
               </div>
             </div>
-          </div>
-
-          <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
-            <PeriodFact label="Period start" value={formatDate(data.periodStart)} />
-            <PeriodFact label="Renews" value={renewalDate} />
-            <PeriodFact
-              label="Last call counted"
-              value={formatDateTime(data.lastCallAt)}
-            />
-            <PeriodFact
-              label="Stripe sync"
-              value={formatStripeSyncStatus(
-                data.lastStripeSync,
-                data.hasBillingPortal,
-              )}
-            />
-          </dl>
-        </section>
+          </section>
 
         <section className={DASHBOARD_HOME_CARD}>
           <h2 className="shrink-0 text-[15px] font-semibold tracking-tight text-[#0b1220]">
@@ -312,6 +331,7 @@ export function UsageView({
           </div>
         </section>
       ) : null}
+      </DashboardPageScrollBody>
       </DashboardAnimatedPageSections>
     </div>
   );

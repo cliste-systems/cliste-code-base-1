@@ -1,3 +1,7 @@
+import {
+  cleanCaptureFields,
+  type CaraCaptureField,
+} from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-fields";
 import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
 import {
   callRoutingAllowsHumanTransfer,
@@ -22,6 +26,8 @@ export type RoutingSetupContext = {
   transferAllowed: boolean;
   niche: string;
   businessName: string;
+  businessType: string;
+  captureFields: CaraCaptureField[];
 };
 
 export const EMPTY_ROUTING_SETUP_CONTEXT: RoutingSetupContext = {
@@ -33,6 +39,8 @@ export const EMPTY_ROUTING_SETUP_CONTEXT: RoutingSetupContext = {
   transferAllowed: false,
   niche: "",
   businessName: "",
+  businessType: "",
+  captureFields: [],
 };
 
 type OrgSetupRow = {
@@ -44,6 +52,8 @@ type OrgSetupRow = {
   fallback_number?: string | null;
   call_routing_mode?: string | null;
   niche?: string | null;
+  agent_business_type?: string | null;
+  agent_capture_fields?: unknown;
 };
 
 export function routingSetupContextFromOrg(
@@ -87,5 +97,7 @@ export function routingSetupContextFromOrg(
     transferNumber,
     transferAllowed,
     niche: (org.niche as string | null)?.trim() ?? "",
+    businessType: (org.agent_business_type as string | null)?.trim() ?? "",
+    captureFields: cleanCaptureFields(org.agent_capture_fields),
   };
 }

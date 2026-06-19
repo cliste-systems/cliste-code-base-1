@@ -1,5 +1,7 @@
-import { CaraSetupTabServices } from "../cara-setup-tab-services";
+import { redirect } from "next/navigation";
 
-export default function CaraSetupServicesPage() {
-  return <CaraSetupTabServices />;
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+
+export default function CaraSetupServicesRedirectPage() {
+  redirect(DASHBOARD_ROUTES.businessServices);
 }

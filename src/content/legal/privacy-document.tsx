@@ -7,7 +7,7 @@ import {
   LegalTable,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
-import { companyRegistrationLine } from "@/lib/company-details";
+import { CLISTE_COMPANY, companyRegistrationLine } from "@/lib/company-details";
 
 
 export function PrivacyNoticeDocument() {
@@ -15,7 +15,7 @@ export function PrivacyNoticeDocument() {
     <>
       <LegalPageHeader
         title="Privacy notice"
-        description="How Cliste Systems processes personal data when you use our platform as a business customer, when your team uses the dashboard, and when people call your Cliste number."
+        description={`How ${CLISTE_COMPANY.legalName} processes personal data when you use our platform as a business customer, when your team uses the dashboard, and when people call your Cliste number.`}
       />
 
       <LegalCallout variant="info">

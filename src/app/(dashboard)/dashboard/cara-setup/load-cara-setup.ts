@@ -1,5 +1,7 @@
 import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
 import { parseAgentBusinessRules } from "@/lib/agent-business-rules";
+import { parseAgentCaraRules } from "@/lib/agent-cara-rules";
+import { parseCaraConduct, inferCaraConductFromLegacyRules } from "@/lib/agent-cara-conduct";
 import {
   emptyWeekSchedule,
   isBusinessHoursUnset,
@@ -7,9 +9,16 @@ import {
 } from "@/lib/business-hours";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { buildCaraSetupPromptInputFromOrg } from "@/lib/cara-prompt-from-org";
+import { listServicesForOrg } from "@/lib/service-catalog";
 import { normalizeServiceAreaCountyItems } from "@/lib/service-area-boundary";
 import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
-import { VOICE_ASSISTANT_DEFAULT_NAME } from "@/lib/voice-greeting";
+import { recoverHoursNoteFromSources } from "@/lib/parse-plain-text-hours";
+import { parseStoredServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
+import { verticalIdForNiche, verticalPackForNiche } from "@/lib/verticals";
+import { assistantNameLabel, VOICE_ASSISTANT_DEFAULT_NAME } from "@/lib/voice-greeting";
+import { resolveCaptureFieldsForOrg } from "@/lib/agent-capture-fields-backfill";
+import { detailLabelsFromCaptureFields } from "@/lib/sync-capture-fields";
+import { parseCaraGoal } from "@/lib/cara-goal";
 
 import { listBusinessFiles } from "../agent-setup/business-files-actions";
 import { parseAgentFaqs } from "../agent-setup/agent-faqs";
@@ -34,12 +43,15 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "name, address, storefront_eircode, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_location_address, agent_location_eircode, business_hours, business_knowledge_summary, routing_links, fallback_number, call_routing_mode",
+      "name, address, storefront_eircode, niche, quote_prices_on_calls, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
     )
     .eq("id", organizationId)
     .maybeSingle();
 
-  const assistant = VOICE_ASSISTANT_DEFAULT_NAME;
+  const assistant = assistantNameLabel(
+    String(org?.assistant_display_name ?? "").trim() ||
+      VOICE_ASSISTANT_DEFAULT_NAME,
+  );
 
   const businessFiles = await listBusinessFiles();
   const hoursUnset = isBusinessHoursUnset(org?.business_hours);
@@ -55,9 +67,34 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const serviceAreaExclusions =
     (org?.agent_service_area_exclusions as string | null) ?? "";
   const faqs = parseAgentFaqs(org?.agent_faqs);
+  const businessType = (org?.agent_business_type as string | null) ?? "";
+  const businessRules = parseAgentBusinessRules(org?.agent_business_rules);
+  const caraRules = parseAgentCaraRules(org?.agent_cara_rules);
+  const caraConduct =
+    org?.agent_cara_conduct != null
+      ? parseCaraConduct(org.agent_cara_conduct)
+      : inferCaraConductFromLegacyRules(caraRules);
+  const niche = String((org?.niche as string | null) ?? "");
+  const caraGoal = parseCaraGoal(org?.cara_goal);
+  const detailsText = (org?.agent_details_to_collect as string | null) ?? "";
+  const captureFields = resolveCaptureFieldsForOrg({
+    rawFields: org?.agent_capture_fields,
+    detailsText,
+    businessType,
+    niche,
+    caraGoal,
+  });
 
   const promptFromOrg = buildCaraSetupPromptInputFromOrg(org);
 
+  const verticalId = verticalIdForNiche(niche);
+  const serviceCatalog = await listServicesForOrg(supabase, organizationId);
+  const serviceCatalogSupplement = parseStoredServiceCatalogSupplement(
+    org?.agent_service_catalog_supplement,
+  );
+  const useSalonCatalog =
+    verticalPackForNiche(niche).capabilities.usesServiceCatalog ||
+    serviceCatalog.length > 0;
   return {
     businessFiles,
     promptExtras: {
@@ -69,24 +106,37 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
       businessName: (org?.name as string | null) ?? "",
       assistantDisplayName: assistant,
       greeting: (org?.greeting as string | null) ?? "",
-      businessType: (org?.agent_business_type as string | null) ?? "",
+      businessType,
+      niche,
+      verticalId,
       faqs,
       openingHoursSchedule: hoursBundle.schedule,
       openingHoursLegacy: hoursUnset ? openingHoursLegacy : "",
       hoursNeverConfigured: hoursUnset,
       open24_7: hoursBundle.meta.open24_7 === true,
-      hoursNote: hoursBundle.meta.hoursNote ?? "",
+      hoursNote: recoverHoursNoteFromSources(
+        hoursBundle.meta.hoursNote,
+        openingHoursLegacy,
+        businessRules,
+      ),
       serviceAreaItems: normalizeServiceAreaCountyItems(
         parseAgentKnowledgeList(serviceArea),
       ),
       serviceAreaExclusionItems: parseAgentKnowledgeList(serviceAreaExclusions),
-      servicesItems: parseAgentKnowledgeList(servicesOffered),
+      servicesItems: useSalonCatalog
+        ? serviceCatalog.map((s) => s.name)
+        : parseAgentKnowledgeList(servicesOffered),
       servicesNotOfferedItems: parseAgentKnowledgeList(servicesNotOffered),
-      detailsToCollectItems: parseAgentKnowledgeList(
-        (org?.agent_details_to_collect as string | null) ?? "",
-      ),
+      serviceCatalog: useSalonCatalog ? serviceCatalog : [],
+      serviceCatalogSupplement: serviceCatalogSupplement ?? undefined,
+      detailsToCollectItems: detailLabelsFromCaptureFields(captureFields),
       detailsCollectMode: parseDetailsCollectMode(org?.agent_details_collect_mode),
-      businessRules: parseAgentBusinessRules(org?.agent_business_rules),
+      businessRules,
+      caraRules,
+      caraConduct,
+      captureFields,
+      rawBusinessDescription:
+        (org?.raw_business_description as string | null)?.trim() ?? "",
       locationAddress:
         (org?.agent_location_address as string | null)?.trim() ||
         (org?.address as string | null)?.trim() ||
@@ -96,6 +146,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
         (org?.storefront_eircode as string | null)?.trim() ||
         "",
       baseTown: (org?.agent_base_town as string | null)?.trim() ?? "",
+      quotePricesOnCalls: org?.quote_prices_on_calls === true,
     },
   };
 }

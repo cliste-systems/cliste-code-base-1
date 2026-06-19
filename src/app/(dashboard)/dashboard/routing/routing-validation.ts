@@ -1,4 +1,5 @@
 import { detectCanonicalQuestion } from "@/lib/answers-boundary";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { findNearDuplicateChip } from "@/lib/cara-setup-chips";
 
 import { routeKeywords, type SavedRoute } from "./route-models";
@@ -26,6 +27,26 @@ export function isValidHttpUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** True when a stored route `url` is a real web/mail/tel destination (not capture prose). */
+export function isRouteDestinationUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (isValidHttpUrl(trimmed)) return true;
+  if (/^mailto:/i.test(trimmed) || /^tel:/i.test(trimmed)) return true;
+  if (trimmed === "transfer") return true;
+  return false;
+}
+
+/** Prose capture lists (e.g. "name, phone, service") must not live on link routes. */
+export function looksLikeCaptureProse(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || isRouteDestinationUrl(trimmed)) return false;
+  if (trimmed.includes(",")) return true;
+  return /\b(name|phone|number|email|service|appointment|preferred)\b/i.test(
+    trimmed,
+  );
 }
 
 export function validateRouteUrl(url: string): string | null {
@@ -99,7 +120,7 @@ export function buildRouteLintWarnings(
       routeId: route.id,
       kind: "services_conflict",
       message: servicesConflictMessage(keywords, excluded),
-      href: "/dashboard/cara-setup/services",
+      href: DASHBOARD_ROUTES.businessServices,
       linkLabel: "Edit services",
     });
   }

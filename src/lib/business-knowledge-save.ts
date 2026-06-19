@@ -12,9 +12,18 @@ import {
 } from "@/lib/agent-business-rules";
 import {
   cleanCaptureFields,
+  composeCaptureDetailsNote,
   defaultCaptureFieldsForBusinessType,
   type CaraCaptureField,
 } from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-fields";
+import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
+import {
+  isBusinessHoursUnset,
+  serializeBusinessHours,
+  weekScheduleHasOpenDay,
+  emptyWeekSchedule,
+} from "@/lib/business-hours";
+import { parsePlainTextOpeningHours } from "@/lib/parse-plain-text-hours";
 
 export type BusinessKnowledgePayload = {
   rawBusinessDescription?: string;
@@ -31,6 +40,8 @@ export type BusinessKnowledgePayload = {
   onboardingUiCopy?: OnboardingUiCopy | null;
   captureFields?: CaraCaptureField[];
   businessRules?: string[];
+  /** When true, agent_service_area is not written (fixed-location verticals). */
+  skipServiceArea?: boolean;
 };
 
 type SaveResult = { ok: true } | { ok: false; message: string };
@@ -90,15 +101,47 @@ export async function persistBusinessKnowledge(
     return { ok: false, message: "Business type text is too long." };
   }
 
+  let resolvedOpeningHours = openingHours || null;
+
+  const { data: existingHoursRow } = await supabase
+    .from("organizations")
+    .select("business_hours")
+    .eq("id", organizationId)
+    .maybeSingle();
+
   const update: Record<string, unknown> = {
     raw_business_description: rawDescription || null,
     business_knowledge_summary: knowledgeSummary || null,
-    agent_opening_hours: openingHours || null,
-    agent_service_area: serviceArea || null,
+    agent_opening_hours: resolvedOpeningHours,
     agent_services_departments: servicesOffered || null,
     agent_extra_notes: extraNotes || null,
     updated_at: new Date().toISOString(),
   };
+  if (!payload.skipServiceArea) {
+    update.agent_service_area = serviceArea || null;
+  }
+
+  if (
+    openingHours &&
+    isBusinessHoursUnset(existingHoursRow?.business_hours)
+  ) {
+    const parsed = parsePlainTextOpeningHours(openingHours);
+    if (parsed) {
+      if (weekScheduleHasOpenDay(parsed.schedule)) {
+        resolvedOpeningHours =
+          formatWeekScheduleForAgent(parsed.schedule) || openingHours;
+        update.agent_opening_hours = resolvedOpeningHours;
+        update.business_hours = serializeBusinessHours(parsed.schedule, {
+          hoursNote: parsed.hoursNote,
+        });
+      } else {
+        update.agent_opening_hours = openingHours;
+        update.business_hours = serializeBusinessHours(emptyWeekSchedule(), {
+          hoursNote: parsed.hoursNote ?? openingHours.slice(0, 120),
+        });
+      }
+    }
+  }
 
   if (!payload.preserveFaqs) {
     update.agent_faqs = faqs;
@@ -123,10 +166,11 @@ export async function persistBusinessKnowledge(
 
   if (payload.captureFields !== undefined) {
     update.agent_capture_fields = captureFields;
+    update.agent_details_to_collect = composeCaptureDetailsNote(captureFields);
   } else if (payload.businessRules !== undefined) {
     const { data: existingOrg } = await supabase
       .from("organizations")
-      .select("agent_business_type, agent_capture_fields")
+      .select("agent_business_type, agent_capture_fields, niche")
       .eq("id", organizationId)
       .maybeSingle();
 
@@ -135,7 +179,10 @@ export async function persistBusinessKnowledge(
       const businessType =
         refinedBusinessType ||
         String(existingOrg?.agent_business_type ?? "").trim();
-      update.agent_capture_fields = defaultCaptureFieldsForBusinessType(businessType);
+      update.agent_capture_fields = defaultCaptureFieldsForBusinessType(
+        businessType,
+        existingOrg?.niche as string | null,
+      );
     }
   }
 

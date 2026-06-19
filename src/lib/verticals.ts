@@ -1,3 +1,4 @@
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { businessDescriptionFromNiche } from "@/lib/onboarding-business-type";
 import {
   parseOrganizationNiche,
@@ -24,8 +25,39 @@ export type VerticalSelectionChoice = {
   label: string;
   /** One-liner under the headline. */
   description: string;
-  /** Example businesses that belong here (chips on the picker). */
-  examples: string[];
+  /** Short eyebrow above the label on the picker. */
+  tagline: string;
+};
+
+export type VerticalPackCapabilities = {
+  usesServiceCatalog: boolean;
+  /** Omit service area from prompt compilation and DB persistence. */
+  skipServiceArea: boolean;
+  bookingMenuImport: boolean;
+  catalogSatisfiesServicesGate: boolean;
+  autoEnsureBookingRoute: boolean;
+  alwaysIncludeLinkChecklist: boolean;
+  linkChecklistUsesBookingInquiryRoute: boolean;
+  preferPackLabelInSettings: boolean;
+  defaultRouteTemplate: "booking-inquiry" | "form-application";
+};
+
+export type VerticalPackNav = {
+  extraItems?: {
+    href: string;
+    label: string;
+    section: "core" | "account";
+    afterHref?: string;
+  }[];
+  hiddenHrefs?: string[];
+  /** href → label */
+  labelOverrides?: Record<string, string>;
+};
+
+export type VerticalPackOnboarding = {
+  profileHeaderTitle: string;
+  profileHeaderSubtitle: string;
+  pickerIcon: "sparkles" | "building";
 };
 
 export type VerticalPack = {
@@ -38,8 +70,39 @@ export type VerticalPack = {
   selection: Omit<VerticalSelectionChoice, "id">;
   /** Short noun shown beside "Cliste" in the dashboard header / product chrome. */
   productNoun: string;
+  /** Niche pack version — bump when vertical-specific dashboard flows change. */
+  packVersion: string;
   /** How Cara/the product refers to a customer's clientele (e.g. "clients"). */
   customerNoun: { singular: string; plural: string };
+  /** Location switcher noun (e.g. "Location" vs "Site"). */
+  locationNoun: string;
+  nav?: VerticalPackNav;
+  capabilities: VerticalPackCapabilities;
+  onboarding: VerticalPackOnboarding;
+};
+
+const SALON_CAPABILITIES: VerticalPackCapabilities = {
+  usesServiceCatalog: true,
+  skipServiceArea: true,
+  bookingMenuImport: true,
+  catalogSatisfiesServicesGate: true,
+  autoEnsureBookingRoute: true,
+  alwaysIncludeLinkChecklist: true,
+  linkChecklistUsesBookingInquiryRoute: true,
+  preferPackLabelInSettings: true,
+  defaultRouteTemplate: "booking-inquiry",
+};
+
+const GENERIC_CAPABILITIES: VerticalPackCapabilities = {
+  usesServiceCatalog: false,
+  skipServiceArea: false,
+  bookingMenuImport: false,
+  catalogSatisfiesServicesGate: false,
+  autoEnsureBookingRoute: false,
+  alwaysIncludeLinkChecklist: false,
+  linkChecklistUsesBookingInquiryRoute: false,
+  preferPackLabelInSettings: false,
+  defaultRouteTemplate: "form-application",
 };
 
 /** Niches that roll up into the Salon & Beauty vertical. */
@@ -51,12 +114,26 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   niches: SALON_BEAUTY_NICHES,
   selection: {
     label: "Salon & Beauty",
+    tagline: "Beauty & wellness",
     description:
-      "Our first tailored vertical — Cara answers service questions, sends your booking link, and captures messages. She does not hold your live calendar.",
-    examples: ["Hair salon", "Barber", "Nail bar", "Beauty salon", "Spa", "Lashes & brows"],
+      "Salons, barbers, nail studios, and spas — Cara is tuned for appointment-based beauty businesses.",
   },
   productNoun: "Salon",
+  packVersion: "1.0",
   customerNoun: { singular: "client", plural: "clients" },
+  locationNoun: "Location",
+  nav: {
+    labelOverrides: {
+      [DASHBOARD_ROUTES.contacts]: "Clients",
+    },
+  },
+  capabilities: SALON_CAPABILITIES,
+  onboarding: {
+    profileHeaderTitle: "Tell us about your salon",
+    profileHeaderSubtitle:
+      "A few details so Cara can greet your clients and book the way you would.",
+    pickerIcon: "sparkles",
+  },
 };
 
 const GENERIC_PACK: VerticalPack = {
@@ -65,12 +142,21 @@ const GENERIC_PACK: VerticalPack = {
   niches: [],
   selection: {
     label: "Something else",
+    tagline: "Any other business",
     description:
-      "Any other local business — Cara answers calls, sends your links, and captures messages. She does not hold your live calendar.",
-    examples: ["Trades", "Hospitality", "Retail", "Professional services"],
+      "Shops, trades, hospitality, clinics, and more — flexible call handling for any local business.",
   },
   productNoun: "Business",
-  customerNoun: { singular: "caller", plural: "callers" },
+  packVersion: "1.0",
+  customerNoun: { singular: "contact", plural: "contacts" },
+  locationNoun: "Site",
+  capabilities: GENERIC_CAPABILITIES,
+  onboarding: {
+    profileHeaderTitle: "Tell us about your business",
+    profileHeaderSubtitle:
+      "A few details so Cara can answer calls the way you would.",
+    pickerIcon: "building",
+  },
 };
 
 export const VERTICAL_PACKS: Record<VerticalId, VerticalPack> = {
@@ -107,7 +193,7 @@ export function verticalPackForNiche(
 }
 
 export function isVerticalId(v: string): v is VerticalId {
-  return v === "salon_beauty" || v === "generic";
+  return v in VERTICAL_PACKS;
 }
 
 export function parseVerticalId(

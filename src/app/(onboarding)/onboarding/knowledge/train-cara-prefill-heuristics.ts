@@ -35,8 +35,11 @@ export function deterministicFaqSuggestions(
   if (/hour|open|mon|tue|wed|thu|fri|sat|sun|weekend|closed/i.test(blob)) {
     suggestions.push("Are you open on weekends?");
   }
-  if (/appointment|book|availability|wait|come out|response/i.test(blob)) {
-    suggestions.push("How quickly can someone come out?");
+  if (
+    /\bbook(?:ing)?\b|\bschedule\b/i.test(blob) &&
+    !/\bappointment\b/i.test(context.openingHours)
+  ) {
+    suggestions.push("How far in advance should I book?");
   }
 
   if (suggestions.length < 3) {
@@ -55,4 +58,3 @@ export function deterministicFaqSuggestions(
     return true;
   }).slice(0, 5);
 }
-

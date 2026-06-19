@@ -23,7 +23,7 @@ export async function loadRoutingPageData(): Promise<RoutingPageData> {
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "routing_links, agent_location_address, agent_location_eircode, address, storefront_eircode, notification_email, notification_phone, greeting, agent_details_to_collect, agent_services_not_offered, agent_services_departments, fallback_number, call_routing_mode, niche, name",
+      "routing_links, agent_location_address, agent_location_eircode, address, storefront_eircode, notification_email, notification_phone, greeting, agent_details_to_collect, agent_services_not_offered, agent_services_departments, fallback_number, call_routing_mode, niche, name, agent_business_type, agent_capture_fields",
     )
     .eq("id", organizationId)
     .maybeSingle();

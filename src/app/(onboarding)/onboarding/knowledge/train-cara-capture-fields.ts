@@ -1,4 +1,8 @@
-import { detectTradePack, type TradePack } from "./train-cara-trade-topics";
+import type { CaraGoal } from "@/lib/cara-goal";
+import { verticalIdForNiche, type VerticalId } from "@/lib/verticals";
+
+import type { TradePack } from "./train-cara-trade-topics";
+import { tradePackForNicheAndType } from "./train-cara-trade-topics";
 
 export type CaraCaptureField = {
   id: string;
@@ -15,18 +19,6 @@ export type CaptureFieldOption = {
 export const CAPTURE_REQUIRED_FIELDS: readonly CaptureFieldOption[] = [
   { id: "name", label: "Name" },
   { id: "phone", label: "Phone number" },
-];
-
-const TRADES_CAPTURE_OPTIONS: CaptureFieldOption[] = [
-  { id: "address", label: "Address", hint: "Where the job is" },
-  { id: "issue", label: "Description of issue", hint: "What's wrong" },
-  { id: "urgency", label: "Urgency", hint: "Emergency or can it wait" },
-  {
-    id: "callback_time",
-    label: "Preferred callback time",
-    hint: "When to ring them back",
-  },
-  { id: "eircode", label: "Eircode", hint: "If they know it" },
 ];
 
 const SALON_CAPTURE_OPTIONS: CaptureFieldOption[] = [
@@ -49,43 +41,85 @@ const DEFAULT_CAPTURE_OPTIONS: CaptureFieldOption[] = [
   { id: "email", label: "Email", hint: "For confirmations or quotes" },
 ];
 
-export function captureOptionsForPack(pack: TradePack): CaptureFieldOption[] {
-  if (pack === "trades") return TRADES_CAPTURE_OPTIONS;
-  if (pack === "salon") return SALON_CAPTURE_OPTIONS;
-  return DEFAULT_CAPTURE_OPTIONS;
+const FAQ_ONLY_CAPTURE_IDS = new Set([
+  "what_they_need",
+  "callback_time",
+  "location",
+  "urgency",
+  "email",
+]);
+
+const BOOKING_CAPTURE_IDS = new Set([
+  "preferred_service",
+  "preferred_day",
+  "preferred_time",
+  "stylist",
+  "first_visit",
+]);
+
+const CAPTURE_OPTIONS_BY_VERTICAL: Record<VerticalId, CaptureFieldOption[]> = {
+  salon_beauty: SALON_CAPTURE_OPTIONS,
+  generic: DEFAULT_CAPTURE_OPTIONS,
+};
+
+const DEFAULT_CAPTURE_FIELD_IDS_BY_VERTICAL: Record<
+  VerticalId,
+  { id: string; label: string }[]
+> = {
+  salon_beauty: [
+    { id: "preferred_service", label: "Preferred service" },
+    { id: "preferred_day", label: "Preferred day" },
+  ],
+  generic: [
+    { id: "what_they_need", label: "What they need" },
+    { id: "location", label: "Location" },
+    { id: "urgency", label: "Urgency" },
+  ],
+};
+
+export function captureOptionsForPack(
+  pack: TradePack,
+  niche?: string | null,
+): CaptureFieldOption[] {
+  const verticalId = verticalIdForNiche(niche);
+  if (verticalId === "salon_beauty" && pack === "salon") {
+    return CAPTURE_OPTIONS_BY_VERTICAL.salon_beauty;
+  }
+  return CAPTURE_OPTIONS_BY_VERTICAL.generic;
+}
+
+export function captureOptionsForGoal(
+  businessType: string,
+  niche?: string | null,
+  caraGoal?: CaraGoal,
+): CaptureFieldOption[] {
+  const pack = tradePackForNicheAndType(niche, businessType);
+  const options = captureOptionsForPack(pack, niche);
+
+  if (caraGoal === "faq_only") {
+    return options.filter((option) => FAQ_ONLY_CAPTURE_IDS.has(option.id));
+  }
+
+  return options;
+}
+
+export function isBookingOrientedCaptureOption(id: string): boolean {
+  return BOOKING_CAPTURE_IDS.has(id.toLowerCase());
 }
 
 export function defaultCaptureFieldsForBusinessType(
   businessType: string,
+  niche?: string | null,
 ): CaraCaptureField[] {
-  const pack = detectTradePack(businessType);
   const required = CAPTURE_REQUIRED_FIELDS.map((field) => ({
     id: field.id,
     label: field.label,
   }));
 
-  if (pack === "trades") {
-    return [
-      ...required,
-      { id: "address", label: "Address" },
-      { id: "issue", label: "Description of issue" },
-      { id: "urgency", label: "Urgency" },
-    ];
-  }
-
-  if (pack === "salon") {
-    return [
-      ...required,
-      { id: "preferred_service", label: "Preferred service" },
-      { id: "preferred_day", label: "Preferred day" },
-    ];
-  }
-
+  const verticalId = verticalIdForNiche(niche);
   return [
     ...required,
-    { id: "what_they_need", label: "What they need" },
-    { id: "location", label: "Location" },
-    { id: "urgency", label: "Urgency" },
+    ...DEFAULT_CAPTURE_FIELD_IDS_BY_VERTICAL[verticalId],
   ];
 }
 
@@ -171,6 +205,31 @@ export function composeCaptureDetailsNote(fields: CaraCaptureField[]): string {
   if (labels.length === 1) return labels[0]!;
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}.`;
   return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}.`;
+}
+
+export function isCaptureOptionSelected(
+  fields: CaraCaptureField[],
+  id: string,
+): boolean {
+  const key = id.toLowerCase();
+  return fields.some((field) => field.id.toLowerCase() === key);
+}
+
+export function toggleCaptureOption(
+  fields: CaraCaptureField[],
+  option: CaptureFieldOption,
+  enabled: boolean,
+): CaraCaptureField[] {
+  if (enabled) {
+    return ensureRequiredCaptureFields([
+      ...fields,
+      { id: option.id, label: option.label },
+    ]);
+  }
+
+  return ensureRequiredCaptureFields(
+    fields.filter((field) => field.id.toLowerCase() !== option.id.toLowerCase()),
+  );
 }
 
 export function createCustomCaptureField(label: string): CaraCaptureField | null {

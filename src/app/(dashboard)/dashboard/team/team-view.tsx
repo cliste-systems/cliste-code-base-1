@@ -4,11 +4,13 @@ import { useActionState, useMemo } from "react";
 import { Loader2, UserPlus, Users } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardPageScrollBody } from "@/components/dashboard/dashboard-form-scroll-region";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { Field } from "@/components/dashboard/field";
 import { SectionCard } from "@/components/dashboard/section-card";
 import {
   DASHBOARD_HOME_CARD,
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_INPUT_CLASS,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
   DASHBOARD_PRIMARY_BUTTON_CLASS,
@@ -24,6 +26,7 @@ import {
   removeTeamMemberAction,
   type TeamActionResult,
 } from "./actions";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 
 type TeamMember = {
   id: string;
@@ -43,6 +46,7 @@ export function TeamView({
   currentUserId: string;
   canManage: boolean;
 }) {
+  const { copy } = useDashboardVertical();
   const [state, formAction, pending] = useActionState(inviteTeamMember, INITIAL);
 
   const ownerCount = useMemo(
@@ -57,19 +61,23 @@ export function TeamView({
       className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "overflow-hidden")}
       data-dashboard-fill
     >
-      <DashboardAnimatedPageSections className="min-h-0 flex-1">
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
+      <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-hidden">
+        <div className="shrink-0">
         <DashboardPageHeader
           eyebrow="Team"
           title="Team"
           icon={Users}
-          description="Share access to calls, Action Inbox, and contacts."
+          description={copy.team.accessDescription}
           descriptionLine2="Owners can configure Cara; view-only members can monitor activity."
           summary={[
             { value: String(members.length), label: "members" },
             { value: String(ownerCount), label: "owners" },
           ]}
         />
+        </div>
 
+        <DashboardPageScrollBody scrollClassName="flex flex-col gap-4 pt-4">
         <section className={cn(DASHBOARD_HOME_CARD, "shrink-0")}>
           <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
             Team members
@@ -186,7 +194,9 @@ export function TeamView({
             Only owners can invite or remove team members.
           </p>
         )}
+        </DashboardPageScrollBody>
       </DashboardAnimatedPageSections>
+      </div>
     </div>
   );
 }

@@ -4,13 +4,12 @@ export type VoiceDisclosureReport = {
   confirmed: boolean;
   organizationId: string;
   calledNumber?: string;
+  /** When true, skip monitoring (e.g. blocklist preflight — no disclosure played). */
+  skip?: boolean;
 };
 
-/**
- * Log when the worker did not confirm AI/recording disclosure on a completed call.
- * Does not block storage — used for compliance monitoring and ops alerts.
- */
 export function logDisclosureCompliance(report: VoiceDisclosureReport): void {
+  if (report.skip) return;
   if (report.confirmed) return;
   const payload = {
     organization_id: report.organizationId,

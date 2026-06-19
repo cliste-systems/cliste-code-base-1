@@ -21,7 +21,7 @@ export const LEGAL_DOCUMENT_PATHS: Record<LegalDocumentType, string> = {
   dpa: "/legal/dpa",
 };
 
-export const DASHBOARD_LEGAL_ACCEPT_PATH = "/dashboard/legal/accept";
+export const DASHBOARD_LEGAL_ACCEPT_PATH = "/dashboard/legal-accept";
 
 /** Onboarding users accept terms + privacy here before other setup steps. */
 export const ONBOARDING_LEGAL_ACCEPT_PATH = "/onboarding/legal";
@@ -30,11 +30,7 @@ export const ONBOARDING_LEGAL_ACCEPT_PATH = "/onboarding/legal";
 export const LEGAL_ACCEPTANCE_BYPASS_PREFIXES = [
   DASHBOARD_LEGAL_ACCEPT_PATH,
   ONBOARDING_LEGAL_ACCEPT_PATH,
-  "/dashboard/legal/terms",
-  "/dashboard/legal/privacy",
-  "/dashboard/legal/dpa",
-  "/dashboard/legal/cookies",
-  "/dashboard/legal/sub-processors",
+  "/dashboard/set-password",
 ] as const;
 
 export function requiredLegalDocuments(needsDpa: boolean): LegalDocumentType[] {

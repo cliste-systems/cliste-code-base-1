@@ -59,6 +59,9 @@ export type BusinessFileRecord = {
   answerEnabled: boolean;
   sendEnabled: boolean;
   documentKind: string | null;
+  title: string | null;
+  caraDescription: string | null;
+  whenToUse: string | null;
   processingStatus: BusinessFileProcessingStatus;
   extractedText: string | null;
   createdAt: string;
@@ -75,6 +78,9 @@ export type BusinessFileListItem = Pick<
   | "answerEnabled"
   | "sendEnabled"
   | "documentKind"
+  | "title"
+  | "caraDescription"
+  | "whenToUse"
   | "processingStatus"
   | "extractedText"
   | "createdAt"
@@ -129,6 +135,58 @@ export function isSpreadsheetFileType(fileType: string): boolean {
   return fileType === "csv" || fileType === "spreadsheet";
 }
 
+export function defaultBusinessFileTitle(fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "").trim();
+  const cleaned = base.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned || fileName;
+}
+
+export function businessFileDisplayTitle(file: {
+  title?: string | null;
+  fileName: string;
+}): string {
+  const title = file.title?.trim();
+  return title || defaultBusinessFileTitle(file.fileName);
+}
+
+export function whenToUsePlaceholder(kind: BusinessFileKind | null): string {
+  switch (kind) {
+    case "price_list":
+      return "When callers ask about prices or what's on the menu";
+    case "menu":
+      return "When callers ask what's available or about specific items";
+    case "brochure":
+      return "When callers want an overview of what you offer";
+    case "stock_sheet":
+      return "When callers ask about stock or availability";
+    case "service_sheet":
+      return "When callers ask about services or treatments in detail";
+    case "faq_document":
+      return "When callers ask common questions covered in this document";
+    default:
+      return "When callers ask about information in this document";
+  }
+}
+
+export function caraDescriptionPlaceholder(kind: BusinessFileKind | null): string {
+  switch (kind) {
+    case "price_list":
+      return "Our full price list with services and costs";
+    case "menu":
+      return "Our service or product menu";
+    case "brochure":
+      return "Overview brochure about the business";
+    case "stock_sheet":
+      return "Current stock or inventory list";
+    case "service_sheet":
+      return "Detailed service descriptions";
+    case "faq_document":
+      return "Answers to common customer questions";
+    default:
+      return "Business document for caller questions";
+  }
+}
+
 export function mapBusinessFileRow(row: {
   id: string;
   organization_id: string;
@@ -140,6 +198,9 @@ export function mapBusinessFileRow(row: {
   answer_enabled: boolean;
   send_enabled: boolean;
   document_kind: string | null;
+  title?: string | null;
+  cara_description?: string | null;
+  when_to_use?: string | null;
   processing_status: string;
   extracted_text: string | null;
   created_at: string;
@@ -161,6 +222,9 @@ export function mapBusinessFileRow(row: {
     answerEnabled: row.answer_enabled,
     sendEnabled: row.send_enabled,
     documentKind: row.document_kind,
+    title: row.title ?? null,
+    caraDescription: row.cara_description ?? null,
+    whenToUse: row.when_to_use ?? null,
     processingStatus,
     extractedText: row.extracted_text,
     createdAt: row.created_at,
@@ -180,6 +244,9 @@ export function toBusinessFileListItem(
     answerEnabled: record.answerEnabled,
     sendEnabled: record.sendEnabled,
     documentKind: record.documentKind,
+    title: record.title,
+    caraDescription: record.caraDescription,
+    whenToUse: record.whenToUse,
     processingStatus: record.processingStatus,
     extractedText: record.extractedText,
     createdAt: record.createdAt,

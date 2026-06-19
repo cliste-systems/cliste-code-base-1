@@ -69,6 +69,39 @@ read raw URLs out of the prompt — always execute from `routing_links`.
 
 Routes with `active: false` are ignored.
 
+### Uploaded menus and price lists
+
+When callers ask about a specific item or price in an uploaded file, use
+`searchBusinessFile` to query the full stored document. Quote only what matches
+their question — never read the whole menu aloud. If nothing matches, offer to
+send the file (when `send_enabled`) or take a message with `takeCallbackMessage`.
+
+### Booking routes (`presetId: booking-inquiry`)
+
+The dashboard lets owners pick how booking is fulfilled:
+
+| Method | `targetType` | Worker behaviour |
+|--------|--------------|----------------|
+| Text a link | `link` | Offer and send the booking `url` (SMS/email per `linkDelivery`). Report `link_sent`. No Action Inbox ticket. |
+| Team rings back | `callback` | Capture structured booking fields listed in the route `url` note. Create Action Inbox ticket. **Do not confirm slots or deposits.** |
+| Both | `link` + `description` | Send the booking link **and** capture backup details for Action Inbox (see `description` for capture list). |
+
+**Action Inbox ticket format** for booking callback / backup paths — use this exact structure in `summary` when posting `POST /api/voice/action-ticket`:
+
+```
+Booking request — callback needed
+
+Name: Jane Smith
+Phone: +353 87 123 4567
+Preferred service: Balayage (UNCONFIRMED)
+Preferred day: Saturday (UNCONFIRMED)
+```
+
+- First line is the header (dashboard classifies this as a booking request).
+- Each captured field is `Label: value` on its own line.
+- Append `(UNCONFIRMED)` for preferences that are not confirmed appointments.
+- Name and phone may omit `(UNCONFIRMED)` when clearly stated on the call.
+
 ## The fallback ("Anything else")
 
 - Always present and locked in the dashboard; always serialized into

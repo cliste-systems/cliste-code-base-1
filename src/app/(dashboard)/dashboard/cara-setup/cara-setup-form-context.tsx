@@ -17,19 +17,19 @@ import {
   formatWeekScheduleForAgent,
 } from "@/lib/agent-knowledge-format";
 import { cleanBusinessRules } from "@/lib/agent-business-rules";
+import {
+  DEFAULT_CARA_CONDUCT,
+  type CaraConduct,
+} from "@/lib/agent-cara-conduct";
 import { compileCaraOwnerPreview } from "@/lib/compile-cara-owner-preview";
 import type { CaraOwnerPreview } from "@/lib/compile-cara-owner-preview";
 import { weekScheduleHasOpenDay } from "@/lib/business-hours";
+import { dedupeServiceChips } from "@/lib/services-boundary";
+import { syncCaptureFieldsFromDetailLabels } from "@/lib/sync-capture-fields";
 import {
-  buildCallHandlingConflictWarnings,
-  type CallHandlingConflictWarning,
-} from "@/lib/call-handling-boundary";
-import { dedupeCaraSetupChips } from "@/lib/cara-setup-chips";
-import {
-  buildServiceConflictWarnings,
-  dedupeServiceChips,
-  type ServiceConflictWarning,
-} from "@/lib/services-boundary";
+  composeCaptureDetailsNote,
+  type CaraCaptureField,
+} from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-fields";
 import {
   defaultVoiceGreetingIntro,
   parseGreetingParts,
@@ -44,6 +44,9 @@ import type { BusinessFileListItem } from "@/lib/business-files";
 import type { WeekSchedule } from "@/lib/business-hours";
 import type { CaraSetupPromptInput } from "@/lib/compile-cara-prompt";
 import type { DetailsCollectMode } from "@/lib/details-collect-mode";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
+import type { ServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
+import type { VerticalId } from "@/lib/verticals";
 
 type FormSnapshot = {
   assistantDisplayName: string;
@@ -62,6 +65,10 @@ type FormSnapshot = {
   detailsToCollectItems: string[];
   detailsCollectMode: DetailsCollectMode;
   businessRulesItems: string[];
+  caraRulesItems: string[];
+  caraConduct: CaraConduct;
+  captureFields: CaraCaptureField[];
+  rawBusinessDescription: string;
   faqs: AgentFaq[];
   locationAddress: string;
   locationEircode: string;
@@ -70,6 +77,8 @@ type FormSnapshot = {
 
 type CaraSetupFormContextValue = {
   businessName: string;
+  niche: string;
+  verticalId: VerticalId;
   businessFiles: BusinessFileListItem[];
   setBusinessFiles: (files: BusinessFileListItem[]) => void;
   assistantDisplayName: string;
@@ -102,12 +111,23 @@ type CaraSetupFormContextValue = {
   setServicesItems: (v: string[]) => void;
   servicesNotOfferedItems: string[];
   setServicesNotOfferedItems: (v: string[]) => void;
+  serviceCatalog: ServiceCatalogItem[];
+  setServiceCatalog: (v: ServiceCatalogItem[]) => void;
+  serviceCatalogSupplement?: ServiceCatalogSupplement;
+  quotePricesOnCalls: boolean;
+  setQuotePricesOnCalls: (v: boolean) => void;
   detailsToCollectItems: string[];
   setDetailsToCollectItems: (v: string[]) => void;
   detailsCollectMode: DetailsCollectMode;
   setDetailsCollectMode: (v: DetailsCollectMode) => void;
   businessRulesItems: string[];
   setBusinessRulesItems: (v: string[]) => void;
+  caraRulesItems: string[];
+  setCaraRulesItems: (v: string[]) => void;
+  caraConduct: CaraConduct;
+  setCaraConduct: (v: CaraConduct) => void;
+  rawBusinessDescription: string;
+  setRawBusinessDescription: (v: string) => void;
   faqs: AgentFaq[];
   setFaqs: (v: AgentFaq[]) => void;
   isDirty: boolean;
@@ -118,8 +138,6 @@ type CaraSetupFormContextValue = {
   compiledPromptPreview: CaraOwnerPreview;
   markSavedBaseline: () => void;
   discardChanges: () => void;
-  serviceConflictWarnings: ServiceConflictWarning[];
-  callHandlingConflictWarnings: CallHandlingConflictWarning[];
   promptExtras: Pick<
     CaraSetupPromptInput,
     "routes" | "fallbackNote" | "transferNumber"
@@ -191,14 +209,29 @@ export function CaraSetupFormProvider({
   const [servicesNotOfferedItems, setServicesNotOfferedItems] = useState(
     initial.servicesNotOfferedItems,
   );
+  const [serviceCatalog, setServiceCatalog] = useState(initial.serviceCatalog);
+  const [serviceCatalogSupplement, setServiceCatalogSupplement] = useState(
+    initial.serviceCatalogSupplement,
+  );
+  const [quotePricesOnCalls, setQuotePricesOnCalls] = useState(
+    initial.quotePricesOnCalls,
+  );
   const [detailsToCollectItems, setDetailsToCollectItems] = useState(
-    initial.detailsToCollectItems,
+    initial.detailsToCollectItems ?? [],
   );
   const [detailsCollectMode, setDetailsCollectMode] = useState(
     initial.detailsCollectMode,
   );
   const [businessRulesItems, setBusinessRulesItems] = useState(
-    initial.businessRules,
+    initial.businessRules ?? [],
+  );
+  const [caraRulesItems, setCaraRulesItems] = useState(initial.caraRules ?? []);
+  const [caraConduct, setCaraConduct] = useState(
+    initial.caraConduct ?? DEFAULT_CARA_CONDUCT,
+  );
+  const [captureFields, setCaptureFields] = useState(initial.captureFields);
+  const [rawBusinessDescription, setRawBusinessDescription] = useState(
+    initial.rawBusinessDescription,
   );
   const [faqs, setFaqs] = useState<AgentFaq[]>(initial.faqs);
   const [businessFilesState, setBusinessFiles] = useState(businessFiles);
@@ -206,9 +239,6 @@ export function CaraSetupFormProvider({
   const [status, setStatus] = useState<
     { kind: "ok" | "error"; message: string } | null
   >(null);
-  const [serviceConflictWarnings, setServiceConflictWarnings] = useState<
-    ServiceConflictWarning[]
-  >([]);
   const baselineRef = useRef(
     snapshotFromState(
       {
@@ -228,6 +258,10 @@ export function CaraSetupFormProvider({
         detailsToCollectItems: initial.detailsToCollectItems,
         detailsCollectMode: initial.detailsCollectMode,
         businessRulesItems: initial.businessRules,
+        caraRulesItems: initial.caraRules,
+        caraConduct: initial.caraConduct ?? DEFAULT_CARA_CONDUCT,
+        captureFields: initial.captureFields,
+        rawBusinessDescription: initial.rawBusinessDescription,
         faqs: initial.faqs,
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
@@ -260,6 +294,10 @@ export function CaraSetupFormProvider({
         detailsToCollectItems: initial.detailsToCollectItems,
         detailsCollectMode: initial.detailsCollectMode,
         businessRulesItems: initial.businessRules,
+        caraRulesItems: initial.caraRules,
+        caraConduct: initial.caraConduct ?? DEFAULT_CARA_CONDUCT,
+        captureFields: initial.captureFields,
+        rawBusinessDescription: initial.rawBusinessDescription,
         faqs: initial.faqs,
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
@@ -288,6 +326,10 @@ export function CaraSetupFormProvider({
         detailsToCollectItems,
         detailsCollectMode,
         businessRulesItems,
+        caraRulesItems,
+        caraConduct,
+        captureFields,
+        rawBusinessDescription,
         faqs,
         locationAddress,
         locationEircode,
@@ -320,9 +362,16 @@ export function CaraSetupFormProvider({
     setServiceAreaExclusionItems(initial.serviceAreaExclusionItems);
     setServicesItems(initial.servicesItems);
     setServicesNotOfferedItems(initial.servicesNotOfferedItems);
+    setServiceCatalog(initial.serviceCatalog);
+    setServiceCatalogSupplement(initial.serviceCatalogSupplement);
+    setQuotePricesOnCalls(initial.quotePricesOnCalls);
     setDetailsToCollectItems(initial.detailsToCollectItems);
+    setCaptureFields(initial.captureFields);
+    setRawBusinessDescription(initial.rawBusinessDescription);
     setDetailsCollectMode(initial.detailsCollectMode);
     setBusinessRulesItems(initial.businessRules);
+    setCaraRulesItems(initial.caraRules);
+    setCaraConduct(initial.caraConduct ?? DEFAULT_CARA_CONDUCT);
     setFaqs(initial.faqs);
     baselineRef.current = snapshotFromState(
       {
@@ -342,6 +391,10 @@ export function CaraSetupFormProvider({
         detailsToCollectItems: initial.detailsToCollectItems,
         detailsCollectMode: initial.detailsCollectMode,
         businessRulesItems: initial.businessRules,
+        caraRulesItems: initial.caraRules,
+        caraConduct: initial.caraConduct ?? DEFAULT_CARA_CONDUCT,
+        captureFields: initial.captureFields,
+        rawBusinessDescription: initial.rawBusinessDescription,
         faqs: initial.faqs,
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
@@ -370,6 +423,10 @@ export function CaraSetupFormProvider({
       detailsToCollectItems,
       detailsCollectMode,
       businessRulesItems,
+      caraRulesItems,
+      caraConduct,
+      captureFields,
+      rawBusinessDescription,
       faqs,
       locationAddress,
       locationEircode,
@@ -401,19 +458,28 @@ export function CaraSetupFormProvider({
     setServiceAreaExclusionItems(base.serviceAreaExclusionItems);
     setServicesItems(base.servicesItems);
     setServicesNotOfferedItems(base.servicesNotOfferedItems);
-    setDetailsToCollectItems(base.detailsToCollectItems);
-    setDetailsCollectMode(base.detailsCollectMode);
-    setBusinessRulesItems(base.businessRulesItems);
+    setDetailsToCollectItems(base.detailsToCollectItems ?? []);
+    setCaptureFields(base.captureFields ?? initial.captureFields);
+    setRawBusinessDescription(base.rawBusinessDescription ?? "");
+    setDetailsCollectMode(base.detailsCollectMode ?? initial.detailsCollectMode);
+    setBusinessRulesItems(base.businessRulesItems ?? []);
+    setCaraRulesItems(base.caraRulesItems ?? []);
+    setCaraConduct(base.caraConduct ?? DEFAULT_CARA_CONDUCT);
     setFaqs(base.faqs);
     setLocationAddress(base.locationAddress);
     setLocationEircode(base.locationEircode);
     setBaseTown(base.baseTown);
   }, []);
 
+  const updateDetailsToCollectItems = useCallback((next: string[]) => {
+    setDetailsToCollectItems(next);
+    setCaptureFields((current) => syncCaptureFieldsFromDetailLabels(current, next));
+  }, []);
+
   const buildSavePayload = useCallback(() => {
     const hasHours = weekScheduleHasOpenDay(openingHoursSchedule);
     return {
-      assistantDisplayName: VOICE_ASSISTANT_DEFAULT_NAME,
+      assistantDisplayName: assistantDisplayName,
       greetingIntro,
       greetingClosing,
       faqs,
@@ -433,35 +499,35 @@ export function CaraSetupFormProvider({
       servicesNotOffered: formatAgentKnowledgeList(
         dedupeServiceChips(servicesNotOfferedItems),
       ),
-      detailsToCollect: formatAgentKnowledgeList(
-        dedupeCaraSetupChips(detailsToCollectItems),
-      ),
+      detailsToCollect: composeCaptureDetailsNote(captureFields),
       detailsCollectMode,
       businessRules: cleanBusinessRules(businessRulesItems),
+      caraConduct,
       locationAddress,
       locationEircode,
       baseTown,
+      captureFields,
+      rawBusinessDescription,
     };
   }, [
-    assistantDisplayName,
     greetingIntro,
     greetingClosing,
-    businessType,
     faqs,
     openingHoursSchedule,
-    openingHoursLegacy,
     open24_7,
     hoursNote,
     serviceAreaItems,
     serviceAreaExclusionItems,
     servicesItems,
     servicesNotOfferedItems,
-    detailsToCollectItems,
+    captureFields,
     detailsCollectMode,
     businessRulesItems,
+    caraConduct,
     locationAddress,
     locationEircode,
     baseTown,
+    rawBusinessDescription,
   ]);
 
   const saveAsync = useCallback(async (): Promise<boolean> => {
@@ -470,9 +536,6 @@ export function CaraSetupFormProvider({
     if (res.ok) {
       baselineRef.current = currentSnapshot;
       setHoursNeverConfigured(false);
-      setServiceConflictWarnings(
-        buildServiceConflictWarnings(servicesNotOfferedItems, faqs, ""),
-      );
       setStatus({ kind: "ok", message: "Changes saved." });
       return true;
     }
@@ -481,32 +544,7 @@ export function CaraSetupFormProvider({
   }, [
     buildSavePayload,
     currentSnapshot,
-    servicesNotOfferedItems,
-    faqs,
-    businessRulesItems,
-    detailsToCollectItems,
-    businessFilesState,
-    promptExtras,
   ]);
-
-  const callHandlingConflictWarnings = useMemo(
-    () =>
-      buildCallHandlingConflictWarnings({
-        businessRules: businessRulesItems,
-        detailsToCollect: detailsToCollectItems,
-        faqs,
-        businessFiles: businessFilesState,
-        routes: promptExtras.routes,
-        transferNumber: promptExtras.transferNumber,
-      }),
-    [
-      businessRulesItems,
-      detailsToCollectItems,
-      faqs,
-      businessFilesState,
-      promptExtras,
-    ],
-  );
 
   const save = useCallback(() => {
     startTransition(async () => {
@@ -517,7 +555,7 @@ export function CaraSetupFormProvider({
     const hasHours = weekScheduleHasOpenDay(openingHoursSchedule);
     return compileCaraOwnerPreview({
       businessName: initial.businessName,
-      assistantDisplayName: VOICE_ASSISTANT_DEFAULT_NAME,
+      assistantDisplayName: assistantDisplayName,
       businessType,
       locationAddress,
       locationEircode,
@@ -545,9 +583,10 @@ export function CaraSetupFormProvider({
       servicesNotOffered:
         formatAgentKnowledgeList(servicesNotOfferedItems) || undefined,
       detailsToCollect:
-        formatAgentKnowledgeList(detailsToCollectItems) || undefined,
+        formatAgentKnowledgeList(detailsToCollectItems ?? []) || undefined,
       detailsCollectMode,
       businessRules: cleanBusinessRules(businessRulesItems),
+      caraConduct,
       faqs,
       routes: promptExtras.routes,
       fallbackNote: promptExtras.fallbackNote,
@@ -577,11 +616,14 @@ export function CaraSetupFormProvider({
     detailsToCollectItems,
     detailsCollectMode,
     businessRulesItems,
+    caraConduct,
     faqs,
   ]);
 
   const value: CaraSetupFormContextValue = {
     businessName: initial.businessName,
+    niche: initial.niche,
+    verticalId: initial.verticalId,
     businessFiles: businessFilesState,
     setBusinessFiles,
     assistantDisplayName,
@@ -614,12 +656,23 @@ export function CaraSetupFormProvider({
     setServicesItems,
     servicesNotOfferedItems,
     setServicesNotOfferedItems,
+    serviceCatalog,
+    setServiceCatalog,
+    serviceCatalogSupplement,
+    quotePricesOnCalls,
+    setQuotePricesOnCalls,
     detailsToCollectItems,
-    setDetailsToCollectItems,
+    setDetailsToCollectItems: updateDetailsToCollectItems,
     detailsCollectMode,
     setDetailsCollectMode,
     businessRulesItems,
     setBusinessRulesItems,
+    caraRulesItems,
+    setCaraRulesItems,
+    caraConduct,
+    setCaraConduct,
+    rawBusinessDescription,
+    setRawBusinessDescription,
     faqs,
     setFaqs,
     isDirty,
@@ -630,8 +683,6 @@ export function CaraSetupFormProvider({
     compiledPromptPreview,
     markSavedBaseline,
     discardChanges,
-    serviceConflictWarnings,
-    callHandlingConflictWarnings,
     promptExtras,
   };
 

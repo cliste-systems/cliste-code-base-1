@@ -30,6 +30,14 @@ export const TRAINING_TEXTAREA = cn(
 const ABOUT_TEXTAREA_COLLAPSED = "11.5rem";
 const ABOUT_TEXTAREA_EXPANDED = "22rem";
 
+const SERVICES_OWN_WORDS_COLLAPSED = "5.5rem";
+const SERVICES_OWN_WORDS_EXPANDED = "12rem";
+
+export const SERVICES_PLAIN_ENGLISH_TEXTAREA = {
+  collapsedHeight: SERVICES_OWN_WORDS_COLLAPSED,
+  expandedHeight: SERVICES_OWN_WORDS_EXPANDED,
+} as const;
+
 const DUAL_PRIMARY_COLLAPSED = "6.5rem";
 const DUAL_PRIMARY_EXPANDED = "14rem";
 
@@ -52,9 +60,11 @@ type ExpandableTrainingTextareaProps = {
   expandedHeight: string;
   disabled?: boolean;
   "aria-label": string;
+  onExpandedChange?: (expanded: boolean) => void;
+  onBlur?: () => void;
 };
 
-function ExpandableTrainingTextarea({
+export function ExpandableTrainingTextarea({
   value,
   onChange,
   placeholder,
@@ -62,9 +72,19 @@ function ExpandableTrainingTextarea({
   expandedHeight,
   disabled = false,
   "aria-label": ariaLabel,
+  onExpandedChange,
+  onBlur,
 }: ExpandableTrainingTextareaProps) {
   const [expanded, setExpanded] = useState(false);
   const reduceMotion = useReducedMotion();
+
+  function toggleExpanded() {
+    setExpanded((current) => {
+      const next = !current;
+      onExpandedChange?.(next);
+      return next;
+    });
+  }
 
   return (
     <div className="relative mx-auto w-full">
@@ -81,6 +101,7 @@ function ExpandableTrainingTextarea({
           placeholder={placeholder}
           aria-label={ariaLabel}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
           className={cn(
             TRAINING_TEXTAREA,
             "absolute inset-0 h-full pb-11",
@@ -92,7 +113,7 @@ function ExpandableTrainingTextarea({
           disabled={disabled}
           aria-label={expanded ? "Make writing box smaller" : "Make writing box bigger"}
           aria-expanded={expanded}
-          onClick={() => setExpanded((current) => !current)}
+          onClick={toggleExpanded}
           className={EXPAND_TOGGLE}
         >
           {expanded ? (
@@ -242,6 +263,7 @@ type DualTextareaStepProps = {
   onPrimaryChange: (value: string) => void;
   onSecondaryChange: (value: string) => void;
   disabled?: boolean;
+  hidePrimary?: boolean;
 };
 
 export function CaraDualTextareaStep({
@@ -257,24 +279,27 @@ export function CaraDualTextareaStep({
   onPrimaryChange,
   onSecondaryChange,
   disabled = false,
+  hidePrimary = false,
 }: DualTextareaStepProps) {
   return (
     <CaraTrainingStepShell title={title} subtitle={subtitle} helper={helper}>
       <div className="w-full space-y-4">
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">
-            {primaryLabel}
-          </p>
-          <ExpandableTrainingTextarea
-            value={primaryValue}
-            disabled={disabled}
-            placeholder={primaryPlaceholder}
-            aria-label={primaryLabel}
-            collapsedHeight={DUAL_PRIMARY_COLLAPSED}
-            expandedHeight={DUAL_PRIMARY_EXPANDED}
-            onChange={onPrimaryChange}
-          />
-        </div>
+        {hidePrimary ? null : (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">
+              {primaryLabel}
+            </p>
+            <ExpandableTrainingTextarea
+              value={primaryValue}
+              disabled={disabled}
+              placeholder={primaryPlaceholder}
+              aria-label={primaryLabel}
+              collapsedHeight={DUAL_PRIMARY_COLLAPSED}
+              expandedHeight={DUAL_PRIMARY_EXPANDED}
+              onChange={onPrimaryChange}
+            />
+          </div>
+        )}
         <div className="space-y-1.5">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">
             {secondaryLabel}

@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
 
 import {
   getRateLimitStatus,
@@ -12,6 +11,7 @@ import { isSendGridConfigured } from "@/lib/sendgrid-mail";
 import { sendSignupConfirmationEmail } from "@/lib/signup-confirmation-email";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
+import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import { recordLegalAcceptances } from "@/lib/legal-acceptances";
 import { scoreSignupFraud, shouldRouteToReview } from "@/lib/signup-security";
 import {
@@ -34,7 +34,7 @@ function compactPhone(raw: string): string {
 }
 
 export type SignupResult =
-  | { ok: true }
+  | { ok: true; redirectTo: string }
   | { ok: false; message: string; retryAfterSeconds?: number };
 
 function slugifySalonName(raw: string): string {
@@ -133,8 +133,10 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       message: "Signup is temporarily unavailable. Please try again later.",
     };
   }
+  const devRelaxed = isSignupOnboardingDevRelaxed();
   const turnstileEnabled =
-    IS_PRODUCTION || Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
+    !devRelaxed &&
+    (IS_PRODUCTION || Boolean(process.env.TURNSTILE_SECRET_KEY?.trim()));
   if (turnstileEnabled) {
     const turnstileToken = String(formData.get("turnstileToken") ?? "").trim();
     const ts = await verifyTurnstileToken(turnstileToken || null);
@@ -144,19 +146,23 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
   }
 
   const ipFp = rateLimitFingerprint(h, "signup-ip");
-  const ipStatus = await getRateLimitStatus("authenticate", ipFp);
-  if (!ipStatus.allowed) {
-    return {
-      ok: false,
-      message: `Too many signups from this network. Try again in ${ipStatus.retryAfterSeconds}s.`,
-      retryAfterSeconds: ipStatus.retryAfterSeconds,
-    };
+  if (!devRelaxed) {
+    const ipStatus = await getRateLimitStatus("authenticate", ipFp);
+    if (!ipStatus.allowed) {
+      return {
+        ok: false,
+        message: `Too many signups from this network. Try again in ${ipStatus.retryAfterSeconds}s.`,
+        retryAfterSeconds: ipStatus.retryAfterSeconds,
+      };
+    }
   }
 
   const ua = h.get("user-agent");
   const forwardedFor = h.get("x-forwarded-for") ?? "";
   const signupIp = forwardedFor.split(",")[0]?.trim() || null;
-  const fraud = scoreSignupFraud({ email, salonName, signupIp, userAgent: ua });
+  const fraud = devRelaxed
+    ? { score: 0, reasons: [] as string[] }
+    : scoreSignupFraud({ email, salonName, signupIp, userAgent: ua });
 
   let admin;
   try {
@@ -290,7 +296,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     role: "admin",
   });
 
-  const willReview = shouldRouteToReview(fraud.score);
+  const willReview = devRelaxed ? false : shouldRouteToReview(fraud.score);
   await admin
     .from("onboarding_applications")
     .insert({
@@ -344,7 +350,10 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       await admin.from("accounts").delete().eq("id", accountId).then(() => undefined);
       return { ok: false, message: sent.message };
     }
-    redirect(`/signup/check-email?email=${encodeURIComponent(email)}`);
+    return {
+      ok: true,
+      redirectTo: `/signup/check-email?email=${encodeURIComponent(email)}`,
+    };
   }
 
   // Dev: auto sign-in so the wizard sees the session immediately.
@@ -359,5 +368,5 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
 
   void cookies;
 
-  redirect("/onboarding");
+  return { ok: true, redirectTo: "/onboarding" };
 }

@@ -6,20 +6,21 @@ import {
   LegalTable,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
-
+import { CLISTE_COMPANY } from "@/lib/company-details";
+import { SUB_PROCESSORS } from "@/lib/sub-processors.data";
 
 export function DpaDocument() {
   return (
     <>
       <LegalPageHeader
         title="Data Processing Agreement (DPA)"
-        description="GDPR Article 28 agreement between Cliste Systems (processor) and your business (controller) for caller and contact data processed through the Cliste platform."
+        description={`GDPR Article 28 agreement between ${CLISTE_COMPANY.legalName} (processor) and your business (controller) for caller and contact data processed through the Cliste platform.`}
       />
 
       <p className="text-[15px] leading-relaxed text-slate-700">
-        <strong>Cliste Systems</strong> (&ldquo;Processor&rdquo;) and the customer
+        <strong>{CLISTE_COMPANY.legalName}</strong> (&ldquo;Processor&rdquo;) and the customer
         business (&ldquo;Controller&rdquo;) agree the following with respect to
-        processing of personal data carried out by Cliste Systems on behalf of
+        processing of personal data carried out by {CLISTE_COMPANY.legalName} on behalf of
         the Controller under the Cliste platform{" "}
         <LegalInlineLink href="/legal/terms">Terms of Service</LegalInlineLink>.
         This DPA forms part of the agreement between the parties and applies to
@@ -172,6 +173,13 @@ export function DpaDocument() {
           processor-to-processor) elsewhere, supplemented by the technical and
           organisational measures in Annex II.
         </p>
+        <p>
+          Cliste has completed a <strong>transfer impact assessment</strong> for
+          US transfers under Schrems II, documenting supplementary measures
+          including TLS in transit, no voice-audio retention at rest, transcript
+          redaction, provider zero-data-retention options where available, and
+          automated retention deletion via our daily data-retention cron.
+        </p>
       </LegalSection>
 
       <LegalSection title="7. Sub-processors">
@@ -235,7 +243,7 @@ export function DpaDocument() {
           headers={["Field", "Value"]}
           rows={[
             ["Controller", "The customer business (account holder of the Cliste account)"],
-            ["Processor", "Cliste Systems, Ireland"],
+            ["Processor", `${CLISTE_COMPANY.legalName}, Ireland`],
             [
               "Processor contact",
               <>
@@ -301,28 +309,14 @@ export function DpaDocument() {
           </LegalInlineLink>{" "}
           (category summary). Snapshot as of the date this DPA is accepted:
         </p>
-        <LegalList>
-          <li>Supabase — EEA (AWS eu-west-1, Ireland); primary database</li>
-          <li>Vercel — EEA (dub1 Dublin); dashboard &amp; APIs</li>
-          <li>Railway — EEA (EU West); voice worker</li>
-          <li>Stripe Payments Europe Ltd (Ireland)</li>
-          <li>Twilio Ireland (Ireland; SIP/SMS may route globally)</li>
-          <li>
-            LiveKit Inc. (EU SIP Frankfurt for inbound; WebRTC global until
-            protocol pinning; DPF / SCCs)
-          </li>
-          <li>
-            ElevenLabs Inc. (US; EU residency on Enterprise — DPF / SCCs;
-            transient TTS)
-          </li>
-          <li>
-            OpenRouter Inc. (US; EU in-region routing on Enterprise — SCCs; LLM
-            routing)
-          </li>
-          <li>SendGrid / Twilio (US global API today; EU residency available — SCCs)</li>
-          <li>Google Ireland Ltd (optional geocoding — SCCs)</li>
-          <li>Cloudflare Ireland (Ireland; global edge)</li>
-        </LegalList>
+        <LegalTable
+          headers={["Sub-processor", "Location", "Transfer mechanism"]}
+          rows={SUB_PROCESSORS.map((sp) => [
+            sp.name,
+            sp.location,
+            sp.transferMechanism,
+          ])}
+        />
         <p className="text-[13px] text-slate-600">
           For a countersigned copy before your first paid subscription, email{" "}
           <a

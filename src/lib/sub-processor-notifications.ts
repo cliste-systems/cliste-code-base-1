@@ -1,5 +1,6 @@
 import "server-only";
 
+import { CLISTE_COMPANY } from "@/lib/company-details";
 import { SUB_PROCESSOR_LIST_VERSION } from "@/lib/sub-processors.data";
 import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -128,7 +129,7 @@ export async function notifySubProcessorListChangeIfNeeded(): Promise<SubProcess
         "Under our Data Processing Agreement you have 30 days to object on reasonable grounds.",
         "Reply to privacy@clistesystems.ie with any concerns.",
         "",
-        "— Cliste Systems",
+        `— ${CLISTE_COMPANY.legalName}`,
       ].join("\n"),
     });
     if (result.ok) emailsSent += 1;

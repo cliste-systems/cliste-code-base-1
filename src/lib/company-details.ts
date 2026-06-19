@@ -1,7 +1,7 @@
-/** Cliste Systems Ltd company details for public legal documents. */
+/** Cliste Systems Limited company details for public legal documents. */
 
 export const CLISTE_COMPANY = {
-  legalName: "Cliste Systems",
+  legalName: "Cliste Systems Limited",
   jurisdiction: "Ireland",
   /** Set CLISTE_CRO_NUMBER in production env for public display. */
   croNumber: process.env.CLISTE_CRO_NUMBER?.trim() || null,

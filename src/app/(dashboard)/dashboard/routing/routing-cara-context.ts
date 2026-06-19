@@ -86,8 +86,12 @@ export function applyCaraDefaultsToNewRoute(
   switch (route.templateId) {
     case "location": {
       const url = defaultLocationUrl(context);
-      return url ? { ...route, url } : route;
+      return url
+        ? { ...route, url, linkDelivery: route.linkDelivery ?? "sms" }
+        : { ...route, linkDelivery: route.linkDelivery ?? "sms" };
     }
+    case "booking-inquiry":
+      return { ...route, linkDelivery: route.linkDelivery ?? "sms" };
     case "email": {
       const email = context.notificationEmail.trim();
       return email ? { ...route, email } : route;
@@ -150,6 +154,10 @@ export function switchRouteActionType(
     note: route.note,
     transferDuringHoursOnly:
       meta.outcome === "transfer" ? route.transferDuringHoursOnly : undefined,
+    linkDelivery:
+      meta.templateId === "location" || meta.templateId === "booking-inquiry"
+        ? route.linkDelivery ?? "sms"
+        : undefined,
   };
 
   return applyCaraDefaultsToNewRoute(next, context);

@@ -4,12 +4,16 @@
  */
 
 import type { BusinessFileListItem } from "@/lib/business-files";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
+import { servicePriceIsSet } from "@/lib/service-catalog-format";
 import {
   deriveCaraCapabilities,
   type CaraCapabilities,
 } from "@/lib/cara-capabilities";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
-import { dedupeCaraSetupChips, normalizeCaraSetupChip } from "@/lib/cara-setup-chips";
+import { dedupeCaraSetupChips, normalizeCaraSetupChip, caraSetupChipKey } from "@/lib/cara-setup-chips";
+import { tryParseTemporaryUnavailabilityRule } from "@/lib/cara-instruction-heuristics";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { looksLikeExclusion } from "@/lib/services-boundary";
 
 export const DETAILS_SURVEY_WARNING_THRESHOLD = 7;
@@ -19,7 +23,7 @@ export const CARA_WHEN_UNSURE_LOCKED_COPY =
   "If a caller asks for something not covered here, Cara never guesses. She takes the caller's name, number and request, and adds it to your Action Inbox.";
 
 export const COLLECTION_RELEVANCE_INSTRUCTION =
-  "I always get their name and number. I only ask for anything else when it fits what they called about — a quick question doesn't turn into a long checklist. I work questions into the chat naturally; I never read a list like a form. If they don't want to share something, I keep helping, note what's missing, and move on.";
+  "I always get their name. For their number, I confirm the caller ID when it's showing before asking them to spell it out. I only ask for anything else when it fits what they called about — a quick question doesn't turn into a long checklist. I work questions into the chat naturally; I never read a list like a form. If they don't want to share something, I keep helping, note what's missing, and move on.";
 
 export const PHOTO_HANDLING_INSTRUCTION =
   "If they mention photos, pictures, or video, I say that's fine, note they have them, and move on — I can't take images on a call.";
@@ -203,7 +207,7 @@ const CAPABILITY_WARN_MESSAGES: Record<
   book: (configured) =>
     configured
       ? ""
-      : "Cara can't book appointments yet — set it up in Call flow, or she'll take a message instead.",
+      : "This sounds like a booking policy — add it as an FAQ or a note on the relevant service. Cara will take a message until booking is set up in Call flow.",
   transfer: (configured) =>
     configured
       ? ""
@@ -272,6 +276,9 @@ export function detectCapabilityWarnings(
 
 // --- Wrong-home detection (business rules) ---
 
+export const NEVER_QUOTE_PRICE_PATTERN =
+  /\b(?:never|don'?t|do not)\b[^.]{0,40}\b(?:quote|give|discuss|mention)\b[^.]{0,30}\bpric/i;
+
 const WEEKDAYS =
   /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i;
 
@@ -297,9 +304,128 @@ export function looksLikeServiceExclusion(text: string): boolean {
   return looksLikeExclusion(text);
 }
 
+const BUSINESS_POLICY_KEYWORDS =
+  /\b(prices?|quotes?|deposits?|discounts?|refunds?|cancels?|cancellation|bookings?|hours?|walk-?ins?|payments?|opening)\b/i;
+
+/** Standing policies (pricing, booking limits, deposits) — belong in Your policies. */
+const BUSINESS_POLICY_PATTERNS: RegExp[] = [
+  /\b(?:don'?t|do not|never|no)\s+(?:book|accept|take on)\b/i,
+  /\bnot\s+(?:taking|accepting)\s+(?:bookings?|appointments?|new clients?)/i,
+  /\b(?:book|booking|appointment)s?\s+(?:only|required)\b/i,
+  /\b(?:new clients?|walk-?ins?)\b/i,
+  /\b(?:deposit|cancellation fee|refund|no[- ]show)\b/i,
+  /\b(?:minimum|at least)\s+\d+\s*(?:hours?|days?)\s+(?:notice|cancellation)/i,
+  /\b(?:cash only|card only)\b/i,
+  /\b(?:must|need to)\s+(?:pay|prepay|pay in advance)\b/i,
+  /\b(?:consultation|patch test)\s+(?:required|before)\b/i,
+  /\bdo not\s+(?:book|schedule|offer)\b/i,
+  /\b(?:closed|not open)\s+(?:on|for)\b/i,
+  /\b(?:only|just)\s+(?:for|serve)\s+(?:existing|returning)\s+clients?\b/i,
+  /\b(?:flag|mark)\s+(?:anything|calls?)\s+urgent\b/i,
+  /\balways\s+take\s+a\s+message\b/i,
+];
+
+/** Tone and phrasing — belong in Cara's style. */
+const CARA_CONDUCT_PATTERNS: RegExp[] = [
+  /\bkeep\s+(?:it\s+)?(?:answers?|replies?|responses?)\s+short\b/i,
+  /\b(?:short|brief|concise)\s+(?:answers?|replies?|responses?)\b/i,
+  /\b(?:use|say)\s+their\s+(?:first\s+)?name\b/i,
+  /\b(?:first\s+)?name\s+when\s+you\s+have\s+it\b/i,
+  /\b(?:friendly|warm|professional|polite)(?:\s+and\s+(?:friendly|warm|professional|polite))?\b/i,
+  /\b(?:tone|phrasing|wording)\b/i,
+  /\b(?:text|sms)\s+(?:them\s+)?(?:the\s+)?links?\b/i,
+  /\boffer\s+to\s+text\b/i,
+  /\b(?:don'?t|do not|never)\s+read\s+(?:out\s+)?(?:links?|urls?)\b/i,
+  /\binstead\s+of\s+reading\s+(?:them\s+)?(?:out|aloud|urls?)\b/i,
+  /\b(?:speak|talk)\s+(?:more\s+)?(?:slowly|clearly)\b/i,
+  /\b(?:plain|simple)\s+(?:english|language)\b/i,
+  /\bavoid\s+jargon\b/i,
+  /\bconfirm\s+spelling\b/i,
+];
+
+export function looksLikeBusinessPolicyRule(text: string): boolean {
+  const normalized = normalizeCaraSetupChip(text);
+  if (!normalized) return false;
+  if (tryParseTemporaryUnavailabilityRule(normalized)) return true;
+  if (NEVER_QUOTE_PRICE_PATTERN.test(normalized)) return true;
+  if (BUSINESS_POLICY_KEYWORDS.test(normalized)) return true;
+  return BUSINESS_POLICY_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+export function looksLikeCaraConductRule(text: string): boolean {
+  const normalized = normalizeCaraSetupChip(text);
+  if (!normalized) return false;
+  return CARA_CONDUCT_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 // --- Input validation ---
 
-export type CallHandlingInputKind = "detail" | "rule";
+export type CallHandlingInputKind = "detail" | "rule" | "cara_rule";
+
+export type WrongRuleSectionInterrupt =
+  | "business-rules-home"
+  | "cara-rules-home";
+
+export function wrongRuleSectionInterrupt(
+  kind: CallHandlingInputKind,
+  text: string,
+): WrongRuleSectionInterrupt | null {
+  if (kind === "cara_rule" && looksLikeBusinessPolicyRule(text)) {
+    return "business-rules-home";
+  }
+  if (
+    kind === "rule" &&
+    looksLikeCaraConductRule(text) &&
+    !looksLikeBusinessPolicyRule(text)
+  ) {
+    return "cara-rules-home";
+  }
+  return null;
+}
+
+export const WRONG_RULE_SECTION_COPY: Record<
+  WrongRuleSectionInterrupt,
+  { title: string; description: string }
+> = {
+  "business-rules-home": {
+    title: "Sounds like a business policy",
+    description:
+      "Your policies are standing rules Cara must follow — like pricing, booking limits, and what you do or don't offer.",
+  },
+  "cara-rules-home": {
+    title: "Sounds like Cara's style",
+    description:
+      "Cara's style is for tone and phrasing on calls — like keeping answers short or texting links instead of reading them out.",
+  },
+};
+
+export type MisfileNudge = {
+  message: string;
+  moveActionLabel: string;
+  target: "policies" | "style";
+};
+
+export function misfileNudgeForRule(
+  kind: CallHandlingInputKind,
+  text: string,
+): MisfileNudge | null {
+  const interrupt = wrongRuleSectionInterrupt(kind, text);
+  if (!interrupt) return null;
+
+  if (interrupt === "business-rules-home") {
+    return {
+      message: "This looks like a business policy — move it to Your policies?",
+      moveActionLabel: "Move",
+      target: "policies",
+    };
+  }
+
+  return {
+    message: "This looks like Cara's style — move it to Cara's style?",
+    moveActionLabel: "Move",
+    target: "style",
+  };
+}
 
 export type CallHandlingAddValidation =
   | { ok: true; warnings?: string[] }
@@ -314,7 +440,7 @@ export function validateCallHandlingAdd(
   if (!text) return { ok: false, block: "Enter something to add." };
 
   for (const { pattern, message } of COMPLIANCE_OVERRIDE_PATTERNS) {
-    if (kind === "rule" && pattern.test(text)) {
+    if ((kind === "rule" || kind === "cara_rule") && pattern.test(text)) {
       return { ok: false, block: message };
     }
   }
@@ -340,9 +466,6 @@ const ALWAYS_PATTERN = /\balways\b/i;
 const NEVER_PATTERN = /\b(?:never|don'?t|do not)\b/i;
 
 const PRICE_CURRENCY_PATTERN = /(?:€|£|\$)\s*\d+|\d+\s*(?:€|£|\$|euro|eur)\b/i;
-
-const NEVER_QUOTE_PRICE_PATTERN =
-  /\b(?:never|don'?t|do not)\b[^.]{0,40}\b(?:quote|give|discuss|mention)\b[^.]{0,30}\bpric/i;
 
 function significantRuleWords(text: string): string[] {
   const stop = new Set([
@@ -394,6 +517,9 @@ export type CallHandlingConflictWarning = {
   message: string;
   href?: string;
   secondaryHref?: string;
+  action?: "add_faq";
+  sourceText?: string;
+  capabilityKind?: CapabilityKind;
 };
 
 export function lintRuleVsRuleConflicts(rules: string[]): CallHandlingConflictWarning[] {
@@ -408,13 +534,35 @@ export function lintRuleVsRuleConflicts(rules: string[]): CallHandlingConflictWa
         warnings.push({
           id: `rule-rule-${i}-${j}`,
           message: `Possible conflict: "${a}" and "${b}" may contradict each other — Cara may not know which to follow.`,
-          href: "/dashboard/cara-setup/call-handling",
         });
       }
     }
   }
 
   return warnings;
+}
+
+export function lintCatalogPricingVsRules(
+  businessRules: string[],
+  serviceCatalog: ServiceCatalogItem[],
+): CallHandlingConflictWarning[] {
+  const neverQuoteRules = dedupeCaraSetupChips(businessRules).filter((r) =>
+    NEVER_QUOTE_PRICE_PATTERN.test(r),
+  );
+  const catalogHasPrices = serviceCatalog.some((s) => servicePriceIsSet(s.price));
+
+  if (catalogHasPrices && neverQuoteRules.length > 0) {
+    return [
+      {
+        id: "catalog-prices-never-quote-rule",
+        message:
+          "Your service menu has prices, but you have a rule telling Cara never to quote prices — she may contradict herself.",
+        href: DASHBOARD_ROUTES.businessServices,
+      },
+    ];
+  }
+
+  return [];
 }
 
 export function lintRuleVsPricingConflicts(
@@ -436,8 +584,8 @@ export function lintRuleVsPricingConflicts(
       warnings.push({
         id: `rule-faq-price-${rule}-${faq.question}`,
         message: `You've told Cara never to quote prices, but the answer to "${faq.question.trim() || "Common question"}" contains prices — she may contradict herself.`,
-        href: "/dashboard/cara-setup/call-handling",
-        secondaryHref: "/dashboard/cara-setup/answers",
+        href: DASHBOARD_ROUTES.businessFaqs,
+        secondaryHref: DASHBOARD_ROUTES.businessServices,
       });
     }
 
@@ -451,8 +599,8 @@ export function lintRuleVsPricingConflicts(
       warnings.push({
         id: `rule-file-price-${rule}-${file.id}`,
         message: `You've told Cara never to quote prices, but "${file.fileName}" is a price list she can read aloud — she may contradict herself.`,
-        href: "/dashboard/cara-setup/call-handling",
-        secondaryHref: "/dashboard/cara-setup/general",
+        href: DASHBOARD_ROUTES.businessFiles,
+        secondaryHref: DASHBOARD_ROUTES.businessProfile,
       });
     }
   }
@@ -468,13 +616,33 @@ export function lintCapabilityWarningsForItems(
   const seen = new Set<string>();
 
   for (const item of dedupeCaraSetupChips(items)) {
-    for (const message of detectCapabilityWarnings(item, caps)) {
-      if (seen.has(message)) continue;
+    for (const { kind, patterns } of CAPABILITY_PATTERNS) {
+      if (kind === "payment") continue;
+      if (!patterns.some((p) => p.test(item))) continue;
+
+      const configured = capabilityConfigured(kind, caps);
+      const message = CAPABILITY_WARN_MESSAGES[kind](configured);
+      if (!message || seen.has(message)) continue;
       seen.add(message);
+
+      if (kind === "book" && !configured) {
+        warnings.push({
+          id: `capability-book-${caraSetupChipKey(item)}`,
+          message: `"${item}" — ${message}`,
+          href: DASHBOARD_ROUTES.businessFaqs,
+          action: "add_faq",
+          sourceText: item,
+          capabilityKind: kind,
+        });
+        continue;
+      }
+
       warnings.push({
-        id: `capability-${message}`,
+        id: `capability-${kind}-${caraSetupChipKey(item)}`,
         message: `"${item}" — ${message}`,
         href: "/dashboard/routing",
+        sourceText: item,
+        capabilityKind: kind,
       });
     }
   }
@@ -489,8 +657,12 @@ export function buildCallHandlingConflictWarnings(input: {
   businessFiles: BusinessFileListItem[];
   routes?: RoutingActionSummary[];
   transferNumber?: string;
+  serviceCatalog?: ServiceCatalogItem[];
+  /** Dashboard has no business-rules editor — skip orphan rule capability nags. */
+  lintBusinessRuleCapabilities?: boolean;
 }): CallHandlingConflictWarning[] {
   const caps = deriveCaraCapabilities(input.routes, input.transferNumber);
+  const lintBusinessRuleCapabilities = input.lintBusinessRuleCapabilities !== false;
 
   return [
     ...lintRuleVsRuleConflicts(input.businessRules),
@@ -499,7 +671,13 @@ export function buildCallHandlingConflictWarnings(input: {
       input.faqs,
       input.businessFiles,
     ),
-    ...lintCapabilityWarningsForItems(input.businessRules, caps),
+    ...lintCatalogPricingVsRules(
+      input.businessRules,
+      input.serviceCatalog ?? [],
+    ),
+    ...(lintBusinessRuleCapabilities
+      ? lintCapabilityWarningsForItems(input.businessRules, caps)
+      : []),
     ...lintCapabilityWarningsForItems(input.detailsToCollect, caps),
   ];
 }

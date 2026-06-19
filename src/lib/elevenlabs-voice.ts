@@ -1,5 +1,8 @@
 import "server-only";
 
+import {
+  CLISTE_DEFAULT_ELEVENLABS_MODEL_ID,
+} from "@/lib/onboarding-voice-presets";
 import { MAX_GREETING_SCRIPT_LENGTH } from "@/lib/voice-greeting-security";
 
 function elevenLabsTtsBaseUrl(): string {
@@ -37,7 +40,7 @@ export async function synthesizeElevenLabsSpeech(input: {
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_multilingual_v2",
+        model_id: CLISTE_DEFAULT_ELEVENLABS_MODEL_ID,
       }),
       cache: "no-store",
     },

@@ -5,6 +5,9 @@
  * Marketing site CTAs should use the same tier slugs: starter | pro | business | custom
  */
 
+/** Platform subscription free-trial length (Stripe `trial_period_days`). */
+export const PLATFORM_TRIAL_DAYS = 7;
+
 export type PlanTier = "starter" | "pro" | "business" | "enterprise";
 export type BillingInterval = "month" | "year";
 export type LaunchTier = "diy" | "remote" | "onsite_dublin" | "onsite_rest_ie";

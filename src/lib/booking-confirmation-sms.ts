@@ -4,6 +4,8 @@ export type TwilioSmsSendOptions = {
   /** Billable org for SMS metering (optional). */
   organizationId?: string;
   purpose?: string;
+  /** Caller-facing SMS: send from the org's assigned Irish DID. */
+  fromE164?: string;
 };
 
 /** Best-effort outbound SMS (Action Inbox alerts, link delivery, etc.). */
@@ -14,9 +16,10 @@ export async function sendTwilioBookingSms(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const token = process.env.TWILIO_AUTH_TOKEN?.trim();
-  const from =
+  const platformFrom =
     process.env.TWILIO_SMS_FROM?.trim() ||
     process.env.TWILIO_PHONE_NUMBER?.trim();
+  const from = options?.fromE164?.trim() || platformFrom;
   if (!sid || !token || !from) {
     return { ok: false, message: "Twilio not configured" };
   }

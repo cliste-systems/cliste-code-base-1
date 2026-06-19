@@ -9,7 +9,8 @@ export type CallOutcome =
   | "action_created"
   | "failed"
   | "voicemail_or_no_speech"
-  | "spam_or_abuse";
+  | "spam_or_abuse"
+  | "blocked";
 
 export type CallHistoryRow = {
   id: string;
@@ -34,6 +35,7 @@ export const OUTCOME_LABELS: Record<CallOutcome, string> = {
   failed: "Failed",
   voicemail_or_no_speech: "No speech",
   spam_or_abuse: "Spam or abuse",
+  blocked: "Blocked",
 };
 
 /** Fallback intent when summary text does not match a pattern. */
@@ -45,6 +47,7 @@ export const INTENT_FALLBACK_BY_OUTCOME: Record<CallOutcome, string> = {
   failed: "Unknown",
   voicemail_or_no_speech: "Unknown",
   spam_or_abuse: "Unknown",
+  blocked: "Unknown",
 };
 
 /**
@@ -95,7 +98,11 @@ export function normalizeCallOutcome(raw: string): CallOutcome {
   if (s === "failed") return "failed";
   if (s === "voicemail_or_no_speech") return "voicemail_or_no_speech";
   if (s === "spam_or_abuse") return "spam_or_abuse";
+  if (s === "blocked" || s === "caller_blocked") return "blocked";
 
+  if (hay.includes("blocklist") || hay.includes("caller_blocked")) {
+    return "blocked";
+  }
   if (hay.includes("spam") || hay.includes("abuse") || hay.includes("robocall")) {
     return "spam_or_abuse";
   }

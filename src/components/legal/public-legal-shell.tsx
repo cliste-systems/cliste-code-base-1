@@ -4,6 +4,9 @@ import type { ReactNode } from "react";
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import { LegalPathProvider } from "@/components/legal/legal-path-context";
 import { PublicLegalTabs } from "@/components/legal/public-legal-tabs";
+import {
+  companyRegistrationLine,
+} from "@/lib/company-details";
 
 type Props = {
   children: ReactNode;
@@ -43,7 +46,7 @@ export function PublicLegalShell({ children }: Props) {
 
         <footer className="space-y-2 border-t border-slate-100 py-6 text-center text-[12px] leading-relaxed text-slate-500 sm:py-8">
           <p>
-            Cliste Systems, Dublin, Ireland ·{" "}
+            {companyRegistrationLine()} ·{" "}
             <a
               href="mailto:hello@clistesystems.ie"
               className="font-medium text-[#0b1220] underline-offset-2 hover:underline"

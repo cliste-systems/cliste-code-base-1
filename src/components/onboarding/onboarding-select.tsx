@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,8 +11,10 @@ export type OnboardingSelectOption<T extends string> = {
   label: string;
   /** Shown under the label in rich option rows. */
   description?: string;
-  /** Example chips — helps differentiate similar-looking labels. */
-  examples?: readonly string[];
+  /** Small label above the title — helps separate similar options. */
+  tagline?: string;
+  icon?: LucideIcon;
+  iconClassName?: string;
 };
 
 type OnboardingSelectProps<T extends string> = {
@@ -38,7 +41,7 @@ export function OnboardingSelect<T extends string>({
   const listboxId = useId();
   const selected = options.find((option) => option.value === value);
   const richOptions = options.some(
-    (option) => option.description || (option.examples?.length ?? 0) > 0,
+    (option) => option.description || option.tagline || option.icon,
   );
 
   useEffect(() => {
@@ -119,7 +122,8 @@ export function OnboardingSelect<T extends string>({
               const isSelected = option.value === value;
               const isRich =
                 richOptions &&
-                (option.description || (option.examples?.length ?? 0) > 0);
+                (option.description || option.tagline || option.icon);
+              const Icon = option.icon;
 
               if (isRich) {
                 return (
@@ -133,47 +137,47 @@ export function OnboardingSelect<T extends string>({
                       setOpen(false);
                     }}
                     className={cn(
-                      "flex w-full cursor-pointer flex-col items-start gap-1.5 rounded-xl border px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow]",
+                      "flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow]",
                       isSelected
                         ? "border-[#0b1220]/25 bg-[#0b1220]/[0.04] shadow-[0_4px_16px_rgba(15,23,42,0.06)] ring-1 ring-[#0b1220]/10"
                         : "border-slate-200/80 bg-slate-50/70 hover:border-slate-300 hover:bg-white",
                     )}
                   >
-                    <span className="flex w-full items-center justify-between gap-2">
-                      <span className="text-[15px] font-semibold text-[#0b1220]">
+                    {Icon ? (
+                      <span
+                        className={cn(
+                          "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg",
+                          option.iconClassName ??
+                            "bg-slate-100 text-slate-600",
+                        )}
+                        aria-hidden
+                      >
+                        <Icon className="size-4" strokeWidth={1.75} />
+                      </span>
+                    ) : null}
+                    <span className="min-w-0 flex-1">
+                      {option.tagline ? (
+                        <span className="block text-[10px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                          {option.tagline}
+                        </span>
+                      ) : null}
+                      <span className="mt-0.5 block text-[15px] font-medium text-[#0b1220]">
                         {option.label}
                       </span>
-                      <Check
-                        className={cn(
-                          "size-4 shrink-0 text-[#0b1220]/50 transition-opacity",
-                          isSelected ? "opacity-100" : "opacity-0",
-                        )}
-                        strokeWidth={2}
-                        aria-hidden
-                      />
+                      {option.description ? (
+                        <span className="mt-1 block text-[12px] leading-snug text-slate-600">
+                          {option.description}
+                        </span>
+                      ) : null}
                     </span>
-                    {option.description ? (
-                      <span className="text-[12px] leading-snug text-slate-500">
-                        {option.description}
-                      </span>
-                    ) : null}
-                    {option.examples && option.examples.length > 0 ? (
-                      <span className="flex flex-wrap gap-1">
-                        {option.examples.map((example) => (
-                          <span
-                            key={example}
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[11px]",
-                              isSelected
-                                ? "bg-white/80 text-slate-600"
-                                : "bg-white text-slate-500",
-                            )}
-                          >
-                            {example}
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
+                    <Check
+                      className={cn(
+                        "mt-1 size-4 shrink-0 text-[#0b1220]/50 transition-opacity",
+                        isSelected ? "opacity-100" : "opacity-0",
+                      )}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
                   </button>
                 );
               }

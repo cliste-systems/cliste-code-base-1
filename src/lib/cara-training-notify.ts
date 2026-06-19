@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { sendTwilioBookingSms } from "@/lib/booking-confirmation-sms";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { resolveOrgSenderEmail } from "@/lib/org-sender-email";
 
 /**
  * SMS + email when Cara needs owner input on the training page. Best-effort.
@@ -17,7 +18,7 @@ export async function notifyCaraTrainingOwner(
 ): Promise<void> {
   const { data: org, error } = await admin
     .from("organizations")
-    .select("name, notification_email, notification_phone")
+    .select("name, slug, notification_email, notification_phone")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -42,6 +43,11 @@ export async function notifyCaraTrainingOwner(
   const trainingUrl = `${origin}/dashboard/cara-training?item=${encodeURIComponent(input.itemId)}`;
 
   if (email && isSendGridConfigured()) {
+    const orgSender = resolveOrgSenderEmail({
+      name: org.name,
+      slug: org.slug,
+      notificationEmail: email,
+    });
     const res = await sendTransactionalEmail({
       to: email,
       subject: `${biz} — Cara needs training input`,
@@ -52,6 +58,14 @@ export async function notifyCaraTrainingOwner(
         "",
         `Open Cara Training: ${trainingUrl}`,
       ].join("\n"),
+      ...(orgSender
+        ? {
+            from: { email: orgSender.email, name: orgSender.name },
+            replyTo: orgSender.replyTo
+              ? { email: orgSender.replyTo, name: orgSender.name }
+              : undefined,
+          }
+        : {}),
     });
     if (!res.ok) {
       console.error("[cara-training-notify] email failed", res.message);

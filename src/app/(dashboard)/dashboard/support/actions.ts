@@ -58,6 +58,23 @@ export async function createSupportTicket(payload: {
   return { ok: true, ticketId: data.id };
 }
 
+export async function submitDashboardFeedback(payload: {
+  body: string;
+  pagePath: string;
+}): Promise<CreateSupportTicketResult> {
+  const body = payload.body.trim();
+  const pagePath = payload.pagePath.trim() || "/dashboard";
+
+  if (!body) {
+    return { ok: false, message: "Please enter your feedback." };
+  }
+
+  return createSupportTicket({
+    subject: "Dashboard feedback",
+    body: `Page: ${pagePath}\n\n${body}`,
+  });
+}
+
 export type ReplySupportTicketResult =
   | { ok: true }
   | { ok: false; message: string };

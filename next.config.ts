@@ -150,6 +150,21 @@ const nextConfig: NextConfig = {
   // Don't advertise we're a Next.js app to every visitor. Trivial change but
   // removes a fingerprinting datapoint that helps attackers pick exploits.
   poweredByHeader: false,
+  serverExternalPackages: ["unpdf"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "**.supabase.in",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
   async headers() {
     return [
       {

@@ -16,6 +16,7 @@ import {
 } from "@/lib/answers-boundary";
 import { buildCaraCapabilitiesFromPromptExtras } from "@/lib/call-handling-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
 import { cn } from "@/lib/utils";
 
 import type { AgentFaq } from "../agent-setup/agent-faqs";
@@ -28,6 +29,9 @@ type Props = {
   total: number;
   routes?: RoutingActionSummary[];
   transferNumber?: string;
+  openingHours?: string;
+  businessRules?: string[];
+  serviceCatalog?: ServiceCatalogItem[];
   onUpdate: (index: number, patch: Partial<AgentFaq>) => void;
   onRemove: (index: number) => void;
 };
@@ -39,6 +43,9 @@ export function AnswersFaqEditor({
   total,
   routes,
   transferNumber,
+  openingHours,
+  businessRules,
+  serviceCatalog,
   onUpdate,
   onRemove,
 }: Props) {
@@ -61,11 +68,14 @@ export function AnswersFaqEditor({
           index: i,
           routes,
           transferNumber,
+          openingHours,
+          businessRules,
+          serviceCatalog,
         }),
       );
     }
     return map;
-  }, [faqs, routes, transferNumber]);
+  }, [faqs, routes, transferNumber, openingHours, businessRules, serviceCatalog]);
 
   function handleQuestionBlur(index: number) {
     const faq = faqs[index];
@@ -78,21 +88,12 @@ export function AnswersFaqEditor({
 
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <p className="shrink-0 text-[12px] text-slate-500">
+      <div className="space-y-3">
+        <p className="text-[12px] text-slate-500">
           {total} of {maxFaqs} questions
           {entries.length < total ? ` · showing ${entries.length} matches` : ""}
-          {total > 3 ? " · scroll the list for more" : ""}
         </p>
-        <ul
-          className={cn(
-            "space-y-3",
-            total > 3 &&
-              "min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]",
-          )}
-          role="list"
-          aria-label="Common questions"
-        >
+        <ul className="space-y-3" role="list" aria-label="Common questions">
           {entries.map(({ faq, index }) => {
             const warnings = warningsByIndex.get(index) ?? [];
             const questionId = `faq-question-${index}`;

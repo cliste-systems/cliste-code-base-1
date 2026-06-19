@@ -70,7 +70,8 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     data: "Recipient email, message body.",
     location:
       "United States (global API today). EU data residency available (EU subuser + api.eu.sendgrid.com).",
-    transferMechanism: "SCCs (Twilio Group DPA); EU residency when configured.",
+    transferMechanism:
+      "SCCs (Module 3) under Twilio Group DPA; EU data residency available when configured.",
     url: "https://www.twilio.com/legal/privacy",
     group: "global-services",
   },
@@ -91,7 +92,7 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     location:
       "Inbound telephony: EU SIP (Frankfurt) via Twilio trunk. WebRTC / agent media: global routing until LiveKit protocol region pinning is enabled.",
     transferMechanism:
-      "EU SIP path stays in EEA; DPF / SCCs for any WebRTC traffic routed outside EEA until protocol pinning is on.",
+      "EU SIP path stays in EEA; SCCs (Module 3) for WebRTC traffic routed outside EEA until protocol pinning is enabled.",
     url: "https://livekit.io/privacy",
     group: "us-voice",
   },
@@ -101,7 +102,8 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     data: "Generated speech text (transient).",
     location:
       "United States (global API). EU data residency available on Enterprise plans.",
-    transferMechanism: "EU–US DPF and/or SCCs.",
+    transferMechanism:
+      "SCCs (Module 3) under ElevenLabs DPA; EU data residency available on Enterprise plans.",
     url: "https://elevenlabs.io/privacy",
     group: "us-voice",
   },
@@ -112,7 +114,8 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     data: "Conversation / business text (no audio). Underlying model providers vary.",
     location:
       "United States. EU in-region routing available for enterprise accounts (eu.openrouter.ai).",
-    transferMechanism: "SCCs; ZDR / provider allowlists where configured.",
+    transferMechanism:
+      "SCCs (Module 3) under OpenRouter DPA; ZDR and provider allowlists as supplementary measures.",
     url: "https://openrouter.ai/privacy",
     group: "us-voice",
   },
@@ -123,6 +126,17 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     location: "EU entity; processing may occur globally.",
     transferMechanism: "Google Cloud DPA + SCCs.",
     url: "https://policies.google.com/privacy",
+    group: "global-services",
+  },
+  {
+    name: "Sentry (Functional Software, Inc.)",
+    purpose: "Error monitoring and performance traces for the dashboard and APIs.",
+    data: "Stack traces, request metadata — no intentional caller audio or transcripts.",
+    location:
+      "United States (default). EU data residency available on Business plans.",
+    transferMechanism:
+      "SCCs (Module 3) under Sentry DPA; EU residency when enabled.",
+    url: "https://sentry.io/privacy/",
     group: "global-services",
   },
 ];
@@ -146,17 +160,17 @@ export const SUB_PROCESSOR_CATEGORIES_PUBLIC = [
     purpose:
       "Connect phone calls to the AI agent; in-call speech recognition via LiveKit Agents (audio not retained at rest).",
     location: "EU SIP (Frankfurt) for inbound calls; WebRTC global until pinned",
-    transfers: "None on SIP path; DPF / SCCs for unpinned WebRTC.",
+    transfers: "None on SIP path; SCCs for unpinned WebRTC.",
   },
   {
     category: "Speech & language AI",
     purpose: "Text-to-speech and LLM conversation (transient).",
     location: "United States (EU options for some vendors)",
-    transfers: "DPF / SCCs.",
+    transfers: "SCCs (Module 3).",
   },
   {
-    category: "Payments, messaging & security",
-    purpose: "Billing, SMS/email alerts, DDoS protection.",
+    category: "Payments, messaging, security & observability",
+    purpose: "Billing, SMS/email alerts, DDoS protection, error monitoring.",
     location: "EU entity; some US / global processing",
     transfers: "Vendor DPAs + SCCs.",
   },

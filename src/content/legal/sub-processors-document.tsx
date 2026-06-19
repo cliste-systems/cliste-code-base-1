@@ -56,8 +56,11 @@ export function SubProcessorsDocument({
           OpenRouter). Transactional email (SendGrid) uses the global API today; EU
           residency is available when configured. Where processing leaves the EEA we
           rely on <strong>EU–US Data Privacy Framework</strong> certification
-          and/or <strong>Standard Contractual Clauses</strong>, plus technical
-          measures: TLS, no voice-audio retention, and transcript redaction.
+          where the sub-processor is certified, and the European Commission&apos;s{" "}
+          <strong>Standard Contractual Clauses</strong> (Module 3) elsewhere, plus
+          technical measures documented in our transfer impact assessment: TLS, no
+          voice-audio retention, transcript redaction, and automated retention
+          deletion.
         </p>
       </LegalSection>
 
@@ -143,8 +146,9 @@ export function SubProcessorsDocument({
       <LegalSection title="Standard Contractual Clauses (SCCs)">
         <p>
           Where data leaves the EEA we use the European Commission&rsquo;s 2021
-          SCCs, supplemented by TLS, encryption at rest, no voice-audio retention,
-          and transcript redaction of card numbers and government IDs.
+          SCCs (Module 3), supplemented by TLS, encryption at rest, no voice-audio
+          retention, transcript redaction of card numbers and government IDs, and
+          the supplementary measures in our Schrems II transfer impact assessment.
         </p>
       </LegalSection>
 

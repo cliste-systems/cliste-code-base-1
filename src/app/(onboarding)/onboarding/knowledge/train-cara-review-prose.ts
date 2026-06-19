@@ -174,7 +174,6 @@ export function buildReviewAvailabilitySpeech(
 
 export function buildReviewCallsSpeech(
   captureDetails: string,
-  rules: string[],
   about: string,
 ): ReviewSpeech | null {
   const alreadySaid = aboutParagraphs(about);
@@ -183,15 +182,6 @@ export function buildReviewCallsSpeech(
   const capture = buildReviewCaptureLine(captureDetails);
   if (capture && !isAlreadyCoveredElsewhere(capture, alreadySaid)) {
     lines.push(capture);
-  }
-
-  const rulesLine = buildReviewRulesLine(rules);
-  if (
-    rulesLine &&
-    !lines.some((line) => isNearDuplicate(line, rulesLine)) &&
-    !isAlreadyCoveredElsewhere(rulesLine, alreadySaid)
-  ) {
-    lines.push(rulesLine);
   }
 
   if (lines.length === 0) return null;
@@ -279,22 +269,6 @@ function buildReviewCaptureLine(details: string): string {
   );
   return polishSpeechText(`I'll ${joinNaturalLanguageList(actions)}.`);
 }
-
-function buildReviewRulesLine(rules: string[]): string {
-  const cleaned = rules
-    .map((rule) => stripTrailingPunctuation(rule))
-    .filter(Boolean);
-  if (cleaned.length === 0) return "";
-  if (cleaned.length === 1) {
-    return polishSpeechText(
-      `I'll always make sure to ${lowercaseLead(cleaned[0]!)}.`,
-    );
-  }
-  return polishSpeechText(
-    `I'll always ${joinNaturalLanguageList(cleaned.map(lowercaseLead))}.`,
-  );
-}
-
 function narrateHoursLine(line: string): string {
   const lower = line.toLowerCase();
 

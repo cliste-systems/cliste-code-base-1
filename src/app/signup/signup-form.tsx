@@ -8,7 +8,9 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import type { TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { AuthTurnstileField } from "@/components/auth/auth-turnstile-field";
@@ -18,6 +20,7 @@ import {
   OnboardingFieldSurfaceProvider,
 } from "@/components/onboarding/onboarding-form-card";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
+import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
 import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
 import {
   ONBOARDING_FIELD_INPUT,
@@ -29,11 +32,14 @@ import {
 } from "@/components/legal/legal-acceptance-checkbox";
 import { AuthFormAlert } from "@/components/auth/auth-form-alert";
 import { cn } from "@/lib/utils";
-import type { BillingInterval, PlanTier } from "@/lib/cliste-plans";
+import type { BillingInterval, PlanTier } from "@/lib/cliste-plans.data";
 
 import { startSignup, type SignupResult } from "./actions";
 
 const INITIAL: SignupResult = { ok: false, message: "" };
+
+const SIGNUP_SUCCESS_HOLD_MS = 360;
+const SIGNUP_EXIT_MS = 520;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -95,6 +101,10 @@ type Props = {
   selectedPlanName: string | null;
   selectedPlanPriceCents: number | null;
   billingIntervalLabel: "monthly" | "annual";
+  /** Dev QA — skip Cloudflare Turnstile when CLISTE_SIGNUP_ONBOARDING_DEV=true */
+  skipTurnstile?: boolean;
+  /** Fades the signup shell before client navigation. */
+  onTransitionStart?: () => void;
 };
 
 export function SignupForm({
@@ -103,7 +113,11 @@ export function SignupForm({
   selectedPlanName,
   selectedPlanPriceCents,
   billingIntervalLabel,
+  skipTurnstile = false,
+  onTransitionStart,
 }: Props) {
+  const router = useRouter();
+  const reduceMotion = useReducedMotion() ?? false;
   const [state, formAction, pending] = useActionState(
     async (_prev: SignupResult, formData: FormData) => {
       return startSignup(_prev, formData);
@@ -115,9 +129,13 @@ export function SignupForm({
   const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
   const [turnstileVerified, setTurnstileVerified] = useState(false);
   const [submittingSecurity, setSubmittingSecurity] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
+  const redirectToRef = useRef<string | null>(null);
+  const transitionStartedRef = useRef(false);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
-  const turnstileSiteKey =
-    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
+  const turnstileSiteKey = skipTurnstile
+    ? ""
+    : (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "");
   const errorMessage = !state.ok && state.message ? state.message : null;
 
   useEffect(() => {
@@ -127,9 +145,34 @@ export function SignupForm({
     // Cloudflare (tokens are single-use). Reset the widget so the next attempt
     // gets a fresh token instead of replaying a burned one.
     if (!message) return;
+    setAccountCreated(false);
     setTurnstileVerified(false);
     turnstileRef.current?.reset();
   }, [state]);
+
+  useEffect(() => {
+    if (!state.ok || !state.redirectTo || transitionStartedRef.current) return;
+    transitionStartedRef.current = true;
+    redirectToRef.current = state.redirectTo;
+    setAccountCreated(true);
+
+    const holdMs = reduceMotion ? 0 : SIGNUP_SUCCESS_HOLD_MS;
+    const exitMs = reduceMotion ? 0 : SIGNUP_EXIT_MS;
+
+    const exitTimer = window.setTimeout(() => {
+      onTransitionStart?.();
+    }, holdMs);
+
+    const navTimer = window.setTimeout(() => {
+      const path = redirectToRef.current;
+      if (path) router.push(path);
+    }, holdMs + exitMs + 40);
+
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(navTimer);
+    };
+  }, [state, reduceMotion, router, onTransitionStart]);
 
   function clearFieldError(field: keyof SignupFieldErrors) {
     setFieldErrors((current) => {
@@ -193,11 +236,20 @@ export function SignupForm({
 
   return (
     <OnboardingFieldSurfaceProvider surface="profile">
-      <form
+      <motion.form
         action={formAction}
         onSubmit={handleSubmit}
         noValidate
         className="w-full space-y-2"
+        animate={
+          reduceMotion
+            ? undefined
+            : {
+                opacity: pending && !accountCreated ? 0.9 : 1,
+                y: pending && !accountCreated ? 2 : 0,
+              }
+        }
+        transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
       >
         {planTier ? (
           <input type="hidden" name="planTier" value={planTier} />
@@ -391,17 +443,20 @@ export function SignupForm({
           <OnboardingPrimaryButton
             type="submit"
             pending={pending || submittingSecurity}
+            disabled={accountCreated}
             className="w-full max-w-none sm:min-w-[14rem]"
           >
-            {submittingSecurity
-              ? "Verifying…"
-              : pending
-                ? "Creating your account…"
-                : "Create account"}
+            {accountCreated
+              ? "Account created"
+              : submittingSecurity
+                ? "Verifying…"
+                : pending
+                  ? "Creating your account…"
+                  : "Create account"}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </OnboardingPrimaryButton>
         </OnboardingEnter>
-      </form>
+      </motion.form>
     </OnboardingFieldSurfaceProvider>
   );
 }

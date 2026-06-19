@@ -6,6 +6,12 @@ import { headers } from "next/headers";
 import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { sendInviteEmail } from "@/lib/invite-email";
+import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
+import {
+  parseOrganizationNiche,
+  PRODUCT_NAME_BY_NICHE,
+} from "@/lib/organization-niche";
 import {
   buildSecurityEventContext,
   logSecurityEvent,
@@ -42,28 +48,65 @@ export async function inviteTeamMember(
     "http://localhost:3001";
   const inviteRedirectTo = `${appOrigin}/auth/callback?next=/dashboard/set-password`;
 
-  const { data: authData, error: authError } =
-    await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: inviteRedirectTo,
-      data: {
-        full_name: name || undefined,
-        needs_password: true,
-      },
-    });
+  const { data: orgRow } = await admin
+    .from("organizations")
+    .select("name, slug, niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
 
-  if (authError || !authData.user?.id) {
+  const businessName =
+    resolveOrganizationDisplayName(orgRow?.name, orgRow?.slug) ||
+    "your team";
+  const niche = parseOrganizationNiche(orgRow?.niche);
+  const productName = PRODUCT_NAME_BY_NICHE[niche];
+
+  const { data: existingAuthUsers } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
+  const existingAuthUser = existingAuthUsers?.users?.find(
+    (user) => user.email?.trim().toLowerCase() === email,
+  );
+  if (existingAuthUser?.id) {
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("account_id")
+      .eq("id", existingAuthUser.id)
+      .maybeSingle();
+
+    if (
+      existingProfile?.account_id &&
+      existingProfile.account_id !== session.accountId
+    ) {
+      return {
+        ok: false,
+        message: "This email is already linked to another business.",
+      };
+    }
+  }
+
+  const inviteResult = await sendInviteEmail({
+    email,
+    recipientName: name || undefined,
+    businessName,
+    productName,
+    redirectTo: inviteRedirectTo,
+    admin,
+  });
+
+  if (!inviteResult.ok) {
     return {
       ok: false,
-      message:
-        authError?.message ??
-        "Could not send invite. Check the email address and try again.",
+      message: inviteResult.message,
     };
   }
+
+  const userId = inviteResult.userId;
 
   const { data: existing } = await admin
     .from("profiles")
     .select("account_id")
-    .eq("id", authData.user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (existing?.account_id && existing.account_id !== session.accountId) {
@@ -75,7 +118,7 @@ export async function inviteTeamMember(
 
   const { error: profileError } = await admin.from("profiles").upsert(
     {
-      id: authData.user.id,
+      id: userId,
       account_id: session.accountId,
       organization_id: session.organizationId,
       active_organization_id: session.organizationId,
@@ -88,7 +131,7 @@ export async function inviteTeamMember(
   if (!profileError) {
     await admin.from("account_memberships").upsert(
       {
-        user_id: authData.user.id,
+        user_id: userId,
         account_id: session.accountId,
         role,
       },
@@ -106,7 +149,7 @@ export async function inviteTeamMember(
     outcome: "success",
     actorUserId: session.user.id,
     actorEmail: session.user.email ?? null,
-    targetUserId: authData.user.id,
+    targetUserId: userId,
     targetEmail: email,
     metadata: { role },
   });
@@ -162,6 +205,12 @@ export async function removeTeamMember(
     .delete()
     .eq("user_id", trimmed)
     .eq("account_id", session.accountId);
+
+  try {
+    await admin.auth.admin.deleteUser(trimmed);
+  } catch {
+    /* profile already removed; auth cleanup is best-effort */
+  }
 
   revalidatePath(DASHBOARD_ROUTES.team);
   return { ok: true };

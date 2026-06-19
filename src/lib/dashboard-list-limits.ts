@@ -23,3 +23,6 @@ export const CONTACTS_CLIENT_LIMIT = 500;
 
 /** Open tickets for call-history follow-up badges (not full ticket history). */
 export const CALL_HISTORY_OPEN_TICKET_LIMIT = 500;
+
+/** Activity page — merged call + ticket feed (newest first). */
+export const ACTIVITY_FEED_LIMIT = 200;

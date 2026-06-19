@@ -6,6 +6,8 @@ import {
 } from "@/lib/legal-documents";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
+
 function isCurrentAcceptance(
   documentType: LegalDocumentType,
   documentVersion: string,
@@ -54,6 +56,7 @@ export async function onboardingPathNeedsLegalAcceptance(params: {
   userId: string;
   organizationId: string;
 }): Promise<boolean> {
+  if (isSignupOnboardingDevRelaxed()) return false;
   if (!params.pathname.startsWith("/onboarding")) return false;
   if (
     params.pathname === "/onboarding/legal" ||

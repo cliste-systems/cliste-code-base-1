@@ -3,11 +3,18 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { SIGNUP_EMAIL_OTP_PATTERN } from "@/lib/signup-email-otp";
+import { buildTransactionalEmailHtml } from "@/lib/transactional-email-layout";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export function signupConfirmationRedirectOrigin(): string {
   return resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+}
+
+export function signupConfirmationLogoUrl(): string {
+  return `${signupConfirmationRedirectOrigin()}${PUBLIC_ASSETS.logo}`;
 }
 
 export function buildSignupConfirmationEmailBodies(
@@ -33,41 +40,22 @@ export function buildSignupConfirmationEmailBodies(
   ].join("\n");
 
   const codeBlock = emailOtp
-    ? `<p style="margin:0 0 8px;font-size:13px;color:#64748b;">Enter this code on the verification page:</p>
-                <p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:0.35em;color:#0b1220;">${emailOtp}</p>`
+    ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#64748b;text-align:center;">Enter this code on the verification page:</p>
+                <p style="margin:0 0 24px;font-size:28px;font-weight:700;letter-spacing:0.28em;line-height:1.2;color:#0b1220;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">${emailOtp}</p>`
     : "";
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-  <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0b1220;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:32px 16px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px 28px;">
-            <tr>
-              <td>
-                <p style="margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">Cliste</p>
-                <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:600;">Confirm your email</h1>
-                ${codeBlock}
-                <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;">
-                  ${emailOtp ? "Or tap the button below to confirm in one click." : "Tap the button below to verify this inbox and continue setting up Cara."}
-                </p>
-                <p style="margin:0 0 24px;">
-                  <a href="${actionLink}" style="display:inline-block;background:#0b1220;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 20px;border-radius:999px;">
-                    Confirm email and continue
-                  </a>
-                </p>
-                <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">
-                  If you did not create this account, you can ignore this email.
-                </p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+  const html = buildTransactionalEmailHtml({
+    subject,
+    logoUrl: signupConfirmationLogoUrl(),
+    headline: "Confirm your email",
+    extraHtml: codeBlock,
+    bodyHtml: emailOtp
+      ? "Or tap the button below to confirm in one click."
+      : "Tap the button below to verify this inbox and continue setting up Cara.",
+    ctaLabel: "Confirm email and continue",
+    ctaHref: actionLink,
+    footerHtml: "If you did not create this account, you can ignore this email.",
+  });
 
   return { subject, text, html };
 }
@@ -140,9 +128,13 @@ export async function sendSignupConfirmationEmail(
     };
   }
 
-  // 6-digit code for the same token — lets the user type it on the
-  // check-email page instead of opening the link.
-  const emailOtp = linkData?.properties?.email_otp?.trim() || undefined;
+  const emailOtp = linkData?.properties?.email_otp?.trim();
+  if (!emailOtp || !SIGNUP_EMAIL_OTP_PATTERN.test(emailOtp)) {
+    return {
+      ok: false,
+      message: "Could not create a verification code. Please try again.",
+    };
+  }
 
   const bodies = buildSignupConfirmationEmailBodies(actionLink, emailOtp);
   return sendTransactionalEmail({

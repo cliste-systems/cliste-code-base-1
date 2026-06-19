@@ -5,6 +5,7 @@ import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-
 import {
   DASHBOARD_ICON_CHIP_LG,
   DASHBOARD_ICON_GLYPH_LG,
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
 import {
@@ -18,11 +19,13 @@ import {
   ACTION_INBOX_TICKET_LIMIT,
 } from "@/lib/dashboard-list-limits";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 
 import {
-  ACTION_CATEGORY_LABELS,
   ACTION_CATEGORY_SHORT,
   classifyActionCategory,
+  type ActionCategory,
 } from "./categories";
 import {
   buildActionInboxMetrics,
@@ -102,6 +105,7 @@ function toInboxItem(
   row: TicketRow,
   callsByPhone: Map<string, RelatedCallPreview>,
   clientsByPhone: Map<string, ClientByPhone>,
+  categoryLabels: Record<ActionCategory, string>,
 ): ActionInboxItem {
   const category = classifyActionCategory(row.summary);
   const callerNumber = row.caller_number?.trim() ?? "";
@@ -129,7 +133,7 @@ function toInboxItem(
     createdAt: row.created_at,
     createdAtLabel: formatActionDateTimeLabel(row.created_at),
     category,
-    categoryTitle: ACTION_CATEGORY_LABELS[category],
+    categoryTitle: categoryLabels[category],
     categoryShort: ACTION_CATEGORY_SHORT[category],
     relatedCall,
   };
@@ -144,7 +148,7 @@ export default async function ActionInboxPage({
 
   const { supabase, organizationId } = await requireDashboardSession();
 
-  const [{ data: ticketData, error }, { data: callData }, { data: clientData }] =
+  const [{ data: ticketData, error }, { data: callData }, { data: clientData }, { data: blockedRows }, orgRow] =
     await Promise.all([
       supabase
         .from("action_tickets")
@@ -163,20 +167,33 @@ export default async function ActionInboxPage({
         .select("phone_e164, name, email")
         .eq("organization_id", organizationId)
         .limit(ACTION_INBOX_CLIENT_LIMIT),
+      supabase
+        .from("blocked_callers")
+        .select("caller_e164")
+        .eq("organization_id", organizationId),
+      getCachedDashboardOrganizationRow(),
     ]);
 
+  const categoryLabels = dashboardVerticalCopy(
+    orgRow?.niche,
+    orgRow?.agent_business_type,
+  ).actionInbox.categoryLabels;
   const callsByPhone = buildLatestCallByPhone((callData ?? []) as CallRow[]);
   const clientsByPhone = buildClientsByPhone((clientData ?? []) as ClientRow[]);
   const items = !error
     ? ((ticketData ?? []) as TicketRow[]).map((row) =>
-        toInboxItem(row, callsByPhone, clientsByPhone),
+        toInboxItem(row, callsByPhone, clientsByPhone, categoryLabels),
       )
     : [];
 
   const metrics = buildActionInboxMetrics(items);
+  const blockedCallerE164s = (blockedRows ?? []).map(
+    (row) => String((row as { caller_e164: string }).caller_e164),
+  );
 
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <DashboardAnimatedPageSections>
       <header className="shrink-0">
         <div className="flex items-start gap-3">
@@ -215,9 +232,11 @@ export default async function ActionInboxPage({
           items={items}
           metrics={metrics}
           initialSelectedTicketId={initialSelectedTicketId}
+          blockedCallerE164s={blockedCallerE164s}
         />
       )}
       </DashboardAnimatedPageSections>
+      </div>
     </div>
   );
 }

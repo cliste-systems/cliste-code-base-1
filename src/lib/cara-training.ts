@@ -31,6 +31,10 @@ import {
 } from "./cara-training-draft";
 import { notifyCaraTrainingOwner } from "./cara-training-notify";
 import {
+  AGENT_CONFIG_REVALIDATE_PATHS,
+  DASHBOARD_ROUTES,
+} from "@/lib/dashboard-routes";
+import {
   normalizeTrainingTopic,
   parseCaraTrainingPatch,
   parseOwnerMessages,
@@ -49,12 +53,8 @@ export const CARA_TRAINING_OPEN_STATUSES: CaraTrainingStatus[] = [
 
 const TRAINING_REVALIDATE_PATHS = [
   "/dashboard",
-  "/dashboard/cara-training",
-  "/dashboard/cara-setup",
-  "/dashboard/cara-setup/general",
-  "/dashboard/cara-setup/services",
-  "/dashboard/cara-setup/call-handling",
-  "/dashboard/cara-setup/answers",
+  DASHBOARD_ROUTES.caraTraining,
+  ...AGENT_CONFIG_REVALIDATE_PATHS,
 ] as const;
 
 function revalidateCaraTraining() {

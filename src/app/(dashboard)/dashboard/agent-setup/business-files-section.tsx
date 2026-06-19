@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Trash2, Upload } from "lucide-react";
+import { FileText, Pencil, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
+import { BusinessFileSetupDialog } from "./business-file-setup-dialog";
 import {
   Dialog,
   DialogContent,
@@ -18,50 +19,82 @@ import {
   DASHBOARD_ICON_GLYPH_MD,
   DASHBOARD_PRIMARY_BUTTON_CLASS,
 } from "@/components/dashboard/dashboard-surface";
-import {
-  OnboardingFieldBox,
-} from "@/components/onboarding/onboarding-form-card";
-import { OnboardingSelect } from "@/components/onboarding/onboarding-select";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   BUSINESS_FILE_KINDS,
   BUSINESS_FILE_KIND_LABELS,
+  businessFileDisplayTitle,
   formatBusinessFileDate,
   formatBusinessFileSize,
   businessFileKindLabel,
   fileSupportsAnswerToggle,
+  isBusinessFileKind,
   isSpreadsheetFileType,
   type BusinessFileKind,
   type BusinessFileListItem,
 } from "@/lib/business-files";
 import {
-  buildFileExtractionPreview,
   extractedContentLooksLikePii,
   sliceFileTextForPrompt,
 } from "@/lib/business-file-prompt";
 import {
   fileCouldNotReadMessage,
   fileReadinessLabel,
+  fileScannedPdfOcrHint,
 } from "@/lib/answers-boundary";
 import { cn } from "@/lib/utils";
+import {
+  SEND_ONLY_CATALOG_OVERLAP_NOTE,
+  SEND_ONLY_FAQ_OVERLAP_NOTE,
+  showSendOnlyOverlapNote,
+} from "@/lib/knowledge-precedence";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 type UploadResult =
+  | { ok: true; file?: BusinessFileListItem; overlapSendOnlyDefault?: boolean }
+  | { ok: false; message: string };
+
+type ActionResult =
   | { ok: true; file?: BusinessFileListItem }
   | { ok: false; message: string };
 
-type ActionResult = { ok: true } | { ok: false; message: string };
+function FileUnreadableNotice({ fileType }: { fileType: string }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[12.5px] leading-relaxed text-amber-900">
+        {fileCouldNotReadMessage(fileType)}
+      </p>
+      {fileType === "pdf" ? (
+        <p className="rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[12px] leading-relaxed text-amber-950">
+          {fileScannedPdfOcrHint()}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 type BusinessFilesSectionProps = {
   initialFiles: BusinessFileListItem[];
   variant?: "dashboard" | "onboarding";
+  hasServiceCatalog?: boolean;
+  hasFaqs?: boolean;
   /** Call flow has send-link or send-file — required to enable "send to callers". */
   sendConfigured?: boolean;
   onUpload: (formData: FormData) => Promise<UploadResult>;
   onToggle: (
     id: string,
     patch: { answerEnabled?: boolean; sendEnabled?: boolean },
+  ) => Promise<ActionResult>;
+  onUpdateMetadata: (
+    fileId: string,
+    patch: {
+      title: string;
+      documentKind: BusinessFileKind;
+      caraDescription: string;
+      whenToUse: string;
+    },
   ) => Promise<ActionResult>;
   onDelete: (id: string) => Promise<ActionResult>;
   /** Notified whenever the file list changes (upload, toggle, delete). */
@@ -71,28 +104,28 @@ type BusinessFilesSectionProps = {
 export function BusinessFilesSection({
   initialFiles,
   variant = "dashboard",
+  hasServiceCatalog = false,
+  hasFaqs = false,
   sendConfigured = false,
   onUpload,
   onToggle,
+  onUpdateMetadata,
   onDelete,
   onFilesChange,
 }: BusinessFilesSectionProps) {
   const [files, setFiles] = useState(initialFiles);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<{
-    fileName: string;
-    preview: ReturnType<typeof buildFileExtractionPreview>;
-    unreadable: boolean;
-    piiWarning: boolean;
-    truncated: boolean;
+  const [setupContext, setSetupContext] = useState<{
+    file: BusinessFileListItem;
+    isNewUpload: boolean;
   } | null>(null);
   const [replacePrompt, setReplacePrompt] = useState<{
     file: File;
     existing: BusinessFileListItem;
   } | null>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
-  const [documentKind, setDocumentKind] = useState<BusinessFileKind>("price_list");
+  const [documentKind, setDocumentKind] = useState<BusinessFileKind | "">("");
   const [piiDismissed, setPiiDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const onboarding = variant === "onboarding";
@@ -103,7 +136,11 @@ export function BusinessFilesSection({
 
   function runUpload(file: File, options?: { skipReplaceCheck?: boolean }) {
     setMessage(null);
-    setUploadPreview(null);
+
+    if (!documentKind) {
+      setMessage("Choose a document type before uploading.");
+      return;
+    }
 
     const existing = files.find((f) => f.documentKind === documentKind);
     if (existing && !options?.skipReplaceCheck) {
@@ -125,19 +162,19 @@ export function BusinessFilesSection({
         });
 
         const hasText = Boolean(uploaded.extractedText?.trim());
-        const preview = buildFileExtractionPreview(uploaded.extractedText);
-        const slice = sliceFileTextForPrompt(uploaded.extractedText);
-        setUploadPreview({
-          fileName: uploaded.fileName,
-          preview,
-          unreadable: !hasText,
-          piiWarning:
-            !piiDismissed &&
-            hasText &&
-            extractedContentLooksLikePii(uploaded.extractedText ?? ""),
-          truncated: slice?.wasTruncated ?? false,
-        });
-        setMessage(null);
+        if (
+          hasText &&
+          !piiDismissed &&
+          extractedContentLooksLikePii(uploaded.extractedText ?? "")
+        ) {
+          setMessage(
+            "This file may contain personal contact details — only upload what Cara genuinely needs on calls.",
+          );
+        } else {
+          setMessage(null);
+        }
+
+        setSetupContext({ file: uploaded, isNewUpload: true });
       } else if (!res.ok) {
         setMessage(res.message);
       }
@@ -199,39 +236,35 @@ export function BusinessFilesSection({
             onboarding ? "min-w-0 sm:max-w-xs" : "sm:w-44",
           )}
         >
-          {onboarding ? (
-            <OnboardingFieldBox label="Document type" htmlFor="documentKind">
-              <OnboardingSelect
-                id="documentKind"
-                value={documentKind}
-                options={BUSINESS_FILE_KINDS.map((kind) => ({
-                  value: kind,
-                  label: BUSINESS_FILE_KIND_LABELS[kind],
-                }))}
-                onValueChange={setDocumentKind}
-              />
-            </OnboardingFieldBox>
-          ) : (
-            <label className="block space-y-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">
-                Document type
-              </span>
-              <select
-                id="documentKind"
-                value={documentKind}
-                onChange={(event) =>
-                  setDocumentKind(event.target.value as BusinessFileKind)
-                }
-                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-[13px] text-[#0b1220]"
-              >
-                {BUSINESS_FILE_KINDS.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {BUSINESS_FILE_KIND_LABELS[kind]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <label className="block space-y-1">
+            <span
+              className={cn(
+                "text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400",
+                onboarding && "text-[12px] normal-case tracking-normal text-[#0b1220]",
+              )}
+            >
+              Document type
+            </span>
+            <select
+              id="documentKind"
+              value={documentKind}
+              onChange={(event) => {
+                const value = event.target.value;
+                setDocumentKind(isBusinessFileKind(value) ? value : "");
+              }}
+              className={cn(
+                "h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-[13px] text-[#0b1220]",
+                onboarding && "h-10 px-3",
+              )}
+            >
+              <option value="">Choose type…</option>
+              {BUSINESS_FILE_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {BUSINESS_FILE_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
@@ -247,15 +280,17 @@ export function BusinessFilesSection({
           />
           <Button
             type="button"
-            disabled={pending}
+            disabled={pending || !documentKind}
             onClick={() => inputRef.current?.click()}
-            className="h-9 w-fit shrink-0 rounded-xl bg-[#0b1220] px-3 text-[12px] font-medium text-white hover:bg-[#0b1220]/90"
+            className="h-9 w-fit shrink-0 rounded-xl bg-[#0b1220] px-3 text-[12px] font-medium text-white hover:bg-[#0b1220]/90 disabled:opacity-50"
           >
             <Upload className="size-3.5" aria-hidden />
             Upload file
           </Button>
           <p className="text-[12px] text-slate-500">
-            PDF, CSV, XLSX, or TXT · max 10 MB
+            {documentKind
+              ? "PDF, CSV, XLSX, or TXT · max 10 MB"
+              : "Choose a document type first"}
           </p>
         </div>
       </div>
@@ -272,9 +307,36 @@ export function BusinessFilesSection({
         <div className="rounded-xl border border-slate-200/75 bg-white px-4 py-3 shadow-[0_4px_20px_rgba(15,23,42,0.06)]">
           <p className="text-[13px] font-semibold text-[#0b1220]">How files are used</p>
           <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
-            Upload price lists, menus, brochures, stock sheets, service sheets, or FAQ
-            documents. Each file can help Cara answer questions, be sent to callers, or
-            both.
+            {hasServiceCatalog || hasFaqs ? (
+              <>
+                Upload brochures, stock sheets, or other documents Cara can send to
+                callers. For services, prices, and common questions, use your{" "}
+                {hasServiceCatalog ? (
+                  <Link
+                    href={DASHBOARD_ROUTES.businessServices}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    Services menu
+                  </Link>
+                ) : null}
+                {hasServiceCatalog && hasFaqs ? " and " : null}
+                {hasFaqs ? (
+                  <Link
+                    href={DASHBOARD_ROUTES.businessFaqs}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    FAQ answers
+                  </Link>
+                ) : null}{" "}
+                instead of duplicating them in files.
+              </>
+            ) : (
+              <>
+                Upload price lists, menus, brochures, stock sheets, service sheets, or
+                FAQ documents. Each file can help Cara answer questions, be sent to
+                callers, or both.
+              </>
+            )}
           </p>
         </div>
       ) : null}
@@ -285,52 +347,6 @@ export function BusinessFilesSection({
         <p className="text-[12px] text-red-600" role="alert">
           {message}
         </p>
-      ) : null}
-
-      {uploadPreview ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-[13px] font-semibold text-[#0b1220]">
-            Here&apos;s what Cara read from {uploadPreview.fileName}
-          </p>
-          {uploadPreview.unreadable ? (
-            <p className="mt-2 text-[12.5px] leading-relaxed text-amber-900">
-              {fileCouldNotReadMessage()} The file is saved but won&apos;t be
-              active on calls until it has readable content.
-            </p>
-          ) : uploadPreview.preview ? (
-            <>
-              <ul className="mt-2 space-y-1 text-[12.5px] text-slate-700">
-                {uploadPreview.preview.items.map((item) => (
-                  <li key={item} className="truncate">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-[12px] text-slate-500">
-                {uploadPreview.preview.summary}
-              </p>
-            </>
-          ) : null}
-          {uploadPreview.truncated ? (
-            <p className="mt-2 text-[12px] text-amber-900">
-              This file is large — Cara has the first portion. Long documents are
-              better split or trimmed.
-            </p>
-          ) : null}
-          {uploadPreview.piiWarning ? (
-            <p className="mt-2 text-[12px] text-amber-900">
-              This file may contain personal contact details — only upload what
-              Cara genuinely needs on calls.{" "}
-              <button
-                type="button"
-                className="font-medium underline underline-offset-2"
-                onClick={() => setPiiDismissed(true)}
-              >
-                Dismiss
-              </button>
-            </p>
-          ) : null}
-        </div>
       ) : null}
 
       {files.length === 0 ? (
@@ -349,15 +365,42 @@ export function BusinessFilesSection({
               !onboarding && "max-w-xl",
             )}
           >
-            Add a price list, menu, brochure, stock sheet, service sheet, or FAQ
-            document.
+            {hasServiceCatalog || hasFaqs ? (
+              <>
+                Upload brochures, stock sheets, or other documents. For services and
+                prices, use your{" "}
+                <Link
+                  href={DASHBOARD_ROUTES.businessServices}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Services menu
+                </Link>
+                {hasFaqs ? (
+                  <>
+                    ; for common questions, use{" "}
+                    <Link
+                      href={DASHBOARD_ROUTES.businessFaqs}
+                      className="font-medium underline underline-offset-2"
+                    >
+                      FAQs
+                    </Link>
+                  </>
+                ) : null}
+                .
+              </>
+            ) : (
+              <>
+                Add a price list, menu, brochure, stock sheet, service sheet, or FAQ
+                document.
+              </>
+            )}
           </p>
         </div>
       ) : (
         <ul
           className={cn(
-            "divide-y rounded-xl border bg-white",
-            onboarding ? "divide-slate-100 border-slate-200/75" : "divide-slate-100 border-slate-200",
+            "space-y-2",
+            onboarding && "space-y-3",
           )}
         >
           {files.map((file) => (
@@ -366,12 +409,56 @@ export function BusinessFilesSection({
               file={file}
               pending={pending}
               sendConfigured={sendConfigured}
+              hasServiceCatalog={hasServiceCatalog}
+              hasFaqs={hasFaqs}
               onToggle={toggle}
+              onEdit={() => setSetupContext({ file, isNewUpload: false })}
               onRemove={setRemoveId}
             />
           ))}
         </ul>
       )}
+
+      <BusinessFileSetupDialog
+        context={setupContext}
+        onOpenChange={(open) => {
+          if (!open) setSetupContext(null);
+        }}
+        onSave={async (fileId, patch) => {
+          const result = await onUpdateMetadata(fileId, patch);
+          if (result.ok) {
+            setFiles((prev) => {
+              const next = prev.map((file) => {
+                if (file.id !== fileId) return file;
+                if ("file" in result && result.file) return result.file;
+                return {
+                  ...file,
+                  title: patch.title,
+                  documentKind: patch.documentKind,
+                  caraDescription: patch.caraDescription || null,
+                  whenToUse: patch.whenToUse || null,
+                };
+              });
+              onFilesChange?.(next);
+              return next;
+            });
+          }
+          return result;
+        }}
+        onCancelUpload={async (fileId) => {
+          const result = await onDelete(fileId);
+          if (result.ok) {
+            setFiles((prev) => {
+              const next = prev.filter((file) => file.id !== fileId);
+              onFilesChange?.(next);
+              return next;
+            });
+            setSetupContext(null);
+          } else {
+            setMessage(result.message);
+          }
+        }}
+      />
 
       <Dialog
         open={replacePrompt !== null}
@@ -449,137 +536,191 @@ function BusinessFileRow({
   file,
   pending,
   sendConfigured,
+  hasServiceCatalog,
+  hasFaqs,
   onToggle,
+  onEdit,
   onRemove,
 }: {
   file: BusinessFileListItem;
   pending: boolean;
   sendConfigured: boolean;
+  hasServiceCatalog: boolean;
+  hasFaqs: boolean;
   onToggle: (
     id: string,
     patch: { answerEnabled?: boolean; sendEnabled?: boolean },
   ) => void;
+  onEdit: () => void;
   onRemove: (id: string) => void;
 }) {
   const canAnswer = fileSupportsAnswerToggle(file);
   const status = fileReadinessLabel(file);
-  const truncated = sliceFileTextForPrompt(file.extractedText)?.wasTruncated;
+  const promptSlice = sliceFileTextForPrompt(file.extractedText);
+  const truncated = promptSlice?.wasTruncated;
   const kindLabel = businessFileKindLabel(file.documentKind);
+  const displayTitle = businessFileDisplayTitle(file);
+  const needsSetup = !file.title?.trim();
+  const sendOnlyOverlap = showSendOnlyOverlapNote({
+    file,
+    hasServiceCatalog,
+    hasFaqs,
+  });
+  const showFileName =
+    displayTitle.toLowerCase() !==
+    file.fileName.replace(/\.[^.]+$/, "").trim().toLowerCase();
 
   return (
-    <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4">
-      <span className={DASHBOARD_ICON_CHIP_MD}>
-        <FileText className={DASHBOARD_ICON_GLYPH_MD} aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate text-[14px] font-semibold text-[#0b1220]">
-            {file.fileName}
-          </p>
-          {kindLabel ? (
+    <li className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+      <div className="flex items-start gap-3">
+        <span className={DASHBOARD_ICON_CHIP_MD}>
+          <FileText className={DASHBOARD_ICON_GLYPH_MD} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-semibold text-[#0b1220]">
+                {displayTitle}
+              </p>
+              {showFileName ? (
+                <p className="truncate text-[11.5px] text-slate-500">
+                  {file.fileName}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+                onClick={onEdit}
+                aria-label={`Edit ${displayTitle}`}
+                className="size-8 p-0 text-slate-500 hover:text-slate-800"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+                onClick={() => onRemove(file.id)}
+                aria-label={`Remove ${displayTitle}`}
+                className="size-8 p-0 text-slate-500 hover:text-slate-800"
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {kindLabel ? (
+              <StatusPill className="border-slate-300/70 bg-white text-[10px]">
+                {kindLabel}
+              </StatusPill>
+            ) : null}
+            {needsSetup ? (
+              <StatusPill className="border-amber-300/80 bg-amber-50 text-[10px] text-amber-900">
+                Needs setup
+              </StatusPill>
+            ) : null}
             <StatusPill className="border-slate-300/70 bg-white text-[10px]">
-              {kindLabel}
+              {file.fileType.toUpperCase()}
             </StatusPill>
-          ) : null}
-          <StatusPill className="border-slate-300/70 bg-white text-[10px]">
-            {file.fileType.toUpperCase()}
-          </StatusPill>
-          <StatusPill className="border-slate-300/70 bg-white text-[10px]">
-            {status}
-          </StatusPill>
-        </div>
-        <p className="text-[12px] text-slate-500">
-          {formatBusinessFileDate(file.createdAt)} · {formatBusinessFileSize(file.sizeBytes)}
-        </p>
-        {isSpreadsheetFileType(file.fileType) ? (
-          <p className="text-[11px] leading-relaxed text-slate-500">
-            Uploaded spreadsheets are static until replaced. Re-upload when stock or
-            prices change often.
-          </p>
-        ) : null}
-        {!canAnswer ? (
-          <p className="text-[11px] leading-relaxed text-amber-900/80">
-            {fileCouldNotReadMessage()}
-          </p>
-        ) : null}
-        {truncated ? (
-          <p className="text-[11px] leading-relaxed text-amber-900/80">
-            This file is large — Cara has the first portion on calls.
-          </p>
-        ) : null}
-        <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:gap-6">
-          <label
-            className={cn(
-              "flex items-start gap-2",
-              !canAnswer && "opacity-60",
-            )}
-          >
-            <Switch
-              checked={file.answerEnabled}
-              disabled={pending || !canAnswer}
-              onCheckedChange={(checked) =>
-                onToggle(file.id, { answerEnabled: checked })
-              }
-              aria-label="Cara can answer from this"
-              className="mt-0.5 data-checked:bg-[#0b1220]"
-            />
-            <span className="text-[12px] leading-snug text-slate-700">
-              <span className="font-medium text-[#0b1220]">Cara can answer from this</span>
-              <span className="mt-0.5 block text-slate-500">
-                Cara can use this file to answer caller questions.
-              </span>
+            <StatusPill className="border-slate-300/70 bg-white text-[10px]">
+              {status}
+            </StatusPill>
+            {truncated ? (
+              <StatusPill className="border-slate-300/70 bg-slate-50 text-[10px] text-slate-600">
+                Lookup on calls
+              </StatusPill>
+            ) : null}
+            <span className="text-[11px] text-slate-400">
+              {formatBusinessFileDate(file.createdAt)} ·{" "}
+              {formatBusinessFileSize(file.sizeBytes)}
             </span>
-          </label>
-          <label
-            className={cn(
-              "flex items-start gap-2",
-              !sendConfigured && "opacity-60",
-            )}
-          >
-            <Switch
-              checked={file.sendEnabled}
-              disabled={pending || !sendConfigured || !canAnswer}
-              onCheckedChange={(checked) =>
-                onToggle(file.id, { sendEnabled: checked })
-              }
-              aria-label="Cara can send this to callers"
-              className="mt-0.5 data-checked:bg-[#0b1220]"
-            />
-            <span className="text-[12px] leading-snug text-slate-700">
-              <span className="font-medium text-[#0b1220]">Cara can send this to callers</span>
-              <span className="mt-0.5 block text-slate-500">
-                {sendConfigured
-                  ? "Cara can text this file when callers ask."
-                  : "Set up text links in Call flow first."}{" "}
+          </div>
+
+          {file.whenToUse?.trim() ? (
+            <p className="mt-1.5 line-clamp-1 text-[11.5px] text-slate-600">
+              {file.whenToUse.trim()}
+            </p>
+          ) : null}
+
+          {!canAnswer ? (
+            <div className="mt-2 text-[11px] leading-relaxed">
+              <FileUnreadableNotice fileType={file.fileType} />
+            </div>
+          ) : null}
+
+          {sendOnlyOverlap ? (
+            <p className="mt-2 rounded-lg border border-sky-200/80 bg-sky-50/70 px-3 py-2 text-[11.5px] leading-relaxed text-sky-950">
+              {sendOnlyOverlap === "faqs"
+                ? SEND_ONLY_FAQ_OVERLAP_NOTE
+                : SEND_ONLY_CATALOG_OVERLAP_NOTE}
+            </p>
+          ) : null}
+
+          {isSpreadsheetFileType(file.fileType) ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              Re-upload when stock or prices change often.
+            </p>
+          ) : null}
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label
+              className={cn(
+                "flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-2.5 py-2",
+                !canAnswer && "opacity-60",
+              )}
+            >
+              <Switch
+                checked={file.answerEnabled}
+                disabled={pending || !canAnswer}
+                onCheckedChange={(checked) =>
+                  onToggle(file.id, { answerEnabled: checked })
+                }
+                aria-label="Cara can answer from this"
+                className="data-checked:bg-[#0b1220]"
+              />
+              <span className="text-[11.5px] leading-snug text-slate-700">
+                <span className="font-medium text-[#0b1220]">Cara reads from this</span>
+              </span>
+            </label>
+            <label
+              className={cn(
+                "flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-2.5 py-2",
+                !sendConfigured && "opacity-60",
+              )}
+            >
+              <Switch
+                checked={file.sendEnabled}
+                disabled={pending || !sendConfigured || !canAnswer}
+                onCheckedChange={(checked) =>
+                  onToggle(file.id, { sendEnabled: checked })
+                }
+                aria-label="Cara can send this to callers"
+                className="data-checked:bg-[#0b1220]"
+              />
+              <span className="text-[11.5px] leading-snug text-slate-700">
+                <span className="font-medium text-[#0b1220]">Send to callers</span>
                 {!sendConfigured ? (
-                  <Link
-                    href="/dashboard/routing"
-                    className="font-medium text-[#0b1220] underline underline-offset-2"
-                  >
-                    Call flow
-                  </Link>
+                  <>
+                    {" · "}
+                    <Link
+                      href="/dashboard/routing"
+                      className="font-medium text-[#0b1220] underline underline-offset-2"
+                    >
+                      Call flow
+                    </Link>
+                  </>
                 ) : null}
               </span>
-              {file.sendEnabled ? (
-                <span className="mt-1 block text-amber-900/90">
-                  Anyone who receives the link can open this file.
-                </span>
-              ) : null}
-            </span>
-          </label>
+            </label>
+          </div>
         </div>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={pending}
-        onClick={() => onRemove(file.id)}
-        aria-label={`Remove ${file.fileName}`}
-        className="shrink-0 self-start text-slate-500 hover:text-slate-800"
-      >
-        <Trash2 className="size-4" aria-hidden />
-      </Button>
     </li>
   );
 }

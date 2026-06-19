@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { CaraTrainingStepShell, TRAINING_SURFACE } from "./cara-training-step-shell";
 import type { ReviewFaqItem, ReviewPage } from "./train-cara-review-pages";
 
-function CaraSpeechCard({ intro, body }: { intro: string; body: string }) {
+function CaraSpeechCard({ body }: { body: string }) {
   return (
     <article
       className={cn(
@@ -14,10 +14,7 @@ function CaraSpeechCard({ intro, body }: { intro: string; body: string }) {
       )}
     >
       <div className="max-w-[36rem] text-pretty text-center">
-        <p className="text-[14px] leading-snug font-medium text-slate-500 sm:text-[15px]">
-          {intro}
-        </p>
-        <p className="mt-4 text-[15px] leading-[1.8] text-[#0b1220] sm:text-[15.5px] sm:leading-[1.85]">
+        <p className="text-[15px] leading-[1.8] text-[#0b1220] sm:text-[15.5px] sm:leading-[1.85]">
           {body}
         </p>
       </div>
@@ -25,13 +22,7 @@ function CaraSpeechCard({ intro, body }: { intro: string; body: string }) {
   );
 }
 
-function FaqReviewCard({
-  intro,
-  items,
-}: {
-  intro: string;
-  items: ReviewFaqItem[];
-}) {
+function FaqReviewCard({ items }: { items: ReviewFaqItem[] }) {
   return (
     <article
       className={cn(
@@ -39,11 +30,8 @@ function FaqReviewCard({
         "flex w-full flex-col px-5 py-5 sm:px-6 sm:py-6",
       )}
     >
-      <p className="text-center text-[14px] leading-snug font-medium text-slate-500 sm:text-[15px]">
-        {intro}
-      </p>
       <ul
-        className="mt-4 max-h-[min(26rem,52vh)] space-y-2.5 overflow-y-auto overscroll-y-contain pr-0.5"
+        className="max-h-[min(26rem,52vh)] space-y-2.5 overflow-y-auto overscroll-y-contain pr-0.5"
         aria-label="FAQ review list"
       >
         {items.map((item, index) => (
@@ -79,19 +67,20 @@ export function CaraReviewStep({
   if (!page) return null;
 
   const hasFaqItems = Boolean(page.faqItems && page.faqItems.length > 0);
+  const pageNumberLabel = `${pageIndex + 1} of ${pages.length}`;
 
   return (
     <CaraTrainingStepShell
       compact
       title={page.title}
-      subtitle={page.subtitle}
+      subtitle={pageNumberLabel}
       className="max-w-none"
     >
       <div className={cn("w-full", disabled && "pointer-events-none opacity-60")}>
         {hasFaqItems ? (
-          <FaqReviewCard intro={page.intro} items={page.faqItems!} />
+          <FaqReviewCard items={page.faqItems!} />
         ) : (
-          <CaraSpeechCard intro={page.intro} body={page.body} />
+          <CaraSpeechCard body={page.body} />
         )}
       </div>
     </CaraTrainingStepShell>

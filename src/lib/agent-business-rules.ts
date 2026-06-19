@@ -1,4 +1,12 @@
-export const MAX_BUSINESS_RULES = 15;
+import {
+  BUSINESS_RULE_PRESETS,
+  isBusinessRulePresetId,
+  MAX_CUSTOM_BUSINESS_RULES,
+} from "@/lib/business-rule-presets";
+import { detectPromptInjectionViolation } from "@/lib/prompt-injection-guard";
+
+export const MAX_BUSINESS_RULES =
+  BUSINESS_RULE_PRESETS.length + MAX_CUSTOM_BUSINESS_RULES;
 export const MAX_BUSINESS_RULE_LENGTH = 200;
 
 export const BUSINESS_RULES_SECTION_MARKER =
@@ -10,19 +18,35 @@ export function normalizeBusinessRuleKey(text: string): string {
 
 export function cleanBusinessRules(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  const out: string[] = [];
-  const seen = new Set<string>();
+  const presets: string[] = [];
+  const custom: string[] = [];
+  const seenPreset = new Set<string>();
+  const seenCustom = new Set<string>();
+
   for (const item of value) {
     if (typeof item !== "string") continue;
-    const trimmed = item.trim().slice(0, MAX_BUSINESS_RULE_LENGTH);
+    const trimmed = item.trim();
     if (!trimmed) continue;
-    const key = normalizeBusinessRuleKey(trimmed);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(trimmed);
-    if (out.length >= MAX_BUSINESS_RULES) break;
+
+    if (isBusinessRulePresetId(trimmed)) {
+      if (!BUSINESS_RULE_PRESETS.some((p) => p.id === trimmed)) continue;
+      if (seenPreset.has(trimmed)) continue;
+      seenPreset.add(trimmed);
+      presets.push(trimmed);
+      continue;
+    }
+
+    const customText = trimmed.slice(0, MAX_BUSINESS_RULE_LENGTH);
+    const violation = detectPromptInjectionViolation(customText);
+    if (violation) continue;
+    const key = normalizeBusinessRuleKey(customText);
+    if (seenCustom.has(key)) continue;
+    seenCustom.add(key);
+    custom.push(customText);
+    if (custom.length >= MAX_CUSTOM_BUSINESS_RULES) break;
   }
-  return out;
+
+  return [...presets, ...custom];
 }
 
 export function parseAgentBusinessRules(value: unknown): string[] {

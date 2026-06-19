@@ -7,6 +7,9 @@ export const PUBLIC_ASSETS = {
   /** Dashboard main-pane background (cara05, 3840×2400). */
   dashboard: {
     background: { jpg: "/j6m3t9w2.jpg", webp: "/j6m3t9w2.webp" },
+    homeHero: { png: "/p3n7k2w8.png" },
+    /** Home footer banner (cara33, 2800×300). */
+    homeFooter: { png: "/w9c4r3a3.png" },
   },
   onboarding: {
     default2x: { jpg: "/k3w9r1t5.jpg", webp: "/k3w9r1t5.webp" },

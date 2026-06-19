@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 
+import { isAgentConfigPath } from "@/lib/dashboard-routes";
+
 import { useCaraSetupForm } from "./cara-setup-form-context";
 
 type Props = {
@@ -38,7 +40,7 @@ export function CaraSetupUnsavedGuard({ children }: Props) {
       if (!anchor || !(anchor instanceof HTMLAnchorElement)) return;
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#")) return;
-      if (href.startsWith("/dashboard/cara-setup")) return;
+      if (isAgentConfigPath(href)) return;
       e.preventDefault();
       e.stopPropagation();
       setPendingHref(href);
@@ -50,13 +52,13 @@ export function CaraSetupUnsavedGuard({ children }: Props) {
   }, [isDirty, pathname]);
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {children}
       <ConfirmDialog
         open={leaveOpen}
         onOpenChange={setLeaveOpen}
         title="Unsaved changes"
-        description="You have unsaved changes in Cara Setup. Save them before you leave?"
+        description="You have unsaved changes. Save them before you leave?"
         confirmLabel="Save changes"
         cancelLabel="Stay on page"
         pending={pending}
@@ -83,6 +85,6 @@ export function CaraSetupUnsavedGuard({ children }: Props) {
           Discard changes and leave
         </button>
       </ConfirmDialog>
-    </>
+    </div>
   );
 }

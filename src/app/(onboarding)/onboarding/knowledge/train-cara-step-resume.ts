@@ -2,10 +2,11 @@ import { TRAIN_CARA_STEPS, type TrainCaraStepId } from "./train-cara-constants";
 
 const LEGACY_STEP_MAP: Record<string, TrainCaraStepId> = {
   know: "about",
-  handle: "review",
-  "call-flow": "review",
-  rules: "capture",
-  actions: "review",
+  handle: "faqs",
+  "call-flow": "faqs",
+  rules: "faqs",
+  actions: "faqs",
+  review: "faqs",
 };
 
 export function parseTrainCaraStepIndex(

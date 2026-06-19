@@ -4,21 +4,26 @@ import { SetPasswordForm } from "./set-password-form";
 
 export default function SetPasswordPage() {
   return (
-    <div className="from-muted/25 via-background to-background mx-auto max-w-2xl space-y-6 bg-gradient-to-b pb-8">
-      <header className="border-border/60 border-b pb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <div className="flex w-full flex-col gap-6">
+      <div className="space-y-2 text-center sm:text-left">
+        <h1 className="text-xl font-semibold tracking-tight text-[#0b1220]">
           Set your password
         </h1>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          If your invite link signed you in without choosing a password, define
-          one here so you can also use{" "}
-          <Link href="/authenticate" className="text-foreground underline-offset-4 hover:underline">
+        <p className="text-sm leading-relaxed text-slate-600">
+          Your invite signed you in without a password. Choose one now so you
+          can also use{" "}
+          <Link
+            href="/authenticate"
+            className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+          >
             email sign-in
           </Link>{" "}
           later.
         </p>
-      </header>
-      <SetPasswordForm />
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <SetPasswordForm />
+      </div>
     </div>
   );
 }

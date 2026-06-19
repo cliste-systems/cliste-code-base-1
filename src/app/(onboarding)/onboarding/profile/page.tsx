@@ -1,6 +1,10 @@
 import { guardOnboardingPage } from "@/lib/onboarding-page-guard";
 import { ownerNameNeedsCapture } from "@/lib/profile-display-name";
-import { requireOnboardingSession } from "@/lib/onboarding-session";
+import {
+  ONBOARDING_STEPS,
+  requireOnboardingSession,
+} from "@/lib/onboarding-session";
+import { parseCaraGoal } from "@/lib/cara-goal";
 import { verticalIdForNiche } from "@/lib/verticals";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -16,7 +20,7 @@ export default async function OnboardingProfilePage() {
   const [{ data: org }, { data: profile }] = await Promise.all([
     admin
       .from("organizations")
-      .select("name, address, storefront_eircode, niche, agent_business_type")
+      .select("name, address, storefront_eircode, niche, agent_business_type, cara_goal")
       .eq("id", session.organizationId)
       .maybeSingle(),
     admin
@@ -36,6 +40,10 @@ export default async function OnboardingProfilePage() {
     storedNiche && storedNiche !== "other"
       ? verticalIdForNiche(storedNiche)
       : "";
+  const defaultCaraGoal =
+    session.onboardingStep > ONBOARDING_STEPS.profile
+      ? parseCaraGoal(org?.cara_goal)
+      : ("" as const);
 
   return (
     <ProfileOnboardingView
@@ -44,6 +52,7 @@ export default async function OnboardingProfilePage() {
       defaultFirstName=""
       defaultLastName=""
       defaultVertical={defaultVertical}
+      defaultCaraGoal={defaultCaraGoal}
       defaultAddress={(org?.address as string | null) ?? ""}
       defaultEircode={(org?.storefront_eircode as string | null) ?? ""}
     />

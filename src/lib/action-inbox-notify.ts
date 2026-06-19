@@ -4,6 +4,7 @@ import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { sendTwilioBookingSms } from "@/lib/booking-confirmation-sms";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { resolveOrgSenderEmail } from "@/lib/org-sender-email";
 
 type NotifyInput = {
   summary: string;
@@ -22,7 +23,7 @@ export async function notifyActionInboxOwner(
 ): Promise<void> {
   const { data: org, error } = await admin
     .from("organizations")
-    .select("name, notification_email, notification_phone")
+    .select("name, slug, notification_email, notification_phone")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -52,6 +53,11 @@ export async function notifyActionInboxOwner(
   const inboxUrl = `${origin}/dashboard/action-inbox`;
 
   if (email && isSendGridConfigured()) {
+    const orgSender = resolveOrgSenderEmail({
+      name: org.name,
+      slug: org.slug,
+      notificationEmail: email,
+    });
     const res = await sendTransactionalEmail({
       to: email,
       subject: `${biz} — new Action Inbox item`,
@@ -64,6 +70,14 @@ export async function notifyActionInboxOwner(
         "",
         `Open Action Inbox: ${inboxUrl}`,
       ].join("\n"),
+      ...(orgSender
+        ? {
+            from: { email: orgSender.email, name: orgSender.name },
+            replyTo: orgSender.replyTo
+              ? { email: orgSender.replyTo, name: orgSender.name }
+              : undefined,
+          }
+        : {}),
     });
     if (!res.ok) {
       console.error("[action-inbox-notify] email failed", res.message);

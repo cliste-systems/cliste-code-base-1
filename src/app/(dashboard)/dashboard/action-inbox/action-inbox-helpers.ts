@@ -152,8 +152,52 @@ export function inboxCallerMetaLine(
   return item.createdAtLabel;
 }
 
+export type StructuredCaptureField = {
+  label: string;
+  value: string;
+  unconfirmed: boolean;
+};
+
+export type StructuredCaptureSummary = {
+  header: string;
+  fields: StructuredCaptureField[];
+};
+
+
+export function parseStructuredCaptureSummary(
+  summary: string | null | undefined,
+): StructuredCaptureSummary | null {
+  const raw = String(summary ?? "").trim();
+  if (!raw) return null;
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const header = lines[0]!;
+  const fields: StructuredCaptureField[] = [];
+
+  for (const line of lines.slice(1)) {
+    const match = line.match(/^([^:]+):\s*(.+)\s*$/i);
+    if (!match) continue;
+    const label = match[1]!.trim();
+    const valueRaw = match[2]!.trim();
+    const unconfirmed = /\(UNCONFIRMED\)/i.test(valueRaw);
+    const value = valueRaw.replace(/\s*\(UNCONFIRMED\)\s*/gi, "").trim();
+    if (!label || !value) continue;
+    fields.push({ label, value, unconfirmed });
+  }
+
+  if (fields.length === 0) return null;
+  return { header, fields };
+}
+
 export function nextStepForCategory(category: ActionCategory): string {
   switch (category) {
+    case "booking_request":
+      return "Call back to arrange the booking — nothing is confirmed yet";
     case "callback":
       return "Call the contact back";
     case "urgent":

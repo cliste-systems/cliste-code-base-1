@@ -6,7 +6,10 @@ import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faq
 import {
   buildCaraCapabilitiesFromPromptExtras,
   detectCapabilityWarnings,
+  looksLikeOpeningHours,
+  looksLikeServiceExclusion,
   matchesSensitiveDataCollection,
+  NEVER_QUOTE_PRICE_PATTERN,
   SENSITIVE_DATA_BLOCK_MESSAGE,
 } from "@/lib/call-handling-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
@@ -15,13 +18,17 @@ import {
   businessFileKindLabel,
   type BusinessFileListItem,
 } from "@/lib/business-files";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { detectPromptInjectionViolation } from "@/lib/prompt-injection-guard";
 export const FAQ_ANSWER_WORD_WARNING_THRESHOLD = 70;
 
 export const FAQ_MATCHING_INSTRUCTION =
   "I match caller questions to common questions by meaning, not exact wording. If several could match, I use the most specific. I adapt the saved answer naturally to the caller's phrasing — I never recite it robotically. Owner-written answers are approved business content I may rely on; the safety rule against improvising regulated advice applies to going beyond approved content, not to delivering it.";
 
-export const KNOWLEDGE_PRECEDENCE_INSTRUCTION =
-  "When several sources could answer, I use this order: (1) structured setup — services, hours, areas, location, and business rules; (2) common-question answers; (3) uploaded file content. If sources disagree, I use the highest-priority source and do not mention the discrepancy to the caller. If a common question duplicates structured setup, structured setup wins.";
+export {
+  KNOWLEDGE_PRECEDENCE_INSTRUCTION,
+} from "@/lib/knowledge-precedence";
 
 export type CanonicalQuestionCategory =
   | "services"
@@ -44,7 +51,7 @@ const CANONICAL_QUESTION_PATTERNS: {
   {
     category: "services",
     setupLabel: "Services",
-    setupHref: "/dashboard/cara-setup/services",
+    setupHref: DASHBOARD_ROUTES.businessServices,
     patterns: [
       /\bwhat\s+(?:services|do\s+you\s+(?:offer|do)|can\s+you\s+do)\b/i,
       /\b(?:services|work)\s+(?:do\s+you|you)\s+(?:offer|do|provide)\b/i,
@@ -53,8 +60,8 @@ const CANONICAL_QUESTION_PATTERNS: {
   },
   {
     category: "hours",
-    setupLabel: "General",
-    setupHref: "/dashboard/cara-setup/general",
+    setupLabel: "Profile",
+    setupHref: DASHBOARD_ROUTES.businessProfile,
     patterns: [
       /\b(?:what\s+(?:are\s+)?(?:your\s+)?(?:opening\s+)?hours|when\s+are\s+you\s+open)\b/i,
       /\bwhat\s+time\b/i,
@@ -64,8 +71,8 @@ const CANONICAL_QUESTION_PATTERNS: {
   },
   {
     category: "location",
-    setupLabel: "General",
-    setupHref: "/dashboard/cara-setup/general",
+    setupLabel: "Profile",
+    setupHref: DASHBOARD_ROUTES.businessProfile,
     patterns: [
       /\bwhere\s+(?:are\s+you|is\s+(?:the\s+)?(?:business|shop|salon|office))\b/i,
       /\b(?:address|located|location|directions|find\s+you)\b/i,
@@ -74,8 +81,8 @@ const CANONICAL_QUESTION_PATTERNS: {
   },
   {
     category: "areas",
-    setupLabel: "General",
-    setupHref: "/dashboard/cara-setup/general",
+    setupLabel: "Profile",
+    setupHref: DASHBOARD_ROUTES.businessProfile,
     patterns: [
       /\bwhat\s+areas\b/i,
       /\b(?:do\s+you|areas\s+do\s+you)\s+cover\b/i,
@@ -105,6 +112,8 @@ export type FaqFieldWarning = {
     | "length"
     | "empty_answer"
     | "near_duplicate"
+    | "structured_duplicate"
+    | "injection"
     | "capability";
 };
 
@@ -189,16 +198,96 @@ export function findNearDuplicateFaqQuestion(
   return null;
 }
 
+export function lintFaqVsStructuredFields(input: {
+  question: string;
+  answer: string;
+  openingHours?: string;
+  businessRules?: string[];
+  serviceCatalog?: ServiceCatalogItem[];
+}): FaqFieldWarning[] {
+  const warnings: FaqFieldWarning[] = [];
+  const combined = `${input.question} ${input.answer}`.trim();
+  if (!combined) return warnings;
+
+  if (input.openingHours?.trim() && looksLikeOpeningHours(combined)) {
+    warnings.push({
+      id: "structured-hours",
+      index: -1,
+      field: "question",
+      kind: "structured_duplicate",
+      message:
+        "This looks like opening hours — set them in Profile so Cara always says the same thing.",
+      href: DASHBOARD_ROUTES.businessProfile,
+    });
+  }
+
+  if (looksLikeServiceExclusion(combined)) {
+    warnings.push({
+      id: "structured-exclusion",
+      index: -1,
+      field: "question",
+      kind: "structured_duplicate",
+      message:
+        "This looks like a service you don't offer — add it under Services exclusions instead.",
+      href: DASHBOARD_ROUTES.businessServices,
+    });
+  }
+
+  const neverQuote = (input.businessRules ?? []).some((r) =>
+    NEVER_QUOTE_PRICE_PATTERN.test(r),
+  );
+  const catalogHasPrices = (input.serviceCatalog ?? []).some(
+    (s) => s.price > 0,
+  );
+  if (neverQuote && catalogHasPrices && PRICE_PATTERN.test(input.answer)) {
+    warnings.push({
+      id: "structured-price-conflict",
+      index: -1,
+      field: "answer",
+      kind: "structured_duplicate",
+      message:
+        "Your policies say never quote prices, but this answer includes a price — remove the price or update your policy.",
+      href: DASHBOARD_ROUTES.businessServices,
+    });
+  }
+
+  const injection = detectPromptInjectionViolation(combined);
+  if (injection) {
+    warnings.push({
+      id: "structured-injection",
+      index: -1,
+      field: "answer",
+      kind: "injection",
+      message: injection.message,
+    });
+  }
+
+  return warnings;
+}
+
 export function lintFaqFields(input: {
   faqs: AgentFaq[];
   index: number;
   routes?: RoutingActionSummary[];
   transferNumber?: string;
   forcedCanonical?: boolean;
+  openingHours?: string;
+  businessRules?: string[];
+  serviceCatalog?: ServiceCatalogItem[];
 }): FaqFieldWarning[] {
   const warnings: FaqFieldWarning[] = [];
   const faq = input.faqs[input.index];
   if (!faq) return warnings;
+
+  warnings.push(
+    ...lintFaqVsStructuredFields({
+      question: faq.question,
+      answer: faq.answer,
+      openingHours: input.openingHours,
+      businessRules: input.businessRules,
+      serviceCatalog: input.serviceCatalog,
+    }).map((w) => ({ ...w, index: input.index })),
+  );
 
   const caps = buildCaraCapabilitiesFromPromptExtras(
     input.routes,
@@ -289,7 +378,7 @@ export function lintFaqFields(input: {
         field: "answer",
         kind: "capability",
         message: SENSITIVE_DATA_BLOCK_MESSAGE,
-        href: "/dashboard/cara-setup/call-handling",
+        href: DASHBOARD_ROUTES.businessFaqs,
       });
     }
   }
@@ -331,8 +420,8 @@ export function lintFaqVsFilePriceConflicts(
       warnings.push({
         id: `faq-file-price-${i}-${file.id}`,
         message: `Your answer to "${faq.question.trim() || "a question"}" may not match prices in "${file.fileName}" — review both?`,
-        href: "/dashboard/cara-setup/answers",
-        secondaryHref: "/dashboard/cara-setup/answers",
+        href: DASHBOARD_ROUTES.businessFaqs,
+        secondaryHref: DASHBOARD_ROUTES.businessFiles,
       });
     }
   }
@@ -358,7 +447,7 @@ export function lintDuplicateDocumentKinds(
     warnings.push({
       id: `duplicate-kind-${kind}`,
       message: `You have ${group.length} ${label.toLowerCase()} files — overlapping documents can disagree.`,
-      href: "/dashboard/cara-setup/answers",
+      href: DASHBOARD_ROUTES.businessFiles,
     });
   }
   return warnings;
@@ -384,6 +473,17 @@ export function fileReadinessLabel(file: BusinessFileListItem): string {
   return "Ready";
 }
 
-export function fileCouldNotReadMessage(): string {
-  return "Cara couldn't read anything from this file — it may be a scanned image. Try a text-based PDF, CSV, or TXT.";
+export function fileCouldNotReadMessage(fileType?: string): string {
+  if (fileType === "pdf") {
+    return "Cara couldn't read any text from this PDF.";
+  }
+  if (fileType === "spreadsheet") {
+    return "Cara can't read spreadsheets yet — export to CSV or TXT, or upload a text-based PDF.";
+  }
+  return "Cara couldn't read anything from this file. Try a text-based PDF, CSV, or TXT.";
+}
+
+/** Shown when a PDF upload has no extractable text (often scanned/image-only). */
+export function fileScannedPdfOcrHint(): string {
+  return "If you can't select text when you open the PDF, it's probably image-based. Export a text-based PDF, save as Word/Google Docs and re-export, or run OCR — then upload again.";
 }

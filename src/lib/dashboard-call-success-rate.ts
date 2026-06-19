@@ -3,6 +3,7 @@ import { normalizeCallOutcome, type CallOutcome } from "@/lib/call-history-types
 const INELIGIBLE: readonly CallOutcome[] = [
   "spam_or_abuse",
   "voicemail_or_no_speech",
+  "blocked",
 ];
 
 const SUCCESS: readonly CallOutcome[] = [

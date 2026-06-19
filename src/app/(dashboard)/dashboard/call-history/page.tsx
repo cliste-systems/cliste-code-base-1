@@ -5,6 +5,7 @@ import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-
 import {
   DASHBOARD_ICON_CHIP_LG,
   DASHBOARD_ICON_GLYPH_LG,
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
 import {
@@ -24,13 +25,15 @@ import {
   parseDashboardMetricRange,
 } from "@/lib/dashboard-metric-range";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
 
 import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
 import {
   buildCallHistoryMetricsFromSummaryRows,
   type CallFollowUp,
   type CallHistoryListItem,
-  summaryForDisplay,
+  callSummaryForDisplay,
 } from "./call-history-helpers";
 import { CallHistoryView } from "./call-history-view";
 
@@ -90,6 +93,8 @@ function parsePageParam(raw: string | undefined): number {
 function toListItem(
   row: CallLogListRow,
   openFollowUpByKey: Map<string, CallFollowUp>,
+  businessName: string,
+  blockedSet: Set<string>,
 ): CallHistoryListItem {
   const mapped = mapCallLogToRow({
     ...row,
@@ -118,7 +123,12 @@ function toListItem(
     hasOpenAction: Boolean(followUp),
     followUp,
   };
-  item.summaryPreview = summaryForDisplay(item);
+  item.summaryPreview = callSummaryForDisplay(item, {
+    businessName,
+    callerIsBlocked:
+      normalizeBlockedCallerE164(mapped.callerId) != null &&
+      blockedSet.has(normalizeBlockedCallerE164(mapped.callerId)!),
+  });
   return item;
 }
 
@@ -131,6 +141,8 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const requestedPage = parsePageParam(sp.page);
 
   const { supabase, organizationId } = await requireDashboardSession();
+  const orgRow = await getCachedDashboardOrganizationRow();
+  const businessName = String(orgRow?.name ?? "").trim();
 
   const lowerIso = getDashboardMetricRangeLowerBoundIso(rangeKey);
   const upperIso = getDashboardMetricRangeUpperExclusiveIso(rangeKey);
@@ -156,7 +168,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     { data: metricsData, error: metricsError },
     { data: pageData, error: listError },
     { data: ticketRows },
-    { data: org },
+    { data: blockedRows },
   ] = await Promise.all([
     applyRangeFilters(
       supabase
@@ -188,10 +200,9 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       .order("created_at", { ascending: false })
       .limit(CALL_HISTORY_OPEN_TICKET_LIMIT),
     supabase
-      .from("organizations")
-      .select("is_active")
-      .eq("id", organizationId)
-      .maybeSingle(),
+      .from("blocked_callers")
+      .select("caller_e164")
+      .eq("organization_id", organizationId),
   ]);
 
   const error = countError ?? metricsError ?? listError;
@@ -212,12 +223,18 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
   const calls = !error
     ? ((pageData ?? []) as CallLogListRow[]).map((row) =>
-        toListItem(row, openFollowUpByKey),
+        toListItem(row, openFollowUpByKey, businessName, blockedSet),
       )
     : [];
 
+  const blockedCallerE164s = (blockedRows ?? []).map(
+    (row) => String((row as { caller_e164: string }).caller_e164),
+  );
+  const blockedSet = new Set(blockedCallerE164s);
+
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <DashboardAnimatedPageSections>
       <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
@@ -241,7 +258,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
             ]}
           />
         </div>
-        <DashboardHeaderRangeControls caraActive={org?.is_active !== false} />
+        <DashboardHeaderRangeControls />
       </header>
 
       {error ? (
@@ -254,6 +271,8 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           calls={calls}
           metrics={metrics}
           initialSelectedCallId={initialSelectedCallId}
+          blockedCallerE164s={blockedCallerE164s}
+          businessName={businessName}
           pagination={{
             page,
             pageSize: CALL_HISTORY_PAGE_SIZE,
@@ -264,6 +283,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         />
       )}
       </DashboardAnimatedPageSections>
+      </div>
     </div>
   );
 }

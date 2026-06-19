@@ -47,6 +47,7 @@ export type CaraSetupChipEditorProps = {
   listBanner?: ReactNode;
   /** Hide tag list when a parent renders ordered items (e.g. fixed collect order). */
   hideChipList?: boolean;
+  renderChipAccessory?: (item: string, index: number) => ReactNode;
   renderInterruptDialog?: (ctx: {
     kind: string;
     item: string;
@@ -67,8 +68,10 @@ export function CaraSetupChipEditor({
   nearDupLists = [],
   listBanner,
   hideChipList = false,
+  renderChipAccessory,
   renderInterruptDialog,
 }: CaraSetupChipEditorProps) {
+  const chips = value ?? [];
   const [draft, setDraft] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -91,8 +94,8 @@ export function CaraSetupChipEditor({
   function commitItems(items: string[]) {
     const normalized = dedupeCaraSetupChips(items);
     if (
-      normalized.length === value.length &&
-      normalized.every((item, i) => item === value[i])
+      normalized.length === chips.length &&
+      normalized.every((item, i) => item === chips[i])
     ) {
       return;
     }
@@ -107,12 +110,12 @@ export function CaraSetupChipEditor({
 
     if (!normalized) return false;
 
-    if (maxItems !== undefined && value.length >= maxItems) {
+    if (maxItems !== undefined && chips.length >= maxItems) {
       setInlineError(`You can add up to ${maxItems} items.`);
       return false;
     }
 
-    const exact = findExactChipInList(normalized, value);
+    const exact = findExactChipInList(normalized, chips);
     if (exact) {
       setToast(`"${exact}" is already on this list.`);
       setDraft("");
@@ -135,7 +138,7 @@ export function CaraSetupChipEditor({
       if (nearDup) break;
     }
     if (!nearDup) {
-      nearDup = findNearDuplicateChip(normalized, value);
+      nearDup = findNearDuplicateChip(normalized, chips);
     }
     if (nearDup) {
       setInlineWarn(`Looks similar to "${nearDup}" — check you need both.`);
@@ -151,7 +154,7 @@ export function CaraSetupChipEditor({
       setInlineWarn(result.warn);
     }
 
-    commitItems([...value, normalized]);
+    commitItems([...chips, normalized]);
     setDraft("");
     return true;
   }
@@ -173,7 +176,7 @@ export function CaraSetupChipEditor({
       setCommaPreview(null);
       return;
     }
-    let next = [...value];
+    let next = [...chips];
     for (const item of commaPreview) {
       if (findExactChipInList(item, next)) continue;
       const result = beforeAdd(item);
@@ -202,7 +205,7 @@ export function CaraSetupChipEditor({
   }
 
   function removeItem(index: number) {
-    onChange(value.filter((_, i) => i !== index));
+    onChange(chips.filter((_, i) => i !== index));
   }
 
   const chipClass =
@@ -255,7 +258,7 @@ export function CaraSetupChipEditor({
           <p className="text-[12.5px] text-slate-500">{lengthHint}</p>
         ) : null}
 
-        {!hideChipList && value.length > 0 ? (
+        {!hideChipList && chips.length > 0 ? (
           <motion.ul
             layout
             className="flex flex-wrap gap-2"
@@ -263,7 +266,7 @@ export function CaraSetupChipEditor({
             transition={chipTransition}
           >
             <AnimatePresence initial={false} mode="popLayout">
-              {value.map((item, index) => (
+              {chips.map((item, index) => (
                 <motion.li
                   key={`${item}-${index}`}
                   layout="position"
@@ -272,17 +275,20 @@ export function CaraSetupChipEditor({
                   animate={reduceMotion ? undefined : "animate"}
                   exit={reduceMotion ? undefined : "exit"}
                   transition={chipTransition}
-                  className={chipClass}
+                  className="flex max-w-full flex-col gap-1"
                 >
-                  <span className="truncate">{item}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                    aria-label={`Remove ${item}`}
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
+                  <span className={chipClass}>
+                    <span className="truncate">{item}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                      aria-label={`Remove ${item}`}
+                    >
+                      <X className="size-3" aria-hidden />
+                    </button>
+                  </span>
+                  {renderChipAccessory?.(item, index)}
                 </motion.li>
               ))}
             </AnimatePresence>

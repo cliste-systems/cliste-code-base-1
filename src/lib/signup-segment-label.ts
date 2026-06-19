@@ -4,7 +4,7 @@ import {
 } from "@/lib/organization-niche";
 import {
   VERTICAL_PACKS,
-  verticalIdForNiche,
+  verticalPackForNiche,
 } from "@/lib/verticals";
 
 /**
@@ -16,10 +16,10 @@ export function signupSegmentLabel(params: {
   businessType?: string | null;
 }): string {
   const niche = parseOrganizationNiche(params.niche);
-  const verticalId = verticalIdForNiche(niche);
+  const pack = verticalPackForNiche(niche);
 
-  if (verticalId === "salon_beauty") {
-    return VERTICAL_PACKS.salon_beauty.selection.label;
+  if (pack.capabilities.preferPackLabelInSettings) {
+    return pack.selection.label;
   }
 
   const businessType = params.businessType?.trim();

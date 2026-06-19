@@ -3,6 +3,7 @@ import "server-only";
 import twilio from "twilio";
 
 import { createAdminClient } from "@/utils/supabase/admin";
+import { ensureTwilioIe1MessagingRegion } from "@/lib/twilio-ie-messaging";
 
 /**
  * Cliste phone-number pool.
@@ -250,6 +251,14 @@ export async function purchaseIrishDids(count: number): Promise<PurchaseResult> 
       }
 
       if (bought.phoneNumber) {
+        const ie1 = await ensureTwilioIe1MessagingRegion(bought.phoneNumber);
+        if (!ie1.ok) {
+          console.warn(
+            "[phone-pool] IE1 messaging region not set",
+            bought.phoneNumber,
+            ie1.message,
+          );
+        }
         purchased.push({ e164: bought.phoneNumber, sid: bought.sid });
       }
     } catch (err) {

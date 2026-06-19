@@ -1,16 +1,16 @@
 # Records of Processing Activities (ROPA)
 
-GDPR Article 30(1) record for **Cliste Systems** as **controller** of
+GDPR Article 30(1) record for **Cliste Systems Limited** as **controller** of
 its own platform data (sales, billing, support, marketing) and
 Article 30(2) record as **processor** of customer-salon data.
 
-Last reviewed: 2026-06-12.
+Last reviewed: 2026-06-16.
 
 ---
 
 ## 1. Controller information
 
-- **Name:** Cliste Systems
+- **Name:** Cliste Systems Limited
 - **Address:** Ireland (full address on request)
 - **Contact:** privacy@clistesystems.ie
 - **DPO / privacy lead:** Brendan O'Toole (acting). Cliste does not
@@ -29,7 +29,7 @@ Last reviewed: 2026-06-12.
 | Lawful basis         | Art 6(1)(b) contract; Art 6(1)(c) for invoicing/tax records                                   |
 | Data categories      | Email, name, hashed password, role, IP / user agent, plan tier, Stripe customer / subscription IDs |
 | Data subject groups  | Salon owners, operators, agency staff                                                         |
-| Recipients           | Stripe (billing), Supabase (database), Vercel (hosting)                                       |
+| Recipients           | Stripe (billing), Supabase (database), Vercel (hosting), Sentry (errors) |
 | International        | Yes — see DPA Annex III                                                                       |
 | Retention            | Account lifetime + 6 years (tax). Inactive accounts purged after 13 months.                  |
 | Security measures    | DPA Annex II                                                                                  |
@@ -45,20 +45,7 @@ Last reviewed: 2026-06-12.
 | International        | Same as 2.1                                                                                    |
 | Retention            | 13 months from last interaction; deleted on request                                            |
 
-### 2.3 Public booking visitors (controller-of-record portion)
-
-Cliste is processor of the booking record itself (see Section 3) but
-**controller** of the abuse-prevention layer (rate-limiting,
-Turnstile, OTP).
-
-| Field             | Value                                                                            |
-| ----------------- | -------------------------------------------------------------------------------- |
-| Purpose           | Bot mitigation; preventing fraudulent / abusive bookings                          |
-| Lawful basis      | Art 6(1)(f) legitimate interest (security of the service)                         |
-| Data categories   | IP, user-agent, hashed phone, OTP code (10 minute lifetime), event timestamps    |
-| Retention         | OTP rows: 30 minutes. Rate events: 14 days. (Daily retention cron.)              |
-
-### 2.4 Security audit log
+### 2.3 Security audit log
 
 | Field             | Value                                                                            |
 | ----------------- | -------------------------------------------------------------------------------- |
@@ -102,7 +89,18 @@ salon**. Cliste's processing is governed by the DPA at `docs/legal/DPA.md`.
 | Subjects          | Salon's customers / callers                                                       |
 | Retention         | Tied to the parent appointment / call; erasable via Art 17 tool                  |
 
-### 3.4 Outbound SMS / Email confirmations
+### 3.4 Blocked caller numbers
+
+| Field             | Value                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Purpose           | Prevent unwanted repeat callers from reaching the AI agent                        |
+| Lawful basis      | Art 6(1)(f) legitimate interests (business protection; minimal data)             |
+| Categories        | Caller phone number (E.164), optional owner note, created timestamp              |
+| Subjects          | People the salon owner has blocked                                                |
+| Recipients        | None outside Cliste; voice worker reads list for pre-answer gate                 |
+| Retention         | Until owner removes block or Art 17 erasure for that phone number                |
+
+### 3.5 Outbound SMS / Email confirmations
 
 | Field             | Value                                                                            |
 | ----------------- | -------------------------------------------------------------------------------- |

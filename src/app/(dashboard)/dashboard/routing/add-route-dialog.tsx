@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Bot } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { DashboardSelect } from "@/components/dashboard/dashboard-select";
@@ -22,11 +22,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { BusinessFileListItem } from "@/lib/business-files";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { onboardingPageVariants } from "@/components/onboarding/onboarding-motion";
 import type { DashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 import { useDashboardVertical } from "../dashboard-vertical-context";
 import { cn } from "@/lib/utils";
 
+import type { CaraCaptureField } from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-fields";
+
+import {
+  applyBookingFulfilmentMethod,
+  bookingFlowReady,
+  bookingStep4Label,
+  defaultBookingCaptureFields,
+  inferBookingFulfilmentMethod,
+  BOOKING_FULFILMENT_OPTIONS,
+  syncBookingRouteFromCaptureFields,
+  type BookingFulfilmentMethod,
+} from "./booking-fulfilment";
 import {
   switchRouteActionType,
   type RoutingCaraContext,
@@ -71,18 +84,6 @@ function triggerPresetsFromCopy(copy: DashboardVerticalCopy): {
       actionType: "send_link",
     },
     {
-      id: "menu",
-      label: copy.routing.menuPresetLabel,
-      name: copy.routing.menuPresetName,
-      actionType: "send_file",
-    },
-    {
-      id: "quote",
-      label: copy.routing.quotePresetLabel,
-      name: copy.routing.quotePresetName,
-      actionType: "take_message",
-    },
-    {
       id: "directions",
       label: copy.routing.directionsPresetLabel,
       name: copy.routing.directionsPresetName,
@@ -103,6 +104,8 @@ const ACTION_OPTIONS: RouteActionType[] = [
   "take_message",
   "transfer",
 ];
+
+const SPEAK_ACTION_OPTIONS: RouteActionType[] = ["take_message", "transfer"];
 
 type Stage = "flow" | "intro" | "details" | "pov";
 
@@ -183,6 +186,36 @@ export function AddRouteDialog({
     return match?.id ?? "";
   });
 
+  const [bookingFulfilmentMethod, setBookingFulfilmentMethod] =
+    useState<BookingFulfilmentMethod>("link");
+  const [bookingCaptureFields, setBookingCaptureFields] = useState<
+    CaraCaptureField[]
+  >([]);
+
+  useEffect(() => {
+    if (!open || !route) return;
+    if (route.templateId !== "booking-inquiry") return;
+    setBookingFulfilmentMethod(inferBookingFulfilmentMethod(route));
+    setBookingCaptureFields(
+      defaultBookingCaptureFields(
+        setupContext.niche,
+        setupContext.businessType,
+        setupContext.captureFields.length > 0
+          ? setupContext.captureFields
+          : undefined,
+      ),
+    );
+  }, [
+    open,
+    route?.id,
+    route?.templateId,
+    route?.outcome,
+    route?.description,
+    setupContext.niche,
+    setupContext.businessType,
+    setupContext.captureFields,
+  ]);
+
   const handleOpenChange = (next: boolean) => {
     if (next) {
       if (isNew) {
@@ -226,20 +259,72 @@ export function AddRouteDialog({
   const rulesHints = fieldHints.filter((h) => h.field === "rules");
 
   const activeType = routeActionType(route);
+  const isDirectionsFlow = triggerId === "directions" || route.templateId === "location";
+  const isBookFlow = triggerId === "book" || route.templateId === "booking-inquiry";
+  const isLinkDeliveryFlow = isDirectionsFlow;
+  const isSpeakFlow = triggerId === "speak";
+  const flowActionOptions = isSpeakFlow ? SPEAK_ACTION_OPTIONS : ACTION_OPTIONS;
   const patch = (partial: Partial<SavedRoute>) => onChange({ ...route, ...partial });
+
+  const defaultCaptureFields = () =>
+    defaultBookingCaptureFields(
+      setupContext.niche,
+      setupContext.businessType,
+      setupContext.captureFields.length > 0
+        ? setupContext.captureFields
+        : undefined,
+    );
 
   const applyTrigger = (id: string) => {
     setTriggerId(id);
     const preset = triggerPresets.find((p) => p.id === id);
     if (!preset) return;
     const next = switchRouteActionType(route, preset.actionType, caraContext);
+    const captureFields = defaultCaptureFields();
+    if (id === "book") {
+      setBookingFulfilmentMethod("link");
+      setBookingCaptureFields(captureFields);
+      onChange({
+        ...applyBookingFulfilmentMethod(
+          {
+            ...next,
+            templateId: "booking-inquiry",
+            name: "",
+            keywords: "",
+            description: "",
+            note: "",
+            linkDelivery: "sms",
+          },
+          "link",
+          captureFields,
+        ),
+      });
+      return;
+    }
     onChange({
       ...next,
+      templateId: id === "directions" ? next.templateId : next.templateId,
       name: "",
       keywords: "",
       description: "",
       note: "",
+      linkDelivery: id === "directions" ? "sms" : undefined,
     });
+  };
+
+  const applyBookingFulfilment = (method: BookingFulfilmentMethod) => {
+    setBookingFulfilmentMethod(method);
+    onChange(
+      applyBookingFulfilmentMethod(route, method, bookingCaptureFields),
+    );
+  };
+
+  const handleBookingCaptureFieldsChange = (fields: CaraCaptureField[]) => {
+    setBookingCaptureFields(fields);
+    if (bookingFulfilmentMethod === "link") return;
+    onChange(
+      syncBookingRouteFromCaptureFields(route, bookingFulfilmentMethod, fields),
+    );
   };
 
   const applyAction = (actionType: RouteActionType) => {
@@ -248,15 +333,21 @@ export function AddRouteDialog({
   };
 
   const needsDestination =
-    activeType === "send_link" ||
-    activeType === "send_file" ||
-    activeType === "directions" ||
-    activeType === "transfer";
+    !isBookFlow &&
+    (activeType === "send_link" ||
+      activeType === "send_file" ||
+      activeType === "directions" ||
+      activeType === "transfer");
+
+  const showStep4 = isBookFlow || needsDestination;
 
   const flowReady =
     triggerId.length > 0 &&
-    (!needsDestination || !routeNeedsSetup(route)) &&
-    (activeType !== "transfer" || setupContext.transferAllowed);
+    (isBookFlow
+      ? bookingFlowReady(route, bookingFulfilmentMethod, bookingCaptureFields)
+      : (!needsDestination || !routeNeedsSetup(route)) &&
+        (activeType !== "transfer" || setupContext.transferAllowed) &&
+        (!isLinkDeliveryFlow || Boolean(route.linkDelivery)));
 
   const keywordList = parseRouteKeywordList(route.keywords);
 
@@ -326,21 +417,49 @@ export function AddRouteDialog({
 
                 <div>
                   <FlowLine n={3} label="Then" />
-                  <DashboardSelect
-                    className="mt-2"
-                    value={activeType}
-                    aria-label="Then"
-                    options={ACTION_OPTIONS.map((id) => {
-                      const meta = ROUTE_ACTION_TYPE_BY_ID.get(id)!;
-                      return { value: id, label: meta.label };
-                    })}
-                    onValueChange={(value) => applyAction(value as RouteActionType)}
-                  />
+                  {isBookFlow ? (
+                    <DashboardSelect
+                      className="mt-2"
+                      value={bookingFulfilmentMethod}
+                      aria-label="Then"
+                      options={BOOKING_FULFILMENT_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      onValueChange={(value) =>
+                        applyBookingFulfilment(value as BookingFulfilmentMethod)
+                      }
+                    />
+                  ) : isLinkDeliveryFlow ? (
+                    <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-[#0b1220]">
+                      Send a link — Cara says the address, then texts or emails the maps link.
+                    </p>
+                  ) : (
+                    <DashboardSelect
+                      className="mt-2"
+                      value={activeType}
+                      aria-label="Then"
+                      options={flowActionOptions.map((id) => {
+                        const meta = ROUTE_ACTION_TYPE_BY_ID.get(id)!;
+                        return { value: id, label: meta.label };
+                      })}
+                      onValueChange={(value) => applyAction(value as RouteActionType)}
+                    />
+                  )}
                 </div>
 
-                {needsDestination ? (
+                {showStep4 ? (
                   <div>
-                    <FlowLine n={4} label="Choose destination" />
+                    <FlowLine
+                      n={4}
+                      label={
+                        isBookFlow
+                          ? bookingStep4Label(bookingFulfilmentMethod)
+                          : isLinkDeliveryFlow
+                            ? "How to send the link"
+                            : "Choose destination"
+                      }
+                    />
                     <div className="mt-2">
                       <RoutingRouteEditor
                         route={route}
@@ -352,6 +471,15 @@ export function AddRouteDialog({
                         onSave={() => {}}
                         onCancel={() => {}}
                         destinationOnly
+                        bookingFulfilmentMethod={
+                          isBookFlow ? bookingFulfilmentMethod : undefined
+                        }
+                        bookingCaptureFields={
+                          isBookFlow ? bookingCaptureFields : undefined
+                        }
+                        onBookingCaptureFieldsChange={
+                          isBookFlow ? handleBookingCaptureFieldsChange : undefined
+                        }
                       />
                     </div>
                   </div>
@@ -467,7 +595,7 @@ export function AddRouteDialog({
                       </button>
                     ) : (
                       <Link
-                        href="/dashboard/cara-setup/services"
+                        href={DASHBOARD_ROUTES.businessServices}
                         className="shrink-0 text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-[#0b1220] hover:underline"
                       >
                         Add services in Setup

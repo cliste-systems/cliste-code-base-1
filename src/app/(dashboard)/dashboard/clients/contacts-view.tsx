@@ -35,6 +35,7 @@ import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+import { useDashboardVertical } from "../dashboard-vertical-context";
 import { categoryStatusVariant } from "../action-inbox/categories";
 import { normalizeContactEmail } from "../action-inbox/action-inbox-helpers";
 import {
@@ -59,6 +60,7 @@ type ContactsViewProps = {
 };
 
 export function ContactsView({ contacts, metrics: _metrics, className }: ContactsViewProps) {
+  const { copy } = useDashboardVertical();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ContactFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -146,8 +148,8 @@ export function ContactsView({ contacts, metrics: _metrics, className }: Contact
                 {contacts.length === 0 ? (
                   <EmptyState
                     icon={Users}
-                    title="No contacts yet"
-                    description="When Cara answers calls, contacts appear here. Saved clients from bookings show up too."
+                    title={`No ${copy.customerNoun.plural} yet`}
+                    description={copy.contacts.emptyDescription}
                     className="min-h-[12rem]"
                   />
                 ) : filtered.length === 0 ? (
@@ -349,13 +351,15 @@ function ContactDetailPanel({
   tel: string | null;
   sms: string | null;
 }) {
+  const { copy } = useDashboardVertical();
+
   if (!contact) {
     return (
       <DetailPanelShell surface="embedded">
         <EmptyState
           icon={User}
-          title="Select a contact"
-          description="Choose someone from the directory to see how to reach them, their calls, and open follow-ups."
+          title={`Select a ${copy.customerNoun.singular}`}
+          description={copy.contacts.selectDescription}
           className="min-h-0 flex-1"
         />
       </DetailPanelShell>

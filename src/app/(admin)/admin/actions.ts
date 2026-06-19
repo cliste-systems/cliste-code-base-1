@@ -19,7 +19,10 @@ import { geocodeIrelandLocation } from "@/lib/geocode-ireland";
 import {
   type OrganizationNiche,
   isOrganizationNiche,
+  parseOrganizationNiche,
+  PRODUCT_NAME_BY_NICHE,
 } from "@/lib/organization-niche";
+import { sendInviteEmail } from "@/lib/invite-email";
 import {
   buildSecurityEventContext,
   logSecurityEvent,
@@ -348,27 +351,27 @@ export async function createOrganization(payload: {
     const appOrigin = await getAppOriginForRedirect(payload.clientOrigin);
     const inviteRedirectTo = `${appOrigin}/auth/callback`;
 
-    const { data: authData, error: authError } =
-      await admin.auth.admin.inviteUserByEmail(ownerEmail, {
-        redirectTo: inviteRedirectTo,
-        data: {
-          full_name: ownerName,
-          needs_password: true,
-        },
-      });
+    const productName =
+      PRODUCT_NAME_BY_NICHE[parseOrganizationNiche(niche)];
 
-    if (authError || !authData.user?.id) {
+    const inviteResult = await sendInviteEmail({
+      email: ownerEmail,
+      recipientName: ownerName,
+      businessName: name,
+      productName,
+      redirectTo: inviteRedirectTo,
+      admin,
+    });
+
+    if (!inviteResult.ok) {
       await admin.from("organizations").delete().eq("id", organizationId);
       return {
         ok: false,
-        message: formatAuthError(
-          authError?.message ??
-            "Could not send invite. Check Supabase Auth email settings and redirect URLs."
-        ),
+        message: formatAuthError(inviteResult.message),
       };
     }
 
-    userId = authData.user.id;
+    userId = inviteResult.userId;
 
     const { error: profileError } = await admin.from("profiles").insert({
       id: userId,

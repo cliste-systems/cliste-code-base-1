@@ -1,9 +1,9 @@
 # Data Protection Impact Assessment (DPIA)
 
-**Service:** Cliste — AI voice receptionist + booking platform for hair
-& beauty salons.
+**Service:** Cliste — AI voice receptionist and Action Inbox for local
+businesses (hair & beauty salons and similar trades).
 
-**Date:** 2026-06-12 (reviewed; prior baseline 2026-04-18).
+**Date:** 2026-06-16 (reviewed; prior baseline 2026-06-12).
 
 **Owner:** Brendan O'Toole (privacy lead, acting DPO).
 
@@ -49,8 +49,9 @@ filed with the DPC because the residual risk after mitigations is
 3. LiveKit Agents handles in-call speech recognition (global Cloud routing); the worker
    passes text to an LLM (OpenRouter) and returns synthesised audio via
    ElevenLabs.
-4. When the agent confirms a booking, it writes an `appointments` row
-   via the Supabase service role and triggers an SMS / email.
+4. When the agent confirms a booking or creates an Action Inbox item, it
+   writes an `appointments` row and/or `action_tickets` row via the Supabase
+   service role and may trigger an SMS / email.
 5. Post-call, the worker writes a `call_logs` row with raw transcript,
    AI summary, outcome, duration.
 
@@ -71,7 +72,8 @@ be on behalf of minors (parents booking for children).
 
 ### 2.4 Recipients
 
-LiveKit, OpenRouter, ElevenLabs, Twilio, Supabase, SendGrid.
+LiveKit, OpenRouter, ElevenLabs, Twilio, Supabase, SendGrid, Sentry
+(error monitoring — stack traces only, no intentional caller content).
 See `/legal/sub-processors` for transfer mechanisms and EU-region options.
 
 ### 2.5 Retention
@@ -143,5 +145,5 @@ required.
 - [x] Quarterly review of agent prompt + redaction guidance — **eng** (special-category minimisation in `compile-cara-prompt.ts`, `transcript-redaction.ts`)
 - [ ] Annual sub-processor security review — **privacy lead**
 - [ ] Confirm Twilio call recording is OFF on all numbers — **eng**
-- [ ] Add UI for the salon to export caller list (Art 20) — **eng**
+- [x] Art 20 portability UI (org-wide JSON/CSV export) — **eng** (`/dashboard/legal/data-requests`)
 - [ ] Re-run DPIA on > 50 active salons — **privacy lead**

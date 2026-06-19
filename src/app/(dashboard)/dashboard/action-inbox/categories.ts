@@ -4,6 +4,7 @@ import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
  * Universal Action Inbox categories (inferred from ticket summary text).
  */
 export type ActionCategory =
+  | "booking_request"
   | "callback"
   | "urgent"
   | "confirm"
@@ -15,6 +16,7 @@ export type ActionCategory =
   | "follow_up";
 
 export const ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
+  booking_request: "Booking request — callback needed",
   callback: "Callback requested",
   urgent: "Urgent issue",
   confirm: "Needs confirmation",
@@ -28,6 +30,7 @@ export const ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
 
 /** Compact pill label in list rows. */
 export const ACTION_CATEGORY_SHORT: Record<ActionCategory, string> = {
+  booking_request: "Booking",
   callback: "Callback",
   urgent: "Urgent",
   confirm: "Confirm",
@@ -40,6 +43,7 @@ export const ACTION_CATEGORY_SHORT: Record<ActionCategory, string> = {
 };
 
 export const ACTION_CATEGORIES: readonly ActionCategory[] = [
+  "booking_request",
   "callback",
   "urgent",
   "confirm",
@@ -53,16 +57,21 @@ export const ACTION_CATEGORIES: readonly ActionCategory[] = [
 
 export type ActionCategoryFilter = "all" | ActionCategory;
 
-export const ACTION_CATEGORY_FILTER_OPTIONS: {
-  value: ActionCategoryFilter;
-  label: string;
-}[] = [
-  { value: "all", label: "All types" },
-  ...ACTION_CATEGORIES.map((c) => ({
-    value: c as ActionCategoryFilter,
-    label: ACTION_CATEGORY_LABELS[c],
-  })),
-];
+export function actionCategoryFilterOptions(
+  labels: Record<ActionCategory, string>,
+): { value: ActionCategoryFilter; label: string }[] {
+  return [
+    { value: "all", label: "All types" },
+    ...ACTION_CATEGORIES.map((c) => ({
+      value: c as ActionCategoryFilter,
+      label: labels[c],
+    })),
+  ];
+}
+
+export const ACTION_CATEGORY_FILTER_OPTIONS = actionCategoryFilterOptions(
+  ACTION_CATEGORY_LABELS,
+);
 
 /** Status pill colour per inbox category (meaning-only). */
 export function categoryStatusVariant(category: ActionCategory): StatusVariant {
@@ -72,12 +81,13 @@ export function categoryStatusVariant(category: ActionCategory): StatusVariant {
       return "attention";
     case "callback":
       return "info";
-    case "failed":
-      return "muted";
+    case "booking_request":
     case "confirm":
     case "quote":
     case "lead":
       return "info";
+    case "failed":
+      return "muted";
     case "follow_up":
     case "unclear":
     default:
@@ -91,6 +101,13 @@ export function classifyActionCategory(summary: string | null | undefined): Acti
 
   if (/\b(urgent|emergency|asap|immediately|right away|critical)\b/.test(s)) {
     return "urgent";
+  }
+  if (
+    /booking request.*callback|callback.*booking request|booking request — callback needed/i.test(
+      s,
+    )
+  ) {
+    return "booking_request";
   }
   if (/\b(complaint|unhappy|angry|refund|disappointed|upset|terrible|rude)\b/.test(s)) {
     return "complaint";

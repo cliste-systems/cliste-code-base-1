@@ -9,12 +9,10 @@ export function DashboardHomeHeader({
   greeting,
   greetingSubline,
   openActions,
-  caraActive,
 }: {
   greeting: string;
   greetingSubline: string;
   openActions: number;
-  caraActive: boolean;
 }) {
   return (
     <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -25,7 +23,7 @@ export function DashboardHomeHeader({
         <p className="mt-0.5 text-[13px] text-slate-500">{greetingSubline}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <DashboardHeaderRangeControls caraActive={caraActive} />
+        <DashboardHeaderRangeControls />
         <Link
           href={DASHBOARD_ROUTES.actionInbox}
           className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0b1220]"

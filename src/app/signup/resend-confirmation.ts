@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 
+import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import {
   getRateLimitStatus,
   rateLimitFingerprint,
@@ -25,13 +26,15 @@ export async function resendSignupConfirmationEmail(
 
   const h = await headers();
   const fp = rateLimitFingerprint(h, `signup-resend:${email}`);
-  const status = await getRateLimitStatus("authenticate", fp);
-  if (!status.allowed) {
-    return {
-      ok: false,
-      message: `Please wait ${status.retryAfterSeconds}s before requesting another email.`,
-      retryAfterSeconds: status.retryAfterSeconds,
-    };
+  if (!isSignupOnboardingDevRelaxed()) {
+    const status = await getRateLimitStatus("authenticate", fp);
+    if (!status.allowed) {
+      return {
+        ok: false,
+        message: `Please wait ${status.retryAfterSeconds}s before requesting another email.`,
+        retryAfterSeconds: status.retryAfterSeconds,
+      };
+    }
   }
 
   const sent = await sendSignupConfirmationEmail({ email });

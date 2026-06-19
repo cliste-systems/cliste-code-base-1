@@ -23,7 +23,30 @@ import {
   ONBOARDING_STEPS,
   requireOnboardingSession,
 } from "@/lib/onboarding-session";
-import { generateCaraCustomPrompt } from "@/lib/cara-custom-prompt";
+import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
+import { extractServiceExclusions } from "@/lib/extract-service-exclusions";
+import { extractServiceOfferings } from "@/lib/extract-service-offerings";
+import { sanitizeServicesOfferedRaw } from "@/lib/service-offered-raw";
+import { extractServiceCatalogSupplement } from "@/lib/extract-service-supplement";
+import {
+  emptyServiceCatalogSupplement,
+  serializeServiceCatalogSupplement,
+  type ServiceCatalogSupplement,
+} from "@/lib/service-catalog-supplement";
+import {
+  listServicesForOrg,
+  syncServiceNamesToBoundary,
+} from "@/lib/service-catalog";
+import { verticalPackForNiche } from "@/lib/verticals";
+import {
+  databaseUpdateRequiredMessage,
+  isMissingPostgresColumn,
+} from "@/lib/supabase-errors";
+import {
+  lintExtractedKnowledgeLists,
+  type KnowledgeLintIssue,
+} from "@/lib/cara-knowledge-lint";
+import { snapshotFromLists } from "@/lib/cara-knowledge-snapshot";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -45,15 +68,14 @@ async function advanceToNumberStep(organizationId: string): Promise<never> {
   redirect("/onboarding/number");
 }
 
-import {
-  CARA_BASELINE_HANDLE_OPTIONS,
-  HANDLE_OPTION_BY_ID,
-} from "./train-cara-constants";
 import type { CaraHandleOptionId, TrainCaraStepId } from "./train-cara-constants";
+import { ensureSalonBookingRouteInPayload } from "./ensure-salon-booking-route";
 
 export type TrainCaraPayload = BusinessKnowledgePayload & {
   preserveFaqs?: boolean;
+  servicesOfferedRaw?: string;
   servicesNotOffered?: string;
+  servicesNotOfferedRaw?: string;
   detailsToCollect?: string;
   handleOptions: CaraHandleOptionId[];
   routes: SavedRoute[];
@@ -66,22 +88,70 @@ export type TrainCaraPayload = BusinessKnowledgePayload & {
   whatsappContact?: string;
   meetingLink?: string;
   logNote?: string;
+  serviceCatalogSupplement?: ServiceCatalogSupplement | null;
 };
 
 export type TrainCaraSaveResult = { ok: true } | { ok: false; message: string };
 
+function trainCaraKnowledgeSnapshot(
+  payload: TrainCaraPayload,
+  overrides: {
+    servicesOffered?: string;
+    servicesNotOffered?: string;
+  } = {},
+) {
+  return snapshotFromLists({
+    about: payload.rawBusinessDescription,
+    openingHours: payload.openingHours,
+    serviceArea: payload.serviceArea,
+    servicesOffered: overrides.servicesOffered ?? payload.servicesOffered,
+    servicesOfferedRaw: payload.servicesOfferedRaw,
+    servicesNotOffered: overrides.servicesNotOffered ?? payload.servicesNotOffered,
+    servicesNotOfferedRaw: payload.servicesNotOfferedRaw,
+    captureFields: payload.captureFields,
+    detailsToCollect: payload.detailsToCollect,
+    faqs: payload.faqs,
+    routes: payload.routes,
+    transferNumber: payload.transferPhone,
+  });
+}
+
+function firstExtractedKnowledgeBlock(
+  snapshot: ReturnType<typeof trainCaraKnowledgeSnapshot>,
+  extracted: {
+    servicesOffered?: string[];
+    servicesNotOffered?: string[];
+  },
+): KnowledgeLintIssue | null {
+  const blockers = lintExtractedKnowledgeLists({
+    snapshot,
+    ...extracted,
+  });
+  return blockers[0] ?? null;
+}
+
 async function persistTrainCara(
   organizationId: string,
   payload: TrainCaraPayload,
-  options: { strictRoutes?: boolean; finalize?: boolean } = {},
+  options: { strictRoutes?: boolean } = {},
 ): Promise<TrainCaraSaveResult> {
+  const admin = createAdminClient();
+  const { data: orgMeta } = await admin
+    .from("organizations")
+    .select("niche")
+    .eq("id", organizationId)
+    .maybeSingle();
+  const niche = String(orgMeta?.niche ?? "");
+  const pack = verticalPackForNiche(niche);
+  const skipServiceArea = pack.capabilities.skipServiceArea;
+
   const supabase = await createClient();
 
   const knowledgeSaved = await persistBusinessKnowledge(supabase, organizationId, {
     rawBusinessDescription: payload.rawBusinessDescription,
     businessKnowledgeSummary: payload.businessKnowledgeSummary,
     openingHours: payload.openingHours,
-    serviceArea: payload.serviceArea,
+    serviceArea: skipServiceArea ? "" : payload.serviceArea,
     servicesOffered: payload.servicesOffered,
     emergencyCallouts: payload.emergencyCallouts,
     extraNotes: payload.extraNotes,
@@ -90,7 +160,8 @@ async function persistTrainCara(
     faqs: payload.faqs,
     onboardingUiCopy: payload.onboardingUiCopy,
     captureFields: payload.captureFields,
-    businessRules: payload.businessRules,
+    businessRules: [],
+    skipServiceArea,
   });
 
   if (!knowledgeSaved.ok) return knowledgeSaved;
@@ -104,17 +175,26 @@ async function persistTrainCara(
     if (routeError) return { ok: false, message: routeError };
   }
 
-  const admin = createAdminClient();
+  const servicesOfferedRaw = String(payload.servicesOfferedRaw ?? "").trim();
   const servicesNotOffered = String(payload.servicesNotOffered ?? "").trim();
+  const servicesNotOfferedRaw = String(payload.servicesNotOfferedRaw ?? "").trim();
   const detailsToCollect = String(payload.detailsToCollect ?? "").trim();
   const update: Record<string, unknown> = {
     cara_handle_options: payload.handleOptions,
     routing_links: links,
     train_cara_step: payload.trainCaraStep ?? null,
+    agent_services_departments_raw: servicesOfferedRaw || null,
     agent_services_not_offered: servicesNotOffered || null,
+    agent_services_not_offered_raw: servicesNotOfferedRaw || null,
+    agent_business_rules_raw: null,
     agent_details_to_collect: detailsToCollect || null,
     updated_at: new Date().toISOString(),
   };
+  if (payload.serviceCatalogSupplement !== undefined) {
+    update.agent_service_catalog_supplement = serializeServiceCatalogSupplement(
+      payload.serviceCatalogSupplement ?? emptyServiceCatalogSupplement(),
+    );
+  }
   if (payload.emailAddress?.trim()) {
     update.notification_email = payload.emailAddress.trim();
   }
@@ -128,43 +208,19 @@ async function persistTrainCara(
     update.notification_phone = payload.whatsappContact.trim();
   }
 
-  // On the final step, compile Cara's call-handling instructions from everything
-  // captured so the voice worker has a ready prompt before the test call.
-  if (options.finalize) {
-    const { data: orgRow } = await admin
-      .from("organizations")
-      .select("name, agent_business_type")
-      .eq("id", organizationId)
-      .maybeSingle();
-
-    const baseline = new Set<CaraHandleOptionId>(CARA_BASELINE_HANDLE_OPTIONS);
-    const routingActions = payload.handleOptions
-      .filter((id) => !baseline.has(id))
-      .map((id) => HANDLE_OPTION_BY_ID.get(id)?.title)
-      .filter((title): title is string => Boolean(title));
-
-    update.custom_prompt = await generateCaraCustomPrompt({
-      businessName: String(orgRow?.name ?? "").trim(),
-      businessType: String(orgRow?.agent_business_type ?? "").trim(),
-      knowledgeSummary: String(payload.businessKnowledgeSummary ?? "").trim(),
-      openingHours: payload.openingHours,
-      serviceArea: payload.serviceArea,
-      servicesOffered: payload.servicesOffered,
-      servicesNotOffered: payload.servicesNotOffered,
-      detailsToCollect: payload.detailsToCollect,
-      businessRules: payload.businessRules,
-      faqs: payload.faqs?.map((f) => ({
-        question: f.question,
-        answer: f.answer,
-      })),
-      routingActions,
-      transferNumber: transfer,
-    });
-  }
-
   const { error } = await admin.from("organizations").update(update).eq("id", organizationId);
 
-  if (error) return { ok: false, message: error.message };
+  if (error) {
+    if (isMissingPostgresColumn(error, "agent_service_catalog_supplement")) {
+      return {
+        ok: false,
+        message: databaseUpdateRequiredMessage("agent_service_catalog_supplement"),
+      };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  await regenerateCaraCustomPrompt(admin, organizationId);
 
   revalidatePath("/onboarding/knowledge");
   revalidatePath("/dashboard/routing");
@@ -234,20 +290,100 @@ export async function saveTrainCaraProgress(
   return persistTrainCara(session.organizationId, payload, { strictRoutes: false });
 }
 
-export async function skipTrainCaraStep(): Promise<never> {
+export type ExtractOfferingsResult =
+  | { ok: true; formatted: string; raw: string; chips: string[] }
+  | { ok: false; message: string };
+
+export async function extractServiceOfferingsForTrainCara(
+  rawParagraph: string,
+): Promise<ExtractOfferingsResult> {
   const session = await requireOnboardingSession();
   const admin = createAdminClient();
+  const raw = rawParagraph.trim();
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+
+  const pack = verticalPackForNiche(String(org?.niche ?? ""));
+  if (pack.capabilities.usesServiceCatalog) {
+    const catalog = await listServicesForOrg(admin, session.organizationId);
+    if (catalog.length > 0) {
+      const formatted = syncServiceNamesToBoundary(catalog);
+      const chips = catalog
+        .map((service) => service.name.trim())
+        .filter(Boolean);
+      return {
+        ok: true,
+        formatted,
+        raw,
+        chips,
+      };
+    }
+  }
+
+  const result = await extractServiceOfferings(raw);
+  if (!result.ok) return result;
+  return { ok: true, formatted: result.formatted, raw, chips: result.chips };
+}
+
+export type ExtractExclusionsResult =
+  | { ok: true; formatted: string; raw: string; chips: string[] }
+  | { ok: false; message: string };
+
+export async function extractServiceExclusionsForTrainCara(
+  rawParagraph: string,
+): Promise<ExtractExclusionsResult> {
+  const raw = rawParagraph.trim();
+  const result = await extractServiceExclusions(raw);
+  if (!result.ok) return result;
+  return { ok: true, formatted: result.formatted, raw, chips: result.chips };
+}
+
+export async function skipTrainCaraStep(): Promise<TrainCaraSaveResult | never> {
+  const session = await requireOnboardingSession();
+  const admin = createAdminClient();
+
+  const { data: org, error: loadError } = await admin
+    .from("organizations")
+    .select("agent_services_departments, agent_opening_hours, niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+
+  if (loadError) {
+    return { ok: false, message: loadError.message };
+  }
+
+  const niche = String(org?.niche ?? "");
+  const servicesText = String(org?.agent_services_departments ?? "").trim();
+  const pack = verticalPackForNiche(niche);
+  const hasCatalog =
+    pack.capabilities.catalogSatisfiesServicesGate
+      ? (await listServicesForOrg(admin, session.organizationId)).length > 0
+      : false;
+  const services = servicesText || (hasCatalog ? "catalog" : "");
+  const hours = String(org?.agent_opening_hours ?? "").trim();
+  if (!services || !hours) {
+    return {
+      ok: false,
+      message:
+        "Add your services and opening hours before continuing — Cara needs these to answer calls.",
+    };
+  }
 
   const { error } = await admin
     .from("organizations")
     .update({
       train_cara_step: null,
+      train_cara_skipped_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", session.organizationId);
 
   if (error) {
-    throw new Error(error.message);
+    return { ok: false, message: error.message };
   }
 
   revalidatePath("/onboarding", "layout");
@@ -260,13 +396,39 @@ export async function completeTrainCaraStep(
   payload: TrainCaraPayload,
 ): Promise<TrainCaraSaveResult | never> {
   const session = await requireOnboardingSession();
-  // Routes + transfer are configured in Your number and Routing in the dashboard.
-  const saved = await persistTrainCara(session.organizationId, payload, {
+  const admin = createAdminClient();
+  const { data: org } = await admin
+    .from("organizations")
+    .select("niche, agent_business_type")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+
+  const niche = String(org?.niche ?? "");
+  const businessType = String(org?.agent_business_type ?? "").trim();
+  const pack = verticalPackForNiche(niche);
+  let nextPayload = payload;
+
+  if (pack.capabilities.autoEnsureBookingRoute) {
+    const ensured = ensureSalonBookingRouteInPayload({
+      routes: payload.routes,
+      linkUrl: payload.linkUrl,
+      captureFields: payload.captureFields ?? [],
+      handleOptions: payload.handleOptions,
+      niche,
+      businessType,
+    });
+    nextPayload = {
+      ...payload,
+      routes: ensured.routes,
+      handleOptions: ensured.handleOptions,
+    };
+  }
+
+  const saved = await persistTrainCara(session.organizationId, nextPayload, {
     strictRoutes: false,
   });
   if (!saved.ok) return saved;
 
-  const admin = createAdminClient();
   const { error } = await admin
     .from("organizations")
     .update({
@@ -277,6 +439,113 @@ export async function completeTrainCaraStep(
 
   if (error) return { ok: false, message: error.message };
 
+  await regenerateCaraCustomPrompt(admin, session.organizationId);
+
   revalidatePath("/onboarding", "layout");
   return advanceToNumberStep(session.organizationId);
+}
+
+export async function persistTrainCaraServicesStep(
+  payload: TrainCaraPayload & {
+    extractOfferings?: boolean;
+  },
+): Promise<TrainCaraSaveResult & { offerings?: string }> {
+  const session = await requireOnboardingSession();
+  const admin = createAdminClient();
+  let servicesOffered = String(payload.servicesOffered ?? "").trim();
+  let servicesOfferedRaw = String(payload.servicesOfferedRaw ?? "").trim();
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+  const pack = verticalPackForNiche(String(org?.niche ?? ""));
+  const catalog = pack.capabilities.usesServiceCatalog
+    ? await listServicesForOrg(admin, session.organizationId)
+    : [];
+  const catalogNames = catalog.map((item) => item.name);
+
+  if (catalog.length > 0) {
+    servicesOfferedRaw = sanitizeServicesOfferedRaw({
+      raw: servicesOfferedRaw,
+      catalogNames,
+      offeredChips: servicesOffered,
+    });
+  }
+
+  let serviceCatalogSupplement: ServiceCatalogSupplement | null = null;
+  if (catalog.length > 0) {
+    serviceCatalogSupplement = servicesOfferedRaw
+      ? await extractServiceCatalogSupplement(servicesOfferedRaw, catalogNames)
+      : emptyServiceCatalogSupplement();
+  }
+
+  if (payload.extractOfferings !== false) {
+    const extracted = await extractServiceOfferingsForTrainCara(servicesOfferedRaw);
+    if (!extracted.ok) {
+      return { ok: false, message: extracted.message };
+    }
+    servicesOffered = extracted.formatted;
+    const snapshot = trainCaraKnowledgeSnapshot(payload, { servicesOffered });
+    const blocker = firstExtractedKnowledgeBlock(snapshot, {
+      servicesOffered: extracted.chips,
+    });
+    if (blocker) {
+      return { ok: false, message: blocker.message };
+    }
+    const saved = await persistTrainCara(session.organizationId, {
+      ...payload,
+      servicesOffered,
+      servicesOfferedRaw,
+      serviceCatalogSupplement,
+    });
+    if (!saved.ok) return saved;
+    await regenerateCaraCustomPrompt(admin, session.organizationId);
+    return { ok: true, offerings: servicesOffered };
+  }
+
+  const saved = await persistTrainCara(session.organizationId, {
+    ...payload,
+    servicesOffered,
+    servicesOfferedRaw,
+    serviceCatalogSupplement,
+  });
+  if (!saved.ok) return saved;
+  await regenerateCaraCustomPrompt(admin, session.organizationId);
+  return { ok: true, offerings: servicesOffered };
+}
+
+export async function persistTrainCaraExclusionsStep(
+  payload: TrainCaraPayload,
+): Promise<TrainCaraSaveResult & { formatted?: string }> {
+  const session = await requireOnboardingSession();
+  const raw = String(payload.servicesNotOfferedRaw ?? "").trim();
+  let servicesNotOffered = "";
+  let servicesNotOfferedChips: string[] = [];
+
+  if (raw) {
+    const extracted = await extractServiceExclusionsForTrainCara(raw);
+    if (!extracted.ok) {
+      return { ok: false, message: extracted.message };
+    }
+    servicesNotOffered = extracted.formatted;
+    servicesNotOfferedChips = extracted.chips;
+  }
+
+  const snapshot = trainCaraKnowledgeSnapshot(payload, { servicesNotOffered });
+  const blocker = firstExtractedKnowledgeBlock(snapshot, {
+    servicesNotOffered: servicesNotOfferedChips,
+  });
+  if (blocker) {
+    return { ok: false, message: blocker.message };
+  }
+
+  const saved = await persistTrainCara(session.organizationId, {
+    ...payload,
+    servicesNotOffered,
+    servicesNotOfferedRaw: raw,
+  });
+  if (!saved.ok) return saved;
+  return { ok: true, formatted: servicesNotOffered };
 }

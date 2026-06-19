@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { rateLimitFingerprint } from "@/lib/auth-rate-limit";
+import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 
 export type VoiceApiRateLimitScope = "voice_preview" | "greeting_review";
 
@@ -61,6 +62,9 @@ export async function getVoiceApiRateLimitStatus(
   scope: VoiceApiRateLimitScope,
   fingerprint: string,
 ): Promise<VoiceApiRateLimitStatus> {
+  if (isSignupOnboardingDevRelaxed()) {
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
   const cfg = CONFIG[scope];
   const { count, windowStartMs } = await countRequests(scope, fingerprint);
   if (count < cfg.maxRequests) {

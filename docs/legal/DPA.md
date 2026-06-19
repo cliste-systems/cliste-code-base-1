@@ -1,8 +1,12 @@
 # Data Processing Agreement (DPA)
 
-**Cliste Systems** ("Processor") and the customer salon ("Controller") agree
+> **Note:** The authoritative customer-facing DPA is published in the app at
+> `/legal/dpa` (`src/content/legal/dpa-document.tsx`). This file is an internal
+> mirror for ops and may lag slightly — prefer the in-app version for legal text.
+
+**Cliste Systems Limited** ("Processor") and the customer business ("Controller") agree
 the following with respect to processing of personal data carried out by
-Cliste Systems on behalf of the salon under the Cliste platform Terms of
+Cliste Systems Limited on behalf of the customer under the Cliste platform Terms of
 Service.
 
 This DPA forms part of the agreement between the parties and applies to all
@@ -24,11 +28,10 @@ Capitalised terms not defined here have the meaning given in the GDPR
 
 ## 2. Subject matter and duration
 
-Cliste processes Personal Data to provide the Cliste salon platform —
-appointment management, AI voice receptionist, payment processing
-facilitation, SMS / email notifications, and the operator dashboard —
-for the duration of the customer's subscription, plus the retention
-periods set out in `RETENTION.md`.
+Cliste processes Personal Data to provide the Cliste platform — AI voice
+receptionist, Action Inbox, optional appointments, SMS / email notifications,
+and the operator dashboard — for the duration of the customer's subscription,
+plus the retention periods set out in `RETENTION.md`.
 
 ## 3. Nature, purpose and categories
 

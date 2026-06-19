@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
-import type { VerticalId } from "@/lib/verticals";
+import type { CaraGoal } from "@/lib/cara-goal";
+import { VERTICAL_PACKS, type VerticalId } from "@/lib/verticals";
 
 import { ProfileForm } from "./profile-form";
 
@@ -13,21 +14,20 @@ type Props = {
   defaultFirstName: string;
   defaultLastName: string;
   defaultVertical: VerticalId | "";
+  defaultCaraGoal: CaraGoal | "";
   defaultAddress: string;
   defaultEircode: string;
 };
 
 function profileStepHeader(vertical: VerticalId | "") {
-  if (vertical === "salon_beauty") {
-    return {
-      title: "Tell us about your salon",
-      description: "A few details so Cara can answer calls the way you would.",
-    };
-  }
+  const pack =
+    vertical && vertical in VERTICAL_PACKS
+      ? VERTICAL_PACKS[vertical]
+      : VERTICAL_PACKS.generic;
 
   return {
-    title: "Tell us about your business",
-    description: "A few details so Cara can answer calls the way you would.",
+    title: pack.onboarding.profileHeaderTitle,
+    description: pack.onboarding.profileHeaderSubtitle,
   };
 }
 
@@ -35,6 +35,7 @@ export function ProfileOnboardingView(props: Props) {
   const [vertical, setVertical] = useState<VerticalId | "">(
     props.defaultVertical,
   );
+  const [caraGoal, setCaraGoal] = useState<CaraGoal | "">(props.defaultCaraGoal);
   const header = profileStepHeader(vertical);
 
   return (
@@ -52,6 +53,8 @@ export function ProfileOnboardingView(props: Props) {
         defaultEircode={props.defaultEircode}
         vertical={vertical}
         onVerticalChange={setVertical}
+        caraGoal={caraGoal}
+        onCaraGoalChange={setCaraGoal}
       />
     </OnboardingStepShell>
   );

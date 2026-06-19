@@ -9,7 +9,7 @@ export function DashboardLegalDocumentPage({
   children: ReactNode;
 }) {
   return (
-    <DashboardAnimatedStack>
+    <DashboardAnimatedStack embedded>
       <section className="px-5 py-6 sm:px-6 sm:py-7">
         <LegalDocumentBody>{children}</LegalDocumentBody>
       </section>

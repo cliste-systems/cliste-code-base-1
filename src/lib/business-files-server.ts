@@ -14,11 +14,72 @@ import {
   type BusinessFileKind,
   type BusinessFileListItem,
 } from "@/lib/business-files";
+import { shouldDefaultAnswerEnabledOff } from "@/lib/knowledge-precedence";
+import {
+  BUSINESS_FILE_SELECT,
+  BUSINESS_FILE_SELECT_LEGACY,
+  businessFileSelectColumns,
+  isMissingBusinessFileMetadataColumnError,
+  markBusinessFileMetadataColumnsAvailable,
+  markBusinessFileMetadataColumnsUnavailable,
+  businessFileMetadataColumnsAvailable,
+} from "@/lib/business-files-select";
+import {
+  databaseUpdateRequiredMessage,
+  isMissingPostgresColumn,
+} from "@/lib/supabase-errors";
 import { createAdminClient } from "@/utils/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const BUSINESS_FILE_SELECT =
-  "id, organization_id, file_name, file_type, mime_type, storage_path, size_bytes, answer_enabled, send_enabled, document_kind, processing_status, extracted_text, created_at, updated_at";
+export {
+  BUSINESS_FILE_SELECT,
+  BUSINESS_FILE_SELECT_LEGACY,
+  businessFileSelectColumns,
+} from "@/lib/business-files-select";
+
+async function selectBusinessFilesForOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+  options?: { sendEnabledOnly?: boolean; orderByName?: boolean },
+) {
+  const runQuery = (select: string) => {
+    let query = supabase
+      .from("business_files")
+      .select(select)
+      .eq("organization_id", organizationId);
+
+    if (options?.sendEnabledOnly) {
+      query = query.eq("send_enabled", true);
+    }
+
+    if (options?.orderByName) {
+      query = query.order("file_name", { ascending: true });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
+
+    return query;
+  };
+
+  if (businessFileMetadataColumnsAvailable() === false) {
+    return runQuery(BUSINESS_FILE_SELECT_LEGACY);
+  }
+
+  const result = await runQuery(BUSINESS_FILE_SELECT);
+  if (
+    result.error &&
+    isMissingBusinessFileMetadataColumnError(result.error.message)
+  ) {
+    markBusinessFileMetadataColumnsUnavailable();
+    return runQuery(BUSINESS_FILE_SELECT_LEGACY);
+  }
+
+  if (!result.error) {
+    markBusinessFileMetadataColumnsAvailable();
+  }
+
+  return result;
+}
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^\w.\-()+\s]/g, "_").slice(0, 180) || "document";
@@ -28,16 +89,37 @@ export async function listBusinessFilesForOrg(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<BusinessFileListItem[]> {
-  const { data, error } = await supabase
-    .from("business_files")
-    .select(BUSINESS_FILE_SELECT)
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false });
+  const { data, error } = await selectBusinessFilesForOrg(
+    supabase,
+    organizationId,
+  );
 
   if (error || !data) return [];
-  return data.map((row) =>
+  return (data as unknown[]).map((row) =>
     toBusinessFileListItem(
-      mapBusinessFileRow(row as Parameters<typeof mapBusinessFileRow>[0]),
+      mapBusinessFileRow(
+        row as unknown as Parameters<typeof mapBusinessFileRow>[0],
+      ),
+    ),
+  );
+}
+
+export async function listSendableBusinessFilesForOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<BusinessFileListItem[]> {
+  const { data, error } = await selectBusinessFilesForOrg(
+    supabase,
+    organizationId,
+    { sendEnabledOnly: true, orderByName: true },
+  );
+
+  if (error || !data) return [];
+  return (data as unknown[]).map((row) =>
+    toBusinessFileListItem(
+      mapBusinessFileRow(
+        row as unknown as Parameters<typeof mapBusinessFileRow>[0],
+      ),
     ),
   );
 }
@@ -46,8 +128,10 @@ export async function uploadBusinessFileForOrg(input: {
   organizationId: string;
   file: File;
   documentKind?: BusinessFileKind | null;
+  hasServiceCatalog?: boolean;
+  hasFaqs?: boolean;
 }): Promise<
-  { ok: true; file: BusinessFileListItem } | { ok: false; message: string }
+  { ok: true; file: BusinessFileListItem; overlapSendOnlyDefault?: boolean } | { ok: false; message: string }
 > {
   const { organizationId, file } = input;
   const documentKind =
@@ -60,6 +144,9 @@ export async function uploadBusinessFileForOrg(input: {
   }
   if (file.size > MAX_BUSINESS_FILE_BYTES) {
     return { ok: false, message: "File is too large (max 10 MB)." };
+  }
+  if (!documentKind) {
+    return { ok: false, message: "Choose a document type before uploading." };
   }
 
   const mimeType = (file.type || "application/octet-stream").toLowerCase();
@@ -79,14 +166,22 @@ export async function uploadBusinessFileForOrg(input: {
   const safeName = sanitizeFileName(file.name);
   const storagePath = `${organizationId}/${fileId}/${safeName}`;
   const fileType = inferFileType(file.name, mimeType);
-  const { text: extractedText, processingStatus } = extractBusinessFileText(
+  const { text: extractedText, processingStatus } = await extractBusinessFileText(
     buffer,
     file.name,
     mimeType,
   );
 
-  const answerEnabled =
+  const couldAnswer =
     processingStatus === "ready" && Boolean(extractedText?.trim());
+  const overlapSendOnlyDefault = shouldDefaultAnswerEnabledOff({
+    documentKind,
+    hasServiceCatalog: input.hasServiceCatalog === true,
+    hasFaqs: input.hasFaqs === true,
+    processingStatus,
+    hasExtractedText: Boolean(extractedText?.trim()),
+  });
+  const answerEnabled = couldAnswer && !overlapSendOnlyDefault;
 
   const admin = createAdminClient();
   const { error: uploadError } = await admin.storage
@@ -100,24 +195,39 @@ export async function uploadBusinessFileForOrg(input: {
     return { ok: false, message: uploadError.message };
   }
 
-  const { data: row, error: insertError } = await admin
+  const insertPayload = {
+    id: fileId,
+    organization_id: organizationId,
+    file_name: file.name,
+    file_type: fileType,
+    mime_type: mimeType,
+    storage_path: storagePath,
+    size_bytes: file.size,
+    answer_enabled: answerEnabled,
+    send_enabled: false,
+    document_kind: documentKind,
+    processing_status: processingStatus,
+    extracted_text: extractedText,
+  };
+
+  let { data: row, error: insertError } = await admin
     .from("business_files")
-    .insert({
-      id: fileId,
-      organization_id: organizationId,
-      file_name: file.name,
-      file_type: fileType,
-      mime_type: mimeType,
-      storage_path: storagePath,
-      size_bytes: file.size,
-      answer_enabled: answerEnabled,
-      send_enabled: false,
-      document_kind: documentKind,
-      processing_status: processingStatus,
-      extracted_text: extractedText,
-    })
-    .select(BUSINESS_FILE_SELECT)
+    .insert(insertPayload)
+    .select(businessFileSelectColumns())
     .single();
+
+  if (
+    insertError &&
+    isMissingBusinessFileMetadataColumnError(insertError.message) &&
+    businessFileMetadataColumnsAvailable() !== false
+  ) {
+    markBusinessFileMetadataColumnsUnavailable();
+    ({ data: row, error: insertError } = await admin
+      .from("business_files")
+      .insert(insertPayload)
+      .select(BUSINESS_FILE_SELECT_LEGACY)
+      .single());
+  }
 
   if (insertError || !row) {
     await admin.storage.from(BUSINESS_FILES_BUCKET).remove([storagePath]);
@@ -127,8 +237,11 @@ export async function uploadBusinessFileForOrg(input: {
   return {
     ok: true,
     file: toBusinessFileListItem(
-      mapBusinessFileRow(row as Parameters<typeof mapBusinessFileRow>[0]),
+      mapBusinessFileRow(
+        row as unknown as Parameters<typeof mapBusinessFileRow>[0],
+      ),
     ),
+    overlapSendOnlyDefault: overlapSendOnlyDefault || undefined,
   };
 }
 
@@ -174,7 +287,7 @@ export async function updateBusinessFileTogglesForOrg(
         return {
           ok: false,
           message:
-            "This file is not ready for answering yet. TXT and CSV are supported for now; PDF and spreadsheets need processing.",
+            "Cara couldn't read text from this file. Try a text-based PDF, CSV, or TXT.",
         };
       }
     }
@@ -194,6 +307,100 @@ export async function updateBusinessFileTogglesForOrg(
   if (error) return { ok: false, message: error.message };
 
   return { ok: true };
+}
+
+const MAX_FILE_TITLE_CHARS = 120;
+const MAX_FILE_DESCRIPTION_CHARS = 500;
+const MAX_FILE_WHEN_TO_USE_CHARS = 300;
+
+export async function updateBusinessFileMetadataForOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+  fileId: string,
+  patch: {
+    title?: string;
+    documentKind?: BusinessFileKind;
+    caraDescription?: string;
+    whenToUse?: string;
+  },
+): Promise<{ ok: true; file: BusinessFileListItem } | { ok: false; message: string }> {
+  const title = patch.title?.trim() ?? "";
+  const caraDescription = patch.caraDescription?.trim() ?? "";
+  const whenToUse = patch.whenToUse?.trim() ?? "";
+  const documentKind =
+    patch.documentKind && isBusinessFileKind(patch.documentKind)
+      ? patch.documentKind
+      : null;
+
+  if (!documentKind) {
+    return { ok: false, message: "Choose what type of document this is." };
+  }
+  if (!title) {
+    return { ok: false, message: "Add a title for this file." };
+  }
+  if (title.length > MAX_FILE_TITLE_CHARS) {
+    return {
+      ok: false,
+      message: `Title must be at most ${MAX_FILE_TITLE_CHARS} characters.`,
+    };
+  }
+  if (caraDescription.length > MAX_FILE_DESCRIPTION_CHARS) {
+    return {
+      ok: false,
+      message: `Description must be at most ${MAX_FILE_DESCRIPTION_CHARS} characters.`,
+    };
+  }
+  if (whenToUse.length > MAX_FILE_WHEN_TO_USE_CHARS) {
+    return {
+      ok: false,
+      message: `When to use must be at most ${MAX_FILE_WHEN_TO_USE_CHARS} characters.`,
+    };
+  }
+
+  if (businessFileMetadataColumnsAvailable() === false) {
+    return {
+      ok: false,
+      message: databaseUpdateRequiredMessage("business_files.title"),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("business_files")
+    .update({
+      title,
+      document_kind: documentKind,
+      cara_description: caraDescription || null,
+      when_to_use: whenToUse || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", fileId)
+    .eq("organization_id", organizationId)
+    .select(BUSINESS_FILE_SELECT)
+    .maybeSingle();
+
+  if (error) {
+    if (
+      isMissingPostgresColumn(error, "title") ||
+      isMissingBusinessFileMetadataColumnError(error.message)
+    ) {
+      markBusinessFileMetadataColumnsUnavailable();
+      return {
+        ok: false,
+        message: databaseUpdateRequiredMessage("business_files.title"),
+      };
+    }
+    return { ok: false, message: error.message };
+  }
+  if (!data) return { ok: false, message: "File not found." };
+
+  return {
+    ok: true,
+    file: toBusinessFileListItem(
+      mapBusinessFileRow(
+        data as unknown as Parameters<typeof mapBusinessFileRow>[0],
+      ),
+    ),
+  };
 }
 
 export async function deleteBusinessFileForOrg(

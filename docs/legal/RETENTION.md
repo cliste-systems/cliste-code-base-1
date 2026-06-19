@@ -17,6 +17,7 @@ Last reviewed: 2026-06-12.
 | `call_logs.ai_summary`, `caller_number`     | 13 months            | Same cron, longer cutoff                                                                   |
 | `call_logs` row itself                      | Indefinite (org-only) | Kept for ops reporting; contains only org id + duration + outcome after 13 months          |
 | `action_tickets`                            | Tied to parent call   | Erasable via `/dashboard/legal/data-requests`                                                          |
+| `blocked_callers`                           | Until owner unblocks  | Owner-managed blocklist; deleted on Art 17 erasure for that phone number                                |
 | Voice audio (LiveKit / SIP)                 | Not stored at rest   | LiveKit egress recording disabled; Twilio recording disabled                                |
 | `public_booking_otp_challenges` (legacy)    | 30 minutes           | Cron deletes stale rows only — public booking retired; no new writes                        |
 | `public_booking_rate_events` (legacy)       | 14 days              | Same — purge only                                                                          |

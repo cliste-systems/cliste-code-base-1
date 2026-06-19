@@ -10,6 +10,11 @@ export const PUBLIC_LEGAL_PAGES = [
 /** In-dashboard legal hub (authenticated business owners). */
 export const DASHBOARD_LEGAL_PAGES = [
   {
+    href: "/dashboard/legal/caller-notice",
+    label: "Caller notice",
+    description: "Copy-paste privacy wording for your customers",
+  },
+  {
     href: "/dashboard/legal/data-requests",
     label: "Data requests",
     description: "Export or erase customer data",

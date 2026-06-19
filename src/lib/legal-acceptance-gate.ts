@@ -3,6 +3,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { isDashboardAccessGatePath } from "@/lib/dashboard-access-gate";
 import {
   DASHBOARD_LEGAL_ACCEPT_PATH,
   getMissingLegalAcceptances,
@@ -12,25 +13,33 @@ import {
 import type { DashboardSession } from "@/lib/dashboard-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-async function missingLegalAcceptancesForUser(params: {
-  userId: string;
-  organizationId: string;
-}): Promise<boolean> {
+export async function dashboardUserNeedsLegalAcceptance(
+  session: DashboardSession,
+): Promise<boolean> {
+  if (session.isLocalPreview) {
+    return false;
+  }
+
   const admin = createAdminClient();
   const { data: org } = await admin
     .from("organizations")
     .select("status, platform_subscription_id, onboarding_step")
-    .eq("id", params.organizationId)
+    .eq("id", session.organizationId)
     .maybeSingle();
 
   const needsDpa = orgNeedsDpaAcceptance(org ?? {});
   const missing = await getMissingLegalAcceptances(admin, {
-    userId: params.userId,
-    organizationId: params.organizationId,
+    userId: session.user.id,
+    organizationId: session.organizationId,
     needsDpa,
   });
 
   return missing.length > 0;
+}
+
+export async function dashboardPathnameFromHeaders(): Promise<string> {
+  const h = await headers();
+  return h.get("x-pathname") ?? h.get("x-middleware-request-x-pathname") ?? "";
 }
 
 /**
@@ -40,14 +49,14 @@ async function missingLegalAcceptancesForUser(params: {
 export async function enforceDashboardLegalAcceptance(
   session: DashboardSession,
 ): Promise<void> {
-  const h = await headers();
-  const pathname =
-    h.get("x-pathname") ??
-    h.get("x-middleware-request-x-pathname") ??
-    "";
+  if (session.isLocalPreview) {
+    return;
+  }
 
-  // Next.js 16 does not always forward custom middleware headers to layouts.
-  // Middleware enforces the gate on /dashboard/*; skip here to avoid redirect loops.
+  const pathname = await dashboardPathnameFromHeaders();
+
+  // Middleware enforces the gate on /dashboard/*; skip here to avoid redirect loops
+  // when the pathname header is unavailable in this render.
   if (!pathname) {
     return;
   }
@@ -56,12 +65,24 @@ export async function enforceDashboardLegalAcceptance(
     return;
   }
 
-  const needsAcceptance = await missingLegalAcceptancesForUser({
-    userId: session.user.id,
-    organizationId: session.organizationId,
-  });
+  const needsAcceptance = await dashboardUserNeedsLegalAcceptance(session);
 
   if (needsAcceptance) {
     redirect(DASHBOARD_LEGAL_ACCEPT_PATH);
   }
+}
+
+export async function dashboardShouldUseGateShell(
+  session: DashboardSession,
+  pathname: string,
+): Promise<boolean> {
+  if (session.isLocalPreview || !pathname) {
+    return false;
+  }
+
+  if (!isDashboardAccessGatePath(pathname)) {
+    return false;
+  }
+
+  return dashboardUserNeedsLegalAcceptance(session);
 }

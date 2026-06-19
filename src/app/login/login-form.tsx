@@ -12,7 +12,6 @@ import {
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
 import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
 import {
-  ONBOARDING_FIELD_HINT,
   ONBOARDING_FIELD_INPUT,
 } from "@/components/onboarding/onboarding-ui";
 import { AuthFormAlert } from "@/components/auth/auth-form-alert";
@@ -115,7 +114,6 @@ export function LoginForm() {
           htmlFor="login-password"
           error={fieldErrors.password ?? fieldErrors.captcha}
         >
-          <p className={ONBOARDING_FIELD_HINT}>Use the password from your invite</p>
           <div className="relative">
             <input
               id="login-password"

@@ -2,28 +2,29 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { FileText, HelpCircle, Plus } from "lucide-react";
+import { HelpCircle, Plus } from "lucide-react";
 
+import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { DASHBOARD_INPUT_CLASS } from "@/components/dashboard/dashboard-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { buildAnswersConflictWarnings } from "@/lib/answers-boundary";
-import { buildCaraCapabilitiesFromPromptExtras } from "@/lib/call-handling-boundary";
+import { lintFaqVsFilePriceConflicts } from "@/lib/answers-boundary";
+import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
+import { cleanBusinessRules } from "@/lib/agent-business-rules";
+import { weekScheduleHasOpenDay } from "@/lib/business-hours";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
-import {
-  deleteBusinessFile,
-  updateBusinessFileToggles,
-  uploadBusinessFile,
-} from "../agent-setup/business-files-actions";
-import { BusinessFilesSection } from "../agent-setup/business-files-section";
 import { MAX_FAQS } from "../agent-setup/agent-faqs";
 import { AddQuestionDialog } from "./add-question-dialog";
 import { AnswersFaqEditor } from "./answers-faq-editor";
+import { FaqsLintNotices } from "./faqs-lint-notices";
 import { useCaraSetupForm } from "./cara-setup-form-context";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 
 export function CaraSetupTabAnswers() {
   const form = useCaraSetupForm();
+  const { copy } = useDashboardVertical();
   const [faqFilter, setFaqFilter] = useState("");
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
 
@@ -41,18 +42,28 @@ export function CaraSetupTabAnswers() {
 
   const answersConflictWarnings = useMemo(
     () =>
-      buildAnswersConflictWarnings({
-        faqs: form.faqs,
-        businessFiles: form.businessFiles,
-      }),
+      lintFaqVsFilePriceConflicts(form.faqs, form.businessFiles),
     [form.faqs, form.businessFiles],
   );
 
-  const caps = buildCaraCapabilitiesFromPromptExtras(
-    form.promptExtras.routes,
-    form.promptExtras.transferNumber,
-  );
-  const sendConfigured = caps.sendLink || caps.sendFile;
+  const faqLintContext = useMemo(() => {
+    const hasHours = weekScheduleHasOpenDay(form.openingHoursSchedule);
+    return {
+      openingHours: form.open24_7
+        ? "Open 24 hours, 7 days a week"
+        : hasHours
+          ? formatWeekScheduleForAgent(form.openingHoursSchedule)
+          : undefined,
+      businessRules: cleanBusinessRules(form.businessRulesItems),
+      serviceCatalog:
+        form.serviceCatalog.length > 0 ? form.serviceCatalog : undefined,
+    };
+  }, [
+    form.openingHoursSchedule,
+    form.open24_7,
+    form.businessRulesItems,
+    form.serviceCatalog,
+  ]);
 
   function updateFaq(index: number, patch: Partial<(typeof form.faqs)[number]>) {
     form.setFaqs(
@@ -75,14 +86,13 @@ export function CaraSetupTabAnswers() {
   }
 
   const atFaqCap = form.faqs.length >= MAX_FAQS;
+  const hasServiceCatalog = form.serviceCatalog.length > 0;
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col divide-y divide-slate-100"
-      data-cara-setup-answers
-    >
+    <DashboardAnimatedStack embedded>
+      <FaqsLintNotices />
       {answersConflictWarnings.length > 0 ? (
-        <div className="shrink-0 space-y-2 border-b border-amber-200/80 bg-amber-50/60 px-5 py-4">
+        <div className="space-y-2 border-b border-amber-200/80 bg-amber-50/60 px-5 py-4">
           {answersConflictWarnings.map((warning) => (
             <p
               key={warning.id}
@@ -97,6 +107,17 @@ export function CaraSetupTabAnswers() {
                   Review
                 </Link>
               ) : null}
+              {warning.secondaryHref ? (
+                <>
+                  {" "}
+                  <Link
+                    href={warning.secondaryHref}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    Review file
+                  </Link>
+                </>
+              ) : null}
             </p>
           ))}
         </div>
@@ -105,10 +126,8 @@ export function CaraSetupTabAnswers() {
       <SectionCard
         flat
         icon={HelpCircle}
-        title="Common questions"
+        title={copy.caraSetup.commonQuestionsTitle}
         description="Questions callers ask most, with the answer Cara should give out loud."
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        bodyClassName="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden !space-y-0"
         action={
           <Button
             type="button"
@@ -119,7 +138,9 @@ export function CaraSetupTabAnswers() {
             className="h-9 rounded-lg border-slate-300 bg-white text-[12px] text-slate-700"
             title={
               atFaqCap
-                ? "Question limit reached — for bigger knowledge (price lists, menus), upload a file below instead."
+                ? hasServiceCatalog
+                  ? "Question limit reached — add more services in your Services menu."
+                  : "Question limit reached — for bigger knowledge (price lists, menus), use Files instead."
                 : undefined
             }
           >
@@ -130,8 +151,29 @@ export function CaraSetupTabAnswers() {
       >
         {atFaqCap ? (
           <p className="mb-3 text-[12.5px] text-amber-900">
-            Question limit reached — for bigger knowledge (price lists, menus),
-            upload a file below instead.
+            {hasServiceCatalog ? (
+              <>
+                Question limit reached — add more services or prices in your{" "}
+                <Link
+                  href={DASHBOARD_ROUTES.businessServices}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Services menu
+                </Link>
+                .
+              </>
+            ) : (
+              <>
+                Question limit reached — for bigger knowledge (price lists, menus),{" "}
+                <Link
+                  href={DASHBOARD_ROUTES.businessFiles}
+                  className="font-medium underline underline-offset-2"
+                >
+                  upload a file on Files
+                </Link>{" "}
+                instead.
+              </>
+            )}
           </p>
         ) : null}
 
@@ -167,37 +209,18 @@ export function CaraSetupTabAnswers() {
             </Button>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <AnswersFaqEditor
-              faqs={form.faqs}
-              maxFaqs={MAX_FAQS}
-              entries={filteredFaqs}
-              total={form.faqs.length}
-              routes={form.promptExtras.routes}
-              transferNumber={form.promptExtras.transferNumber}
-              onUpdate={updateFaq}
-              onRemove={removeFaq}
-            />
-          </div>
+          <AnswersFaqEditor
+            faqs={form.faqs}
+            maxFaqs={MAX_FAQS}
+            entries={filteredFaqs}
+            total={form.faqs.length}
+            routes={form.promptExtras.routes}
+            transferNumber={form.promptExtras.transferNumber}
+            {...faqLintContext}
+            onUpdate={updateFaq}
+            onRemove={removeFaq}
+          />
         )}
-      </SectionCard>
-
-      <SectionCard
-        flat
-        icon={FileText}
-        title="Files"
-        description="Upload documents Cara can read from or send to callers."
-        className="shrink-0"
-        bodyClassName="!pb-4"
-      >
-        <BusinessFilesSection
-          initialFiles={form.businessFiles}
-          sendConfigured={sendConfigured}
-          onFilesChange={form.setBusinessFiles}
-          onUpload={uploadBusinessFile}
-          onToggle={updateBusinessFileToggles}
-          onDelete={deleteBusinessFile}
-        />
       </SectionCard>
 
       <AddQuestionDialog
@@ -206,8 +229,9 @@ export function CaraSetupTabAnswers() {
         existingFaqs={form.faqs}
         routes={form.promptExtras.routes}
         transferNumber={form.promptExtras.transferNumber}
+        {...faqLintContext}
         onAdd={addFaq}
       />
-    </div>
+    </DashboardAnimatedStack>
   );
 }

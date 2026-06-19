@@ -5,6 +5,7 @@ import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-
 import {
   DASHBOARD_ICON_CHIP_LG,
   DASHBOARD_ICON_GLYPH_LG,
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
 import { normalizeContactEmail } from "../action-inbox/action-inbox-helpers";
@@ -16,6 +17,10 @@ import {
   CONTACTS_TICKET_LIMIT,
 } from "@/lib/dashboard-list-limits";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
+
+import type { ActionCategory } from "../action-inbox/categories";
 
 import {
   buildFollowUp,
@@ -112,6 +117,7 @@ function buildContactsFromCalls(
   calls: CallRow[],
   ticketsByKey: Map<string, TicketRow[]>,
   clientsByKey: Map<string, ClientRow>,
+  categoryLabels: Record<ActionCategory, string>,
 ): ContactListItem[] {
   const byKey = new Map<string, ContactListItem>();
 
@@ -168,7 +174,7 @@ function buildContactsFromCalls(
         lastOutcomeLabel: entry.outcomeLabel,
         openFollowUps: openTickets.length,
         calls: [entry],
-        openActions: openTickets.map(buildFollowUp),
+        openActions: openTickets.map((row) => buildFollowUp(row, categoryLabels)),
       });
     }
   }
@@ -197,7 +203,7 @@ function buildContactsFromCalls(
       lastOutcomeLabel: null,
       openFollowUps: openTickets.length,
       calls: [],
-      openActions: openTickets.map(buildFollowUp),
+      openActions: openTickets.map((row) => buildFollowUp(row, categoryLabels)),
     });
   }
 
@@ -206,7 +212,7 @@ function buildContactsFromCalls(
     const tickets = ticketsByKey.get(contact.id) ?? [];
     const openTickets = tickets.filter((t) => t.status !== "resolved");
     contact.openFollowUps = openTickets.length;
-    contact.openActions = openTickets.map(buildFollowUp);
+    contact.openActions = openTickets.map((row) => buildFollowUp(row, categoryLabels));
     for (const t of tickets) {
       contact.displayName = mergeCallerName(contact.displayName, t.caller_name);
     }
@@ -230,8 +236,9 @@ function buildContactsFromCalls(
 export default async function ContactsPage() {
   const { supabase, organizationId } = await requireDashboardSession();
 
-  const [{ data: callData, error: callError }, { data: ticketData }, { data: clientData }] =
+  const [orgRow, { data: callData, error: callError }, { data: ticketData }, { data: clientData }] =
     await Promise.all([
+      getCachedDashboardOrganizationRow(),
       supabase
         .from("call_logs")
         .select(
@@ -255,11 +262,16 @@ export default async function ContactsPage() {
 
   const ticketsByKey = buildTicketsByKey((ticketData ?? []) as TicketRow[]);
   const clientsByKey = buildClientsByKey((clientData ?? []) as ClientRow[]);
+  const categoryLabels = dashboardVerticalCopy(
+    orgRow?.niche,
+    orgRow?.agent_business_type,
+  ).actionInbox.categoryLabels;
   const contacts = !callError
     ? buildContactsFromCalls(
         (callData ?? []) as CallRow[],
         ticketsByKey,
         clientsByKey,
+        categoryLabels,
       )
     : [];
 
@@ -267,6 +279,7 @@ export default async function ContactsPage() {
 
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <DashboardAnimatedPageSections>
       <header className="shrink-0">
         <div className="flex items-start gap-3">
@@ -306,6 +319,7 @@ export default async function ContactsPage() {
         <ContactsView className="min-h-0 flex-1" contacts={contacts} metrics={metrics} />
       )}
       </DashboardAnimatedPageSections>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   normalizeCallOutcome,
   type CallOutcome,
 } from "@/lib/call-history-types";
+import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 export type CallFollowUp = {
   id: string;
   summary: string;
@@ -36,13 +37,38 @@ export function callDisplayName(
   return resolveCallerDisplayName([item.callerName], item.callerDisplay);
 }
 
-export function summaryForDisplay(item: CallHistoryListItem): string | null {
+export function summaryForDisplay(
+  item: CallHistoryListItem,
+  options?: { businessName?: string },
+): string | null {
+  if (item.outcome === "blocked") {
+    if (item.aiSummary?.trim()) return item.aiSummary.trim();
+    return blockedCallDashboardSummary(options?.businessName ?? "");
+  }
   if (item.aiSummary?.trim()) return item.aiSummary.trim();
   const review = item.transcriptReview?.trim();
   if (review) return truncatePreview(review, 160);
   const verbatim = item.transcriptVerbatim.trim();
   if (verbatim && verbatim !== "No transcript on file.") {
     return truncatePreview(verbatim, 160);
+  }
+  return null;
+}
+
+/** Summary for call detail — includes blocklist fallback when webhook logged a bare answered row. */
+export function callSummaryForDisplay(
+  item: CallHistoryListItem,
+  options: { businessName?: string; callerIsBlocked?: boolean },
+): string | null {
+  const summary = summaryForDisplay(item, options);
+  if (summary) return summary;
+  if (
+    options.callerIsBlocked &&
+    item.durationSeconds <= 2 &&
+    !item.transcriptReview?.trim() &&
+    !fullTranscriptForDisplay(item)
+  ) {
+    return blockedCallDashboardSummary(options.businessName ?? "");
   }
   return null;
 }
@@ -94,6 +120,8 @@ export function whatHappenedNextLabel(
       return "Handled";
     case "spam_or_abuse":
       return "Handled";
+    case "blocked":
+      return "Blocked";
     default:
       return "Handled";
   }
@@ -110,6 +138,7 @@ export function outcomeBadgeVariant(outcome: CallOutcome): StatusVariant {
       return "info";
     case "failed":
     case "spam_or_abuse":
+    case "blocked":
       return "attention";
     case "voicemail_or_no_speech":
     default:
@@ -145,6 +174,7 @@ export const OUTCOME_FILTER_OPTIONS: { value: OutcomeFilterValue; label: string 
   { value: "failed", label: "Failed" },
   { value: "voicemail_or_no_speech", label: "No speech" },
   { value: "spam_or_abuse", label: "Spam or abuse" },
+  { value: "blocked", label: "Blocked" },
   { value: "needs_attention", label: "Needs attention" },
 ];
 

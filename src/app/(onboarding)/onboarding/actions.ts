@@ -13,11 +13,21 @@ import {
   resolveCheckoutReturnOrigin,
 } from "@/lib/platform-billing-checkout";
 import {
+  assertElementsSubscriptionReady,
+  assertPlatformSubscriptionOwnership,
+  assertSetupIntentMatchesSubscription,
+  assertSetupIntentSucceeded,
+  createPlatformElementsCheckout,
+  persistPlatformElementsSubscription,
+} from "@/lib/platform-billing-elements";
+import { resolveAccountIdForOrganization } from "@/lib/account-access";
+import {
   isPlanTier,
   PLANS,
   planSupportsSelfServeCheckout,
   type PlanTier,
 } from "@/lib/cliste-plans";
+import { getStripeClient } from "@/lib/stripe";
 
 /** Stripe plan checkout — off until billing is ready. Set `CLISTE_PLAN_CHECKOUT_ENABLED=true` to enable. */
 const PLAN_CHECKOUT_ENABLED =
@@ -25,6 +35,8 @@ const PLAN_CHECKOUT_ENABLED =
 const PLAN_CHECKOUT_DEV_SKIP_ALLOWED =
   process.env.NODE_ENV !== "production" && !PLAN_CHECKOUT_ENABLED;
 import { cleanAgentFaqs } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
+import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
+import { verticalPackForNiche } from "@/lib/verticals";
 import { classifyBusinessDescription } from "@/lib/classify-business-description";
 import {
   nicheHasPhysicalLocation,
@@ -36,6 +48,8 @@ import {
   resolveNicheForVerticalChoice,
 } from "@/lib/verticals";
 import { importBusinessFromWebsite } from "@/lib/website-import";
+import { isValidIrishEircode } from "@/lib/irish-eircode";
+import type { WebsiteImportLocation } from "@/lib/website-import-types";
 import { geocodeIrelandLocation } from "@/lib/geocode-ireland";
 import { CLISTE_DEFAULT_ELEVENLABS_VOICE_ID } from "@/lib/onboarding-voice-presets";
 import {
@@ -63,6 +77,10 @@ import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
+import {
+  handleOptionsForCaraGoal,
+  type CaraGoal,
+} from "@/lib/cara-goal";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 async function provisionPhoneForOrganization(organizationId: string): Promise<void> {
@@ -125,10 +143,11 @@ export type ImportWebsiteResult =
       businessDescription: string;
       address: string;
       eircode: string;
+      locations: WebsiteImportLocation[];
       regulated: boolean;
       imported: { services: number; faqs: number; hours: boolean; area: boolean };
     }
-  | { ok: false; message: string };
+  | { ok: false; message: string; reason?: string };
 
 /**
  * Website import — fetch the business site, AI-extract details, persist drafts
@@ -141,11 +160,23 @@ export async function importWebsiteForProfile(
 
   const result = await importBusinessFromWebsite(url);
   if (!result.ok) {
-    return { ok: false, message: result.message };
+    return {
+      ok: false,
+      message: result.message,
+      ...(result.reason ? { reason: result.reason } : {}),
+    };
   }
   const d = result.data;
 
   const admin = createAdminClient();
+  const { data: orgRow } = await admin
+    .from("organizations")
+    .select("niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+  const skipServiceArea = verticalPackForNiche(String(orgRow?.niche ?? ""))
+    .capabilities.skipServiceArea;
+
   const update: Record<string, unknown> = {
     raw_business_description: d.businessDescription,
     updated_at: new Date().toISOString(),
@@ -157,19 +188,28 @@ export async function importWebsiteForProfile(
     update.agent_services_not_offered = d.servicesNotOffered.join(", ");
   }
   if (d.openingHours) update.agent_opening_hours = d.openingHours;
-  if (d.serviceArea) update.agent_service_area = d.serviceArea;
+  if (d.serviceArea && !skipServiceArea) update.agent_service_area = d.serviceArea;
   if (d.faqs.length) update.agent_faqs = cleanAgentFaqs(d.faqs);
 
-  await admin
+  const { error } = await admin
     .from("organizations")
     .update(update)
     .eq("id", session.organizationId);
 
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  await regenerateCaraCustomPrompt(admin, session.organizationId);
+
+  const multipleLocations = d.locations.length > 1;
+
   return {
     ok: true,
     businessDescription: d.businessDescription,
-    address: d.address,
-    eircode: d.eircode,
+    address: multipleLocations ? "" : d.address,
+    eircode: multipleLocations ? "" : d.eircode,
+    locations: d.locations,
     regulated: d.regulated,
     imported: {
       services: d.services.length,
@@ -191,6 +231,8 @@ export type SaveProfilePayload = {
   lastName: string;
   /** Owner's explicit vertical choice from the niche picker. */
   vertical?: string;
+  /** What Cara should do on calls — FAQ-only vs full follow-up. */
+  caraGoal?: string;
 };
 
 /**
@@ -214,6 +256,12 @@ export async function saveProfileStep(
   if (!verticalChoice) {
     return { ok: false, message: "Pick the option that fits you best." };
   }
+
+  const caraGoalRaw = String(payload.caraGoal ?? "").trim();
+  if (caraGoalRaw !== "faq_only" && caraGoalRaw !== "full_agent") {
+    return { ok: false, message: "Choose what you want Cara to do on calls." };
+  }
+  const caraGoal: CaraGoal = caraGoalRaw;
 
   const admin = createAdminClient();
   const [{ data: org }, { data: profile }] = await Promise.all([
@@ -280,6 +328,9 @@ export async function saveProfileStep(
   if (requiresLocation && !eircode) {
     return { ok: false, message: "Add your Eircode." };
   }
+  if (requiresLocation && eircode && !isValidIrishEircode(eircode)) {
+    return { ok: false, message: "Enter one Eircode for this location." };
+  }
 
   if (captureOwnerName || firstName || lastName) {
     if (firstName.length < 1 || lastName.length < 1) {
@@ -333,6 +384,8 @@ export async function saveProfileStep(
       ...(locationEircode
         ? { agent_location_eircode: locationEircode }
         : {}),
+      cara_goal: caraGoal,
+      cara_handle_options: handleOptionsForCaraGoal(caraGoal),
       onboarding_step: ONBOARDING_STEPS.voice,
       updated_at: new Date().toISOString(),
     })
@@ -722,6 +775,154 @@ export async function prepareOnboardingEmbeddedCheckout(): Promise<OnboardingEmb
     return { ok: false, message: "Expected embedded Checkout session." };
   }
   return { ok: true, clientSecret: result.clientSecret };
+}
+
+export type OnboardingElementsCheckoutResult =
+  | {
+      ok: true;
+      clientSecret: string;
+      subscriptionId: string;
+      returnUrl: string;
+      summary: {
+        planName: string;
+        trialDays: number;
+        amountLabel: string;
+        intervalLabel: string;
+        email: string;
+      };
+    }
+  | { ok: false; message: string };
+
+export async function prepareOnboardingElementsCheckout(): Promise<OnboardingElementsCheckoutResult> {
+  const session = await requireOnboardingSession();
+
+  const admin = createAdminClient();
+  const missingDpa = await getMissingLegalAcceptances(admin, {
+    userId: session.user.id,
+    organizationId: session.organizationId,
+    needsDpa: true,
+  });
+  if (missingDpa.includes("dpa")) {
+    return {
+      ok: false,
+      message:
+        "Accept the Data Processing Agreement on the plan page before continuing to billing.",
+    };
+  }
+
+  if (!PLAN_CHECKOUT_ENABLED) {
+    return {
+      ok: false,
+      message: "Plan checkout is not enabled in this environment.",
+    };
+  }
+
+  const planTier = isPlanTier(session.planTier) ? session.planTier : "pro";
+  if (!planSupportsSelfServeCheckout(planTier)) {
+    return {
+      ok: false,
+      message:
+        "Custom plans are arranged directly with our team. Email hello@clistesystems.ie to get started.",
+    };
+  }
+
+  const accountId = await resolveAccountIdForOrganization(session.organizationId);
+  if (!accountId) {
+    return { ok: false, message: "Organisation is not linked to an account." };
+  }
+
+  await persistOrgBillingSelection({
+    organizationId: session.organizationId,
+    planTier,
+    launchTier: "diy",
+    interval: session.billingInterval === "year" ? "year" : "month",
+  });
+
+  const origin = await resolveCheckoutReturnOrigin();
+  const result = await createPlatformElementsCheckout({
+    organizationId: session.organizationId,
+    accountId,
+    userEmail: session.user.email ?? "",
+    planTier,
+    launchTier: "diy",
+    interval: session.billingInterval === "year" ? "year" : "month",
+  });
+
+  if (!result.ok) return result;
+
+  return {
+    ok: true,
+    clientSecret: result.clientSecret,
+    subscriptionId: result.subscriptionId,
+    returnUrl: `${origin}/onboarding/plan?status=return&subscription_id=${result.subscriptionId}`,
+    summary: result.summary,
+  };
+}
+
+export async function persistOnboardingElementsCheckout(
+  subscriptionId: string,
+): Promise<void> {
+  const session = await requireOnboardingSession();
+  const trimmed = subscriptionId.trim();
+  if (!trimmed) {
+    throw new Error("Missing subscription.");
+  }
+
+  const accountId = await resolveAccountIdForOrganization(session.organizationId);
+  if (!accountId) {
+    throw new Error("Organisation is not linked to an account.");
+  }
+
+  await persistPlatformElementsSubscription({
+    organizationId: session.organizationId,
+    subscriptionId: trimmed,
+    accountId,
+  });
+
+  await activatePlatformSubscriptionGoLive(session.organizationId);
+}
+
+export async function finaliseElementsCheckoutReturn(input: {
+  subscriptionId: string;
+  setupIntentId: string;
+}): Promise<void> {
+  const session = await requireOnboardingSession();
+  const subscriptionId = input.subscriptionId.trim();
+  const setupIntentId = input.setupIntentId.trim();
+  if (!subscriptionId || !setupIntentId) {
+    throw new Error("Missing payment return details.");
+  }
+
+  const stripe = getStripeClient();
+  const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+  assertSetupIntentSucceeded(setupIntent);
+
+  const accountId = await resolveAccountIdForOrganization(session.organizationId);
+  if (!accountId) {
+    throw new Error("Organisation is not linked to an account.");
+  }
+
+  const { subscription } = await assertElementsSubscriptionReady(subscriptionId);
+  assertPlatformSubscriptionOwnership(subscription, {
+    organizationId: session.organizationId,
+    accountId,
+  });
+  assertSetupIntentMatchesSubscription(setupIntent, subscription, subscriptionId);
+
+  await persistPlatformElementsSubscription({
+    organizationId: session.organizationId,
+    subscriptionId,
+    accountId,
+  });
+
+  await activatePlatformSubscriptionGoLive(session.organizationId);
+}
+
+export async function finalizeOnboardingElementsCheckout(
+  subscriptionId: string,
+): Promise<void> {
+  await persistOnboardingElementsCheckout(subscriptionId);
+  redirect("/dashboard?welcome=1");
 }
 
 /**

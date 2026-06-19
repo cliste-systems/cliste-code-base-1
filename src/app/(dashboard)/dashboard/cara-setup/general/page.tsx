@@ -1,5 +1,7 @@
-import { CaraSetupTabGeneral } from "../cara-setup-tab-general";
+import { redirect } from "next/navigation";
 
-export default function CaraSetupGeneralPage() {
-  return <CaraSetupTabGeneral />;
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+
+export default function CaraSetupGeneralRedirectPage() {
+  redirect(DASHBOARD_ROUTES.businessProfile);
 }

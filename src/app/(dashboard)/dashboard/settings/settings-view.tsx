@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   Check,
   PhoneForwarded,
@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form-scroll-region";
+import { DashboardProfileEditor, type DashboardProfileEditorHandle } from "@/components/dashboard/dashboard-profile-editor";
 import {
   DASHBOARD_ICON_CHIP_LG,
   DASHBOARD_ICON_GLYPH_LG,
@@ -27,16 +29,39 @@ import {
 } from "@/lib/call-routing";
 import { cn } from "@/lib/utils";
 
+import { AccountSecuritySection } from "./account-security-section";
 import { saveOrganizationSettings } from "./actions";
-import { buildSettingsMetrics, type SettingsInitial } from "./settings-helpers";
-import { SettingsStatusPanel } from "./settings-status-panel";
+import { BlockedNumbersSection } from "./blocked-numbers-section";
+import type { BlockedNumbersInitial } from "./blocked-numbers-actions";
+import type { SettingsInitial } from "./settings-helpers";
+import { SettingsSection } from "./settings-section";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 
 type SettingsViewProps = {
   initial: SettingsInitial;
+  blockedNumbers: BlockedNumbersInitial;
+  profileInitial: {
+    name: string;
+    initials: string;
+    avatarUrl: string | null;
+    subtitle: string;
+  };
+  signInEmail: string;
+  canManageAccount: boolean;
+  isLocalPreview?: boolean;
   className?: string;
 };
 
-export function SettingsView({ initial, className }: SettingsViewProps) {
+export function SettingsView({
+  initial,
+  blockedNumbers,
+  profileInitial,
+  signInEmail,
+  canManageAccount,
+  isLocalPreview = false,
+  className,
+}: SettingsViewProps) {
+  const { copy } = useDashboardVertical();
   const [businessName, setBusinessName] = useState(initial.businessName);
   const [notificationEmail, setNotificationEmail] = useState(
     initial.notificationEmail,
@@ -50,33 +75,7 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
   const [transferNumber, setTransferNumber] = useState(initial.transferNumber);
   const [pending, startTransition] = useTransition();
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-
-  const liveState = useMemo<SettingsInitial>(
-    () => ({
-      isActive: initial.isActive,
-      businessName,
-      phoneNumber: initial.phoneNumber,
-      signupSegment: initial.signupSegment,
-      notificationEmail,
-      notificationPhone,
-      callRoutingMode,
-      transferNumber,
-      accountStatus: initial.accountStatus,
-    }),
-    [
-      initial.isActive,
-      businessName,
-      initial.phoneNumber,
-      initial.signupSegment,
-      notificationEmail,
-      notificationPhone,
-      callRoutingMode,
-      transferNumber,
-      initial.accountStatus,
-    ],
-  );
-
-  const metrics = useMemo(() => buildSettingsMetrics(liveState), [liveState]);
+  const profileEditorRef = useRef<DashboardProfileEditorHandle>(null);
 
   const hasClisteNumber = Boolean(initial.phoneNumber.trim());
   const phoneDisplay = hasClisteNumber
@@ -84,11 +83,17 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
     : null;
 
   const fieldClass = cn(DASHBOARD_INPUT_CLASS, "text-[13px] text-[#0b1220]");
-  const forwardingExpanded = callRoutingMode !== "cliste_number";
 
   function save() {
     setSaveMsg(null);
     startTransition(async () => {
+      const profileResult =
+        (await profileEditorRef.current?.saveIfDirty()) ?? { ok: true as const };
+      if (!profileResult.ok) {
+        setSaveMsg(profileResult.message);
+        return;
+      }
+
       const result = await saveOrganizationSettings({
         isActive: initial.isActive,
         businessName,
@@ -131,7 +136,9 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
                 Settings
               </h1>
               <p className="mt-0.5 max-w-xl text-[13px] leading-snug text-slate-600">
-                Business details, phone line, and notifications.
+                {canManageAccount
+                  ? "Your profile, sign-in, business details, and notifications."
+                  : "Business details, phone line, and notifications."}
               </p>
             </div>
           </div>
@@ -150,16 +157,28 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
         </p>
       ) : null}
 
-      <div
-        className={cn(
-          "min-h-0 flex-1",
-          forwardingExpanded &&
-            "overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]",
-        )}
-      >
-        <DashboardAnimatedStack>
-          <SettingsStatusPanel metrics={metrics} />
-          <SettingsSection title="Business identity">
+      <DashboardFormScrollRegion>
+        <DashboardAnimatedStack embedded>
+          <SettingsSection title="Your profile">
+            <DashboardProfileEditor
+              ref={profileEditorRef}
+              deferSaveToParent
+              initialName={profileInitial.name}
+              initials={profileInitial.initials}
+              avatarUrl={profileInitial.avatarUrl}
+              subtitle={profileInitial.subtitle}
+            />
+          </SettingsSection>
+
+          {canManageAccount ? (
+            <AccountSecuritySection
+              signInEmail={signInEmail}
+              fieldClass={fieldClass}
+              isLocalPreview={isLocalPreview}
+            />
+          ) : null}
+
+          <SettingsSection title={copy.settings.businessIdentityTitle}>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="business-name">Business name</Label>
@@ -256,8 +275,10 @@ export function SettingsView({ initial, className }: SettingsViewProps) {
             </div>
           </div>
         </SettingsSection>
+
+        <BlockedNumbersSection initial={blockedNumbers} />
         </DashboardAnimatedStack>
-      </div>
+      </DashboardFormScrollRegion>
     </div>
   );
 }
@@ -370,24 +391,5 @@ function CallRoutingControls({
         </div>
       )}
     </div>
-  );
-}
-
-function SettingsSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section>
-      <div className="px-5 py-2.5">
-        <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
-          {title}
-        </h2>
-      </div>
-      <div className="space-y-3 px-5 pb-4">{children}</div>
-    </section>
   );
 }

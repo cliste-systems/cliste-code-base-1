@@ -39,6 +39,11 @@ export function canAddLocation(planTier: PlanTier, locationCount: number): boole
   return locationCount < 1;
 }
 
+import { isVerticalId, VERTICAL_PACKS } from "@/lib/verticals";
+
 export function locationLabelForVertical(verticalId: string): string {
-  return verticalId === "salon_beauty" ? "Location" : "Site";
+  if (isVerticalId(verticalId)) {
+    return VERTICAL_PACKS[verticalId].locationNoun;
+  }
+  return VERTICAL_PACKS.generic.locationNoun;
 }

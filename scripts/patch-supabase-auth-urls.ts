@@ -9,6 +9,8 @@
  *   npx tsx scripts/patch-supabase-auth-urls.ts
  */
 
+import { SIGNUP_EMAIL_OTP_LENGTH } from "../src/lib/signup-email-otp";
+
 const PROJECT_REF = "rtoebbwzwxcnscsxghww";
 const SITE_URL = "https://app.clistesystems.ie";
 const REDIRECT_URLS = [
@@ -21,6 +23,7 @@ const REDIRECT_URLS = [
 type AuthConfig = {
   site_url?: string;
   uri_allow_list?: string;
+  mailer_otp_length?: number;
 };
 
 function parseAllowList(raw: string | undefined): string[] {
@@ -106,13 +109,17 @@ async function main() {
   const patch = {
     site_url: SITE_URL,
     uri_allow_list: mergedRedirects,
+    mailer_otp_length: SIGNUP_EMAIL_OTP_LENGTH,
   };
 
   const updated = await managementFetch(token, "PATCH", patch);
 
-  console.log("Supabase Auth URLs updated:");
+  console.log("Supabase Auth config updated:");
   console.log(`  site_url: ${updated.site_url ?? SITE_URL}`);
   console.log(`  uri_allow_list: ${updated.uri_allow_list ?? mergedRedirects}`);
+  console.log(
+    `  mailer_otp_length: ${updated.mailer_otp_length ?? SIGNUP_EMAIL_OTP_LENGTH}`,
+  );
 }
 
 main().catch((error: unknown) => {

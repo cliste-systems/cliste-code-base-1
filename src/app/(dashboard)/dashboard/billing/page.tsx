@@ -8,6 +8,11 @@ import { PLANS, type PlanTier } from "@/lib/cliste-plans";
 import { finaliseBillingCheckout } from "./actions";
 import { UsageView } from "./usage-view";
 import type { UsagePageData } from "./usage-helpers";
+import {
+  DASHBOARD_HOME_CONTENT_COLUMN,
+  DASHBOARD_PAGE_SHELL_FILL_WHITE,
+} from "@/components/dashboard/dashboard-surface";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -185,13 +190,18 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const checkoutCancelled = status === "cancel";
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-dashboard-fill>
+    <div
+      className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "overflow-hidden")}
+      data-dashboard-fill
+    >
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <UsageView
         className="min-h-0 flex-1"
         data={data}
         billingReady={billingReady}
         checkoutCancelled={checkoutCancelled}
       />
+      </div>
     </div>
   );
 }

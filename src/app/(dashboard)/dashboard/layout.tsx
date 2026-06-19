@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { DashboardGateShell } from "@/components/dashboard/dashboard-gate-shell";
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
 import { DashboardVerticalProvider } from "./dashboard-vertical-context";
@@ -16,9 +17,14 @@ import {
 import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
 import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { navItemsForVertical } from "@/lib/dashboard-nav-items";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import { verticalPackForNiche } from "@/lib/verticals";
-import { enforceDashboardLegalAcceptance } from "@/lib/legal-acceptance-gate";
+import {
+  dashboardPathnameFromHeaders,
+  dashboardShouldUseGateShell,
+  enforceDashboardLegalAcceptance,
+} from "@/lib/legal-acceptance-gate";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import {
   fetchDashboardNavBadges,
@@ -31,13 +37,15 @@ import {
   parseSeenAtCookie,
 } from "@/lib/dashboard-nav-seen-cookies";
 import { DashboardMobileNav } from "./dashboard-mobile-nav";
+import { DashboardChromeBar } from "./dashboard-chrome-bar";
 import {
   DashboardSidebar,
   type DashboardSidebarNavItem,
 } from "./dashboard-sidebar";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { dashboardVersionDisplay } from "@/lib/dashboard-versions";
 
-import { DASHBOARD_INTERACTIVE_CURSOR } from "@/components/dashboard/dashboard-surface";
+import { DASHBOARD_INTERACTIVE_CURSOR, DASHBOARD_REBUILD_SHELL } from "@/components/dashboard/dashboard-surface";
 import { cn } from "@/lib/utils";
 
 import { DashboardViewportLock } from "./dashboard-viewport-lock";
@@ -45,19 +53,14 @@ import { DashboardViewportLock } from "./dashboard-viewport-lock";
 const navItems: {
   href: string;
   label: string;
-  section: "core" | "agent" | "account";
+  section: "core" | "account";
 }[] = [
   { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
+  { href: DASHBOARD_ROUTES.activity, label: "Activity", section: "core" },
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
   { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
   { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
-  { href: DASHBOARD_ROUTES.caraSetup, label: "Cara Setup", section: "agent" },
-  {
-    href: DASHBOARD_ROUTES.caraTraining,
-    label: "Cara Training",
-    section: "agent",
-  },
   { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
   { href: DASHBOARD_ROUTES.support, label: "Support", section: "account" },
   { href: DASHBOARD_ROUTES.legalDataRequests, label: "Legal", section: "account" },
@@ -84,6 +87,12 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const session = await requireDashboardSession();
+  const pathname = await dashboardPathnameFromHeaders();
+
+  if (await dashboardShouldUseGateShell(session, pathname)) {
+    return <DashboardGateShell>{children}</DashboardGateShell>;
+  }
+
   const { supabase, organizationId, profile, user, accountId } = session;
 
   await enforceDashboardLegalAcceptance(session);
@@ -117,8 +126,9 @@ export default async function DashboardLayout({
     (orgRow?.status as string | undefined) ??
     "active";
   if (
-    lifecycleStatus === "pending_verification" ||
-    lifecycleStatus === "onboarding"
+    !session.isLocalPreview &&
+    (lifecycleStatus === "pending_verification" ||
+      lifecycleStatus === "onboarding")
   ) {
     redirect("/onboarding");
   }
@@ -136,31 +146,34 @@ export default async function DashboardLayout({
   const needsPassword =
     userMeta?.needs_password === true || userMeta?.needs_password === "true";
 
-  const coreNav = navItems
+  const vertical = verticalPackForNiche(orgRow?.niche);
+  const resolvedNavItems = navItemsForVertical(navItems, vertical);
+
+  const coreNav = resolvedNavItems
     .filter((i) => i.section === "core")
     .map((item) => toNavItem(item, navBadges));
-  const caraNav = navItems
-    .filter((i) => i.section === "agent")
-    .map((item) => toNavItem(item, navBadges));
-  const adminNav = navItems
+  const accountNav = resolvedNavItems
     .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = navItems.map((item) =>
-    toNavItem(item, navBadges),
-  );
+  const caraTrainingBadge = navBadges[DASHBOARD_ROUTES.caraTraining];
+  const mobileNavItems: DashboardSidebarNavItem[] = resolvedNavItems
+    .filter((i) => i.section === "core")
+    .map((item) => toNavItem(item, navBadges));
 
   const accountSummary = buildDashboardAccountSummary(profile, user, {
     name: accountBilling?.name ?? orgRow?.name ?? null,
     slug: orgRow?.slug ?? null,
   });
-  const vertical = verticalPackForNiche(orgRow?.niche);
-  const productNoun = vertical.id === "generic" ? null : vertical.productNoun;
   const locationLabel = locationLabelForVertical(vertical.id);
   const accountName =
     resolveOrganizationDisplayName(
       accountBilling?.name ?? orgRow?.name,
       orgRow?.slug,
     ) || "Your business";
+  const versionDisplay = dashboardVersionDisplay({
+    experienceLabel: vertical.selection.label,
+    packVersion: vertical.packVersion,
+  });
 
   return (
     <>
@@ -171,25 +184,43 @@ export default async function DashboardLayout({
           DASHBOARD_INTERACTIVE_CURSOR,
         )}
       >
-        <DashboardSidebar
-          coreNav={coreNav}
-          caraNav={caraNav}
-          adminNav={adminNav}
-          needsPassword={needsPassword}
-          account={accountSummary}
-          locations={locations}
-          activeOrganizationId={organizationId}
-          viewAllLocations={viewAllLocations}
-          locationLabel={locationLabel}
-          accountName={accountName}
-          productNoun={productNoun}
-        />
+        {!DASHBOARD_REBUILD_SHELL ? (
+          <DashboardSidebar
+            coreNav={coreNav}
+            accountNav={accountNav}
+            caraTrainingBadge={
+              typeof caraTrainingBadge === "number" && caraTrainingBadge > 0
+                ? caraTrainingBadge
+                : undefined
+            }
+            needsPassword={needsPassword}
+            account={accountSummary}
+            locations={locations}
+            activeOrganizationId={organizationId}
+            viewAllLocations={viewAllLocations}
+            locationLabel={locationLabel}
+            accountName={accountName}
+          />
+        ) : null}
 
         <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white lg:h-full">
-          <div className="shrink-0 border-b border-slate-200 bg-[#fcfcfd] px-4 py-3 lg:hidden">
-            <DashboardMobileNav items={mobileNavItems} productNoun={productNoun} />
-          </div>
-          {needsPassword ? (
+          {!DASHBOARD_REBUILD_SHELL ? (
+            <DashboardChromeBar versionDisplay={versionDisplay} />
+          ) : null}
+          {!DASHBOARD_REBUILD_SHELL ? (
+            <div className="shrink-0 border-b border-slate-200 bg-[#fcfcfd] px-4 py-3 lg:hidden">
+              <DashboardMobileNav
+                items={mobileNavItems}
+                accountNav={accountNav}
+                caraTrainingBadge={
+                  typeof caraTrainingBadge === "number" && caraTrainingBadge > 0
+                    ? caraTrainingBadge
+                    : undefined
+                }
+              />
+            </div>
+          ) : null}
+          {!DASHBOARD_REBUILD_SHELL && needsPassword ? (
             <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/90 px-4 py-3 text-xs leading-snug text-amber-950 lg:hidden">
               Finish setup: choose a password for this account.{" "}
               <Link
@@ -201,13 +232,15 @@ export default async function DashboardLayout({
             </div>
           ) : null}
           <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-white">
-            <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-white px-6 py-6 has-[>[data-dashboard-fill]]:overflow-hidden has-[>[data-dashboard-fill]]:p-0 sm:px-8 [scrollbar-gutter:stable] has-[>[data-dashboard-fill]]:[scrollbar-gutter:auto]">
-              <DashboardVerticalProvider
-                niche={orgRow?.niche}
-                businessType={orgRow?.agent_business_type}
-              >
-                {children}
-              </DashboardVerticalProvider>
+            <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-white px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-home]:!overflow-y-auto has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
+              {DASHBOARD_REBUILD_SHELL ? null : (
+                <DashboardVerticalProvider
+                  niche={orgRow?.niche}
+                  businessType={orgRow?.agent_business_type}
+                >
+                  {children}
+                </DashboardVerticalProvider>
+              )}
             </div>
           </main>
         </div>

@@ -8,7 +8,7 @@ import {
   SetupChecklist,
   SetupProgressBar,
 } from "@/components/dashboard/dashboard-setup-checklist";
-import { DASHBOARD_HOME_CARD } from "@/components/dashboard/dashboard-surface";
+import { dashboardHomeCardShellClassName } from "@/components/dashboard/dashboard-surface";
 import type { CaraStatusSnapshot } from "@/lib/cara-status";
 import {
   buildCaraSetupSteps,
@@ -23,7 +23,6 @@ import {
   formatCallSuccessRateValue,
 } from "@/lib/dashboard-call-success-rate";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
-import { cn } from "@/lib/utils";
 
 function lineMetricValue(caraStatus: CaraStatusSnapshot): string {
   const phoneConnected = caraStatus.phoneLine.value === "Connected";
@@ -118,14 +117,12 @@ export function CaraStatusCard({
   const isLive = caraStatus.isOnline;
 
   return (
-    <section
-      className={cn(DASHBOARD_HOME_CARD, "flex shrink-0 flex-col", className)}
-    >
+    <section className={dashboardHomeCardShellClassName(false, className)}>
       <h2 className="mb-2 shrink-0 text-[15px] font-semibold tracking-tight text-[#0b1220]">
         Cara status
       </h2>
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5">
         <CaraStatusBanner caraStatus={caraStatus} />
 
         <div className="grid min-h-[68px] shrink-0 grid-cols-3 divide-x divide-slate-100 rounded-xl border border-slate-200 bg-white">
@@ -137,7 +134,7 @@ export function CaraStatusCard({
             href={
               phoneConnected
                 ? DASHBOARD_ROUTES.settings
-                : DASHBOARD_ROUTES.caraSetup
+                : DASHBOARD_ROUTES.businessProfile
             }
           />
           <MetricItem
@@ -154,7 +151,7 @@ export function CaraStatusCard({
           />
         </div>
 
-        <div className="flex flex-col">
+        <div className="mt-auto flex min-h-0 flex-col">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-[13px] font-medium text-[#0b1220]">
               Setup progress

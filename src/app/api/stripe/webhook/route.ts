@@ -7,6 +7,10 @@ import {
   assertWebhookPlatformCheckoutSessionComplete,
 } from "@/lib/platform-billing-checkout";
 import {
+  activateElementsOnboardingIfReady,
+  isDevPreviewBillingMetadata,
+} from "@/lib/platform-billing-elements";
+import {
   patchAccountAndLocations,
   resolveAccountIdFromBillingMetadata,
 } from "@/lib/account-billing";
@@ -100,6 +104,11 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
         await handlePlatformSubscriptionDeleted(admin, sub);
+        break;
+      }
+      case "setup_intent.succeeded": {
+        const setupIntent = event.data.object as Stripe.SetupIntent;
+        await handleSetupIntentSucceeded(setupIntent);
         break;
       }
       default:
@@ -221,6 +230,34 @@ async function handlePlatformSubscriptionChange(
       .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq("account_id", accountId);
   }
+
+  const defaultPm =
+    typeof sub.default_payment_method === "string"
+      ? sub.default_payment_method
+      : sub.default_payment_method?.id;
+  if (
+    orgId &&
+    defaultPm &&
+    isHealthy &&
+    !(
+      process.env.NODE_ENV === "production" &&
+      isDevPreviewBillingMetadata(sub.metadata)
+    )
+  ) {
+    try {
+      await activateElementsOnboardingIfReady({
+        organizationId: orgId,
+        subscriptionId: sub.id,
+        accountId,
+      });
+    } catch (err) {
+      await captureObservedError(err, {
+        route: "stripe/webhook",
+        sideEffect: "elements_go_live",
+        orgId,
+      });
+    }
+  }
 }
 
 async function handlePlatformSubscriptionDeleted(
@@ -246,4 +283,42 @@ async function handlePlatformSubscriptionDeleted(
       updated_at: new Date().toISOString(),
     })
     .eq("account_id", accountId);
+}
+
+async function handleSetupIntentSucceeded(
+  setupIntent: Stripe.SetupIntent,
+) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    isDevPreviewBillingMetadata(setupIntent.metadata)
+  ) {
+    return;
+  }
+
+  const orgId = (setupIntent.metadata?.cliste_organization_id ?? "").trim();
+  const subscriptionId = (
+    setupIntent.metadata?.cliste_subscription_id ?? ""
+  ).trim();
+  if (!orgId || !subscriptionId) return;
+
+  const accountId = await resolveAccountIdFromBillingMetadata({
+    accountId: setupIntent.metadata?.cliste_account_id,
+    organizationId: orgId,
+  });
+  if (!accountId) return;
+
+  try {
+    await activateElementsOnboardingIfReady({
+      organizationId: orgId,
+      subscriptionId,
+      accountId,
+    });
+  } catch (err) {
+    await captureObservedError(err, {
+      route: "stripe/webhook",
+      sideEffect: "elements_go_live",
+      orgId,
+      setupIntentId: setupIntent.id,
+    });
+  }
 }

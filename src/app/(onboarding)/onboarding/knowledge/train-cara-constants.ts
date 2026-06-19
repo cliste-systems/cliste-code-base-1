@@ -11,10 +11,19 @@ export const TRAIN_CARA_STEPS = [
   {
     id: "services",
     label: "Services",
-    title: "What do you offer?",
-    subtitle: "List what callers might ask you for.",
+    title: "What you offer",
+    subtitle: "Import or add the treatments and services callers ask about.",
     helper: "Short list is fine — a few words per item.",
-    progressLabel: "Services and exclusions",
+    progressLabel: "Services offered",
+  },
+  {
+    id: "exclusions",
+    label: "Exclusions",
+    title: "What you don't offer",
+    subtitle:
+      "Write normally — Cara will pick out what she must never agree to.",
+    helper: "One sentence is fine.",
+    progressLabel: "Services not offered",
   },
   {
     id: "hours",
@@ -28,11 +37,11 @@ export const TRAIN_CARA_STEPS = [
   {
     id: "capture",
     label: "Details",
-    title: "Details and rules for Cara",
+    title: "What should Cara get from each caller?",
     subtitle:
-      "What to collect on each call, and what Cara should always follow or avoid.",
-    helper: "Write both in plain English — Cara reads this on calls.",
-    progressLabel: "Details and rules",
+      "Pick the details Cara should note when someone wants to book or follow up.",
+    helper: "Name and number are always collected.",
+    progressLabel: "Caller details",
   },
   {
     id: "faqs",
@@ -41,14 +50,6 @@ export const TRAIN_CARA_STEPS = [
     subtitle: "Pick a common question or write your own.",
     helper: "Short answers work best — refine later in Cara Setup.",
     progressLabel: "Common questions",
-  },
-  {
-    id: "review",
-    label: "Review",
-    title: "Review Cara's briefing",
-    subtitle: "Check Cara understands your business before you go live.",
-    helper: "Use Back to change anything.",
-    progressLabel: "Review",
   },
 ] as const;
 
@@ -66,13 +67,13 @@ export const OPENING_HOURS_PLACEHOLDER =
   "Mon–Fri 9am–6pm, Sat 10am–4pm, Sun closed.";
 
 export const SERVICE_AREA_PLACEHOLDER =
-  "The towns or areas you cover.";
+  "Town and county — e.g. Galway, Co. Galway";
 
 export const DEFAULT_DETAILS_TO_COLLECT =
   "Name, phone number, what they need, and the best time to call back.";
 
 export const RULES_PLACEHOLDER =
-  "e.g. never quote prices over the phone, always take a message if unsure, flag anything urgent.";
+  "e.g. never give prices over the phone, no walk-ins on Mondays, 48 hours notice to cancel.";
 
 /** Always on — persisted for routing continuity, not shown in Train Cara UI. */
 export const CARA_BASELINE_HANDLE_OPTIONS = [
@@ -182,11 +183,11 @@ export const DEFAULT_FAQ_SUGGESTIONS = [
 ] as const;
 
 export const DEFAULT_BUSINESS_RULE_SUGGESTIONS = [
-  "We need 24 hours notice for cancellations.",
-  "We don't offer free quotes over the phone.",
-  "We don't work bank holidays.",
-  "Out-of-area jobs need approval first.",
-  "Payment is due on completion.",
+  "We need 24 hours' notice to cancel or reschedule.",
+  "We don't give prices over the phone.",
+  "We're closed on bank holidays.",
+  "Always take a message if no one's available.",
+  "Flag anything urgent straight away.",
 ] as const;
 
 export const TRADES_FAQ_SUGGESTIONS = [

@@ -1,25 +1,27 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import { onboardingSpring } from "./onboarding-motion";
 import {
   ONBOARDING_STEPS_META,
   ONBOARDING_TOTAL_STEPS,
   normalizeOnboardingPath,
   onboardingStepIndex,
 } from "./onboarding-steps";
+import { useOnboardingProgress } from "./onboarding-progress";
 
 export function OnboardingStepDots() {
   const pathname = usePathname();
-  const reduceMotion = useReducedMotion();
+  const { furthestDbStep } = useOnboardingProgress();
 
   const currentPath = normalizeOnboardingPath(pathname);
   const current = onboardingStepIndex(pathname);
-  const progress = (current / ONBOARDING_TOTAL_STEPS) * 100;
+  const progressStep = Math.min(
+    ONBOARDING_TOTAL_STEPS,
+    Math.max(current, furthestDbStep),
+  );
 
   const activeMeta =
     ONBOARDING_STEPS_META.find((step) => step.path === currentPath) ??
@@ -29,7 +31,7 @@ export function OnboardingStepDots() {
     <div
       className="flex w-full shrink-0 flex-col items-center gap-2.5 px-4 pb-6 pt-2 sm:px-6"
       role="progressbar"
-      aria-valuenow={current}
+      aria-valuenow={progressStep}
       aria-valuemin={1}
       aria-valuemax={ONBOARDING_TOTAL_STEPS}
       aria-label={`Step ${current} of ${ONBOARDING_TOTAL_STEPS}: ${activeMeta?.label ?? "Onboarding"}`}
@@ -48,8 +50,8 @@ export function OnboardingStepDots() {
         {ONBOARDING_STEPS_META.map((step, index) => {
           const stepNumber = index + 1;
           const isCurrent = step.path === currentPath;
-          const isComplete = stepNumber < current;
-          const isReachable = stepNumber <= current;
+          const isComplete = stepNumber < progressStep;
+          const isReachable = stepNumber <= progressStep;
 
           return (
             <div
@@ -86,20 +88,25 @@ export function OnboardingStepDots() {
         })}
       </div>
 
-      <div className="relative h-1 w-full max-w-md overflow-hidden rounded-full bg-[#0b1220]/10">
-        {reduceMotion ? (
-          <div
-            className="h-full rounded-full bg-[#0b1220]"
-            style={{ width: `${progress}%` }}
-          />
-        ) : (
-          <motion.div
-            className="h-full rounded-full bg-[#0b1220]"
-            initial={false}
-            animate={{ width: `${progress}%` }}
-            transition={onboardingSpring}
-          />
-        )}
+      <div className="flex w-full max-w-md gap-1">
+        {ONBOARDING_STEPS_META.map((step, index) => {
+          const stepNumber = index + 1;
+          const filled = stepNumber <= progressStep;
+          return (
+            <div
+              key={`${step.path}-bar`}
+              className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-[#0b1220]/10"
+              aria-hidden
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full bg-[#0b1220] transition-[width] duration-500 ease-out",
+                  filled ? "w-full" : "w-0",
+                )}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   type WeekSchedule,
   weekScheduleHasOpenDay,
 } from "@/lib/business-hours";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { GREETING_LEGAL_OVERLAP_PATTERN } from "@/lib/voice-greeting-guardrails";
 import {
   buildFullVoiceGreeting,
@@ -165,7 +166,7 @@ export function lintAnythingElse(text: string): AnythingElseLint[] {
       id: "ae-hours",
       message:
         "This looks like opening hours — Cara already knows those from Opening hours.",
-      href: "/dashboard/cara-setup/general",
+      href: DASHBOARD_ROUTES.businessProfile,
     });
   }
 
@@ -174,7 +175,7 @@ export function lintAnythingElse(text: string): AnythingElseLint[] {
       id: "ae-services",
       message:
         "This looks like a services list — move it to Services instead.",
-      href: "/dashboard/cara-setup/services",
+      href: DASHBOARD_ROUTES.businessServices,
     });
   }
 
@@ -183,7 +184,7 @@ export function lintAnythingElse(text: string): AnythingElseLint[] {
       id: "ae-areas",
       message:
         "This looks like a service area list — Cara already knows your areas.",
-      href: "/dashboard/cara-setup/general",
+      href: DASHBOARD_ROUTES.businessProfile,
     });
   }
 
@@ -191,7 +192,7 @@ export function lintAnythingElse(text: string): AnythingElseLint[] {
     warnings.push({
       id: "ae-faq",
       message: "This looks like common questions — move them to Answers.",
-      href: "/dashboard/cara-setup/answers",
+      href: DASHBOARD_ROUTES.businessFaqs,
     });
   }
 
@@ -200,7 +201,7 @@ export function lintAnythingElse(text: string): AnythingElseLint[] {
       id: "ae-identity",
       message:
         "Cara's introduction is set under Voice & greeting — remove duplicate lines here.",
-      href: "/dashboard/cara-setup/general",
+      href: DASHBOARD_ROUTES.caraGreeting,
     });
   }
 
@@ -211,7 +212,7 @@ export function lintAnythingElse(text: string): AnythingElseLint[] {
         id: `ae-canonical-${question}`,
         message:
           "A line looks like a question Cara already answers from setup — review and trim.",
-        href: "/dashboard/cara-setup/general",
+        href: DASHBOARD_ROUTES.businessProfile,
       });
       break;
     }
@@ -268,6 +269,14 @@ export function buildHoursPromptBlock(input: {
   }
 
   if (!weekScheduleHasOpenDay(input.schedule)) {
+    if (input.formattedHours.trim()) {
+      const parts = [`Our opening hours are:\n${input.formattedHours.trim()}`];
+      if (input.note?.trim()) {
+        parts.push(`Hours note: ${input.note.trim()}`);
+      }
+      parts.push(HOURS_CLOSED_DAY_INSTRUCTION);
+      return parts.join("\n\n");
+    }
     return HOURS_ALL_CLOSED_INSTRUCTION;
   }
 

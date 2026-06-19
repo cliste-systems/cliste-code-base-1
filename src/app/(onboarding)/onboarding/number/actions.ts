@@ -3,11 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import {
-  callRoutingAllowsHumanTransfer,
-  isCallRoutingMode,
-  type CallRoutingMode,
-} from "@/lib/call-routing";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import {
   ONBOARDING_STEPS,
@@ -15,6 +10,12 @@ import {
 } from "@/lib/onboarding-session";
 import { provisionOrganizationPhoneNumber } from "@/lib/phone-pool";
 import { createAdminClient } from "@/utils/supabase/admin";
+
+import {
+  callRoutingAllowsHumanTransfer,
+  isCallRoutingMode,
+  type CallRoutingMode,
+} from "@/lib/call-routing";
 
 export type SaveOnboardingNumberInput = {
   mode: CallRoutingMode;
@@ -46,13 +47,13 @@ export async function saveOnboardingNumber(
   const transfer = allowsTransfer ? (input.transferPhone?.trim() ?? "") : "";
 
   const admin = createAdminClient();
+
   const update: Record<string, unknown> = {
     call_routing_mode: input.mode,
     fallback_number: transfer || null,
     onboarding_step: ONBOARDING_STEPS.testCall,
     updated_at: new Date().toISOString(),
   };
-  // Mirror the transfer number to notifications so the owner is reachable.
   if (transfer) update.notification_phone = transfer;
 
   const { error } = await admin
@@ -62,11 +63,11 @@ export async function saveOnboardingNumber(
 
   if (error) return { ok: false, message: error.message };
 
-  // Now that routes, transfer, and routing mode are final, compile the
-  // call-handling prompt the voice worker will use on the test call.
+  // Final onboarding compile after routing mode — train-cara should have run first.
   await regenerateCaraCustomPrompt(admin, session.organizationId);
 
   revalidatePath("/onboarding", "layout");
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/routing");
   redirect("/onboarding/test-call");
 }

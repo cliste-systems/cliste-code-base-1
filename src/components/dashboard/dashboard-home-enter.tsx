@@ -1,13 +1,17 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 
 import { useOnboardingAnimateIn } from "@/components/onboarding/onboarding-enter";
+import {
+  dashboardHomeLayoutTransition,
+} from "@/components/dashboard/dashboard-home-resize-motion";
 import { onboardingPageVariants } from "@/components/onboarding/onboarding-motion";
 import { cn } from "@/lib/utils";
 
 /**
- * One-shot home fade — single wrapper so flex-1 / min-h-0 on workspace panels stay intact.
+ * One-shot home fade — fixed viewport column on desktop (no page scroll).
+ * LayoutGroup keeps cards and hero smooth when the window is resized.
  */
 export function DashboardHomeEnter({
   children,
@@ -21,20 +25,32 @@ export function DashboardHomeEnter({
 
   if (reduceMotion) {
     return (
-      <div className={cn("flex min-h-0 flex-1 flex-col gap-4", className)}>
+      <div
+        className={cn(
+          "flex h-full min-h-0 flex-1 flex-col gap-4",
+          className,
+        )}
+      >
         {children}
       </div>
     );
   }
 
   return (
-    <motion.div
-      className={cn("flex min-h-0 flex-1 flex-col gap-4", className)}
-      variants={onboardingPageVariants}
-      initial="initial"
-      animate={ready ? "animate" : "initial"}
-    >
-      {children}
-    </motion.div>
+    <LayoutGroup id="dashboard-home">
+      <motion.div
+        layout
+        transition={dashboardHomeLayoutTransition}
+        className={cn(
+          "flex h-full min-h-0 flex-1 flex-col gap-4",
+          className,
+        )}
+        variants={onboardingPageVariants}
+        initial="initial"
+        animate={ready ? "animate" : "initial"}
+      >
+        {children}
+      </motion.div>
+    </LayoutGroup>
   );
 }

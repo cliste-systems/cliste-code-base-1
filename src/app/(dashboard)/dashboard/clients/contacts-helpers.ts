@@ -8,7 +8,6 @@ import {
   normalizeContactEmail,
 } from "../action-inbox/action-inbox-helpers";
 import {
-  ACTION_CATEGORY_LABELS,
   ACTION_CATEGORY_SHORT,
   classifyActionCategory,
   type ActionCategory,
@@ -199,11 +198,14 @@ export function initialsFor(displayName: string): string | null {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
-export function buildFollowUp(row: {
-  id: string;
-  summary: string | null;
-  created_at: string;
-}): ContactFollowUp {
+export function buildFollowUp(
+  row: {
+    id: string;
+    summary: string | null;
+    created_at: string;
+  },
+  categoryLabels: Record<ActionCategory, string>,
+): ContactFollowUp {
   const category = classifyActionCategory(row.summary);
   return {
     id: row.id,
@@ -211,7 +213,7 @@ export function buildFollowUp(row: {
     createdAtLabel: formatContactDateTimeLabel(row.created_at),
     category,
     categoryShort: ACTION_CATEGORY_SHORT[category],
-    categoryTitle: ACTION_CATEGORY_LABELS[category],
+    categoryTitle: categoryLabels[category],
   };
 }
 

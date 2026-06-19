@@ -15,6 +15,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
 import { type SavedRoute } from "@/app/(dashboard)/dashboard/routing/route-models";
+import { isValidHttpUrl } from "@/app/(dashboard)/dashboard/routing/routing-validation";
 import { useOnboardingKnowledgeNav } from "@/components/onboarding/onboarding-knowledge-nav";
 import { OnboardingEnter, OnboardingEnterProvider } from "@/components/onboarding/onboarding-enter";
 import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
@@ -23,15 +24,14 @@ import {
   ONBOARDING_LOGO_SIZE,
   ONBOARDING_SECONDARY_BUTTON,
 } from "@/components/onboarding/onboarding-ui";
-import {
-  multilineTextToRules,
-  rulesToMultilineText,
-} from "@/lib/agent-business-rules";
 import { normalizeCaraTrainingVoice } from "@/lib/cara-starter-notes";
 import {
   isOnboardingUiCopyFresh,
   type OnboardingUiCopy,
 } from "@/lib/onboarding-ui-copy-shared";
+import type { CaraGoal } from "@/lib/cara-goal";
+import { verticalPackForNiche } from "@/lib/verticals";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
 import { cn } from "@/lib/utils";
 
 import {
@@ -39,21 +39,21 @@ import {
   skipTrainCaraStep,
   ensureOnboardingUiCopy,
   saveTrainCaraProgress,
+  persistTrainCaraExclusionsStep,
+  persistTrainCaraServicesStep,
   type TrainCaraPayload,
   type TrainCaraSaveResult,
 } from "./actions";
 import { CaraFaqsStep } from "./cara-faqs-step";
-import { CaraReviewStep } from "./cara-review-step";
-import {
-  buildReviewPageContent,
-  buildReviewPages,
-} from "./train-cara-review-pages";
 import {
   CaraDualTextareaStep,
   CaraTextareaStep,
 } from "./cara-training-step-shell";
-import { captureFieldsFromDetailsText } from "./train-cara-capture-text";
-import { composeCaptureDetailsNote } from "./train-cara-capture-fields";
+import {
+  composeCaptureDetailsNote,
+  type CaraCaptureField,
+} from "./train-cara-capture-fields";
+import { TrainCaraCaptureStep } from "./train-cara-capture-step";
 import { compileCaraPhoneNotes } from "./train-cara-compile-notes";
 import {
   CARA_HANDLE_OPTIONS,
@@ -62,27 +62,37 @@ import {
   TRAIN_CARA_STEPS,
   ensureRequiredHandleOptions,
   type CaraHandleOptionId,
+  type TrainCaraStepId,
 } from "./train-cara-constants";
-import { resolveServicesStepCopy } from "./train-cara-services-copy";
+import { resolveServicesStepCopy, resolveExclusionsStepCopy } from "./train-cara-services-copy";
+import { TrainCaraServicesStep } from "./train-cara-services-step";
+import { TrainCaraExclusionsStep } from "./train-cara-exclusions-step";
 import { aboutTextForStep } from "./train-cara-about-text";
 import { trainCaraVerticalCopy } from "./train-cara-vertical-copy";
 import { TrainCaraIntro } from "./train-cara-intro";
 
 const INITIAL: TrainCaraSaveResult = { ok: false, message: "" };
 
+function stepIndexForId(id: TrainCaraStepId): number {
+  const index = TRAIN_CARA_STEPS.findIndex((item) => item.id === id);
+  return index >= 0 ? index : 0;
+}
+
 export type TrainCaraInitial = {
   businessName: string;
   about: string;
   servicesOffered: string;
+  servicesOfferedRaw: string;
   servicesNotOffered: string;
+  servicesNotOfferedRaw: string;
   openingHours: string;
   serviceArea: string;
-  detailsToCollect: string;
-  businessRules: string[];
-  compiledNotes: string;
+  captureFields: CaraCaptureField[];
   faqs: AgentFaq[];
   businessType: string;
   niche: string;
+  caraGoal: CaraGoal;
+  serviceCatalog: ServiceCatalogItem[];
   handleOptions: CaraHandleOptionId[];
   routes: SavedRoute[];
   linkLabel: string;
@@ -119,7 +129,7 @@ function applyDetailsToRoutes(
   return routes.map((route) => {
     if (route.outcome === "send_link") {
       const url = details.meetingLink.trim() || details.linkUrl.trim();
-      if (!url) return route;
+      if (!url || !isValidHttpUrl(url)) return route;
       return { ...route, url };
     }
     if (route.outcome === "email" && details.emailAddress.trim()) {
@@ -149,17 +159,19 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
 
   const [about, setAbout] = useState(() => aboutTextForStep(initial.about));
   const [servicesOffered, setServicesOffered] = useState(initial.servicesOffered);
+  const [servicesOfferedRaw, setServicesOfferedRaw] = useState(
+    initial.servicesOfferedRaw,
+  );
   const [servicesNotOffered, setServicesNotOffered] = useState(
     initial.servicesNotOffered,
   );
+  const [servicesNotOfferedRaw, setServicesNotOfferedRaw] = useState(
+    initial.servicesNotOfferedRaw || initial.servicesNotOffered,
+  );
+  const [serviceCatalog, setServiceCatalog] = useState(initial.serviceCatalog);
   const [openingHours, setOpeningHours] = useState(initial.openingHours);
   const [serviceArea, setServiceArea] = useState(initial.serviceArea);
-  const [detailsToCollect, setDetailsToCollect] = useState(
-    initial.detailsToCollect.trim(),
-  );
-  const [rulesText, setRulesText] = useState(
-    rulesToMultilineText(initial.businessRules),
-  );
+  const [captureFields, setCaptureFields] = useState(initial.captureFields);
   const [faqs, setFaqs] = useState<AgentFaq[]>(initial.faqs);
 
   const [handleOptions] = useState<CaraHandleOptionId[]>(() =>
@@ -171,61 +183,32 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [savingProgress, startSaveProgress] = useTransition();
-  const [skippingIntro, startSkipIntro] = useTransition();
+  const [finishingLater, startFinishLater] = useTransition();
   const [state, formAction, pending] = useActionState(completeTrainCaraStep, INITIAL);
 
-  const businessRules = useMemo(
-    () => multilineTextToRules(rulesText),
-    [rulesText],
+  const detailsToCollect = useMemo(
+    () => composeCaptureDetailsNote(captureFields),
+    [captureFields],
   );
-
-  const reviewContent = useMemo(
-    () =>
-      buildReviewPageContent({
-        about,
-        servicesOffered,
-        servicesNotOffered,
-        openingHours,
-        serviceArea,
-        detailsToCollect,
-        businessRules,
-        faqs,
-      }),
-    [
-      about,
-      servicesOffered,
-      servicesNotOffered,
-      openingHours,
-      serviceArea,
-      detailsToCollect,
-      businessRules,
-      faqs,
-    ],
-  );
-
-  const reviewPages = useMemo(
-    () => buildReviewPages(reviewContent, initial.businessName),
-    [reviewContent, initial.businessName],
-  );
-
-  const [reviewPageIndex, setReviewPageIndex] = useState(0);
 
   const step = TRAIN_CARA_STEPS[stepIndex]!;
   const isLast = stepIndex === TRAIN_CARA_STEPS.length - 1;
-  const busy = pending || savingProgress || skippingIntro;
+  const busy = pending || savingProgress || finishingLater;
+
+  const skipServiceArea = verticalPackForNiche(initial.niche).capabilities
+    .skipServiceArea;
+
+  const canFinishLater =
+    step.id === "services" ||
+    step.id === "exclusions" ||
+    step.id === "hours" ||
+    step.id === "capture" ||
+    step.id === "faqs";
 
   useLayoutEffect(() => {
     if (phase === "intro") return;
     setInternalStepIndex(stepIndex);
   }, [phase, stepIndex, setInternalStepIndex]);
-
-  useEffect(() => {
-    if (step.id === "review") {
-      // Reset to the first review page whenever we (re)enter the review step.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setReviewPageIndex(0);
-    }
-  }, [stepIndex, step.id]);
 
   useEffect(() => {
     if (phase === "intro") return;
@@ -250,7 +233,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
         openingHours,
         serviceArea,
         detailsToCollect,
-        rules: businessRules,
         faqs,
       }),
     [
@@ -261,14 +243,13 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
       openingHours,
       serviceArea,
       detailsToCollect,
-      businessRules,
       faqs,
     ],
   );
 
   const verticalCopy = useMemo(
-    () => trainCaraVerticalCopy(initial.niche),
-    [initial.niche],
+    () => trainCaraVerticalCopy(initial.niche, initial.caraGoal),
+    [initial.niche, initial.caraGoal],
   );
   const aboutCopy = verticalCopy.about;
 
@@ -282,6 +263,16 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
     [initial.businessType, initial.niche, onboardingUiCopy],
   );
 
+  const exclusionsCopy = useMemo(
+    () =>
+      resolveExclusionsStepCopy({
+        businessType: initial.businessType,
+        niche: initial.niche,
+        servicesCopy,
+      }),
+    [initial.businessType, initial.niche, servicesCopy],
+  );
+
   useEffect(() => {
     if (phase !== "training") return;
     if (step.id !== "services" && step.id !== "faqs") return;
@@ -292,6 +283,7 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
     const type = initial.businessType.trim();
     if (
       isOnboardingUiCopyFresh(onboardingUiCopy, {
+        niche: initial.niche,
         businessType: type,
         rawBusinessDescription: description,
       })
@@ -335,7 +327,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
   function payloadFromState(
     overrides: Partial<Pick<TrainCaraPayload, "trainCaraStep">> = {},
   ): TrainCaraPayload {
-    const captureFields = captureFieldsFromDetailsText(detailsToCollect);
     const captureDetailsNote = composeCaptureDetailsNote(captureFields);
     const summary = buildCompiledNotes();
     const selectedHandles = sanitizeHandleOptions(handleOptions);
@@ -352,12 +343,13 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
       rawBusinessDescription: about.trim(),
       businessKnowledgeSummary: summary,
       openingHours: openingHours.trim(),
-      serviceArea: serviceArea.trim(),
+      serviceArea: skipServiceArea ? "" : serviceArea.trim(),
       servicesOffered: servicesOffered.trim(),
+      servicesOfferedRaw: servicesOfferedRaw.trim(),
       servicesNotOffered: servicesNotOffered.trim(),
+      servicesNotOfferedRaw: servicesNotOfferedRaw.trim(),
       detailsToCollect: detailsToCollect.trim(),
       faqs,
-      businessRules,
       captureFields,
       handleOptions: selectedHandles,
       routes: builtRoutes,
@@ -370,16 +362,13 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
       transferPhone: initial.transferPhone,
       trainCaraStep: overrides.trainCaraStep ?? step.id,
       onboardingUiCopy: onboardingUiCopy ?? undefined,
-      preserveFaqs: step.id !== "faqs" && step.id !== "review",
+      preserveFaqs: step.id !== "faqs",
     };
   }
 
   function validateStep(): string | null {
     if (step.id === "about" && about.trim().length < MIN_ABOUT_LENGTH) {
       return `Tell Cara a little more about the business (at least ${MIN_ABOUT_LENGTH} characters).`;
-    }
-    if (step.id === "review" && !buildCompiledNotes().trim()) {
-      return "Cara needs phone notes before you continue.";
     }
     return null;
   }
@@ -413,12 +402,43 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
       return;
     }
 
-    if (step.id === "review") {
-      if (reviewPages.length === 0 || reviewPageIndex >= reviewPages.length - 1) {
-        startTransition(() => formAction(payloadFromState()));
-        return;
-      }
-      setReviewPageIndex((index) => index + 1);
+    if (step.id === "services") {
+      const nextIndex = Math.min(TRAIN_CARA_STEPS.length - 1, stepIndex + 1);
+      const nextStep = TRAIN_CARA_STEPS[nextIndex];
+      if (!nextStep) return;
+      startSaveProgress(async () => {
+        const result = await persistTrainCaraServicesStep({
+          ...payloadFromState({ trainCaraStep: nextStep.id }),
+        });
+        if (!result.ok) {
+          setLocalError(result.message);
+          return;
+        }
+        if (result.offerings) {
+          setServicesOffered(result.offerings);
+        }
+        setStepIndex(nextIndex);
+      });
+      return;
+    }
+
+    if (step.id === "exclusions") {
+      const nextIndex = Math.min(TRAIN_CARA_STEPS.length - 1, stepIndex + 1);
+      const nextStep = TRAIN_CARA_STEPS[nextIndex];
+      if (!nextStep) return;
+      startSaveProgress(async () => {
+        const result = await persistTrainCaraExclusionsStep(
+          payloadFromState({ trainCaraStep: nextStep.id }),
+        );
+        if (!result.ok) {
+          setLocalError(result.message);
+          return;
+        }
+        if (result.formatted != null) {
+          setServicesNotOffered(result.formatted);
+        }
+        setStepIndex(nextIndex);
+      });
       return;
     }
 
@@ -432,10 +452,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
 
   function handleBack() {
     setLocalError(null);
-    if (step.id === "review" && reviewPageIndex > 0) {
-      setReviewPageIndex((index) => index - 1);
-      return;
-    }
     if (stepIndex === 0) {
       setPhase("intro");
       router.replace(pathname, { scroll: false });
@@ -449,16 +465,42 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
     router.push("/onboarding/voice");
   }
 
-  function handleIntroSkip() {
+  function handleFinishLater() {
     setLocalError(null);
-    startSkipIntro(async () => {
-      try {
-        await skipTrainCaraStep();
-      } catch (error) {
-        setLocalError(
-          error instanceof Error ? error.message : "Could not skip this step.",
-        );
+    startFinishLater(async () => {
+      const result = await skipTrainCaraStep();
+      if (result && !result.ok) {
+        setLocalError(result.message);
       }
+    });
+  }
+
+  function handleServicesNotOfferedRawChange(value: string) {
+    setServicesNotOfferedRaw(value);
+    if (!value.trim()) {
+      setServicesNotOffered("");
+    }
+  }
+
+  function handleSkipServices() {
+    if (step.id !== "services") return;
+    setLocalError(null);
+    const targetIndex =
+      initial.caraGoal === "faq_only"
+        ? stepIndexForId("hours")
+        : stepIndex + 1;
+    const targetStep = TRAIN_CARA_STEPS[targetIndex];
+    if (!targetStep) return;
+    startSaveProgress(async () => {
+      const result = await persistTrainCaraServicesStep({
+        ...payloadFromState({ trainCaraStep: targetStep.id }),
+        extractOfferings: false,
+      });
+      if (!result.ok) {
+        setLocalError(result.message);
+        return;
+      }
+      setStepIndex(targetIndex);
     });
   }
 
@@ -490,18 +532,39 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
         );
       case "services":
         return (
-          <CaraDualTextareaStep
+          <TrainCaraServicesStep
             title={step.title}
             subtitle={servicesCopy.subtitle}
             helper={servicesCopy.helper}
-            primaryLabel={servicesCopy.primaryLabel}
-            primaryValue={servicesOffered}
-            primaryPlaceholder={servicesCopy.primaryPlaceholder}
-            secondaryLabel={servicesCopy.secondaryLabel}
-            secondaryValue={servicesNotOffered}
-            secondaryPlaceholder={servicesCopy.secondaryPlaceholder}
-            onPrimaryChange={setServicesOffered}
-            onSecondaryChange={setServicesNotOffered}
+            niche={initial.niche}
+            caraGoal={initial.caraGoal}
+            servicesCopy={servicesCopy}
+            catalog={serviceCatalog}
+            bookingLinkUrl={initial.linkUrl}
+            servicesOfferedRaw={servicesOfferedRaw}
+            onCatalogChange={(services, offered) => {
+              setServiceCatalog(services);
+              setServicesOffered(offered);
+              if (services.length > 0) {
+                setServicesOfferedRaw("");
+              }
+            }}
+            onServicesOfferedRawChange={setServicesOfferedRaw}
+            onSkip={
+              initial.caraGoal === "faq_only" ? handleSkipServices : undefined
+            }
+            disabled={busy}
+          />
+        );
+      case "exclusions":
+        return (
+          <TrainCaraExclusionsStep
+            title={step.title}
+            subtitle={exclusionsCopy.subtitle}
+            exclusionsCopy={exclusionsCopy}
+            servicesNotOfferedRaw={servicesNotOfferedRaw}
+            servicesNotOffered={servicesNotOffered}
+            onServicesNotOfferedRawChange={handleServicesNotOfferedRawChange}
             disabled={busy}
           />
         );
@@ -524,18 +587,15 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
         );
       case "capture":
         return (
-          <CaraDualTextareaStep
+          <TrainCaraCaptureStep
             title={verticalCopy.capture.title}
             subtitle={verticalCopy.capture.subtitle}
             helper={verticalCopy.capture.helper}
-            primaryLabel={verticalCopy.labels.detailsToCollect}
-            primaryValue={detailsToCollect}
-            primaryPlaceholder={verticalCopy.placeholders.detailsToCollect}
-            secondaryLabel={verticalCopy.labels.rules}
-            secondaryValue={rulesText}
-            secondaryPlaceholder={verticalCopy.placeholders.rules}
-            onPrimaryChange={setDetailsToCollect}
-            onSecondaryChange={setRulesText}
+            captureFields={captureFields}
+            onCaptureFieldsChange={setCaptureFields}
+            businessType={initial.businessType}
+            niche={initial.niche}
+            caraGoal={initial.caraGoal}
             disabled={busy}
           />
         );
@@ -562,14 +622,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
             onChange={setFaqs}
           />
         );
-      case "review":
-        return (
-          <CaraReviewStep
-            pages={reviewPages}
-            pageIndex={reviewPageIndex}
-            disabled={busy}
-          />
-        );
       default:
         return null;
     }
@@ -589,10 +641,9 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
             </OnboardingEnter>
           </OnboardingEnterProvider>
           <TrainCaraIntro
+            niche={initial.niche}
             onStart={handleStartTraining}
             onBack={handleIntroBack}
-            onSkip={handleIntroSkip}
-            skipPending={skippingIntro}
             disabled={busy}
           />
           {(localError || formError) ? (
@@ -605,71 +656,78 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
     );
   }
 
-  const isLastReviewPage =
-    step.id === "review" &&
-    (reviewPages.length === 0 || reviewPageIndex >= reviewPages.length - 1);
-  const continueLabel = step.id === "review"
-    ? isLastReviewPage
-      ? "Continue"
-      : "Next"
-    : "Save and continue";
-  const reviewStepKey =
-    step.id === "review" ? `review-${reviewPageIndex}` : step.id;
+  const continueLabel = isLast ? "Continue" : "Save and continue";
 
   return (
-    <div className="flex w-full flex-col items-center">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center">
       <OnboardingStepPanel
-        stepKey={reviewStepKey}
-        className={cn(
-          "flex w-full flex-col items-center",
-          step.id === "review" ? "gap-3" : "gap-5",
-        )}
+        stepKey={step.id}
+        className="flex min-h-0 w-full flex-1 flex-col items-center gap-4"
       >
         <OnboardingEnterProvider>
-          <div className="flex w-full flex-col items-center gap-5">
-            <OnboardingEnter className="flex w-full justify-center">
-              <ClisteLogoMark
-                size={ONBOARDING_LOGO_SIZE}
-                priority
-                className="mx-auto"
-              />
-            </OnboardingEnter>
-            <OnboardingEnter className="w-full">{renderStep()}</OnboardingEnter>
+          <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4">
+            <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4 overflow-y-auto overscroll-y-contain">
+              <OnboardingEnter className="flex w-full shrink-0 justify-center">
+                <ClisteLogoMark
+                  size={ONBOARDING_LOGO_SIZE}
+                  priority
+                  className="mx-auto"
+                />
+              </OnboardingEnter>
+              <OnboardingEnter className="w-full shrink-0">
+                {renderStep()}
+              </OnboardingEnter>
 
-            {formError ? (
-              <p className="w-full text-center text-[13px] text-red-600" role="alert">
-                {formError}
-              </p>
-            ) : null}
+              {formError ? (
+                <p className="w-full shrink-0 text-center text-[13px] text-red-600" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+            </div>
 
-            <OnboardingEnter className="flex w-full items-center justify-center gap-3 pt-4">
-              <button
-                type="button"
-                onClick={handleBack}
-                disabled={busy}
-                className={ONBOARDING_SECONDARY_BUTTON}
-              >
-                <ChevronLeft className="size-4" aria-hidden />
-                Back
-              </button>
-              <OnboardingPrimaryButton
-                type="button"
-                pending={busy}
-                onClick={handleContinue}
-                className="min-w-[12rem]"
-              >
-                {busy ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Saving…
-                  </>
-                ) : (
-                  <>
-                    {continueLabel}
-                    <ArrowRight className="size-4" aria-hidden />
-                  </>
-                )}
-              </OnboardingPrimaryButton>
+            <OnboardingEnter className="flex w-full shrink-0 flex-col items-center justify-center gap-2.5 border-t border-slate-200/60 pt-3">
+              {canFinishLater ? (
+                <button
+                  type="button"
+                  onClick={handleFinishLater}
+                  disabled={busy}
+                  className={cn(
+                    ONBOARDING_SECONDARY_BUTTON,
+                    "h-auto min-h-10 w-full max-w-md px-3 py-2.5 text-[12px] leading-snug sm:text-[13px]",
+                  )}
+                >
+                  {finishingLater ? "Saving…" : "Finish later"}
+                </button>
+              ) : null}
+              <div className="flex w-full items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  disabled={busy}
+                  className={ONBOARDING_SECONDARY_BUTTON}
+                >
+                  <ChevronLeft className="size-4" aria-hidden />
+                  Back
+                </button>
+                <OnboardingPrimaryButton
+                  type="button"
+                  pending={busy}
+                  onClick={handleContinue}
+                  className="min-w-[12rem]"
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      {continueLabel}
+                      <ArrowRight className="size-4" aria-hidden />
+                    </>
+                  )}
+                </OnboardingPrimaryButton>
+              </div>
             </OnboardingEnter>
           </div>
         </OnboardingEnterProvider>

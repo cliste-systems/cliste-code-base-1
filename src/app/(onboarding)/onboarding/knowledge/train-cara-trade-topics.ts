@@ -1,3 +1,5 @@
+import { verticalIdForNiche } from "@/lib/verticals";
+
 /** Trade-aware topics for the "What should Cara know?" step (not FAQs). */
 
 export type TradeKnowledgeTopicId =
@@ -38,6 +40,15 @@ export function detectTradePack(businessType: string): TradePack {
   if (!t) return "default";
   if (TRADES_PATTERN.test(t)) return "trades";
   if (SALON_PATTERN.test(t)) return "salon";
+  return "default";
+}
+
+/** Tailored pack selection: salon vertical only; everything else is generic. */
+export function tradePackForNicheAndType(
+  niche: string | null | undefined,
+  _businessType: string,
+): TradePack {
+  if (verticalIdForNiche(niche) === "salon_beauty") return "salon";
   return "default";
 }
 
@@ -97,38 +108,11 @@ const UNIVERSAL_TOPICS: TradeKnowledgeTopic[] = [
   },
 ];
 
-export function getTradeKnowledgeTopics(businessType: string): TradeKnowledgeTopic[] {
-  const pack = detectTradePack(businessType);
-
-  if (pack === "trades") {
-    return [
-      ...UNIVERSAL_TOPICS,
-      {
-        id: "services_offered",
-        label: "Services",
-        required: true,
-        ask: "What services do you offer — repairs, installations, emergencies, and anything else callers should know?",
-      },
-      {
-        id: "emergency_callouts",
-        label: "Emergency callouts",
-        required: false,
-        ask: "Do you offer emergency or out-of-hours callouts? If yes, how should Cara explain that to callers?",
-      },
-      {
-        id: "location",
-        label: "Where you're based",
-        required: false,
-        ask: "Where are you based? (town or area callers should know)",
-      },
-      {
-        id: "pricing",
-        label: "Pricing",
-        required: false,
-        ask: "How should Cara explain your prices or quotes when callers ask?",
-      },
-    ];
-  }
+export function getTradeKnowledgeTopics(
+  businessType: string,
+  niche?: string | null,
+): TradeKnowledgeTopic[] {
+  const pack = tradePackForNicheAndType(niche, businessType);
 
   if (pack === "salon") {
     return [
@@ -189,15 +173,19 @@ export function getTradeKnowledgeTopics(businessType: string): TradeKnowledgeTop
   ];
 }
 
-export function tradeTopicIdsForType(businessType: string): TradeKnowledgeTopicId[] {
-  return getTradeKnowledgeTopics(businessType).map((t) => t.id);
+export function tradeTopicIdsForType(
+  businessType: string,
+  niche?: string | null,
+): TradeKnowledgeTopicId[] {
+  return getTradeKnowledgeTopics(businessType, niche).map((t) => t.id);
 }
 
 export function nextMissingTradeTopic(
   collected: CaraKnowledgeCollected,
   businessType: string,
+  niche?: string | null,
 ): TradeKnowledgeTopic | null {
-  for (const topic of getTradeKnowledgeTopics(businessType)) {
+  for (const topic of getTradeKnowledgeTopics(businessType, niche)) {
     if (!isTradeTopicSatisfied(topic.id, collected)) {
       return topic;
     }
@@ -209,9 +197,10 @@ export function isKnowledgeCollectionComplete(
   collected: CaraKnowledgeCollected,
   summary: string,
   businessType: string,
+  niche?: string | null,
 ): boolean {
   if (summary.trim().length < 40) return false;
-  for (const topic of getTradeKnowledgeTopics(businessType)) {
+  for (const topic of getTradeKnowledgeTopics(businessType, niche)) {
     if (topic.required && !isTradeTopicSatisfied(topic.id, collected)) {
       return false;
     }

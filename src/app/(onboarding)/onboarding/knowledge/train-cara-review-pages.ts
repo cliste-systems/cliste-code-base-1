@@ -1,11 +1,6 @@
 import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
 
 import {
-  buildReviewRules,
-  parseReviewChipList,
-} from "./train-cara-review-display";
-import {
-  buildBlendedAboutSpeech,
   buildReviewAvailabilitySpeech,
   buildReviewCallsSpeech,
   buildReviewExclusionsSpeech,
@@ -14,11 +9,11 @@ import {
   buildReviewServicesSpeech,
   type ReviewFaqItem,
 } from "./train-cara-review-prose";
+import { parseReviewChipList } from "./train-cara-review-display";
 
 export type { ReviewFaqItem };
 
 export type ReviewPageId =
-  | "about"
   | "services"
   | "exclusions"
   | "availability"
@@ -42,7 +37,6 @@ export type ReviewPageContent = {
   hours: string;
   coverage: string;
   captureDetails: string;
-  rules: string[];
   faqs: AgentFaq[];
 };
 
@@ -53,7 +47,6 @@ export function buildReviewPageContent(input: {
   openingHours: string;
   serviceArea: string;
   detailsToCollect: string;
-  businessRules: string[];
   faqs: AgentFaq[];
 }): ReviewPageContent {
   return {
@@ -63,7 +56,6 @@ export function buildReviewPageContent(input: {
     hours: input.openingHours.trim(),
     coverage: input.serviceArea.trim(),
     captureDetails: input.detailsToCollect.trim(),
-    rules: buildReviewRules(input.businessRules),
     faqs: input.faqs.filter((faq) => faq.question.trim() || faq.answer.trim()),
   };
 }
@@ -87,18 +79,9 @@ function pushSpeechPage(
 
 export function buildReviewPages(
   content: ReviewPageContent,
-  businessName: string,
+  _businessName: string,
 ): ReviewPage[] {
-  const name = businessName.trim() || "your business";
   const pages: ReviewPage[] = [];
-
-  pushSpeechPage(
-    pages,
-    "about",
-    `About ${name}`,
-    "How I'll describe the business when callers ask.",
-    buildBlendedAboutSpeech(content.about, name),
-  );
 
   pushSpeechPage(
     pages,
@@ -128,8 +111,8 @@ export function buildReviewPages(
     pages,
     "calls",
     "How I handle calls",
-    "What I'll collect and the rules I'll follow.",
-    buildReviewCallsSpeech(content.captureDetails, content.rules, content.about),
+    "What I'll collect on calls.",
+    buildReviewCallsSpeech(content.captureDetails, content.about),
   );
 
   const faqItems = buildReviewFaqItems(content.faqs);

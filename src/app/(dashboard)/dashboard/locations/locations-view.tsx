@@ -9,12 +9,14 @@ import {
   type LocationActionResult,
 } from "@/app/(dashboard)/dashboard/locations/actions";
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardPageScrollBody } from "@/components/dashboard/dashboard-form-scroll-region";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { Field } from "@/components/dashboard/field";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import {
   DASHBOARD_HOME_CARD,
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_ICON_CHIP_SM,
   DASHBOARD_ICON_GLYPH_SM,
   DASHBOARD_INPUT_CLASS,
@@ -29,6 +31,8 @@ import { resolveOrganizationDisplayName } from "@/lib/organization-display-name"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+import { useDashboardVertical } from "../dashboard-vertical-context";
 
 type LocationsViewProps = {
   locations: AccountLocationRow[];
@@ -51,6 +55,7 @@ export function LocationsView({
   upgradeMessage,
   activeOrganizationId,
 }: LocationsViewProps) {
+  const { copy } = useDashboardVertical();
   const [state, formAction, pending] = useActionState(
     addAccountLocation,
     initialState,
@@ -64,18 +69,22 @@ export function LocationsView({
       className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "overflow-hidden")}
       data-dashboard-fill
     >
-      <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
+      <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-hidden">
+        <div className="shrink-0">
         <DashboardPageHeader
           eyebrow="Locations"
           title={`${locationLabel}s`}
           icon={MapPin}
           description={`Manage every ${locationLabelLower} under ${accountName}.`}
-          descriptionLine2="Each site gets its own phone number and Cara setup."
+          descriptionLine2={copy.locations.subline}
           summary={[
             { value: String(locations.length), label: locationLabelPlural },
           ]}
         />
+        </div>
 
+        <DashboardPageScrollBody scrollClassName="flex flex-col gap-4 pt-4">
         <section className={cn(DASHBOARD_HOME_CARD, "shrink-0")}>
           <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
             Your {locationLabelPlural}
@@ -125,7 +134,7 @@ export function LocationsView({
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2 pl-10 sm:pl-0">
                     <Link
-                      href={DASHBOARD_ROUTES.caraSetup}
+                      href={DASHBOARD_ROUTES.businessProfile}
                       className={cn(
                         DASHBOARD_SECONDARY_BUTTON_CLASS,
                         "inline-flex h-9 items-center px-3.5",
@@ -217,7 +226,9 @@ export function LocationsView({
             </Link>
           </p>
         ) : null}
+        </DashboardPageScrollBody>
       </DashboardAnimatedPageSections>
+      </div>
     </div>
   );
 }

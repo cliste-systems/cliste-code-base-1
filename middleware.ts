@@ -4,11 +4,9 @@ import {
   ADMIN_GATE_COOKIE_PREFIX,
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
+import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
 import { LEGACY_DASHBOARD_REDIRECTS } from "./src/lib/dashboard-routes";
-import {
-  DASHBOARD_LEGAL_ACCEPT_PATH,
-  LEGAL_DOCUMENT_VERSIONS,
-} from "./src/lib/legal-documents";
+import { DASHBOARD_LEGAL_ACCEPT_PATH } from "./src/lib/legal-documents";
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
 import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
 import { pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
@@ -29,6 +27,21 @@ function rootToLoginRedirect(
 ): NextResponse {
   if (request.nextUrl.pathname !== "/") return response;
   const redirectRes = NextResponse.redirect(new URL("/authenticate", request.url));
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
+}
+
+/** Mistyped sign-in URLs (e.g. `/signin`) must not match `/[salonSlug]`. */
+function legacyAuthPathRedirect(
+  request: NextRequest,
+  response: NextResponse,
+): NextResponse {
+  const path = request.nextUrl.pathname;
+  const target = LEGACY_AUTH_REDIRECTS[path];
+  if (!target) return response;
+  const url = new URL(target, request.url);
+  url.search = request.nextUrl.search;
+  const redirectRes = NextResponse.redirect(url);
   copySessionCookies(response, redirectRes);
   return redirectRes;
 }
@@ -108,9 +121,6 @@ function buildForwardRequestHeaders(request: NextRequest): Headers {
   return headers;
 }
 
-const LEGAL_OK_COOKIE = "cliste_legal_ok";
-const LEGAL_OK_VERSION = Object.values(LEGAL_DOCUMENT_VERSIONS).join("|");
-
 async function legalAcceptRedirect(
   request: NextRequest,
   response: NextResponse,
@@ -120,10 +130,6 @@ async function legalAcceptRedirect(
 
   const pathname = request.nextUrl.pathname;
   if (pathname.startsWith("/api/")) return null;
-
-  if (request.cookies.get(LEGAL_OK_COOKIE)?.value === LEGAL_OK_VERSION) {
-    return null;
-  }
 
   const admin = createAdminClient();
   const { data: profile } = await admin
@@ -161,14 +167,6 @@ async function legalAcceptRedirect(
     return redirectRes;
   }
 
-  response.cookies.set(LEGAL_OK_COOKIE, LEGAL_OK_VERSION, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60,
-    path: "/",
-  });
-
   return null;
 }
 
@@ -181,6 +179,8 @@ export async function middleware(request: NextRequest) {
 
   const maybeRootRedirect = rootToLoginRedirect(request, response);
   if (maybeRootRedirect !== response) return maybeRootRedirect;
+  const authAliasRedirect = legacyAuthPathRedirect(request, response);
+  if (authAliasRedirect !== response) return authAliasRedirect;
   const legacyNavRedirect = legacyDashboardPathRedirect(request, response);
   if (legacyNavRedirect !== response) return legacyNavRedirect;
   const unlockRedirect = dashboardUnlockRedirect(request, response);

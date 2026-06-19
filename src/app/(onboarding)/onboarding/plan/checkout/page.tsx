@@ -1,12 +1,14 @@
-import Link from "next/link";
-
-import { StripeEmbeddedCheckout } from "@/components/billing/stripe-embedded-checkout";
+import { PlanCheckoutFlow } from "@/components/billing/plan-checkout-flow";
 import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
+import { PLATFORM_TRIAL_DAYS } from "@/lib/cliste-plans";
 import { guardOnboardingPage } from "@/lib/onboarding-page-guard";
 import { requireOnboardingSession } from "@/lib/onboarding-session";
 import { stripePublishableConfigured } from "@/lib/stripe-publishable";
 
-import { prepareOnboardingEmbeddedCheckout } from "../../actions";
+import {
+  persistOnboardingElementsCheckout,
+  prepareOnboardingElementsCheckout,
+} from "../../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,7 @@ export default async function OnboardingPlanCheckoutPage() {
       <OnboardingStepShell
         variant="wide"
         title="Set up billing"
-        description="Add a payment method to start your 14-day free trial."
+        description={`Add a payment method to start your ${PLATFORM_TRIAL_DAYS}-day free trial.`}
       >
         <CheckoutError
           message="Stripe publishable key is not configured. Add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY to your environment."
@@ -28,44 +30,29 @@ export default async function OnboardingPlanCheckoutPage() {
     );
   }
 
-  const result = await prepareOnboardingEmbeddedCheckout();
+  const result = await prepareOnboardingElementsCheckout();
 
   if (!result.ok) {
     return (
       <OnboardingStepShell
         variant="wide"
         title="Set up billing"
-        description="Add a payment method to start your 14-day free trial."
+        description={`Add a payment method to start your ${PLATFORM_TRIAL_DAYS}-day free trial.`}
       >
         <CheckoutError message={result.message} />
-        <Link
-          href="/onboarding/plan"
-          className="mt-4 inline-block text-sm font-medium text-slate-600 hover:text-slate-900"
-        >
-          Back to plans
-        </Link>
       </OnboardingStepShell>
     );
   }
 
   return (
-    <OnboardingStepShell
-      variant="wide"
-      title="Set up billing"
-      description="14-day free trial, then your plan renews monthly. Cancel anytime."
-    >
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-4 flex justify-end">
-          <Link
-            href="/onboarding/plan"
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            Back to plans
-          </Link>
-        </div>
-        <StripeEmbeddedCheckout clientSecret={result.clientSecret} />
-      </div>
-    </OnboardingStepShell>
+    <PlanCheckoutFlow
+      clientSecret={result.clientSecret}
+      subscriptionId={result.subscriptionId}
+      summary={result.summary}
+      returnUrl={result.returnUrl}
+      continueHref="/dashboard?welcome=1"
+      onPersist={persistOnboardingElementsCheckout}
+    />
   );
 }
 

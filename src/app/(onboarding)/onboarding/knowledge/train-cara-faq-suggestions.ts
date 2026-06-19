@@ -1,10 +1,11 @@
 import type { OnboardingUiCopy } from "@/lib/onboarding-ui-copy-shared";
 
+import { verticalIdForNiche } from "@/lib/verticals";
+
 import {
   deterministicFaqSuggestions,
   type FaqSuggestionContext,
 } from "./train-cara-prefill-heuristics";
-import { detectTradePack } from "./train-cara-trade-topics";
 
 const SALON_FAQ_UI_HINT =
   /\b(walk.?in|balayage|blow.?dry|colour|color|highlight|beard trim|nail|salon)\b/i;
@@ -22,42 +23,6 @@ function hairSalonFaqSuggestions(): string[] {
     "Do you take walk-ins?",
     "How much is a cut and colour?",
     "How far ahead should I book?",
-  ];
-}
-
-function plumberFaqSuggestions(): string[] {
-  return [
-    "Do you offer emergency callouts?",
-    "What areas do you cover?",
-    "How much does a callout cost?",
-  ];
-}
-
-function electricianFaqSuggestions(): string[] {
-  return [
-    "Do you do emergency callouts?",
-    "Can you do fuse board upgrades?",
-    "What areas do you cover?",
-  ];
-}
-
-function heatingFaqSuggestions(): string[] {
-  return [
-    "Do you repair boilers?",
-    "How much is a boiler service?",
-    "Do you offer no-heating emergencies?",
-  ];
-}
-
-function tradesFaqSuggestions(businessType: string): string[] {
-  const lower = businessType.toLowerCase();
-  if (lower.includes("electric")) return electricianFaqSuggestions();
-  if (lower.includes("heat") || lower.includes("boiler")) return heatingFaqSuggestions();
-  if (lower.includes("plumb")) return plumberFaqSuggestions();
-  return [
-    "Do you offer emergency callouts?",
-    "What areas do you cover?",
-    "How quickly can someone come out?",
   ];
 }
 
@@ -81,24 +46,23 @@ export function packFaqSuggestionsForBusiness(
   businessType: string,
   niche: string,
 ): string[] {
+  if (verticalIdForNiche(niche) !== "salon_beauty") {
+    return defaultFaqSuggestions(businessType);
+  }
   if (niche === "barber") return barberFaqSuggestions();
-  if (niche === "hair_salon") return hairSalonFaqSuggestions();
-
-  const pack = detectTradePack(businessType);
-  if (pack === "trades") return tradesFaqSuggestions(businessType);
-  if (pack === "salon") return hairSalonFaqSuggestions();
-  return defaultFaqSuggestions(businessType);
+  return hairSalonFaqSuggestions();
 }
 
 function shouldUseFaqUiCopy(
-  businessType: string,
+  niche: string,
   suggestions: string[] | undefined,
 ): suggestions is string[] {
   if (!suggestions?.length) return false;
-  if (detectTradePack(businessType) !== "trades") return true;
-
-  const blob = suggestions.join(" ");
-  return !SALON_FAQ_UI_HINT.test(blob);
+  if (verticalIdForNiche(niche) === "salon_beauty") {
+    const blob = suggestions.join(" ");
+    return !SALON_FAQ_UI_HINT.test(blob);
+  }
+  return true;
 }
 
 function uniqueSuggestions(lists: string[][], max = 3): string[] {
@@ -133,17 +97,18 @@ export function resolveFaqSuggestions(input: {
   );
   const contextual = deterministicFaqSuggestions(input.context);
   const uiSuggestions = shouldUseFaqUiCopy(
-    input.businessType,
+    input.niche,
     input.uiCopy?.faqSuggestions,
   )
     ? input.uiCopy.faqSuggestions
     : [];
 
-  // AI copy is primary for every vertical; the hardcoded pack is only a fallback.
-  // `shouldUseFaqUiCopy` still guards against salon-flavoured copy on trades.
-  const lists = [uiSuggestions, contextual, packBase];
+  const isSalon = verticalIdForNiche(input.niche) === "salon_beauty";
+  const lists = isSalon
+    ? [packBase, uiSuggestions, contextual]
+    : [uiSuggestions, packBase, contextual];
 
-  return uniqueSuggestions(lists, 3);
+  return uniqueSuggestions(lists, isSalon ? 4 : 3);
 }
 
 export function resolveFaqPlaceholders(input: {
@@ -154,26 +119,20 @@ export function resolveFaqPlaceholders(input: {
   questionPlaceholder: string;
   answerPlaceholder: string;
 } {
-  const pack = detectTradePack(input.businessType);
   const isBarber = input.niche === "barber";
-  const isSalon =
-    input.niche === "hair_salon" || (pack === "salon" && !isBarber);
+  const isSalon = verticalIdForNiche(input.niche) === "salon_beauty";
 
-  const questionFallback = isBarber
-    ? "e.g. Do you take walk-ins?"
-    : isSalon
+  const questionFallback = isSalon
+    ? isBarber
       ? "e.g. Do you take walk-ins?"
-      : pack === "trades"
-        ? "e.g. Do you do emergency callouts?"
-        : "e.g. How much does it cost?";
+      : "e.g. Do you take walk-ins?"
+    : "e.g. How much does it cost?";
 
-  const answerFallback = isBarber
-    ? "e.g. Walk-ins welcome before 5pm — fades need 30 mins."
-    : isSalon
-      ? "e.g. Walk-ins before 4pm; colour needs booking."
-      : pack === "trades"
-        ? "e.g. Yes for burst pipes — standard jobs Mon–Sat."
-        : "e.g. We quote after a quick chat about the job.";
+  const answerFallback = isSalon
+    ? isBarber
+      ? "e.g. Walk-ins welcome before 5pm — fades need 30 mins."
+      : "e.g. Walk-ins before 4pm; colour needs booking."
+    : "e.g. We quote after a quick chat about the job.";
 
   return {
     questionPlaceholder:

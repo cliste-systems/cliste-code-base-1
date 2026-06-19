@@ -13,7 +13,7 @@ export function TermsDocument() {
     <>
       <LegalPageHeader
         title="Terms of service"
-        description="These terms govern your business use of the Cliste platform operated by Cliste Systems, registered in Ireland."
+        description={`These terms govern your business use of the Cliste platform operated by ${CLISTE_COMPANY.legalName}, registered in Ireland.`}
       />
 
       <p className="text-[15px] leading-relaxed text-slate-700">

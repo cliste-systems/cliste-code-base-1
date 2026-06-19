@@ -5,13 +5,18 @@ import { useState, useTransition } from "react";
 import { ArrowRight } from "lucide-react";
 
 import { AuthFormAlert } from "@/components/auth/auth-form-alert";
-import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
 import {
   OnboardingFieldBox,
   OnboardingFieldSurfaceProvider,
 } from "@/components/onboarding/onboarding-form-card";
+import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
 import { ONBOARDING_FIELD_INPUT } from "@/components/onboarding/onboarding-ui";
 import { cn } from "@/lib/utils";
+
+import {
+  SIGNUP_EMAIL_OTP_INPUT_MAX,
+  SIGNUP_EMAIL_OTP_LENGTH,
+} from "@/lib/signup-email-otp";
 
 import { resendSignupConfirmationEmail } from "../resend-confirmation";
 import { verifySignupCode } from "../verify-code";
@@ -54,70 +59,80 @@ export function VerifyCodeForm({ email }: { email: string }) {
 
   return (
     <OnboardingFieldSurfaceProvider surface="profile">
-      <form
-        className="space-y-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          handleVerify();
-        }}
-      >
-        <OnboardingFieldBox
-          label="Verification code"
-          htmlFor="verification-code"
-          error={error ?? undefined}
-          className="px-3.5 py-2.5"
+      <div className="space-y-3">
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleVerify();
+          }}
         >
-          <input
-            id="verification-code"
-            name="code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            placeholder="123456"
+          <OnboardingFieldBox
+            label="Verification code"
+            htmlFor="verification-code"
+            error={error ?? undefined}
+            className="px-3.5 py-2.5"
+          >
+            <input
+              id="verification-code"
+              name="code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            maxLength={SIGNUP_EMAIL_OTP_INPUT_MAX}
+            placeholder={"0".repeat(SIGNUP_EMAIL_OTP_LENGTH)}
             value={code}
             onChange={(event) => {
-              setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+              setCode(
+                event.target.value
+                  .replace(/\D/g, "")
+                  .slice(0, SIGNUP_EMAIL_OTP_INPUT_MAX),
+              );
               setError(null);
             }}
             aria-invalid={Boolean(error)}
             className={cn(
               ONBOARDING_FIELD_INPUT,
-              "text-center text-[20px] font-semibold tracking-[0.4em]",
+              "text-center font-mono text-[15px] font-semibold tracking-[0.22em] sm:text-[17px] sm:tracking-[0.26em]",
             )}
-          />
-        </OnboardingFieldBox>
+            />
+          </OnboardingFieldBox>
 
-        <AuthFormAlert message={error} />
-        {notice ? (
-          <p className="text-[12px] leading-relaxed text-emerald-700">
-            {notice}
-          </p>
-        ) : null}
+          <AuthFormAlert message={error} />
+          {notice ? (
+            <p className="text-[12px] leading-relaxed text-emerald-700">
+              {notice}
+            </p>
+          ) : null}
 
-        <OnboardingPrimaryButton
-          type="submit"
-          pending={pending}
-          disabled={code.length !== 6}
-          className="w-full max-w-none"
-        >
-          {pending ? "Verifying…" : "Verify and continue"}
-          <ArrowRight className="h-4 w-4" aria-hidden />
-        </OnboardingPrimaryButton>
+          <OnboardingPrimaryButton
+            type="submit"
+            pending={pending}
+            disabled={code.length !== SIGNUP_EMAIL_OTP_LENGTH}
+            className="w-full max-w-none"
+          >
+            {pending ? "Verifying…" : "Verify and continue"}
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </OnboardingPrimaryButton>
+        </form>
 
         <p className="text-center text-[12px] text-slate-500">
-          Didn&apos;t get it? Check spam, or{" "}
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={resendPending}
-            className="font-medium text-[#0b1220] underline underline-offset-2 disabled:opacity-60"
-          >
-            {resendPending ? "sending…" : "resend the email"}
-          </button>
-          .
+          Didn&apos;t get it? Check spam.
         </p>
-      </form>
+
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resendPending}
+          className={cn(
+            "w-full cursor-pointer rounded-full border border-slate-200/90 bg-white/90 px-5 py-2.5 text-[13px] font-medium text-[#0b1220] shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition-[color,background-color,border-color,box-shadow] duration-200",
+            "hover:border-slate-300 hover:bg-slate-100 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)]",
+            "disabled:cursor-not-allowed disabled:opacity-60",
+          )}
+        >
+          {resendPending ? "Sending…" : "Resend email"}
+        </button>
+      </div>
     </OnboardingFieldSurfaceProvider>
   );
 }

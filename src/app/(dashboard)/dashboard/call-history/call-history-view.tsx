@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { Check, Copy, Inbox, Phone, PhoneCall, Search, User } from "lucide-react";
+import { Ban, Check, Copy, Inbox, Phone, PhoneCall, Search, ShieldOff, User } from "lucide-react";
+
+import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
@@ -27,8 +30,18 @@ import type { DashboardMetricRangeKey } from "@/lib/dashboard-metric-range";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  ANONYMOUS_CALLER_E164,
+  normalizeBlockedCallerE164,
+} from "@/lib/blocked-callers";
+import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 
+import {
+  addBlockedCaller,
+  removeBlockedCallerByPhone,
+} from "../settings/blocked-numbers-actions";
 import { fetchCallHistoryDetail } from "./actions";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
@@ -39,6 +52,7 @@ import {
   outcomeBadgeVariant,
   reviewTranscriptForDisplay,
   summaryForDisplay,
+  callSummaryForDisplay,
   whatHappenedNextLabel,
   type CallHistoryListItem,
   type CallHistoryMetrics,
@@ -58,6 +72,8 @@ type CallHistoryViewProps = {
   metrics: CallHistoryMetrics;
   initialSelectedCallId?: string | null;
   pagination?: CallHistoryPagination;
+  blockedCallerE164s: string[];
+  businessName?: string;
   className?: string;
 };
 
@@ -85,8 +101,12 @@ export function CallHistoryView({
   metrics: _metrics,
   initialSelectedCallId,
   pagination,
+  blockedCallerE164s,
+  businessName = "",
   className,
 }: CallHistoryViewProps) {
+  const router = useRouter();
+  const { copy } = useDashboardVertical();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilterValue>("all");
@@ -95,6 +115,13 @@ export function CallHistoryView({
   const [detailById, setDetailById] = useState<
     Record<string, { transcriptVerbatim: string; transcriptReview: string | null }>
   >({});
+  const [blockedSet, setBlockedSet] = useState(
+    () => new Set(blockedCallerE164s),
+  );
+
+  useEffect(() => {
+    setBlockedSet(new Set(blockedCallerE164s));
+  }, [blockedCallerE164s]);
 
   const filtered = useMemo(() => {
     return calls.filter(
@@ -149,7 +176,12 @@ export function CallHistoryView({
 
   const copySummary = useCallback(async () => {
     if (!selected) return;
-    const text = summaryForDisplay(selected);
+    const text = callSummaryForDisplay(selected, {
+      businessName,
+      callerIsBlocked:
+        normalizeBlockedCallerE164(selected.callerId) != null &&
+        blockedSet.has(normalizeBlockedCallerE164(selected.callerId)!),
+    });
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
@@ -158,7 +190,7 @@ export function CallHistoryView({
     } catch {
       /* ignore */
     }
-  }, [selected]);
+  }, [selected, businessName, blockedSet]);
 
   const contactHref = DASHBOARD_ROUTES.contacts;
 
@@ -220,7 +252,7 @@ export function CallHistoryView({
                 <EmptyState
                   icon={Phone}
                   title="No calls yet"
-                  description="When Cara answers, calls will appear here with summaries and outcomes."
+                  description={copy.calls.emptyDescription}
                   className="w-full py-10"
                 />
               ) : (
@@ -255,6 +287,10 @@ export function CallHistoryView({
             detailLoading={detailLoading}
             onCopySummary={copySummary}
             contactHref={contactHref}
+            blockedSet={blockedSet}
+            businessName={businessName}
+            onBlockedChange={setBlockedSet}
+            onRefresh={() => router.refresh()}
           />
         }
       />
@@ -387,12 +423,20 @@ function CallDetailPanel({
   detailLoading,
   onCopySummary,
   contactHref,
+  blockedSet,
+  businessName,
+  onBlockedChange,
+  onRefresh,
 }: {
   call: CallHistoryListItem | null;
   copied: boolean;
   detailLoading: boolean;
   onCopySummary: () => void;
   contactHref: string;
+  blockedSet: Set<string>;
+  businessName: string;
+  onBlockedChange: (next: Set<string>) => void;
+  onRefresh: () => void;
 }) {
   if (!call) {
     return (
@@ -417,6 +461,10 @@ function CallDetailPanel({
       detailLoading={detailLoading}
       onCopySummary={onCopySummary}
       contactHref={contactHref}
+      blockedSet={blockedSet}
+      businessName={businessName}
+      onBlockedChange={onBlockedChange}
+      onRefresh={onRefresh}
     />
   );
 }
@@ -427,16 +475,36 @@ function CallDetailPanelContent({
   detailLoading,
   onCopySummary,
   contactHref,
+  blockedSet,
+  businessName,
+  onBlockedChange,
+  onRefresh,
 }: {
   call: CallHistoryListItem;
   copied: boolean;
   detailLoading: boolean;
   onCopySummary: () => void;
   contactHref: string;
+  blockedSet: Set<string>;
+  businessName: string;
+  onBlockedChange: (next: Set<string>) => void;
+  onRefresh: () => void;
 }) {
   const [showFullTranscript, setShowFullTranscript] = useState(false);
+  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [unblockConfirmOpen, setUnblockConfirmOpen] = useState(false);
+  const [blockMsg, setBlockMsg] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
-  const summary = summaryForDisplay(call);
+  const callerE164 = normalizeBlockedCallerE164(call.callerId);
+  const canManageBlock =
+    callerE164 != null && call.callerId.trim() !== ANONYMOUS_CALLER_E164;
+  const isBlocked = callerE164 != null && blockedSet.has(callerE164);
+
+  const summary = callSummaryForDisplay(call, {
+    businessName,
+    callerIsBlocked: isBlocked,
+  });
   const safeTranscript = reviewTranscriptForDisplay(call);
   const fullTranscript = fullTranscriptForDisplay(call);
   const showFull = showFullTranscript && fullTranscript != null;
@@ -446,6 +514,40 @@ function CallDetailPanelContent({
   const showWhatHappenedNext =
     call.hasOpenAction ||
     (call.outcome !== "answered" && whatHappenedNext !== "Handled");
+
+  function onConfirmBlock() {
+    if (!callerE164) return;
+    setBlockMsg(null);
+    startTransition(async () => {
+      const result = await addBlockedCaller({ phone: callerE164 });
+      setBlockConfirmOpen(false);
+      if (!result.ok) {
+        setBlockMsg(result.message);
+        return;
+      }
+      onBlockedChange(new Set([...blockedSet, callerE164]));
+      setBlockMsg("Caller blocked.");
+      onRefresh();
+    });
+  }
+
+  function onConfirmUnblock() {
+    if (!callerE164) return;
+    setBlockMsg(null);
+    startTransition(async () => {
+      const result = await removeBlockedCallerByPhone({ phone: callerE164 });
+      setUnblockConfirmOpen(false);
+      if (!result.ok) {
+        setBlockMsg(result.message);
+        return;
+      }
+      const next = new Set(blockedSet);
+      next.delete(callerE164);
+      onBlockedChange(next);
+      setBlockMsg("Caller unblocked.");
+      onRefresh();
+    });
+  }
 
   return (
     <DetailPanelShell surface="embedded">
@@ -547,6 +649,27 @@ function CallDetailPanelContent({
       </DetailPanelBody>
 
       <DetailPanelFooter>
+        {canManageBlock ? (
+          isBlocked ? (
+            <DetailActionButton
+              type="button"
+              onClick={() => setUnblockConfirmOpen(true)}
+              disabled={pending}
+            >
+              <ShieldOff className="size-3.5" aria-hidden />
+              Unblock
+            </DetailActionButton>
+          ) : (
+            <DetailActionButton
+              type="button"
+              onClick={() => setBlockConfirmOpen(true)}
+              disabled={pending}
+            >
+              <Ban className="size-3.5" aria-hidden />
+              Block this caller
+            </DetailActionButton>
+          )
+        ) : null}
         <DetailActionButton onClick={onCopySummary} disabled={!summary}>
           {copied ? (
             <Check className="size-3.5" aria-hidden />
@@ -566,6 +689,31 @@ function CallDetailPanelContent({
           </DetailActionButton>
         ) : null}
       </DetailPanelFooter>
+
+      {blockMsg ? (
+        <p className="px-5 pb-3 text-[12px] text-slate-600">{blockMsg}</p>
+      ) : null}
+
+      <ConfirmDialog
+        open={blockConfirmOpen}
+        onOpenChange={setBlockConfirmOpen}
+        title="Block this caller?"
+        description="Future calls from this number will hear a short message and hang up before Cara answers. You can undo this in Settings."
+        confirmLabel="Block caller"
+        onConfirm={onConfirmBlock}
+        pending={pending}
+        destructive
+      />
+      <ConfirmDialog
+        open={unblockConfirmOpen}
+        onOpenChange={setUnblockConfirmOpen}
+        title="Unblock this caller?"
+        description="They will be able to reach Cara again on your line."
+        confirmLabel="Unblock"
+        onConfirm={onConfirmUnblock}
+        pending={pending}
+        destructive
+      />
     </DetailPanelShell>
   );
 }

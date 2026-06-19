@@ -14,7 +14,7 @@ function formatListPhrase(items: string[]): string {
 }
 
 const FIXED_ORDER_INSTRUCTION =
-  "I always get their name and number first. When it's relevant to the call, I work through the optional details below in this order — one at a time, woven into the chat naturally. I don't skip ahead unless the caller has already given something. If they don't want to share something, I keep helping, note what's missing, and move on.";
+  "I always get their name first. For their number, I confirm the caller ID when it's showing before asking them to spell it out. When it's relevant to the call, I work through the optional details below in this order — one at a time, woven into the chat naturally. I don't skip ahead unless the caller has already given something. If they don't want to share something, I keep helping, note what's missing, and move on.";
 
 export function buildDetailsCollectionPromptSection(
   collectItems: string[],

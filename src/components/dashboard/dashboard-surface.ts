@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /**
  * Shared card surface — white with a defined edge and a soft, premium
  * elevation so cards read as real surfaces (not faint hairline outlines).
@@ -19,11 +21,90 @@ export const DASHBOARD_INTERACTIVE_CURSOR =
 
 /** Master/detail pages (Calls, Inbox) — white canvas, no grey gutters between cards. */
 export const DASHBOARD_PAGE_SHELL_FILL_WHITE =
-  "flex h-full min-h-0 w-full flex-col gap-4 bg-white p-4 sm:p-5 lg:px-8 lg:py-6";
+  "flex h-full min-h-0 w-full flex-1 flex-col bg-white";
+
+/** Viewport-fit home column — canonical dashboard gutter (px-8 pt-5 pb-5). */
+export const DASHBOARD_HOME_CONTENT_COLUMN =
+  "mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-4 px-8 pb-5 pt-5";
+
+/** Shared column — nav + page content share this wrapper so outer edges align. */
+export const DASHBOARD_CONTENT_COLUMN =
+  "mx-auto w-full max-w-[1500px] px-8";
 
 /** Canonical home card — white, rounded, soft elevation. */
 export const DASHBOARD_HOME_CARD =
   "rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-22px_rgba(15,23,42,0.30)] sm:p-5";
+
+/** App canvas behind dashboard surfaces. */
+export const DASHBOARD_SHELL_BG = "bg-white";
+
+/** Desktop top navigation bar — single rounded container. */
+export const DASHBOARD_TOP_NAV_SURFACE =
+  "rounded-[24px] border border-[#e8eaed] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-22px_rgba(15,23,42,0.10)]";
+
+/**
+ * Hides dashboard page content and mobile nav while sections are rebuilt.
+ * Desktop top nav stays visible. Set to false when re-enabling pages.
+ */
+export const DASHBOARD_REBUILD_SHELL = false;
+
+/** Home hero — large rounded header block below desktop nav. */
+export const DASHBOARD_HOME_HERO =
+  "relative w-full rounded-[24px] border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_30px_-22px_rgba(15,23,42,0.08)]";
+
+/** Home dashboard card shell — flex column, clip overflow when viewport is tight. */
+export const DASHBOARD_HOME_CARD_BODY =
+  "flex h-full min-h-0 flex-col overflow-hidden p-4";
+
+/** Inner body when a home card sits inside a unified panel column. */
+export const DASHBOARD_HOME_CARD_EMBEDDED_BODY =
+  "flex h-full min-h-0 flex-col";
+
+/** Unified home panel — one border/shadow wrapping multiple columns. */
+export const DASHBOARD_HOME_UNIFIED_PANEL =
+  `${DASHBOARD_CARD_SURFACE} min-h-0 overflow-hidden`;
+
+export const DASHBOARD_HOME_UNIFIED_PANEL_COLUMN =
+  "flex min-h-0 flex-col p-4";
+
+export const DASHBOARD_HOME_UNIFIED_PANEL_GRID_OPS =
+  "grid h-full min-h-0 grid-cols-3 divide-x divide-slate-100";
+
+export const DASHBOARD_HOME_UNIFIED_PANEL_GRID_INSIGHTS =
+  "grid h-full min-h-0 grid-cols-4 divide-x divide-slate-100";
+
+export function dashboardHomeCardShellClassName(
+  embedded: boolean,
+  className?: string,
+): string {
+  return embedded
+    ? cn(DASHBOARD_HOME_CARD_EMBEDDED_BODY, className)
+    : cn(DASHBOARD_CARD_SURFACE, DASHBOARD_HOME_CARD_BODY, className);
+}
+
+/** Glass metrics row embedded in the home hero. */
+export const DASHBOARD_HOME_HERO_STAT_STRIP =
+  "rounded-[20px] border border-white/80 bg-white/75 p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-20px_rgba(15,23,42,0.12)] backdrop-blur-sm sm:p-4";
+
+/** Inset surfaces inside the top nav — white pills on the white header bar. */
+export const DASHBOARD_TOP_NAV_INSET =
+  "border border-[#e8eaed] bg-white";
+
+/** Compact pill controls inside the top nav (date, workspace, live status). */
+export const DASHBOARD_TOP_NAV_PILL =
+  "inline-flex h-9 items-center gap-2 rounded-full border border-[#e8eaed] bg-white px-3 text-[13px] font-medium text-[#0b1220] transition-colors hover:bg-slate-50";
+
+/** Centre nav links inside the track — same hover as Today. */
+export const DASHBOARD_TOP_NAV_ITEM =
+  "relative inline-flex h-full items-center justify-center rounded-full px-6 text-[13px] font-medium transition-colors hover:bg-slate-50";
+
+/** Centre nav group — Home, Calls, Inbox, Cara, More inside one rounded track. */
+export const DASHBOARD_TOP_NAV_ITEMS =
+  "flex h-10 shrink-0 flex-row flex-nowrap items-stretch gap-1 rounded-full border border-[#e8eaed] bg-white px-2 py-1";
+
+/** Circular icon controls in the top nav (bell, avatar). */
+export const DASHBOARD_TOP_NAV_ICON_BUTTON =
+  "inline-flex size-9 items-center justify-center rounded-full border border-[#e8eaed] bg-white text-slate-600 transition-colors hover:bg-slate-50";
 
 /**
  * Shared icon chip — border (not ring) so strokes are not clipped by overflow parents.
@@ -113,6 +194,10 @@ export const DASHBOARD_INPUT_CLASS =
 /** Native <select> chrome that matches DASHBOARD_INPUT_CLASS. */
 export const DASHBOARD_SELECT_CLASS =
   "h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-[13px] text-slate-900 shadow-sm focus-visible:border-[#0b1220] focus-visible:ring-1 focus-visible:ring-[#0b1220] focus-visible:outline-none";
+
+/** Home first-row card footers — soft grey, aligned with hero glass metrics. */
+export const DASHBOARD_HOME_PANEL_ACTION_BUTTON_CLASS =
+  "cursor-pointer rounded-xl border border-slate-200/80 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed";
 
 /** The one primary CTA used everywhere. */
 export const DASHBOARD_PRIMARY_BUTTON_CLASS =

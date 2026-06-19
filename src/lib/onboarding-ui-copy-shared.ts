@@ -31,20 +31,43 @@ export type OnboardingUiCopy = {
 };
 
 export function buildOnboardingUiCopyContextKey(input: {
+  niche?: string | null;
   businessType?: string | null;
   rawBusinessDescription: string;
 }): string {
+  const niche = String(input.niche ?? "").trim().toLowerCase();
   const type = String(input.businessType ?? "").trim().toLowerCase();
   const description = String(input.rawBusinessDescription ?? "")
     .trim()
     .slice(0, 600)
     .toLowerCase();
-  return `${type}::${description}`;
+  return `${niche}::${type}::${description}`;
+}
+
+export function parseOnboardingUiCopyContextKey(contextKey: string): {
+  niche: string;
+  businessType: string;
+  rawBusinessDescription: string;
+} {
+  const parts = contextKey.split("::");
+  if (parts.length >= 3) {
+    return {
+      niche: parts[0] ?? "",
+      businessType: parts[1] ?? "",
+      rawBusinessDescription: parts.slice(2).join("::"),
+    };
+  }
+  return {
+    niche: "",
+    businessType: parts[0] ?? "",
+    rawBusinessDescription: parts.slice(1).join("::"),
+  };
 }
 
 export function isOnboardingUiCopyFresh(
   copy: OnboardingUiCopy | null | undefined,
   input: {
+    niche?: string | null;
     businessType?: string | null;
     rawBusinessDescription: string;
   },

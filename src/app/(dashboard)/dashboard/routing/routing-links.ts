@@ -51,6 +51,8 @@ export type RoutingLink = {
   keywords?: string | null;
   /** Instructions for Cara when this route applies (not shown to callers). */
   description?: string | null;
+  /** Directions routes: send the maps link by text, email, or offer both. */
+  linkDelivery?: "sms" | "email" | "both" | null;
 };
 
 export const MAX_ROUTING_FIELD_LEN = 500;
@@ -134,6 +136,13 @@ export function parseRoutingLinks(raw: unknown): RoutingLink[] {
       typeof entry.description === "string" && entry.description.trim()
         ? entry.description.trim().slice(0, MAX_ROUTING_FIELD_LEN)
         : null;
+    const linkDeliveryRaw = entry.linkDelivery;
+    const linkDelivery =
+      linkDeliveryRaw === "sms" ||
+      linkDeliveryRaw === "email" ||
+      linkDeliveryRaw === "both"
+        ? linkDeliveryRaw
+        : null;
     out.push({
       id,
       presetId,
@@ -149,6 +158,7 @@ export function parseRoutingLinks(raw: unknown): RoutingLink[] {
       ...(transferLabel ? { transferLabel } : {}),
       ...(keywords ? { keywords } : {}),
       ...(description ? { description } : {}),
+      ...(linkDelivery ? { linkDelivery } : {}),
     });
   }
   return out;

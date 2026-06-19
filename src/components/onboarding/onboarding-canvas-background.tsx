@@ -109,20 +109,30 @@ function backgroundAssetKey(config: BackgroundConfig): string {
   return config.assets.fallback;
 }
 
+function normalizeBackgroundPath(pathname: string): string {
+  const base = pathname.split("?")[0]?.replace(/\/$/, "") ?? "";
+  if (base.startsWith("/dev/onboarding/")) {
+    return `/onboarding/${base.slice("/dev/onboarding/".length)}`;
+  }
+  return base;
+}
+
 function backgroundForPath(pathname: string): BackgroundConfig {
-  if (pathname === "/onboarding/profile") {
+  const path = normalizeBackgroundPath(pathname);
+
+  if (path === "/onboarding/profile") {
     return heroBackgroundConfig(PROFILE_BACKGROUND, "42% 48%");
   }
 
-  if (pathname === "/onboarding/voice") {
+  if (path === "/onboarding/voice") {
     return heroBackgroundConfig(VOICE_BACKGROUND, "72% 38%");
   }
 
-  if (pathname === "/onboarding/knowledge") {
+  if (path === "/onboarding/knowledge") {
     return heroBackgroundConfig(KNOWLEDGE_BACKGROUND, "50% 45%");
   }
 
-  if (pathname === "/onboarding/plan") {
+  if (path === "/onboarding/plan" || path.startsWith("/onboarding/plan/")) {
     return heroBackgroundConfig(PLAN_BACKGROUND, "50% 45%");
   }
 

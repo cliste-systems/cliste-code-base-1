@@ -285,7 +285,7 @@ export function CaraCommonQuestionsField({
     <motion.div layout="position" transition={layoutTransition} className={cn(FAQ_PANEL, "mx-auto w-full")}>
       {savedRows.length > 0 ? (
         <ul
-          className="max-h-[min(220px,36vh)] divide-y divide-[#0b1220]/[0.06] overflow-y-auto overscroll-y-contain"
+          className="max-h-[min(180px,28vh)] divide-y divide-[#0b1220]/[0.06] overflow-y-auto overscroll-y-contain"
           aria-label="Saved questions"
         >
           {savedRows.map(({ faq, index }) => (

@@ -3,6 +3,7 @@
 import { Share2 } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form-scroll-region";
 import {
   DASHBOARD_ICON_CHIP_LG,
   DASHBOARD_ICON_GLYPH_LG,
@@ -83,9 +84,9 @@ export function RoutingShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <DashboardFormScrollRegion scrollClassName="bg-white">
           {children}
-        </div>
+        </DashboardFormScrollRegion>
       </DashboardAnimatedPageSections>
     </RoutingUnsavedGuard>
   );

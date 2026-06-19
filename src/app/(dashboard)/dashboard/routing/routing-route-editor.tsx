@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -14,6 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { CaptureFieldsChipEditor } from "@/components/agent-knowledge/capture-fields-chip-editor";
+import type { CaraCaptureField } from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-fields";
 import { DashboardSelect } from "@/components/dashboard/dashboard-select";
 import {
   DASHBOARD_INPUT_CLASS,
@@ -30,6 +32,14 @@ import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 import { cn } from "@/lib/utils";
 
 import {
+  applyBookingFulfilmentMethod,
+  BOOKING_FULFILMENT_OPTIONS,
+  defaultBookingCaptureFields,
+  inferBookingFulfilmentMethod,
+  syncBookingRouteFromCaptureFields,
+  type BookingFulfilmentMethod,
+} from "./booking-fulfilment";
+import {
   caraLocationDisplay,
   fillLocationLinksFromCara,
   hasCaraLocation,
@@ -41,6 +51,8 @@ import {
   isFallbackRoute,
   isSpeakToPersonBuiltin,
   routeActionType,
+  routeTemplateUsesLinkDelivery,
+  type RouteLinkDelivery,
   type SavedRoute,
 } from "./route-models";
 import {
@@ -66,6 +78,9 @@ type RoutingRouteEditorProps = {
   isNew?: boolean;
   /** Only link / file / transfer destination controls (embedded in route creator). */
   destinationOnly?: boolean;
+  bookingFulfilmentMethod?: BookingFulfilmentMethod;
+  bookingCaptureFields?: CaraCaptureField[];
+  onBookingCaptureFieldsChange?: (fields: CaraCaptureField[]) => void;
 };
 
 const ACTION_ICON: Record<RouteActionType, typeof Link2> = {
@@ -91,12 +106,70 @@ export function RoutingRouteEditor({
   onSuggestName,
   isNew = false,
   destinationOnly = false,
+  bookingFulfilmentMethod,
+  bookingCaptureFields,
+  onBookingCaptureFieldsChange,
 }: RoutingRouteEditorProps) {
   const patch = (partial: Partial<SavedRoute>) => onChange({ ...route, ...partial });
   const fallback = isFallbackRoute(route);
   const builtinSpeak = isSpeakToPersonBuiltin(route);
   const activeType = routeActionType(route);
   const canSave = fallback || builtinSpeak || route.name.trim().length > 0;
+  const isBookingRoute = route.templateId === "booking-inquiry";
+  const resolvedBookingMethod =
+    bookingFulfilmentMethod ??
+    (isBookingRoute ? inferBookingFulfilmentMethod(route) : "link");
+  const [internalCaptureFields, setInternalCaptureFields] = useState<
+    CaraCaptureField[]
+  >(() =>
+    defaultBookingCaptureFields(
+      setupContext.niche,
+      setupContext.businessType,
+      setupContext.captureFields.length > 0
+        ? setupContext.captureFields
+        : undefined,
+    ),
+  );
+
+  useEffect(() => {
+    if (!isBookingRoute) return;
+    setInternalCaptureFields(
+      defaultBookingCaptureFields(
+        setupContext.niche,
+        setupContext.businessType,
+        setupContext.captureFields.length > 0
+          ? setupContext.captureFields
+          : undefined,
+      ),
+    );
+  }, [
+    isBookingRoute,
+    route.id,
+    route.outcome,
+    route.description,
+    setupContext.niche,
+    setupContext.businessType,
+    setupContext.captureFields,
+  ]);
+
+  const activeCaptureFields = bookingCaptureFields ?? internalCaptureFields;
+  const handleCaptureFieldsChange =
+    onBookingCaptureFieldsChange ??
+    ((fields: CaraCaptureField[]) => {
+      setInternalCaptureFields(fields);
+      if (resolvedBookingMethod !== "link") {
+        onChange(
+          syncBookingRouteFromCaptureFields(route, resolvedBookingMethod, fields),
+        );
+      }
+    });
+
+  const showBookingLinkFields =
+    isBookingRoute &&
+    (resolvedBookingMethod === "link" || resolvedBookingMethod === "both");
+  const showBookingCaptureFields =
+    isBookingRoute &&
+    (resolvedBookingMethod === "callback" || resolvedBookingMethod === "both");
 
   const [suggesting, setSuggesting] = useState(false);
   const [suggestNote, setSuggestNote] = useState<string | null>(null);
@@ -115,7 +188,60 @@ export function RoutingRouteEditor({
           />
         ) : null}
 
-        {route.outcome === "send_link" && route.templateId !== "location" ? (
+        {showBookingLinkFields ? (
+          <>
+            {resolvedBookingMethod === "both" ? (
+              <p className="text-[12px] font-medium text-[#0b1220]">
+                Which booking link?
+              </p>
+            ) : null}
+            <LinkDeliveryFields
+              route={route}
+              onChange={onChange}
+              label="Send booking link via"
+            />
+            <SendDestinationField
+              files={sendableFiles}
+              url={route.url}
+              fileId={route.businessFileId}
+              onSelectLink={(url) =>
+                patch({ url, businessFileId: null, outcome: "send_link" })
+              }
+              onSelectFile={(id) =>
+                patch({
+                  businessFileId: id,
+                  url: "",
+                  outcome: "send_file",
+                  templateId: "brochure",
+                })
+              }
+            />
+          </>
+        ) : null}
+
+        {showBookingCaptureFields ? (
+          <div className="space-y-2">
+            {resolvedBookingMethod === "both" ? (
+              <p className="text-[12px] font-medium text-[#0b1220]">
+                What should Cara note down?
+              </p>
+            ) : null}
+            <CaptureFieldsChipEditor
+              captureFields={activeCaptureFields}
+              onCaptureFieldsChange={handleCaptureFieldsChange}
+              businessType={setupContext.businessType}
+              niche={setupContext.niche}
+            />
+            <p className="text-[11px] text-slate-500">
+              Name and phone are always collected. This is a booking request — not
+              a confirmed appointment.
+            </p>
+          </div>
+        ) : null}
+
+        {route.outcome === "send_link" &&
+        route.templateId !== "location" &&
+        route.templateId !== "booking-inquiry" ? (
           <SendDestinationField
             files={sendableFiles}
             url={route.url}
@@ -338,6 +464,31 @@ export function RoutingRouteEditor({
           ) : null}
         </div>
 
+        {isBookingRoute && !destinationOnly ? (
+          <div className="space-y-1.5">
+            <Label className="text-[12px] text-slate-600">
+              How should booking be fulfilled?
+            </Label>
+            <DashboardSelect
+              value={resolvedBookingMethod}
+              aria-label="Booking fulfilment method"
+              options={BOOKING_FULFILMENT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+              onValueChange={(value) =>
+                onChange(
+                  applyBookingFulfilmentMethod(
+                    route,
+                    value as BookingFulfilmentMethod,
+                    activeCaptureFields,
+                  ),
+                )
+              }
+            />
+          </div>
+        ) : null}
+
         {route.templateId === "location" ? (
           <LocationRouteFields
             route={route}
@@ -346,7 +497,53 @@ export function RoutingRouteEditor({
           />
         ) : null}
 
-        {route.outcome === "send_link" && route.templateId !== "location" ? (
+        {showBookingLinkFields ? (
+          <>
+            <LinkDeliveryFields
+              route={route}
+              onChange={onChange}
+              label="Send booking link via"
+            />
+            <SendDestinationField
+              files={sendableFiles}
+              url={route.url}
+              fileId={route.businessFileId}
+              onSelectLink={(url) =>
+                patch({ url, businessFileId: null, outcome: "send_link" })
+              }
+              onSelectFile={(id) =>
+                patch({
+                  businessFileId: id,
+                  url: "",
+                  outcome: "send_file",
+                  templateId: "brochure",
+                })
+              }
+            />
+          </>
+        ) : null}
+
+        {showBookingCaptureFields ? (
+          <div className="space-y-2">
+            <Label className="text-[12px] text-slate-600">
+              What should Cara note down?
+            </Label>
+            <CaptureFieldsChipEditor
+              captureFields={activeCaptureFields}
+              onCaptureFieldsChange={handleCaptureFieldsChange}
+              businessType={setupContext.businessType}
+              niche={setupContext.niche}
+            />
+            <p className="text-[11px] text-slate-500">
+              Name and phone are always collected. This is a booking request — not
+              a confirmed appointment.
+            </p>
+          </div>
+        ) : null}
+
+        {route.outcome === "send_link" &&
+        route.templateId !== "location" &&
+        route.templateId !== "booking-inquiry" ? (
           <SendDestinationField
             files={sendableFiles}
             url={route.url}
@@ -388,7 +585,7 @@ export function RoutingRouteEditor({
           <TransferRouteFields route={route} setup={setupContext} onChange={onChange} />
         ) : null}
 
-        {route.outcome === "action_inbox" ? (
+        {route.outcome === "action_inbox" && route.templateId !== "booking-inquiry" ? (
           <div className="space-y-1.5">
             <Label htmlFor="route-note" className="text-[12px] text-slate-600">
               What should Cara capture? (optional)
@@ -449,7 +646,7 @@ export function RoutingRouteEditor({
 
 function CaraSetupPrompt({
   message,
-  href = DASHBOARD_ROUTES.caraSetup,
+  href = DASHBOARD_ROUTES.businessProfile,
   linkLabel = "Cara Setup",
 }: {
   message: string;
@@ -463,6 +660,36 @@ function CaraSetupPrompt({
         {linkLabel}
       </Link>{" "}
       to continue.
+    </div>
+  );
+}
+
+function LinkDeliveryFields({
+  route,
+  onChange,
+  label,
+}: {
+  route: SavedRoute;
+  onChange: (route: SavedRoute) => void;
+  label: string;
+}) {
+  if (!routeTemplateUsesLinkDelivery(route.templateId)) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-[12px] text-slate-600">{label}</Label>
+      <DashboardSelect
+        value={route.linkDelivery ?? "sms"}
+        aria-label={label}
+        options={[
+          { value: "sms", label: "Text message (SMS)" },
+          { value: "email", label: "Email" },
+          { value: "both", label: "Text or email — Cara asks which they prefer" },
+        ]}
+        onValueChange={(value) =>
+          onChange({ ...route, linkDelivery: value as RouteLinkDelivery })
+        }
+      />
     </div>
   );
 }
@@ -491,13 +718,20 @@ function LocationRouteFields({
           {display}
         </p>
         <p className="text-[11px] text-slate-500">
-          Cara texts a maps link built from this address. Update it in{" "}
-          <Link href={DASHBOARD_ROUTES.caraSetup} className="font-medium underline">
+          Cara says this address on the call, then sends a maps link by text or
+          email — your choice below. Update the address in{" "}
+          <Link href={DASHBOARD_ROUTES.businessProfile} className="font-medium underline">
             Cara Setup
           </Link>
           .
         </p>
       </div>
+
+      <LinkDeliveryFields
+        route={route}
+        onChange={onChange}
+        label="Send maps link via"
+      />
 
       {locationLinksNeedFill(route) ? (
         <Button
@@ -699,10 +933,10 @@ function SendDestinationField({
         <p className="text-[11px] text-slate-500">
           Upload sendable files in{" "}
           <Link
-            href={`${DASHBOARD_ROUTES.caraSetup}/answers`}
+            href={DASHBOARD_ROUTES.businessFiles}
             className="font-medium underline underline-offset-2"
           >
-            Answers & files
+            Files
           </Link>
           , or paste a web link above.
         </p>

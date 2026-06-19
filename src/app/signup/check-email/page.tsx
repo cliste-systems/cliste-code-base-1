@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
+import { SIGNUP_EMAIL_OTP_LENGTH } from "@/lib/signup-email-otp";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 
 import { VerifyCodeForm } from "./verify-code-form";
@@ -34,12 +35,12 @@ export default async function SignupCheckEmailPage({
           <p className="text-[13px] leading-relaxed text-slate-500">
             {email ? (
               <>
-                We sent a 6-digit code to{" "}
+                We sent a {SIGNUP_EMAIL_OTP_LENGTH}-digit code to{" "}
                 <span className="font-medium text-[#0b1220]">{email}</span>.
                 Enter it below, or use the link in the email.
               </>
             ) : (
-              <>Open the confirmation email and enter the 6-digit code below.</>
+              <>Open the confirmation email and enter the code below.</>
             )}
           </p>
         </OnboardingEnter>

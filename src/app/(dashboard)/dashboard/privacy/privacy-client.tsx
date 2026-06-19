@@ -297,7 +297,11 @@ export function PrivacyToolsClient() {
               <strong className="text-[#0b1220]">{eraseState.phoneE164}</strong>:{" "}
               {eraseState.counts.appointments_anonymised} appointments,{" "}
               {eraseState.counts.call_logs_redacted} call logs,{" "}
-              {eraseState.counts.action_tickets_redacted} action tickets.
+              {eraseState.counts.action_tickets_redacted} action tickets
+              {eraseState.counts.blocked_callers_deleted > 0
+                ? `, ${eraseState.counts.blocked_callers_deleted} blocklist entries`
+                : ""}
+              .
             </p>
           </div>
         ) : null}

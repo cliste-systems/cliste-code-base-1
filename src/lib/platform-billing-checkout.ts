@@ -10,6 +10,7 @@ import {
   isLaunchTier,
   isPlanTier,
   normaliseLaunchTierForDb,
+  PLATFORM_TRIAL_DAYS,
   type LaunchTier,
   type PlanTier,
 } from "@/lib/cliste-plans";
@@ -33,6 +34,11 @@ export type PlatformCheckoutResult =
 export async function resolveCheckoutReturnOrigin(): Promise<string> {
   const configured = resolveAppSiteOrigin();
   if (configured) return configured.origin;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "NEXT_PUBLIC_APP_URL must be set for billing return URLs.",
+    );
+  }
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "http";
@@ -160,7 +166,7 @@ export async function createPlatformSubscriptionCheckout(
     customer_email: input.userEmail,
     allow_promotion_codes: true,
     subscription_data: {
-      trial_period_days: 14,
+      trial_period_days: PLATFORM_TRIAL_DAYS,
       metadata: {
         cliste_account_id: accountId,
         cliste_organization_id: input.organizationId,

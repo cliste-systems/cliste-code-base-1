@@ -18,6 +18,7 @@ export type {
 } from "./cliste-plans.data";
 
 export {
+  PLATFORM_TRIAL_DAYS,
   PLANS,
   LAUNCHES,
   planFromPriceCents,

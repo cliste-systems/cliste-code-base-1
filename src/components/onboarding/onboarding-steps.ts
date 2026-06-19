@@ -25,8 +25,10 @@ export const ONBOARDING_STEP_PATHS = ONBOARDING_STEPS_META.map(
 
 export function normalizeOnboardingPath(pathname: string): OnboardingStepPath | null {
   const base = pathname.split("?")[0]?.replace(/\/$/, "") ?? "";
-  const match = ONBOARDING_STEP_PATHS.find((path) => path === base);
-  return match ?? null;
+  const exact = ONBOARDING_STEP_PATHS.find((path) => path === base);
+  if (exact) return exact;
+  const prefix = ONBOARDING_STEP_PATHS.find((path) => base.startsWith(`${path}/`));
+  return prefix ?? null;
 }
 
 export function onboardingStepIndex(pathname: string): number {

@@ -12,11 +12,12 @@ import {
   packServicesStepCopy,
 } from "@/app/(onboarding)/onboarding/knowledge/train-cara-services-copy";
 import {
-  detectTradePack,
+  tradePackForNicheAndType,
   type TradePack,
 } from "@/app/(onboarding)/onboarding/knowledge/train-cara-trade-topics";
 import {
   buildOnboardingUiCopyContextKey,
+  parseOnboardingUiCopyContextKey,
   type HandleOptionDescriptions,
   type OnboardingUiCopy,
 } from "@/lib/onboarding-ui-copy-shared";
@@ -235,8 +236,9 @@ export function buildHeuristicOnboardingUiCopy(
   input: GenerateOnboardingUiCopyInput,
 ): OnboardingUiCopy {
   const businessType = String(input.businessType ?? "").trim();
-  const pack = detectTradePack(businessType);
+  const pack = tradePackForNicheAndType(input.niche, businessType);
   const contextKey = buildOnboardingUiCopyContextKey({
+    niche: input.niche,
     businessType,
     rawBusinessDescription: input.rawBusinessDescription,
   });
@@ -352,7 +354,10 @@ function parseOnboardingUiCopyJson(
       return null;
     }
 
-    const pack = detectTradePack(contextKey.split("::")[0] ?? "");
+    const pack = tradePackForNicheAndType(
+      input.niche,
+      parseOnboardingUiCopyContextKey(contextKey).businessType,
+    );
 
     return {
       faqSuggestions,
@@ -431,7 +436,9 @@ export function parseStoredOnboardingUiCopy(value: unknown): OnboardingUiCopy | 
     return null;
   }
 
-  const pack = detectTradePack(contextKey.split("::")[0] ?? "");
+  const { niche, businessType, rawBusinessDescription } =
+    parseOnboardingUiCopyContextKey(contextKey);
+  const pack = tradePackForNicheAndType(niche, businessType);
   const businessRuleSuggestions = cleanRuleSuggestions(record.businessRuleSuggestions);
   const businessRulesStepHint = trimField(
     String(record.businessRulesStepHint ?? ""),
@@ -463,9 +470,9 @@ export function parseStoredOnboardingUiCopy(value: unknown): OnboardingUiCopy | 
     ...mergeServicesFields(
       {
         businessName: "",
-        businessType: contextKey.split("::")[0] ?? "",
-        niche: "",
-        rawBusinessDescription: contextKey.split("::")[1] ?? "",
+        businessType,
+        niche,
+        rawBusinessDescription,
       },
       {
         servicesStepSubtitle: trimField(
@@ -514,6 +521,7 @@ export async function generateOnboardingUiCopy(
   const businessType = String(input.businessType ?? "").trim();
   const niche = String(input.niche ?? "").trim();
   const contextKey = buildOnboardingUiCopyContextKey({
+    niche,
     businessType,
     rawBusinessDescription,
   });

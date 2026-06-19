@@ -1,12 +1,9 @@
 /**
  * Transactional email via SendGrid HTTP API (v3).
  *
- * **Salon owner invites** (`inviteUserByEmail`) are sent by **Supabase Auth**, not
- * this module. To use SendGrid for those, set custom SMTP in the Supabase dashboard:
- * Project → Authentication → Emails → SMTP: host `smtp.sendgrid.net`, port `587`,
- * username `apikey`, password = your SendGrid API key, sender = verified address.
- *
- * Use this helper for **application-sent** mail (reminders, notifications, etc.).
+ * Signup confirmation, team invites, and salon owner invites are sent through
+ * this module (branded HTML + first-party auth links). Configure
+ * `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in production.
  *
  * Env (Vercel / `.env.local`):
  * - `SENDGRID_API_KEY` — API key with Mail Send permission
@@ -23,11 +20,19 @@ export function isSendGridConfigured(): boolean {
   );
 }
 
+export type EmailAddress = {
+  email: string;
+  name?: string;
+};
+
 export type SendTransactionalEmailInput = {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  /** Override platform From (e.g. per-business `{slug}@clistesystems.ie`). */
+  from?: EmailAddress;
+  replyTo?: EmailAddress;
 };
 
 export type SendTransactionalEmailResult =
@@ -38,8 +43,10 @@ export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput,
 ): Promise<SendTransactionalEmailResult> {
   const apiKey = process.env.SENDGRID_API_KEY?.trim();
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL?.trim();
-  const fromName = process.env.SENDGRID_FROM_NAME?.trim() || "Cliste";
+  const platformFromEmail = process.env.SENDGRID_FROM_EMAIL?.trim();
+  const platformFromName = process.env.SENDGRID_FROM_NAME?.trim() || "Cliste";
+  const fromEmail = input.from?.email.trim() || platformFromEmail;
+  const fromName = input.from?.name?.trim() || platformFromName;
 
   if (!apiKey) {
     return { ok: false, message: "SENDGRID_API_KEY is not configured." };
@@ -81,6 +88,16 @@ export async function sendTransactionalEmail(
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }] }],
       from: { email: fromEmail, name: fromName },
+      ...(input.replyTo?.email.trim()
+        ? {
+            reply_to: {
+              email: input.replyTo.email.trim(),
+              ...(input.replyTo.name?.trim()
+                ? { name: input.replyTo.name.trim() }
+                : {}),
+            },
+          }
+        : {}),
       subject,
       content: body,
       // Click tracking rewrites links through a SendGrid tracking domain
@@ -105,6 +122,18 @@ export async function sendTransactionalEmail(
     }
   } catch {
     /* ignore */
+  }
+
+  const detailLower = detail.toLowerCase();
+  if (
+    detailLower.includes("maximum credits exceeded") ||
+    detailLower.includes("credit") && detailLower.includes("exceed")
+  ) {
+    return {
+      ok: false,
+      message:
+        "Email sending limit reached on SendGrid. Check your SendGrid plan or wait for credits to reset, then try again.",
+    };
   }
 
   return {

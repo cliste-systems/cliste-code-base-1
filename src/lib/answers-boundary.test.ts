@@ -5,6 +5,8 @@ import {
   buildAnswersConflictWarnings,
   detectCanonicalQuestion,
   faqsForPrompt,
+  fileCouldNotReadMessage,
+  fileScannedPdfOcrHint,
   lintFaqFields,
 } from "./answers-boundary";
 import { buildFileExtractionPreview, sliceFileTextForPrompt } from "./business-file-prompt";
@@ -48,6 +50,12 @@ describe("answers-boundary", () => {
     );
   });
 
+  it("explains scanned PDF recovery for unreadable uploads", () => {
+    assert.match(fileCouldNotReadMessage("pdf"), /couldn't read any text/i);
+    assert.match(fileScannedPdfOcrHint(), /OCR/i);
+    assert.match(fileScannedPdfOcrHint(), /select text/i);
+  });
+
   it("flags FAQ vs file price conflicts", () => {
     const warnings = buildAnswersConflictWarnings({
       faqs: [{ question: "Price?", answer: "Consultations are €80." }],
@@ -61,6 +69,9 @@ describe("answers-boundary", () => {
           answerEnabled: true,
           sendEnabled: false,
           documentKind: "price_list",
+          title: null,
+          caraDescription: null,
+          whenToUse: null,
           processingStatus: "ready",
           extractedText: "Consultation €95",
           createdAt: new Date().toISOString(),
@@ -125,14 +136,48 @@ describe("compileCaraPrompt answers + files", () => {
           answerEnabled: true,
           sendEnabled: true,
           documentKind: "menu",
+          title: null,
+          caraDescription: null,
+          whenToUse: null,
           processingStatus: "ready",
           extractedText: "Soup €5",
           createdAt: new Date().toISOString(),
         },
       ],
     });
-    assert.match(prompt, /From uploaded files/);
+    assert.match(prompt, /Background reference — from uploaded files/);
     assert.match(prompt, /Soup €5/);
     assert.match(prompt, /Text the caller the menu/);
+  });
+
+  it("uses lookup index for oversized files instead of dumping full text", () => {
+    const filler = "Intro line\n".repeat(2_000);
+    const prompt = compileCaraPrompt({
+      businessName: "Example Co",
+      assistantDisplayName: "Cara",
+      businessType: "Business",
+      businessFiles: [
+        {
+          id: "f1",
+          fileName: "menu.pdf",
+          fileType: "pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 100_000,
+          answerEnabled: true,
+          sendEnabled: false,
+          documentKind: "price_list",
+          title: null,
+          caraDescription: null,
+          whenToUse: null,
+          processingStatus: "ready",
+          extractedText: `${filler}Gel manicure — €45`,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    assert.match(prompt, /search_business_file/);
+    assert.match(prompt, /Use search_business_file to look up specific items/);
+    assert.doesNotMatch(prompt, /Gel manicure — €45/);
   });
 });

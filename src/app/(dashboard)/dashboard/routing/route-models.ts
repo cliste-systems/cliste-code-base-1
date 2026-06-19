@@ -3,12 +3,20 @@ import {
   normalizeCaraSetupChip,
 } from "@/lib/cara-setup-chips";
 
-import { validateRouteUrl } from "./routing-validation";
+import {
+  isValidHttpUrl,
+  looksLikeCaptureProse,
+  validateRouteUrl,
+} from "./routing-validation";
 import type { RoutingLink } from "./routing-links";
 import {
   getRoutingLinkDestinations,
   isCompleteLinkDestination,
 } from "./routing-urls";
+import {
+  captureNoteFromBackupDescription,
+  hasBookingBackupMarker,
+} from "./booking-fulfilment";
 import {
   FALLBACK_TEMPLATE_ID,
   ROUTE_TEMPLATE_BY_ID,
@@ -21,6 +29,24 @@ export const BUILTIN_SPEAK_TO_PERSON_ID = "builtin_speak_to_person";
 export const SPEAK_TO_PERSON_TEMPLATE_ID = "speak-to-person";
 
 export type RouteKind = "builtin" | "custom";
+
+/** How Cara sends a maps link after reading the address aloud (directions routes). */
+export type RouteLinkDelivery = "sms" | "email" | "both";
+
+const LINK_DELIVERY_TEMPLATE_IDS = new Set(["location", "booking-inquiry"]);
+
+export function routeTemplateUsesLinkDelivery(templateId: string): boolean {
+  return LINK_DELIVERY_TEMPLATE_IDS.has(templateId);
+}
+
+export function resolvedLinkDelivery(
+  route: Pick<SavedRoute, "templateId" | "outcome" | "linkDelivery">,
+): RouteLinkDelivery | undefined {
+  if (route.outcome !== "send_link" || !routeTemplateUsesLinkDelivery(route.templateId)) {
+    return undefined;
+  }
+  return route.linkDelivery ?? "sms";
+}
 
 const FALLBACK_INBOX_NOTE =
   "Take a message — capture their name, phone number, and what they need so nothing is lost.";
@@ -63,6 +89,8 @@ export type SavedRoute = {
   transferDuringHoursOnly?: boolean;
   /** Instructions for Cara when this route applies. */
   description?: string;
+  /** Directions routes: send the maps link by text, email, or offer both. */
+  linkDelivery?: RouteLinkDelivery;
 };
 
 /** Split stored keywords into individual phrases (comma/semicolon separated). */
@@ -402,7 +430,23 @@ export function serializeRoutes(routes: SavedRoute[]): RoutingLink[] {
     switch (route.outcome) {
       case "send_link": {
         const url = route.url.trim();
-        if (url) out.push({ ...base, url });
+        if (url && isValidHttpUrl(url)) {
+          const linkDelivery = resolvedLinkDelivery(route);
+          out.push({
+            ...base,
+            url,
+            ...(linkDelivery ? { linkDelivery } : {}),
+          });
+        } else if (
+          url &&
+          process.env.NODE_ENV === "development" &&
+          looksLikeCaptureProse(url)
+        ) {
+          console.warn(
+            "[serializeRoutes] Dropped non-URL prose from send_link route:",
+            route.name || route.id,
+          );
+        }
         break;
       }
       case "send_file":
@@ -545,8 +589,22 @@ export function routesFromStoredLinks(links: RoutingLink[]): SavedRoute[] {
             businessFileId: null,
             email: "",
             whatsapp: "",
-            note: DEFAULT_INBOX_NOTE,
+            note:
+              templateId === "booking-inquiry" &&
+              hasBookingBackupMarker(link.description ?? undefined)
+                ? captureNoteFromBackupDescription(link.description ?? undefined) ??
+                  DEFAULT_INBOX_NOTE
+                : DEFAULT_INBOX_NOTE,
             description: link.description?.trim() || undefined,
+            linkDelivery:
+              routeTemplateUsesLinkDelivery(templateId) &&
+              (link.linkDelivery === "sms" ||
+                link.linkDelivery === "email" ||
+                link.linkDelivery === "both")
+                ? link.linkDelivery
+                : routeTemplateUsesLinkDelivery(templateId)
+                  ? "sms"
+                  : undefined,
           });
         });
         continue;
@@ -574,8 +632,22 @@ export function routesFromStoredLinks(links: RoutingLink[]): SavedRoute[] {
         businessFileId: null,
         email: "",
         whatsapp: "",
-        note: DEFAULT_INBOX_NOTE,
+        note:
+          templateId === "booking-inquiry" &&
+          hasBookingBackupMarker(link.description ?? undefined)
+            ? captureNoteFromBackupDescription(link.description ?? undefined) ??
+              DEFAULT_INBOX_NOTE
+            : DEFAULT_INBOX_NOTE,
         description: link.description?.trim() || undefined,
+        linkDelivery:
+          routeTemplateUsesLinkDelivery(templateId) &&
+          (link.linkDelivery === "sms" ||
+            link.linkDelivery === "email" ||
+            link.linkDelivery === "both")
+            ? link.linkDelivery
+            : routeTemplateUsesLinkDelivery(templateId)
+              ? "sms"
+              : undefined,
       });
       continue;
     }

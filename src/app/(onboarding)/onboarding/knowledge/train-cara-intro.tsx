@@ -13,11 +13,12 @@ import {
 } from "@/components/onboarding/onboarding-ui";
 import { cn } from "@/lib/utils";
 
+import { trainCaraIntroCopy } from "./train-cara-vertical-copy";
+
 type Props = {
+  niche?: string;
   onStart: () => void;
   onBack: () => void;
-  onSkip: () => void;
-  skipPending?: boolean;
   disabled?: boolean;
 };
 
@@ -27,14 +28,14 @@ const INTRO_SECONDARY = cn(
 );
 
 export function TrainCaraIntro({
+  niche,
   onStart,
   onBack,
-  onSkip,
-  skipPending = false,
   disabled = false,
 }: Props) {
-  const busy = disabled || skipPending;
+  const busy = disabled;
   const { freeNav } = useOnboardingProgress();
+  const intro = trainCaraIntroCopy(niche);
 
   return (
     <OnboardingEnterProvider>
@@ -43,13 +44,14 @@ export function TrainCaraIntro({
           <header className="w-full space-y-1.5">
             <p className={ONBOARDING_STEP_EYEBROW}>Train Cara</p>
             <h1 className={ONBOARDING_HEADLINE}>
-              <span className="block">Train Cara like someone you&apos;re putting</span>
-              <span className="block">on the phone tomorrow.</span>
+              {intro.headlineLines.map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
             </h1>
             <p className={cn(ONBOARDING_SUBHEADLINE, "max-w-md")}>
-              Treat the next sections like onboarding a new employee. The more
-              Cara knows about your business, the better she&apos;ll handle real
-              calls.
+              {intro.subheadline}
             </p>
           </header>
 
@@ -68,27 +70,17 @@ export function TrainCaraIntro({
             <div
               className={cn(
                 "grid gap-2.5",
-                freeNav ? "grid-cols-2" : "grid-cols-1",
+                freeNav ? "grid-cols-1" : "hidden",
               )}
             >
-              {freeNav ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onBack}
-                  className={INTRO_SECONDARY}
-                >
-                  <ChevronLeft className="size-4 shrink-0" aria-hidden />
-                  Back
-                </button>
-              ) : null}
               <button
                 type="button"
                 disabled={busy}
-                onClick={onSkip}
+                onClick={onBack}
                 className={INTRO_SECONDARY}
               >
-                {skipPending ? "Skipping…" : "Skip & Set Up Later"}
+                <ChevronLeft className="size-3.5 shrink-0" aria-hidden />
+                Back
               </button>
             </div>
           </div>

@@ -109,8 +109,12 @@ function buildLockedSection(assistant: string): CaraLockedPreviewItem[] {
       body: "She can't receive images on a call. If a caller mentions them, she notes it and moves on.",
     },
     {
-      title: "Your rules",
-      body: "Business rules can't override any of the above.",
+      title: "Your policies",
+      body: "Your policies can't override any of the above.",
+    },
+    {
+      title: "Cara's style",
+      body: "Call-style instructions for Cara can't override the non-negotiables or your policies.",
     },
   ];
 }
@@ -201,6 +205,15 @@ export function compileCaraOwnerPreview(
   if (rules.length > 0) {
     parts.push(
       `Rules I follow:\n${rules.map((r) => `• ${r}`).join("\n")}`,
+    );
+  }
+
+  const caraRules = (input.caraRules ?? [])
+    .map((r) => r.trim())
+    .filter((r) => r.length > 2);
+  if (caraRules.length > 0) {
+    parts.push(
+      `How I handle your calls:\n${caraRules.map((r) => `• ${r}`).join("\n")}`,
     );
   }
 

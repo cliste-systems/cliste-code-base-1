@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Bot,
+  Briefcase,
   GraduationCap,
   Gauge,
   Menu,
@@ -20,9 +21,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import { cn } from "@/lib/utils";
 
+import { CaraSidebarNav } from "@/components/dashboard/cara-sidebar-nav";
+import { BusinessSidebarNav } from "@/components/dashboard/business-sidebar-nav";
+import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
 import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
@@ -33,8 +36,10 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/contacts": Users,
   "/dashboard/clients": Users,
   "/dashboard/routing": Share2,
+  "/dashboard/cara": Bot,
   "/dashboard/cara-setup": Bot,
   "/dashboard/agent-setup": Bot,
+  "/dashboard/business": Briefcase,
   "/dashboard/cara-training": GraduationCap,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
@@ -43,20 +48,17 @@ const NAV_ICONS: Record<string, LucideIcon> = {
 
 type DashboardMobileNavProps = {
   items: DashboardSidebarNavItem[];
-  productNoun?: string | null;
+  accountNav: DashboardSidebarNavItem[];
+  caraTrainingBadge?: number;
 };
 
 export function DashboardMobileNav({
   items,
-  productNoun,
+  accountNav,
+  caraTrainingBadge = 0,
 }: DashboardMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const actionInbox = items.find((item) => item.href === "/dashboard/action-inbox");
-  const actionBadge =
-    typeof actionInbox?.badge === "number" && actionInbox.badge > 0
-      ? actionInbox.badge
-      : null;
 
   return (
     <div className="space-y-3">
@@ -75,7 +77,7 @@ export function DashboardMobileNav({
               CLISTE
             </span>
             <span className="mt-1 block text-[9px] font-medium tracking-[0.14em] text-slate-500">
-              {productNoun ?? "Connect"}
+              Voice
             </span>
           </span>
         </Link>
@@ -87,9 +89,6 @@ export function DashboardMobileNav({
             aria-label="Open notifications"
           >
             <Bell className="size-4" aria-hidden />
-            {actionBadge != null ? (
-              <span className="absolute right-2 top-2 size-1.5 rounded-full bg-slate-900" />
-            ) : null}
           </Link>
           <button
             type="button"
@@ -117,13 +116,12 @@ export function DashboardMobileNav({
           {items.map((item) => {
             const Icon = NAV_ICONS[item.href] ?? LayoutDashboard;
             const active =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const badgeCount =
-              typeof item.badge === "number" && item.badge > 0
-                ? item.badge
-                : null;
+              item.activePrefix
+                ? pathname.startsWith(item.activePrefix)
+                : item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -139,17 +137,20 @@ export function DashboardMobileNav({
               >
                 <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
                 <span className="truncate">{item.label}</span>
-                {badgeCount != null ? (
-                  <span
-                    className="ml-auto inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-slate-900 px-1 text-[9px] font-semibold text-white tabular-nums"
-                    aria-label={`${formatNavBadgeCount(badgeCount)} items`}
-                  >
-                    {formatNavBadgeCount(badgeCount)}
-                  </span>
-                ) : null}
               </Link>
             );
           })}
+          <div className="col-span-2 space-y-2 border-t border-slate-100 pt-2">
+            <CaraSidebarNav trainingBadge={caraTrainingBadge} />
+            <BusinessSidebarNav />
+            <AccountSidebarNav
+              items={accountNav.map((item) => ({
+                href: item.href,
+                label: item.label,
+                badge: item.badge,
+              }))}
+            />
+          </div>
         </nav>
       ) : null}
     </div>

@@ -1,19 +1,29 @@
+import Link from "next/link";
+
 /**
- * v1: Cliste no longer hosts a public storefront or native online booking.
- * Public booking/storefront routes render this neutral, non-booking surface so
- * old links resolve safely instead of 404-ing or implying booking still works.
- * The underlying storefront/booking code and DB tables are kept intact.
+ * Retired public salon links (legacy `/[salonSlug]` storefront URLs) resolve here
+ * instead of 404-ing. Cliste does not host public booking pages in v1.
  */
 export function BookingDisabledNotice() {
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-gray-50 px-6 text-center text-gray-900">
       <div className="max-w-md space-y-3">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Online booking isn&apos;t available here
+          This page isn&apos;t available
         </h1>
         <p className="text-sm leading-relaxed text-gray-600">
-          This page is no longer in service. If you&apos;re trying to reach the
+          This link is no longer active. If you&apos;re trying to reach a
           business, please call them directly.
+        </p>
+        <p className="text-sm leading-relaxed text-gray-600">
+          Looking for Cliste?{" "}
+          <Link
+            href="/authenticate"
+            className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+          >
+            Sign in here
+          </Link>
+          .
         </p>
       </div>
     </main>

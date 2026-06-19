@@ -3,9 +3,9 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Bot,
-  ChevronRight,
-  GraduationCap,
+  Building2,
   Gauge,
+  GraduationCap,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
@@ -14,29 +14,38 @@ import {
   Share2,
   Shield,
   Users,
+  Activity,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LocationSwitcher } from "@/components/dashboard/location-switcher";
+import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
+import { CaraSidebarNav } from "@/components/dashboard/cara-sidebar-nav";
+import { BusinessSidebarNav } from "@/components/dashboard/business-sidebar-nav";
+import { DashboardProfileMenu } from "@/components/dashboard/dashboard-profile-menu";
+import type { AccountLocationRow } from "@/lib/account-locations";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
+import { dashboardSidebarRowClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { cn } from "@/lib/utils";
 
-import { LocationSwitcher } from "@/components/dashboard/location-switcher";
-import type { AccountLocationRow } from "@/lib/account-locations";
 import type { DashboardAccountSummary } from "@/lib/dashboard-account-summary";
 
 import { DashboardSignOutButton } from "./dashboard-sign-out-button";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
+  "/dashboard/activity": Activity,
   "/dashboard/calls": Phone,
   "/dashboard/call-history": Phone,
   "/dashboard/action-inbox": Inbox,
   "/dashboard/contacts": Users,
   "/dashboard/clients": Users,
   "/dashboard/routing": Share2,
+  "/dashboard/cara": Bot,
   "/dashboard/cara-setup": Bot,
+  "/dashboard/business": Building2,
   "/dashboard/agent-setup": Bot,
   "/dashboard/cara-training": GraduationCap,
   "/dashboard/usage": Gauge,
@@ -44,20 +53,23 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/support": LifeBuoy,
   "/dashboard/legal/data-requests": Shield,
   "/dashboard/privacy": Shield,
+  "/dashboard/locations": Building2,
+  "/dashboard/team": Users,
   "/dashboard/settings": Settings,
 };
 
 export type DashboardSidebarNavItem = {
   href: string;
   label: string;
-  /** Open action items, upcoming appointments, etc. Hidden when 0 / unset. */
   badge?: number;
+  /** Highlight when pathname starts with this prefix (e.g. all Cara routes). */
+  activePrefix?: string;
 };
 
 type DashboardSidebarProps = {
   coreNav: DashboardSidebarNavItem[];
-  caraNav: DashboardSidebarNavItem[];
-  adminNav: DashboardSidebarNavItem[];
+  accountNav: DashboardSidebarNavItem[];
+  caraTrainingBadge?: number;
   needsPassword: boolean;
   account: DashboardAccountSummary;
   locations: AccountLocationRow[];
@@ -65,9 +77,12 @@ type DashboardSidebarProps = {
   viewAllLocations: boolean;
   locationLabel: string;
   accountName: string;
-  /** Short word beside the wordmark; falls back to "Connect" when not tailored. */
-  productNoun?: string | null;
 };
+
+function sidebarLabel(item: DashboardSidebarNavItem): string {
+  if (item.href === "/dashboard") return "Overview";
+  return item.label;
+}
 
 function NavRow({
   href,
@@ -85,12 +100,7 @@ function NavRow({
   return (
     <Link
       href={href}
-      className={cn(
-        "group flex h-11 items-center justify-between gap-2 rounded-xl px-3 text-[13px] transition-colors",
-        active
-          ? "border border-slate-200 bg-white font-semibold text-[#0b1220] shadow-[0_1px_2px_rgba(15,23,42,0.05),0_8px_20px_-14px_rgba(15,23,42,0.25)]"
-          : "border border-transparent font-normal text-slate-500 hover:bg-white/70 hover:text-[#0b1220]",
-      )}
+      className={dashboardSidebarRowClassName(active)}
       aria-current={active ? "page" : undefined}
     >
       <span className="flex min-w-0 flex-1 items-center gap-3">
@@ -138,12 +148,15 @@ function NavSection({
           <NavRow
             key={item.href}
             href={item.href}
-            label={item.label}
+            label={sidebarLabel(item)}
             badge={item.badge}
             active={
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`)
+              item.activePrefix
+                ? pathname.startsWith(item.activePrefix)
+                : item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`)
             }
           />
         ))}
@@ -154,8 +167,8 @@ function NavSection({
 
 export function DashboardSidebar({
   coreNav,
-  caraNav,
-  adminNav,
+  accountNav,
+  caraTrainingBadge,
   needsPassword,
   account,
   locations,
@@ -163,7 +176,6 @@ export function DashboardSidebar({
   viewAllLocations,
   locationLabel,
   accountName,
-  productNoun,
 }: DashboardSidebarProps) {
   return (
     <aside className="relative z-10 hidden h-dvh w-[260px] shrink-0 flex-col overflow-hidden border-r border-slate-200/80 bg-[#fafbfc] lg:flex">
@@ -182,7 +194,7 @@ export function DashboardSidebar({
               CLISTE
             </p>
             <p className="mt-1 text-[10px] font-medium tracking-[0.14em] text-[#64748b]">
-              {productNoun ?? "Connect"}
+              Voice
             </p>
           </div>
         </div>
@@ -190,9 +202,31 @@ export function DashboardSidebar({
         <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-0.5">
           <NavSection label="Workspace" items={coreNav} />
           <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-          <NavSection label="Cara" items={caraNav} />
+          <section className="space-y-1.5">
+            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
+              Cara
+            </p>
+            <CaraSidebarNav trainingBadge={caraTrainingBadge} />
+          </section>
+          <section className="space-y-1.5">
+            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
+              Business
+            </p>
+            <BusinessSidebarNav />
+          </section>
           <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-          <NavSection label="Account" items={adminNav} />
+          <section className="space-y-1.5">
+            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
+              Account
+            </p>
+            <AccountSidebarNav
+              items={accountNav.map((item) => ({
+                href: item.href,
+                label: item.label,
+                badge: item.badge,
+              }))}
+            />
+          </section>
           {needsPassword ? (
             <>
               <Link
@@ -217,23 +251,7 @@ export function DashboardSidebar({
             locationLabel={locationLabel}
             accountName={accountName}
           />
-          <Link
-            href="/dashboard/settings"
-            className="flex items-center gap-2.5 rounded-[18px] border border-slate-200/80 bg-white px-3 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-white/70 transition-colors hover:border-slate-300 hover:bg-[#fcfcfd]"
-          >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f1f5f9] text-[10px] font-semibold tracking-tight text-[#64748b]">
-              {account.initials}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] font-semibold text-[#0f172a]">
-                {account.displayName}
-              </span>
-              <span className="mt-0.5 block truncate text-[11px] leading-snug text-[#64748b]">
-                {account.subtitle}
-              </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-[#cbd5e1]" aria-hidden />
-          </Link>
+          <DashboardProfileMenu account={account} />
           <DashboardSignOutButton />
         </div>
       </div>

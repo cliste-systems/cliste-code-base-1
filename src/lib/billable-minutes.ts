@@ -20,5 +20,6 @@ export function sumBillableMinutesFromDurations(
   for (const raw of durationsSeconds) {
     total += billableMinutesFromDurationSeconds(raw ?? 0);
   }
-  return total;
+  const factor = 10 ** BILLABLE_MINUTES_DECIMALS;
+  return Math.round(total * factor) / factor;
 }

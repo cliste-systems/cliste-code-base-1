@@ -1,4 +1,5 @@
 import {
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
   DASHBOARD_VIEWPORT_LAYOUT,
 } from "@/components/dashboard/dashboard-surface";
@@ -19,14 +20,16 @@ export default async function RoutingLayout({
   return (
     <div className={DASHBOARD_VIEWPORT_LAYOUT}>
       <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
-        <RoutingFormProvider
-          initialRoutes={data.initialRoutes}
-          sendableFiles={data.sendableFiles}
-          caraContext={data.caraContext}
-          setupContext={data.setupContext}
-        >
-          <RoutingShell>{children}</RoutingShell>
-        </RoutingFormProvider>
+        <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
+          <RoutingFormProvider
+            initialRoutes={data.initialRoutes}
+            sendableFiles={data.sendableFiles}
+            caraContext={data.caraContext}
+            setupContext={data.setupContext}
+          >
+            <RoutingShell>{children}</RoutingShell>
+          </RoutingFormProvider>
+        </div>
       </div>
     </div>
   );

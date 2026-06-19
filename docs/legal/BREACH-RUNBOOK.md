@@ -158,7 +158,7 @@ If a customer-facing summary is appropriate (P0 / P1), publish at
 > Our incident reference is <ID>. Please reply to this email or
 > contact privacy@clistesystems.ie with any questions.
 >
-> — Cliste Systems
+> — Cliste Systems Limited
 
 ## Appendix B — Indicators that should auto-page
 

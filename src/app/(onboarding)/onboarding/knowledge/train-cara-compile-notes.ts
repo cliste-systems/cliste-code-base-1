@@ -11,7 +11,6 @@ export type CompileNotesInput = {
   openingHours: string;
   serviceArea: string;
   detailsToCollect: string;
-  rules: string[];
   faqs: AgentFaq[];
 };
 
@@ -61,13 +60,6 @@ export function compileCaraPhoneNotes(input: CompileNotesInput): string {
   const capture = paragraph(input.detailsToCollect);
   if (capture) {
     parts.push(`When callers ring, I should collect: ${capture}`);
-  }
-
-  const rules = input.rules.map((rule) => rule.trim()).filter(Boolean);
-  if (rules.length > 0) {
-    parts.push(
-      `Important rules:\n${rules.map((rule) => `- ${rule}`).join("\n")}`,
-    );
   }
 
   const faqBlock = formatFaqsForNotes(input.faqs);

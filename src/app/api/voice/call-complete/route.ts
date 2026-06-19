@@ -7,6 +7,8 @@ import {
   isDatabaseOverlapConstraintError,
 } from "@/lib/appointments-overlap";
 import { generateBookingReference, normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
+import { shouldRunCallCompleteSideEffects } from "@/lib/blocked-callers";
+import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
@@ -289,7 +291,7 @@ export async function POST(request: Request) {
 
   const { data: orgRow, error: orgActiveErr } = await admin
     .from("organizations")
-    .select("is_active, status")
+    .select("is_active, status, name")
     .eq("id", orgId)
     .maybeSingle();
   if (orgActiveErr) {
@@ -325,6 +327,7 @@ export async function POST(request: Request) {
     confirmed: body.disclosure_confirmed === true,
     organizationId: orgId,
     calledNumber: calledNumberRaw || undefined,
+    skip: outcome === "blocked",
   });
 
   // Server-side redaction.
@@ -349,6 +352,12 @@ export async function POST(request: Request) {
   }
 
   const callerName = String(body.caller_name ?? "").trim().slice(0, 120) || null;
+  const businessName = String(orgRow?.name ?? "").trim();
+  const aiSummaryForInsert =
+    summaryRedacted.text ??
+    (outcome === "blocked"
+      ? blockedCallDashboardSummary(businessName)
+      : null);
 
   const { data: insertedCall, error: callErr } = await admin
     .from("call_logs")
@@ -360,7 +369,7 @@ export async function POST(request: Request) {
       outcome,
       transcript: transcriptRedacted.text,
       transcript_review: reviewRedacted.text,
-      ai_summary: summaryRedacted.text,
+      ai_summary: aiSummaryForInsert,
       ...(callSid ? { call_sid: callSid } : {}),
       ...(roomName ? { room_name: roomName } : {}),
     })
@@ -577,8 +586,9 @@ export async function POST(request: Request) {
     }
   }
 
-  after(async () => {
-    if (outcome === "action_created") {
+  if (shouldRunCallCompleteSideEffects(outcome)) {
+    after(async () => {
+      if (outcome === "action_created") {
       const notifySummary =
         summaryRedacted.text?.trim() ||
         reviewRedacted.text?.trim() ||
@@ -608,7 +618,8 @@ export async function POST(request: Request) {
         });
       }
     }
-  });
+    });
+  }
 
   revalidateAfterWrite();
 

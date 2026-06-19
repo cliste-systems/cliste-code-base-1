@@ -4,6 +4,7 @@ import { Shield } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form-scroll-region";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { LegalPathProvider } from "@/components/legal/legal-path-context";
 import { DashboardLegalTabs } from "@/components/legal/dashboard-legal-tabs";
@@ -28,9 +29,9 @@ export function DashboardLegalShell({ children }: DashboardLegalShellProps) {
         <DashboardLegalTabs />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-white">
+      <DashboardFormScrollRegion scrollClassName="bg-white">
         <LegalPathProvider variant="dashboard">{children}</LegalPathProvider>
-      </div>
+      </DashboardFormScrollRegion>
     </DashboardAnimatedPageSections>
   );
 }

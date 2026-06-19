@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
+import { CLISTE_COMPANY } from "@/lib/company-details";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 import { PrivacyToolsClient } from "../../privacy/privacy-client";
@@ -11,7 +12,7 @@ export const metadata = {
 
 export default function LegalDataRequestsPage() {
   return (
-    <DashboardAnimatedStack>
+    <DashboardAnimatedStack embedded>
       <PrivacyToolsClient />
 
       <section className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
@@ -81,13 +82,20 @@ export default function LegalDataRequestsPage() {
           </p>
           <blockquote className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[12px] leading-relaxed text-slate-700">
             When you call [Business name], your call may be answered by our AI
-            phone assistant provided by Cliste Systems. Calls may be recorded and
+            phone assistant provided by {CLISTE_COMPANY.legalName}. Calls may be recorded and
             transcribed to handle your request; audio is not kept after the call.
-            We use Cliste to process this data on our behalf. For privacy requests,
+            We use {CLISTE_COMPANY.legalName} to process this data on our behalf. For privacy requests,
             contact us directly or email privacy@clistesystems.ie.
           </blockquote>
           <p className="text-[12px] text-slate-500">
-            Full legal documents are in the tabs above. Need help?{" "}
+            <Link
+              href={DASHBOARD_ROUTES.legalCallerNotice}
+              className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+            >
+              Full caller-notice templates
+            </Link>{" "}
+            (website, signage, social). Full legal documents are in the tabs above.
+            Need help?{" "}
             <Link
               href={DASHBOARD_ROUTES.support}
               className="font-medium text-[#0b1220] underline-offset-2 hover:underline"

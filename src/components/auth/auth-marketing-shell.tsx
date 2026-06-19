@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
@@ -19,6 +19,7 @@ import {
   ONBOARDING_SHELL_SECTION_GAP,
   ONBOARDING_SUBHEADLINE,
 } from "@/components/onboarding/onboarding-ui";
+import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,8 @@ type Props = {
   pageBackground?: PageBackground;
   /** Tighter card padding and header spacing (signup). */
   compact?: boolean;
+  /** Fade the glass panel out before client navigation (signup success). */
+  contentExiting?: boolean;
   urlError?: string | null;
   children: ReactNode;
 };
@@ -105,6 +108,7 @@ function SignupGlassShell({
   children,
   assets,
   compact = false,
+  contentExiting = false,
 }: {
   title: string;
   subtitle: string;
@@ -112,7 +116,9 @@ function SignupGlassShell({
   children: ReactNode;
   assets: PageBackground;
   compact?: boolean;
+  contentExiting?: boolean;
 }) {
+  const reduceMotion = useReducedMotion() ?? false;
   const panel = (
     <div
       className={cn(
@@ -123,11 +129,17 @@ function SignupGlassShell({
       )}
     >
       <OnboardingEnterProvider>
-        <div
+        <motion.div
           className={cn(
             "mx-auto flex w-full max-w-md flex-col items-center",
             compact ? "gap-3.5 sm:gap-4" : ONBOARDING_SHELL_SECTION_GAP,
           )}
+          animate={
+            contentExiting && !reduceMotion
+              ? { opacity: 0, y: -16, scale: 0.985, filter: "blur(6px)" }
+              : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+          }
+          transition={{ duration: 0.52, ease: ONBOARDING_EASE }}
         >
           <div
             className={cn(
@@ -169,7 +181,7 @@ function SignupGlassShell({
             ) : null}
             {children}
           </div>
-        </div>
+        </motion.div>
       </OnboardingEnterProvider>
     </div>
   );
@@ -280,6 +292,7 @@ export function AuthMarketingShell({
   marketingBullets,
   pageBackground,
   compact = false,
+  contentExiting = false,
   urlError,
   children,
 }: Props) {
@@ -291,6 +304,7 @@ export function AuthMarketingShell({
         urlError={urlError}
         assets={pageBackground}
         compact={compact}
+        contentExiting={contentExiting}
       >
         {children}
       </SignupGlassShell>

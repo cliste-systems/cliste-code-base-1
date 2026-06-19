@@ -14,6 +14,7 @@ import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
 import {
   ONBOARDING_SELECTION_CARD,
   ONBOARDING_SELECTION_CARD_ACTIVE,
+  ONBOARDING_PRIMARY_BUTTON,
 } from "@/components/onboarding/onboarding-ui";
 import { cn } from "@/lib/utils";
 import type { BillingInterval, PlanTier } from "@/lib/cliste-plans";
@@ -41,6 +42,8 @@ type Props = {
   defaultPlan: PlanTier;
   defaultInterval: BillingInterval;
   initialError?: string | null;
+  /** Dev preview — Continue navigates here instead of starting checkout. */
+  previewCheckoutPath?: string;
 };
 
 const INITIAL = { ok: false as const, message: "" };
@@ -52,6 +55,7 @@ export function PlanPicker({
   defaultPlan,
   defaultInterval,
   initialError,
+  previewCheckoutPath,
 }: Props) {
   const selfServePlans = plans.filter((p) => p.selfServe);
   const customPlan = plans.find((p) => !p.selfServe);
@@ -232,6 +236,7 @@ export function PlanPicker({
                 tier={p.tier}
                 disabled={pending}
                 isSubmitting={isSubmitting}
+                previewHref={previewCheckoutPath}
                 onContinue={() => {
                   setPlan(p.tier);
                   setSubmittingTier(p.tier);
@@ -273,7 +278,11 @@ export function PlanPicker({
         >
           I confirm I have added (or will display before go-live) caller privacy
           information on my website or in my premises — including that calls may be
-          handled by an AI assistant and may be recorded and transcribed.
+          handled by an AI assistant and may be recorded and transcribed.{" "}
+          <LegalDocLink href="/dashboard/legal/caller-notice">
+            View templates
+          </LegalDocLink>
+          .
         </LegalAcceptanceCheckbox>
 
         <LegalAcceptanceCheckbox
@@ -308,13 +317,28 @@ function PlanContinueButton({
   tier,
   disabled,
   isSubmitting,
+  previewHref,
   onContinue,
 }: {
   tier: PlanTier;
   disabled: boolean;
   isSubmitting: boolean;
+  previewHref?: string;
   onContinue: () => void;
 }) {
+  if (previewHref) {
+    return (
+      <Link
+        href={previewHref}
+        onClick={onContinue}
+        className={cn(ONBOARDING_PRIMARY_BUTTON, "mt-4 w-full px-4 text-[13px]")}
+      >
+        Continue
+        <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
+    );
+  }
+
   return (
     <OnboardingPrimaryButton
       type="submit"

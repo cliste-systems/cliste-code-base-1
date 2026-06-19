@@ -31,15 +31,3 @@ export function parseReviewChipList(
   return items;
 }
 
-export function buildReviewRules(rules: string[]): string[] {
-  const cleaned = rules.map((rule) => rule.trim()).filter(Boolean);
-  const seen = new Set<string>();
-
-  return cleaned.filter((rule) => {
-    const key = rule.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-

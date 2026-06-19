@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useState } from "react";
+import { useId, useEffect, useMemo, useState } from "react";
 
 import { CanonicalQuestionBlocked } from "./canonical-question-blocked";
 
@@ -27,6 +27,10 @@ import {
 } from "@/lib/answers-boundary";
 import { buildCaraCapabilitiesFromPromptExtras } from "@/lib/call-handling-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
+import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
+import { cleanBusinessRules } from "@/lib/agent-business-rules";
+import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
+import { weekScheduleHasOpenDay } from "@/lib/business-hours";
 import { cn } from "@/lib/utils";
 
 import type { AgentFaq } from "../agent-setup/agent-faqs";
@@ -38,6 +42,11 @@ type Props = {
   existingFaqs: AgentFaq[];
   routes?: RoutingActionSummary[];
   transferNumber?: string;
+  openingHours?: string;
+  businessRules?: string[];
+  serviceCatalog?: ServiceCatalogItem[];
+  initialQuestion?: string;
+  initialAnswer?: string;
 };
 
 export function AddQuestionDialog({
@@ -47,11 +56,16 @@ export function AddQuestionDialog({
   existingFaqs,
   routes,
   transferNumber,
+  openingHours,
+  businessRules,
+  serviceCatalog,
+  initialQuestion = "",
+  initialAnswer = "",
 }: Props) {
   const questionId = useId();
   const answerId = useId();
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [question, setQuestion] = useState(initialQuestion);
+  const [answer, setAnswer] = useState(initialAnswer);
   const [canonicalStep, setCanonicalStep] = useState(false);
 
   const handleOpenChange = (next: boolean) => {
@@ -62,6 +76,13 @@ export function AddQuestionDialog({
     }
     onOpenChange(next);
   };
+
+  useEffect(() => {
+    if (open) {
+      setQuestion(initialQuestion);
+      setAnswer(initialAnswer);
+    }
+  }, [open, initialQuestion, initialAnswer]);
 
   const caps = buildCaraCapabilitiesFromPromptExtras(routes, transferNumber);
   const smsConfigured = caps.sendLink || caps.sendFile;
@@ -81,8 +102,26 @@ export function AddQuestionDialog({
       index: draftFaqs.length - 1,
       routes,
       transferNumber,
+      openingHours,
+      businessRules,
+      serviceCatalog,
     });
-  }, [question, answer, existingFaqs, routes, transferNumber]);
+  }, [
+    question,
+    answer,
+    existingFaqs,
+    routes,
+    transferNumber,
+    openingHours,
+    businessRules,
+    serviceCatalog,
+  ]);
+
+  const hasBlockingWarning = draftWarnings.some(
+    (w) =>
+      w.kind === "injection" ||
+      (w.kind === "structured_duplicate" && w.id === "structured-hours"),
+  );
 
   function submit() {
     const q = question.trim();
@@ -208,7 +247,7 @@ export function AddQuestionDialog({
               </Button>
               <Button
                 type="button"
-                disabled={!question.trim()}
+                disabled={!question.trim() || hasBlockingWarning}
                 onClick={() => submit()}
                 className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS)}
               >

@@ -189,3 +189,9 @@
 .pac-matched {
   font-weight: 600;
 }
+
+/* Stripe Payment Element — avoid extra vertical slack in onboarding checkout */
+.cliste-stripe-payment-element [class*="p-HeightObserver"],
+.cliste-stripe-payment-element [class*="p-TabsPanel"] {
+  min-height: 0 !important;
+}

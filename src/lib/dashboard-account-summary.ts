@@ -16,6 +16,7 @@ export type DashboardAccountSummary = {
   initials: string;
   displayName: string;
   subtitle: string;
+  avatarUrl: string | null;
 };
 
 export function formatDashboardProfileRole(
@@ -43,5 +44,6 @@ export function buildDashboardAccountSummary(
     initials: initialsFromName(displayName),
     displayName,
     subtitle: `${formatDashboardProfileRole(profile.role)} · ${accountName}`,
+    avatarUrl: profile.avatarUrl?.trim() || null,
   };
 }

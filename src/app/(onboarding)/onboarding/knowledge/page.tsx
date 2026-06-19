@@ -6,8 +6,11 @@ import {
 import { parseRoutingLinks } from "@/app/(dashboard)/dashboard/routing/routing-links";
 import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
 import { defaultBusinessDescription } from "@/lib/onboarding-business-type";
+import { parseCaraGoal } from "@/lib/cara-goal";
 import { guardOnboardingPage } from "@/lib/onboarding-page-guard";
 import { requireOnboardingSession } from "@/lib/onboarding-session";
+import { listServicesForOrg } from "@/lib/service-catalog";
+import { verticalPackForNiche } from "@/lib/verticals";
 import { createClient } from "@/utils/supabase/server";
 
 import { aboutTextForStep } from "./train-cara-about-text";
@@ -17,10 +20,8 @@ import {
   shouldShowTrainCaraIntro,
 } from "./train-cara-step-resume";
 import { parseStoredOnboardingUiCopy } from "@/lib/onboarding-ui-copy";
-import {
-  parseAgentBusinessRules,
-  stripBusinessRulesFromSummary,
-} from "@/lib/agent-business-rules";
+import { resolveCaptureFieldsForOrg } from "@/lib/agent-capture-fields-backfill";
+import { sanitizeServicesOfferedRaw } from "@/lib/service-offered-raw";
 import { TrainCaraFlow } from "./train-cara-flow";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export default async function OnboardingKnowledgePage({
     supabase
       .from("organizations")
       .select(
-        "name, address, storefront_eircode, niche, agent_business_type, agent_location_address, raw_business_description, business_knowledge_summary, agent_opening_hours, agent_service_area, agent_services_departments, agent_services_not_offered, agent_details_to_collect, agent_faqs, agent_capture_fields, agent_business_rules, cara_handle_options, routing_links, fallback_number, notification_email, notification_phone, onboarding_ui_copy, train_cara_step",
+        "name, address, storefront_eircode, niche, agent_business_type, agent_location_address, raw_business_description, business_knowledge_summary, agent_opening_hours, agent_service_area, agent_services_departments, agent_services_departments_raw, agent_services_not_offered, agent_services_not_offered_raw, agent_details_to_collect, agent_faqs, agent_capture_fields, cara_handle_options, cara_goal, routing_links, fallback_number, notification_email, notification_phone, onboarding_ui_copy, train_cara_step",
       )
       .eq("id", session.organizationId)
       .maybeSingle(),
@@ -53,12 +54,19 @@ export default async function OnboardingKnowledgePage({
   const storedLinks = parseRoutingLinks(
     (org?.routing_links as unknown) ?? null,
   );
+  const verticalPack = verticalPackForNiche(niche);
   const routes = ensureFallbackRoute(
     storedLinks.length > 0 ? routesFromStoredLinks(storedLinks) : [],
   );
 
+  const preferredTemplate = verticalPack.capabilities.defaultRouteTemplate;
+  const preferredLink = routes.find(
+    (route) => route.templateId === preferredTemplate && route.url.trim(),
+  );
   const linkUrl =
-    routes.find((r) => r.outcome === "send_link")?.url ?? "";
+    preferredLink?.url.trim() ||
+    routes.find((r) => r.outcome === "send_link")?.url?.trim() ||
+    "";
   const whatsappContact =
     routes.find((r) => r.outcome === "whatsapp")?.whatsapp ?? "";
   const routeEmail = routes.find((r) => r.outcome === "email")?.email ?? "";
@@ -67,10 +75,6 @@ export default async function OnboardingKnowledgePage({
   const about = aboutTextForStep(
     (org?.raw_business_description as string | null) ?? "",
   );
-  const savedSummaryRaw =
-    (org?.business_knowledge_summary as string | null) ?? "";
-  const businessRules = parseAgentBusinessRules(org?.agent_business_rules);
-  const compiledNotes = stripBusinessRulesFromSummary(savedSummaryRaw);
 
   const classifiedBusinessType = defaultBusinessDescription({
     niche: (org?.niche as string | null) ?? null,
@@ -78,12 +82,24 @@ export default async function OnboardingKnowledgePage({
   });
   const servicesOffered =
     (org?.agent_services_departments as string | null) ?? "";
+  const servicesOfferedRaw =
+    (org?.agent_services_departments_raw as string | null)?.trim() ?? "";
   const servicesNotOffered =
     (org?.agent_services_not_offered as string | null) ?? "";
+  const servicesNotOfferedRaw =
+    (org?.agent_services_not_offered_raw as string | null)?.trim() ?? "";
   const openingHours = (org?.agent_opening_hours as string | null) ?? "";
   const serviceArea = (org?.agent_service_area as string | null) ?? "";
+  const caraGoal = parseCaraGoal(org?.cara_goal);
   const detailsToCollect =
     (org?.agent_details_to_collect as string | null)?.trim() ?? "";
+  const captureFields = resolveCaptureFieldsForOrg({
+    rawFields: org?.agent_capture_fields,
+    detailsText: detailsToCollect,
+    businessType: classifiedBusinessType,
+    niche,
+    caraGoal,
+  });
   const faqs = parseAgentFaqs(org?.agent_faqs);
   const onboardingUiCopy = parseStoredOnboardingUiCopy(org?.onboarding_ui_copy);
 
@@ -96,6 +112,19 @@ export default async function OnboardingKnowledgePage({
     savedStepId,
   });
 
+  const serviceCatalog = verticalPack.capabilities.usesServiceCatalog
+    ? await listServicesForOrg(supabase, session.organizationId)
+    : [];
+
+  const servicesOfferedRawForStep =
+    serviceCatalog.length > 0
+      ? sanitizeServicesOfferedRaw({
+          raw: servicesOfferedRaw,
+          catalogNames: serviceCatalog.map((item) => item.name),
+          offeredChips: servicesOffered,
+        })
+      : servicesOfferedRaw;
+
   return (
     <OnboardingStepShell variant="training" contentOnly>
       <TrainCaraFlow
@@ -103,15 +132,17 @@ export default async function OnboardingKnowledgePage({
           businessName: (org?.name as string | null) ?? "",
           about,
           servicesOffered,
+          servicesOfferedRaw: servicesOfferedRawForStep,
           servicesNotOffered,
+          servicesNotOfferedRaw,
           openingHours,
           serviceArea,
-          detailsToCollect,
-          businessRules,
-          compiledNotes,
+          captureFields,
           faqs,
           businessType: classifiedBusinessType,
           niche,
+          caraGoal,
+          serviceCatalog,
           handleOptions,
           routes,
           linkLabel: "",

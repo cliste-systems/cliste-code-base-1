@@ -1,7 +1,7 @@
 # GDPR, ePrivacy & AI Act — Cliste voice agents in Ireland
 
 **Status:** Internal compliance reference (engineering + product).  
-**Last updated:** 31 May 2026.  
+**Last updated:** 16 June 2026.  
 **Audience:** Cliste team, salon customers (operators), and technical reviewers.
 
 > **This document is not legal advice.** Irish and EU data-protection law is fact-specific. Use this as a map of how Cliste is designed, what the codebase does today, and where professional review is still required. For binding commitments, rely on `/legal/privacy`, `docs/legal/DPA.md`, and signed customer agreements.
@@ -67,7 +67,7 @@ When the salon has a valid **Article 6** basis (usually **contract** or **legiti
 | Send **transactional** SMS/email (confirmations, reminders, pay links) | Twilio / SendGrid — terms prohibit using Cliste for bulk marketing |
 | Transfer data to **US sub-processors** with **DPF and/or SCCs** | Listed at `/legal/sub-processors` |
 | **Anonymise** a customer on erasure while keeping appointment **time/price** for Revenue | `eraseCustomerData` in `src/app/(dashboard)/dashboard/privacy/actions.ts` |
-| Provide salons **Article 15 export** and **Article 17 erasure** tools | `/dashboard/legal/data-requests` (RLS-scoped export; admin-scoped erasure) |
+| Provide salons **Article 15 export**, **Article 17 erasure**, and **Article 20 portability** tools | `/dashboard/legal/data-requests` |
 | Log GDPR exports/erasures in `security_auth_events` | `gdpr_data_export`, `gdpr_erasure` event types |
 | Isolate tenants (RLS, resolve org from `called_number` not body `organization_id`) | `src/app/api/voice/call-complete/route.ts` |
 | Run security/rate-limit processing with **legitimate interest** | OTP/rate tables + cron purge; see ROPA §2.3 |
@@ -109,7 +109,7 @@ When the salon has a valid **Article 6** basis (usually **contract** or **legiti
 
 | Salon must… |
 | ----------- |
-| Tell callers they are dealing with an **AI** and how data is used (privacy notice on website, in-salon signage, verbal policy) |
+| Tell callers they are dealing with an **AI** and how data is used (privacy notice on website, in-salon signage, verbal policy) — copy-paste templates at `/dashboard/legal/caller-notice` |
 | Have a **lawful basis** for answering calls and storing bookings |
 | Honour **data subject requests** (can use `/dashboard/privacy` tools) |
 | Not use exported phone lists for **spam marketing** |
@@ -169,7 +169,7 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 | Access | 15 | `/dashboard/privacy` → `exportCustomerData` (JSON download) |
 | Erasure | 17 | `/dashboard/privacy` → `eraseCustomerData` (anonymise PII; keep tax fields) |
 | Rectification | 16 | Dashboard bookings/contacts (salon-operated) |
-| Portability | 20 | JSON export partially covers; DPIA notes dedicated Art 20 UI **not yet built** |
+| Portability | 20 | `/dashboard/legal/data-requests` → org-wide JSON or CSV export |
 | Restrict / object | 18 / 21 | Manual via privacy@clistesystems.ie |
 | Complain to DPC | — | Linked from `/legal/privacy` |
 
@@ -180,13 +180,13 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 | Voice audio at rest | **Not stored** |
 | `call_logs.transcript`, `transcript_review` | **30 days** → nulled |
 | `call_logs.ai_summary`, `caller_number` | **13 months** → nulled |
-| Appointments after erasure | Anonymised identity; time/price kept (**~6 years** tax — align public copy) |
+| Appointments after erasure | Anonymised identity; time/price kept (**~6 years** tax) |
 | OTP challenges | **30 minutes** |
 | Rate-limit events | **14 days** |
 | Security audit log | **2 years** |
 | Backups | **~35 days** PITR window after deletion |
 
-**Known copy inconsistency:** `/legal/privacy` §11 says appointments retained “7 years” in one row; `RETENTION.md` and erasure comments say **6 years (Revenue)**. Align public and internal docs.
+**Known copy inconsistency:** Reconcile any remaining appointment retention years in public privacy copy with `RETENTION.md` (6 years for tax fields).
 
 ---
 
@@ -224,15 +224,11 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 | -------- | --- | ---- | ------------- |
 | **P0** | AI **disclosure** lives in voice worker (Railway), not verified in this repo | EU AI Act / transparency failure | Enforce first-turn script in worker; add monitoring/logging |
 | **P0** | Confirm **Twilio/LiveKit recording OFF** on all DIDs | Unlawful retention / interception perception | DPIA checklist item — operational verification |
-| **P1** | `/dashboard/privacy` **not in sidebar** (`dashboard-routes.ts`, `dashboard-sidebar.tsx`) | Salons cannot find Art 15/17 tools | Add nav link under Settings or Account |
-| **P1** | `exportCustomerData` **omits** `transcript` / `transcript_review` fields | Incomplete Art 15 access | Extend `.select()` to include transcripts while still within retention |
-| **P1** | No automated **email** to salon admins on sub-processor changes | DPA §7 commitment | Notify on deploy when `SUBS` list changes |
-| **P2** | Art **20** portability UI outstanding | DPIA action item | CSV/JSON bulk export per customer |
+| **P1** | `exportCustomerData` **omits** some fields in edge cases | Incomplete Art 15 access | Verify export includes transcripts while within retention |
+| **P1** | Sub-processor change email | DPA §7 commitment | Cron at `/api/cron/sub-processor-notify` (implemented) |
 | **P2** | `CLISTE_VOICE_ALLOW_LEGACY_ORG_ID` legacy path | Cross-tenant write if secret leaked | Remove flag after worker rollout |
 | **P2** | `business_files` / `extracted_text` may contain PII uploaded by salon | Processor stores whatever controller uploads | Salon guidance in Cara Setup UI; optional scan/redaction |
-| **P3** | Retention **7 vs 6 years** wording mismatch | Transparency accuracy | Single source of truth in privacy page |
 | **P3** | Erasure phone sentinel `+000000000000` shared across subjects | Theoretical collision on re-lookup | Per-row random sentinel or hash |
-| **P3** | Cookie policy still mentions “public booking form” while product may have shifted | Stale transparency | Update cookies copy to match live surfaces |
 
 ### 9.4 Data flows (voice call)
 
@@ -265,7 +261,7 @@ sequenceDiagram
 
 Before going live with the AI line, the salon should confirm:
 
-- [ ] Privacy notice (or leaflet) mentions **AI phone answering**, categories of data, retention, and sub-processors (or link to Cliste’s sub-processor page).
+- [ ] Privacy notice (or leaflet) mentions **AI phone answering**, categories of data, retention, and sub-processors (or link to Cliste’s sub-processor page). Use `/dashboard/legal/caller-notice` for copy-paste templates.
 - [ ] Lawful basis documented (usually contract / legitimate interests for inbound booking).
 - [ ] Staff know how to run **export** and **erasure** at `/dashboard/legal/data-requests`.
 - [ ] **No marketing** use of caller lists via Cliste SMS/voice.
@@ -279,17 +275,13 @@ Before going live with the AI line, the salon should confirm:
 
 Short-term (compliance hygiene):
 
-1. Add **Privacy tools** to dashboard navigation → `/dashboard/legal/data-requests`.
-2. Include **transcripts** in GDPR export when present.
-3. Remove **legacy org-id-only** voice webhook path after worker upgrade.
-4. Reconcile **6 vs 7 year** appointment retention in public privacy table.
-5. Close DPIA checklist: Twilio recording audit, worker AI disclosure test call.
+1. Include **transcripts** in GDPR export when present (verify).
+2. Remove **legacy org-id-only** voice webhook path after worker upgrade.
+3. Close DPIA checklist: Twilio recording audit, worker AI disclosure test call.
 
 Medium-term:
 
-6. Sub-processor change **email notification** job.
-7. Art **20** structured export (appointments + calls in machine-readable bundle).
-8. Salon-facing **“caller privacy”** snippet generator (Art 13 helper text) in Cara Setup.
+4. Salon-facing caller privacy templates — **done** at `/dashboard/legal/caller-notice`.
 
 ---
 
@@ -326,4 +318,5 @@ Medium-term:
 
 | Date | Change |
 | ---- | ------ |
+| 2026-06-16 | Entity rename to Cliste Systems Limited; caller-notice templates page; Art 20 export marked done; Sentry in sub-processor list |
 | 2026-05-31 | Initial research doc: regulatory synthesis + full codebase GDPR audit |

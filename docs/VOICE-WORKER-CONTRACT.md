@@ -4,12 +4,69 @@ The LiveKit/voice worker reports each finished call to the Cliste app. This is
 the single integration point between the worker and the dashboard. Keep the
 worker aligned with this document.
 
+**Worker mode (v1):** `code-base-2` is **Cara-only** — routing links, Action
+Inbox webhooks, and dashboard SMS/email APIs. There is **no** in-worker native
+salon booking, Stripe checkout, or direct Twilio SMS. Org resolution is by
+dialed `phone_numbers.e164` first; AI disclosure is spoken **once** via
+`organizations.greeting` (no separate disclosure line).
+
 ## Org status gate (mandatory)
 
 Before answering a call, load `organizations.is_active` and account `status`. If the
 org is suspended, churned, or `is_active = false`, **do not** start the LLM session —
 play a short unavailable message and hang up. The dashboard API returns `403`
 `org_suspended` if a webhook arrives for an inactive org.
+
+## Blocklist gate (mandatory)
+
+After the org status gate and **before** starting the LLM/TTS session, check whether
+the caller should be blocked:
+
+1. Normalize `caller_number` to E.164 (same rules as below). Withheld callers arrive
+   as `+anonymous`.
+2. Load `organizations.block_anonymous_callers` for the resolved org.
+3. Query `blocked_callers` for a row matching `(organization_id, caller_e164)`.
+
+Block when **either**:
+
+- `caller_e164` is in `blocked_callers` for this org, **or**
+- `caller_number` is `+anonymous` **and** `block_anonymous_callers = true`.
+
+When blocked:
+
+- Play a short message — **no** AI disclosure, **no** LLM session, **no** TTS
+  beyond the clip. Use the business name from org config, e.g. “We're unable to
+  put you through to {business}. This line is operated by Cliste Systems on
+  behalf of the business, and your number isn't authorised to connect. Goodbye.”
+- Hang up.
+- `POST /api/voice/call-complete` with `outcome: "blocked"`, `duration_seconds` near
+  zero, no transcript fields. Do **not** call `action-ticket`, `send-sms`, or
+  `increment_caller_abuse_hit`.
+
+Example preflight SQL (service role):
+
+```sql
+select block_anonymous_callers from organizations where id = $org_id;
+
+select 1 from blocked_callers
+  where organization_id = $org_id and caller_e164 = $normalized_caller
+  limit 1;
+```
+
+Example `call-complete` body for a blocked call:
+
+```json
+{
+  "called_number": "+353…",
+  "call_sid": "CA…",
+  "caller_number": "+353871234567",
+  "outcome": "blocked",
+  "duration_seconds": 0
+}
+```
+
+Blocked calls are logged in Call history for owner visibility but do **not** create
+Action Inbox tickets and are excluded from Cara success metrics.
 
 ## Caller handling
 
@@ -148,6 +205,7 @@ dashboard reads for every metric (defined in `src/lib/call-history-types.ts`):
 | `failed`                 | Caller hung up / dropped / call incomplete. |
 | `voicemail_or_no_speech` | No usable speech (voicemail, silence, no answer). |
 | `spam_or_abuse`          | Robocall / spam / abusive caller. |
+| `blocked`                | Rejected by owner blocklist before Cara started (preflight gate). |
 
 ## Normalization
 
@@ -192,6 +250,108 @@ curl -sS -X POST "$APP_URL/api/voice/action-ticket" \
   }'
 ```
 
+### Caller SMS (from the org's assigned Irish DID)
+
+Send booking links, routing links, or files to the caller's mobile. Uses the
+org's assigned `phone_numbers.e164` as the Twilio `from` address. The body may
+be **just the link or short content** — no AI/privacy legal boilerplate is
+required in the text (disclosure happens on the call and via salon notices).
+
+**Before calling this endpoint**, Cara must ask on the call and set
+`caller_consented: true` (required in production). The API may prefix the
+business name unless `skip_business_prefix: true`.
+
+Returns `400 caller_consent_required`, `429 sms_quota_exhausted`, or
+`422 landline_destination` when applicable.
+
+```bash
+curl -sS -X POST "$APP_URL/api/voice/send-sms" \
+  -H "Authorization: Bearer $CLISTE_VOICE_WEBHOOK_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "called_number": "+353749389378",
+    "to": "+353871234567",
+    "body": "Here is your booking link: https://example.com/book",
+    "purpose": "routing_link",
+    "caller_consented": true
+  }'
+```
+
+Owner notification SMS (Action Inbox, Cara Training) still uses the platform
+`TWILIO_SMS_FROM` number — only caller-facing texts use the assigned DID.
+
+### Caller email (directions / maps links)
+
+Email a caller-facing message (e.g. directions with a maps URL). Requires
+`caller_consented: true` in production. Used by `sendDirectionsLink` on location
+routes when the business chose email or text-or-email delivery.
+
+```bash
+curl -sS -X POST "$APP_URL/api/voice/send-caller-email" \
+  -H "Authorization: Bearer $CLISTE_VOICE_WEBHOOK_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "called_number": "+353749389378",
+    "to": "caller@example.com",
+    "subject": "Directions",
+    "body": "Here are directions: https://maps.google.com/…",
+    "caller_consented": true
+  }'
+```
+
+### Business file lookup (menus / price lists)
+
+Search uploaded business files for relevant excerpts during a call. Use this
+when the caller asks about a specific item, service, or price in an uploaded
+menu or price list — **do not read the whole document aloud**.
+
+Large files are indexed in `custom_prompt`; the full extracted text lives in
+`business_files.extracted_text` and is queried through this endpoint.
+
+Optional filters: `file_id` (uuid), `document_kind` (`price_list`, `menu`,
+`brochure`, `stock_sheet`, `service_sheet`, `faq_doc`, `other`).
+
+Returns `{ ok: true, matches: [] }` when nothing relevant matches — offer to
+text the file (if `send_enabled` on a route) or take a message.
+
+```bash
+curl -sS -X POST "$APP_URL/api/voice/search-business-file" \
+  -H "Authorization: Bearer $CLISTE_VOICE_WEBHOOK_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "called_number": "+353749389378",
+    "query": "gel manicure price",
+    "document_kind": "price_list"
+  }'
+```
+
+Example response:
+
+```json
+{
+  "ok": true,
+  "matches": [
+    {
+      "file_id": "…",
+      "file_name": "menu.pdf",
+      "document_kind": "price_list",
+      "excerpts": [
+        {
+          "text": "Gel manicure — €45\nGel pedicure — €55",
+          "score": 0.82,
+          "start_line": 42,
+          "end_line": 43
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Worker tool:** register `searchBusinessFile` (see code-base-2
+`src/lib/cara_tools.ts`). Invoke silently when the caller asks about menu or
+price details; quote only the returned excerpt.
+
 ## What updates where
 
 - `call_logs` row is created → **Calls** page + **Home** "Recent activity".
@@ -219,10 +379,11 @@ Resolve the org from `called_number`, then read configuration from Postgres
 | Source | Field / table | Use on calls |
 |--------|----------------|--------------|
 | Greeting | `organizations.greeting`, `assistant_display_name` | Opening line — must identify as AI and mention recording if custom |
+| Blocklist | `organizations.block_anonymous_callers`, `blocked_callers` | Preflight gate — reject before LLM (see Blocklist gate) |
 | Instructions | `organizations.custom_prompt` | Call handling |
 | Business text | `agent_business_type`, `business_knowledge_summary`, `agent_opening_hours`, `agent_service_area`, `agent_extra_notes`, `agent_location_address`, `agent_location_eircode` | Spoken context |
 | FAQs | `organizations.agent_faqs` (jsonb `[{question, answer}]`) | Answer during call |
-| Knowledge files | `business_files` where `answer_enabled = true` and `extracted_text` is non-empty | Ground answers (static upload; may be stale) |
+| Knowledge files | `business_files` where `answer_enabled = true` and `extracted_text` is non-empty | Ground answers (static upload; may be stale). **Large files:** prompt contains a short index only — call `POST /api/voice/search-business-file` to look up specific items during the call. |
 
 `business_files` columns: `file_name`, `file_type`, `mime_type`, `storage_path`,
 `extracted_text`, `processing_status` (`ready` | `processing` | `needs_processing`).
@@ -274,3 +435,10 @@ prompt has matched the caller to this route, confirm the mobile number and SMS
 
 Uploaded spreadsheets/PDFs used for answering are **static** until the business
 re-uploads; do not imply live inventory sync.
+
+**Large menus and price lists:** the compiled prompt may include only a short
+index for oversized files. When a caller asks about a specific item or price,
+invoke `searchBusinessFile` (see [`VOICE-WORKER-CONTRACT.md`](./VOICE-WORKER-CONTRACT.md))
+to query the full stored text. Quote only the matching excerpt — never read the
+whole document aloud. If search returns no match, offer to text the file (when
+`send_enabled`) or take a message.

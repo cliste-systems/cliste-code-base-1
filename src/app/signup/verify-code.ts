@@ -2,12 +2,17 @@
 
 import { headers } from "next/headers";
 
+import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import {
   getRateLimitStatus,
   hashRateLimitIdentifier,
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
+import {
+  SIGNUP_EMAIL_OTP_LENGTH,
+  SIGNUP_EMAIL_OTP_PATTERN,
+} from "@/lib/signup-email-otp";
 import { createClient } from "@/utils/supabase/server";
 
 export type VerifySignupCodeResult =
@@ -15,12 +20,11 @@ export type VerifySignupCodeResult =
   | { ok: false; message: string; retryAfterSeconds?: number };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CODE_RE = /^\d{6}$/;
 
 /**
- * Verifies the 6-digit email code from the signup confirmation email and
+ * Verifies the Supabase email OTP from the signup confirmation email and
  * signs the user in (cookies set via the server client). Rate-limited per
- * IP+email so the 6-digit space cannot be brute-forced.
+ * IP+email.
  */
 export async function verifySignupCode(
   emailRaw: string,
@@ -31,32 +35,33 @@ export async function verifySignupCode(
   if (!email || !EMAIL_RE.test(email)) {
     return { ok: false, message: "Enter a valid email address." };
   }
-  if (!CODE_RE.test(code)) {
-    return { ok: false, message: "Enter the 6-digit code from the email." };
+  if (!SIGNUP_EMAIL_OTP_PATTERN.test(code)) {
+    return {
+      ok: false,
+      message: `Enter the ${SIGNUP_EMAIL_OTP_LENGTH}-digit code from the email.`,
+    };
   }
 
   const h = await headers();
-  // Two limiters: per IP+UA (request origin) and per email (global). The
-  // second is IP/UA-independent so rotating user agents or IPs cannot grind
-  // the 6-digit code space against a single account.
   const fpOrigin = rateLimitFingerprint(h, `signup-verify:${email}`);
   const fpEmail = hashRateLimitIdentifier(`signup-verify-email:${email}`);
-  for (const fp of [fpOrigin, fpEmail]) {
-    const status = await getRateLimitStatus("authenticate", fp);
-    if (!status.allowed) {
-      return {
-        ok: false,
-        message: `Too many attempts. Try again in ${status.retryAfterSeconds}s.`,
-        retryAfterSeconds: status.retryAfterSeconds,
-      };
+  if (!isSignupOnboardingDevRelaxed()) {
+    for (const fp of [fpOrigin, fpEmail]) {
+      const status = await getRateLimitStatus("authenticate", fp);
+      if (!status.allowed) {
+        return {
+          ok: false,
+          message: `Too many attempts. Try again in ${status.retryAfterSeconds}s.`,
+          retryAfterSeconds: status.retryAfterSeconds,
+        };
+      }
     }
   }
 
   const supabase = await createClient();
 
   // First signup emails carry a "signup" token; resent emails carry
-  // "magiclink". A wrong-type lookup fails without consuming the token,
-  // so trying both is safe.
+  // "magiclink". A wrong-type lookup fails without consuming the token.
   for (const type of ["signup", "magiclink"] as const) {
     const { error } = await supabase.auth.verifyOtp({ email, token: code, type });
     if (!error) {

@@ -8,7 +8,7 @@ import {
   PhoneForwarded,
   RefreshCw,
 } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
@@ -93,7 +93,10 @@ export function OnboardingNumberView({
   function handleContinue() {
     setError(null);
     startSave(async () => {
-      const res = await saveOnboardingNumber({ mode, transferPhone });
+      const res = await saveOnboardingNumber({
+        mode,
+        transferPhone,
+      });
       if (res && !res.ok) setError(res.message);
     });
   }
@@ -146,15 +149,17 @@ export function OnboardingNumberView({
           ))}
         </OnboardingEnter>
 
-        <ModeDetailPanel
-          mode={mode}
-          transferPhone={transferPhone}
-          onTransferPhoneChange={setTransferPhone}
-          forwardingCodes={forwardingCodes}
-          hasNumber={Boolean(displayNumber)}
-          copiedKey={copiedKey}
-          onCopy={copy}
-        />
+        <OnboardingEnter className="w-full">
+          <ModeDetailPanel
+            mode={mode}
+            transferPhone={transferPhone}
+            onTransferPhoneChange={setTransferPhone}
+            forwardingCodes={forwardingCodes}
+            hasNumber={Boolean(displayNumber)}
+            copiedKey={copiedKey}
+            onCopy={copy}
+          />
+        </OnboardingEnter>
 
       {error ? (
         <p className="text-center text-[13px] text-red-600" role="alert">
@@ -293,14 +298,16 @@ function ModeDetailPanel({
     : { duration: OPTION_MOTION_MS / 1000, ease: OPTION_MOTION_EASE };
 
   return (
-    <motion.div
-      key={panelKey}
-      initial={reduceMotion ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={panelTransition}
-      className="w-full will-change-[opacity]"
-    >
-      {showTransfer ? (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={panelKey}
+        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+        transition={panelTransition}
+        className="w-full"
+      >
+        {showTransfer ? (
         <div className={ONBOARDING_FIELD_BOX}>
           <label htmlFor="transfer-phone" className={ONBOARDING_FIELD_LABEL}>
             Transfer to a person (optional)
@@ -326,7 +333,8 @@ function ModeDetailPanel({
           onCopy={onCopy}
         />
       )}
-    </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

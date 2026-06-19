@@ -56,7 +56,7 @@ export function SectionCard({
         className={cn(
           "flex shrink-0 items-start justify-between gap-3 px-5 py-4",
           !flat && "border-b border-slate-100",
-          flat && description && "pb-3",
+          flat && description && "pb-4",
           headerClassName,
         )}
       >

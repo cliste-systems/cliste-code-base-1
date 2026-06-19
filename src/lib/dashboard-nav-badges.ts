@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+
 export {
   DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
   DASHBOARD_CALL_HISTORY_SEEN_COOKIE,
@@ -78,7 +80,7 @@ export async function fetchDashboardNavBadges(
     "/dashboard/action-inbox": inboxBadge,
     "/dashboard/calls": callBadge,
     "/dashboard/call-history": callBadge,
-    "/dashboard/cara-training": trainingBadge,
+    [DASHBOARD_ROUTES.caraTraining]: trainingBadge,
   };
 }
 

@@ -57,6 +57,11 @@ export function CaraFaqsStep({
 
   return (
     <CaraTrainingStepShell title={title} subtitle={subtitle} helper={helper}>
+      {uiCopy?.faqStepHint?.trim() ? (
+        <p className="mb-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-700">
+          {uiCopy.faqStepHint.trim()}
+        </p>
+      ) : null}
       <CaraCommonQuestionsField
         faqs={faqs}
         suggestions={suggestions}

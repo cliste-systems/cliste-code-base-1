@@ -22,7 +22,7 @@ export function getStripeClient(): Stripe {
     apiVersion: "2026-03-25.dahlia",
     typescript: true,
     appInfo: {
-      name: "Cliste Systems",
+      name: "Cliste Systems Limited",
       url: "https://clistesystems.ie",
     },
   });

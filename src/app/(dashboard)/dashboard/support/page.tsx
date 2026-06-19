@@ -1,4 +1,4 @@
-import { DASHBOARD_PAGE_SHELL_FILL_WHITE } from "@/components/dashboard/dashboard-surface";
+import { DASHBOARD_HOME_CONTENT_COLUMN, DASHBOARD_PAGE_SHELL_FILL_WHITE } from "@/components/dashboard/dashboard-surface";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,7 @@ export default async function SupportPage() {
       className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "overflow-hidden")}
       data-dashboard-fill
     >
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       {error ? (
         <p className="px-1 py-4 text-[13px] text-red-600">
           {error.message}
@@ -48,6 +49,7 @@ export default async function SupportPage() {
       ) : (
         <SupportView className="min-h-0 flex-1" initialTickets={tickets} />
       )}
+      </div>
     </div>
   );
 }

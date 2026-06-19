@@ -1,21 +1,34 @@
 import { parseCallRoutingMode } from "@/lib/call-routing";
+import { loadAccountBilling } from "@/lib/account-session";
+import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { signupSegmentLabel } from "@/lib/signup-segment-label";
+import { canManageDashboardConfig } from "@/lib/team-roles";
 
 import { SettingsView } from "./settings-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId, user, profile, accountId, isLocalPreview } =
+    await requireDashboardSession();
 
-  const { data: org, error } = await supabase
-    .from("organizations")
-    .select(
-      "is_active, status, name, phone_number, niche, agent_business_type, notification_email, notification_phone, call_routing_mode, fallback_number",
-    )
-    .eq("id", organizationId)
-    .maybeSingle();
+  const [{ data: org, error }, accountBilling, { data: blockedRows }] =
+    await Promise.all([
+    supabase
+      .from("organizations")
+      .select(
+        "is_active, status, name, phone_number, niche, agent_business_type, notification_email, notification_phone, call_routing_mode, fallback_number, slug, block_anonymous_callers",
+      )
+      .eq("id", organizationId)
+      .maybeSingle(),
+    loadAccountBilling(accountId),
+    supabase
+      .from("blocked_callers")
+      .select("id, caller_e164, reason, created_at")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (error) {
     return <p className="text-sm text-red-600">{error.message}</p>;
@@ -38,9 +51,32 @@ export default async function SettingsPage() {
         ? "—"
         : "Active";
 
+  const accountSummary = buildDashboardAccountSummary(profile, user, {
+    name: accountBilling?.name ?? org.name ?? null,
+    slug: (org.slug as string | null) ?? null,
+  });
+
   return (
     <SettingsView
       className="min-h-0 flex-1"
+      signInEmail={user.email ?? ""}
+      canManageAccount={canManageDashboardConfig(profile.role)}
+      isLocalPreview={isLocalPreview}
+      profileInitial={{
+        name: profile.name?.trim() || accountSummary.displayName,
+        initials: accountSummary.initials,
+        avatarUrl: accountSummary.avatarUrl,
+        subtitle: accountSummary.subtitle,
+      }}
+      blockedNumbers={{
+        rows: (blockedRows ?? []).map((row) => ({
+          id: row.id as string,
+          caller_e164: row.caller_e164 as string,
+          reason: (row.reason as string | null) ?? null,
+          created_at: row.created_at as string,
+        })),
+        blockAnonymousCallers: Boolean(org.block_anonymous_callers),
+      }}
       initial={{
         isActive: org.is_active ?? true,
         businessName: org.name ?? "",

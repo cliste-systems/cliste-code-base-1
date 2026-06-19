@@ -27,12 +27,14 @@ export type GdprExportPayload = {
   appointments: Record<string, unknown>[];
   call_logs: Record<string, unknown>[];
   action_tickets: Record<string, unknown>[];
+  blocked_callers: Record<string, unknown>[];
 };
 
 export type GdprErasureCounts = {
   appointments_anonymised: number;
   call_logs_redacted: number;
   action_tickets_redacted: number;
+  blocked_callers_deleted: number;
 };
 
 function normalizePhoneOrNull(raw: string): string | null {
@@ -145,7 +147,7 @@ export async function exportCustomerData(
   // can never leak data from another tenant by accident.
   const sb = session.supabase;
 
-  const [appts, calls, tickets] = await Promise.all([
+  const [appts, calls, tickets, blocked] = await Promise.all([
     sb
       .from("appointments")
       .select(
@@ -170,13 +172,20 @@ export async function exportCustomerData(
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
       .limit(500),
+    sb
+      .from("blocked_callers")
+      .select("id, caller_e164, reason, created_at")
+      .eq("organization_id", session.organizationId)
+      .eq("caller_e164", phoneE164)
+      .limit(50),
   ]);
 
-  if (appts.error || calls.error || tickets.error) {
+  if (appts.error || calls.error || tickets.error || blocked.error) {
     console.error("[gdpr] export query error", {
       a: appts.error?.message,
       c: calls.error?.message,
       t: tickets.error?.message,
+      b: blocked.error?.message,
     });
     return { ok: false, message: "Could not assemble export." };
   }
@@ -196,6 +205,7 @@ export async function exportCustomerData(
         appointment_count: appts.data?.length ?? 0,
         call_log_count: calls.data?.length ?? 0,
         action_ticket_count: tickets.data?.length ?? 0,
+        blocked_caller_count: blocked.data?.length ?? 0,
       },
     });
   } catch (err) {
@@ -212,6 +222,7 @@ export async function exportCustomerData(
       appointments: appts.data ?? [],
       call_logs: calls.data ?? [],
       action_tickets: tickets.data ?? [],
+      blocked_callers: blocked.data ?? [],
     },
   };
 }
@@ -253,7 +264,7 @@ export async function eraseCustomerData(
   // use the admin client BUT scope every UPDATE to this org's rows.
   const admin = createAdminClient();
 
-  const [apptsRes, callsRes, ticketsRes] = await Promise.all([
+  const [apptsRes, callsRes, ticketsRes, blockedRes] = await Promise.all([
     admin
       .from("appointments")
       .update({
@@ -284,13 +295,20 @@ export async function eraseCustomerData(
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
       .select("id"),
+    admin
+      .from("blocked_callers")
+      .delete()
+      .eq("organization_id", session.organizationId)
+      .eq("caller_e164", phoneE164)
+      .select("id"),
   ]);
 
-  if (apptsRes.error || callsRes.error || ticketsRes.error) {
+  if (apptsRes.error || callsRes.error || ticketsRes.error || blockedRes.error) {
     console.error("[gdpr] erasure error", {
       a: apptsRes.error?.message,
       c: callsRes.error?.message,
       t: ticketsRes.error?.message,
+      b: blockedRes.error?.message,
     });
     return { ok: false, message: "Erasure failed — please retry." };
   }
@@ -299,6 +317,7 @@ export async function eraseCustomerData(
     appointments_anonymised: apptsRes.data?.length ?? 0,
     call_logs_redacted: callsRes.data?.length ?? 0,
     action_tickets_redacted: ticketsRes.data?.length ?? 0,
+    blocked_callers_deleted: blockedRes.data?.length ?? 0,
   };
 
   try {
@@ -320,6 +339,7 @@ export async function eraseCustomerData(
 
   revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/calls");
+  revalidatePath("/dashboard/settings");
 
   return { ok: true, phoneE164, affected: counts };
 }

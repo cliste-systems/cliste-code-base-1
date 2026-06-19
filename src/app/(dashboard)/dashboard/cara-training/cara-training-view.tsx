@@ -32,6 +32,7 @@ import {
 import {
   DASHBOARD_CARD_SURFACE,
   DASHBOARD_HOME_ATTENTION_ROW_HOVER,
+  DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_ICON_CHIP_SM,
   DASHBOARD_ICON_GLYPH_SM,
   DASHBOARD_INPUT_CLASS,
@@ -62,6 +63,7 @@ import {
   revertAppliedTraining,
   startOwnerInitiatedTraining,
 } from "./actions";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 import { CaraTrainingPatchPreview } from "./cara-training-patch-preview";
 import {
   CARA_TRAINING_SECTION_LABELS,
@@ -86,6 +88,7 @@ export function CaraTrainingView({
   canManage,
   initialSelectedItemId = null,
 }: CaraTrainingViewProps) {
+  const { copy } = useDashboardVertical();
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const [listTab, setListTab] = useState<ListTab>(() => {
@@ -228,12 +231,13 @@ export function CaraTrainingView({
       )}
       data-dashboard-fill
     >
+      <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <DashboardAnimatedPageSections className="min-h-0 flex-1 gap-3 overflow-hidden">
         <DashboardPageHeader
           eyebrow="Cara"
-          title="Cara Training"
+          title="Training"
           icon={GraduationCap}
-          description="Answer gaps from calls in plain English — preview what Cara adds, then confirm."
+          description={copy.training.description}
           summary={[
             { value: String(openItems.length), label: "needs input" },
             {
@@ -667,6 +671,7 @@ export function CaraTrainingView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

@@ -27,8 +27,6 @@ export default async function OnboardingNumberPage() {
     .eq("id", session.organizationId)
     .maybeSingle();
 
-  // Provision the Cliste DID here so it can be shown as the forward target and
-  // verified on the next (test call) step.
   let phoneNumber = (org?.phone_number as string | null)?.trim() || null;
   if (!phoneNumber) {
     const provisioned = await provisionOrganizationPhoneNumber(
