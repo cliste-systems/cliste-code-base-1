@@ -35,7 +35,7 @@ export function TicketAdminReplyForm({ ticketId }: TicketAdminReplyFormProps) {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <Label htmlFor="admin-support-reply">Reply to salon</Label>
+        <Label htmlFor="admin-support-reply">Reply to client</Label>
         <Textarea
           id="admin-support-reply"
           value={body}

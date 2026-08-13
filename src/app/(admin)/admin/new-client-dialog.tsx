@@ -30,10 +30,10 @@ function slugify(name: string): string {
     .replace(/['']/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return s || "salon";
+  return s || "store";
 }
 
-export function NewSalonDialog() {
+export function NewClientDialog() {
   const nameId = useId();
   const slugId = useId();
   const tierId = useId();
@@ -47,7 +47,7 @@ export function NewSalonDialog() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [tier, setTier] = useState<"connect" | "native">("native");
-  const [niche, setNiche] = useState<OrganizationNiche>("hair_salon");
+  const [niche, setNiche] = useState<OrganizationNiche>("retail");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [address, setAddress] = useState("");
@@ -67,7 +67,7 @@ export function NewSalonDialog() {
     setSlug("");
     setSlugTouched(false);
     setTier("native");
-    setNiche("hair_salon");
+    setNiche("retail");
     setOwnerEmail("");
     setOwnerName("");
     setAddress("");
@@ -119,23 +119,25 @@ export function NewSalonDialog() {
           />
         }
       >
-        New salon
+        New retail client
       </DialogTrigger>
       <DialogContent showCloseButton className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New organization</DialogTitle>
+          <DialogTitle>New retail client</DialogTitle>
           <DialogDescription>
-            Creates the tenant and emails the owner an invite.
+            Creates the tenant and emails the owner an invite. Assign the phone
+            number, call routing, and Cara config from the organization page
+            after this step.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor={nameId}>Salon name</Label>
+            <Label htmlFor={nameId}>Store name</Label>
             <Input
               id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Bella Salon"
+              placeholder="SuperValu Donegal Town"
             />
           </div>
           <div className="space-y-2">
@@ -147,11 +149,11 @@ export function NewSalonDialog() {
                 setSlugTouched(true);
                 setSlug(e.target.value.toLowerCase());
               }}
-              placeholder="bella-salon"
+              placeholder="supervalu-donegal-town"
               className="font-mono text-sm"
             />
             <p className="text-muted-foreground text-xs">
-              Public URL segment; auto-filled from name until you edit it.
+              Internal identifier; auto-filled from name until you edit it.
             </p>
           </div>
           <div className="space-y-2">
@@ -178,8 +180,7 @@ export function NewSalonDialog() {
               autoComplete="street-address"
             />
             <p className="text-muted-foreground text-xs">
-              Shown on the public book directory; combined with Eircode for
-              &quot;nearest salon&quot; search.
+              Used by Cara for directions and location questions.
             </p>
           </div>
           <div className="space-y-2">
@@ -188,12 +189,12 @@ export function NewSalonDialog() {
               id={eircodeId}
               value={storefrontEircode}
               onChange={(e) => setStorefrontEircode(e.target.value.toUpperCase())}
-              placeholder="D02 X285"
+              placeholder="F94 X2R8"
               className="font-mono text-sm tracking-wide"
               autoComplete="postal-code"
             />
             <p className="text-muted-foreground text-xs">
-              Resolved with Google Maps Geocoding to pin the salon on the map.
+              Resolved with Google Maps Geocoding to pin the store's location.
             </p>
           </div>
           <div className="space-y-2">
@@ -213,11 +214,12 @@ export function NewSalonDialog() {
               ))}
             </select>
             <p className="text-muted-foreground text-xs">
-              Shown beside Cliste in the salon dashboard (e.g. Salon or Barber).
+              Retail is the pilot default — it tailors the client dashboard for
+              stores.
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor={ownerNameId}>Salon owner name</Label>
+            <Label htmlFor={ownerNameId}>Owner / manager name</Label>
             <Input
               id={ownerNameId}
               autoComplete="name"

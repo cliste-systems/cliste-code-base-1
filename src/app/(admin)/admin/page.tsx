@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { AdminMetricRangeToggle } from "./admin-metric-range-toggle";
-import { NewSalonDialog } from "./new-salon-dialog";
+import { NewClientDialog } from "./new-client-dialog";
 import { SendGridTestPanel } from "./sendgrid-test-panel";
 import { TenantRowActions } from "./tenant-row-actions";
 
@@ -345,7 +345,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           </h1>
         </div>
         {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
-          <NewSalonDialog />
+          <NewClientDialog />
         ) : (
           <div className="flex flex-col items-end gap-1 text-right text-xs text-gray-500">
             <span>Self-serve signup is live at <code className="rounded bg-gray-100 px-1 py-0.5">/signup</code>.</span>
@@ -665,7 +665,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
                     colSpan={6}
                     className="px-5 py-12 text-center text-sm text-gray-500"
                   >
-                    No organizations yet. Use &quot;New salon&quot; to provision
+                    No organizations yet. Use &quot;New retail client&quot; to provision
                     one.
                   </td>
                 </tr>

@@ -163,7 +163,7 @@ export default async function AdminSupportTicketPage({
         <CardHeader>
           <CardTitle className="text-base">Conversation</CardTitle>
           <CardDescription>
-            Original request and all replies. The salon sees this on Support.
+            Original request and all replies. The client sees this on Support.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

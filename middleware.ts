@@ -11,6 +11,7 @@ import {
 } from "./src/lib/legal-documents";
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
 import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
+import { isPublicSignupEnabled } from "./src/lib/public-signup";
 import { pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
 import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
@@ -44,6 +45,30 @@ function legacyDashboardPathRedirect(
   const url = new URL(target, request.url);
   url.search = request.nextUrl.search;
   const redirectRes = NextResponse.redirect(url);
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
+}
+
+/**
+ * Retail pilot: public self-serve signup is frozen. `/signup` is closed for
+ * everyone; `/onboarding` is closed for signed-out visitors (a signed-in
+ * account that is mid-wizard may still finish it). Admin-invited users never
+ * touch these paths — they land on /auth/callback and set a password.
+ */
+function signupGateRedirect(
+  request: NextRequest,
+  response: NextResponse,
+  userId: string | undefined,
+): NextResponse | null {
+  if (isPublicSignupEnabled()) return null;
+  const path = request.nextUrl.pathname;
+  const isSignup = path === "/signup" || path.startsWith("/signup/");
+  const isOnboarding =
+    path === "/onboarding" || path.startsWith("/onboarding/");
+  if (!isSignup && !(isOnboarding && !userId)) return null;
+  const redirectRes = NextResponse.redirect(
+    new URL("/authenticate", request.url),
+  );
   copySessionCookies(response, redirectRes);
   return redirectRes;
 }
@@ -175,6 +200,9 @@ async function legalAcceptRedirect(
 export async function middleware(request: NextRequest) {
   const forwardHeaders = buildForwardRequestHeaders(request);
   const { response, user } = await updateSession(request, forwardHeaders);
+
+  const gatedSignup = signupGateRedirect(request, response, user?.id);
+  if (gatedSignup) return gatedSignup;
 
   const legalRedirect = await legalAcceptRedirect(request, response, user?.id);
   if (legalRedirect) return legalRedirect;

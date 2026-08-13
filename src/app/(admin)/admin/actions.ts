@@ -6,9 +6,17 @@ import { cookies, headers } from "next/headers";
 
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import {
+  callRoutingAllowsHumanTransfer,
+  parseCallRoutingMode,
+  type CallRoutingMode,
+} from "@/lib/call-routing";
+import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
+import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
+import {
   purchasePhoneNumbers,
   searchAvailableUsPhoneNumbers,
 } from "@/lib/livekit-phone-numbers";
+import { provisionOrganizationPhoneNumber } from "@/lib/phone-pool";
 import {
   createSupportDashboardCookieValue,
   SUPPORT_DASHBOARD_COOKIE,
@@ -254,7 +262,7 @@ export async function createOrganization(payload: {
   }
 
   if (!ownerName) {
-    return { ok: false, message: "Salon owner name is required." };
+    return { ok: false, message: "Owner name is required." };
   }
 
   if (!ownerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
@@ -268,7 +276,7 @@ export async function createOrganization(payload: {
   const niche: OrganizationNiche =
     payload.niche && isOrganizationNiche(payload.niche)
       ? payload.niche
-      : "hair_salon";
+      : "retail";
 
   const addressTrim = (payload.address ?? "").trim();
   const eircodeTrim = (payload.storefrontEircode ?? "").trim();
@@ -571,7 +579,7 @@ export type SupportDashboardLinkResult =
   | { ok: true; url: string }
   | { ok: false; message: string };
 
-/** Generates a sign-in link so support can open the salon dashboard as a member. */
+/** Generates a sign-in link so support can open the client dashboard as a member. */
 export async function createSupportDashboardLink(
   organizationId: string,
   clientOrigin?: string | null
@@ -1092,7 +1100,7 @@ export async function assignLivekitUsPhoneToOrganization(
     return {
       ok: false,
       message:
-        "This salon already has a phone number. Remove or change it in Supabase before assigning another LiveKit number (release the old number in LiveKit Cloud if it is no longer needed).",
+        "This organization already has a phone number. Remove or change it in Supabase before assigning another LiveKit number (release the old number in LiveKit Cloud if it is no longer needed).",
     };
   }
 
@@ -1153,6 +1161,155 @@ export async function assignLivekitUsPhoneToOrganization(
   revalidatePath(`/admin/organizations/${id}`);
   revalidatePath("/admin");
   return { ok: true, e164 };
+}
+
+export type AssignPoolPhoneResult =
+  | { ok: true; e164: string }
+  | { ok: false; message: string };
+
+/**
+ * Give a tenant its Cliste number from the Irish Twilio pool (buying one when
+ * the pool is empty). Idempotent — returns the existing number if assigned.
+ */
+export async function assignPoolPhoneToOrganization(
+  organizationId: string,
+): Promise<AssignPoolPhoneResult> {
+  const operator = await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  const result = await provisionOrganizationPhoneNumber(id);
+  if (!result.ok) {
+    await recordAdminEvent(operator, {
+      eventType: "admin_phone_assign_failed",
+      outcome: "failure",
+      metadata: { organization_id: id, reason: result.message },
+    });
+    return { ok: false, message: result.message };
+  }
+
+  revalidatePath(`/admin/organizations/${id}`);
+  revalidatePath("/admin");
+  revalidatePath("/admin/phone-pool");
+  await recordAdminEvent(operator, {
+    eventType: "admin_phone_assigned",
+    outcome: "success",
+    metadata: { organization_id: id, e164: result.e164 },
+  });
+  return { ok: true, e164: result.e164 };
+}
+
+export type UpdateCallRoutingResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+const MAX_TRANSFER_PHONE = 32;
+
+/** Sets how the store's own number reaches Cara plus the human transfer target. */
+export async function updateOrganizationCallRouting(
+  organizationId: string,
+  payload: { callRoutingMode: CallRoutingMode; transferNumber: string },
+): Promise<UpdateCallRoutingResult> {
+  await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  const callRoutingMode = parseCallRoutingMode(payload?.callRoutingMode);
+  const transferNumber = callRoutingAllowsHumanTransfer(callRoutingMode)
+    ? String(payload?.transferNumber ?? "").trim()
+    : "";
+  if (transferNumber.length > MAX_TRANSFER_PHONE) {
+    return { ok: false, message: "Transfer number looks too long." };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { data, error } = await admin
+    .from("organizations")
+    .update({
+      call_routing_mode: callRoutingMode,
+      fallback_number: transferNumber || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+  if (!data?.length) {
+    return { ok: false, message: "Organization not found." };
+  }
+
+  // Routing mode / transfer number feed Cara's call-handling prompt.
+  await regenerateCaraCustomPrompt(admin, id);
+
+  revalidatePath(`/admin/organizations/${id}`);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export type UpdateAccountPlanTierResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+/** Manual plan assignment — pilot clients are invoiced outside Stripe. */
+export async function updateAccountPlanTier(
+  accountId: string,
+  planTier: string,
+): Promise<UpdateAccountPlanTierResult> {
+  const operator = await assertAdminOperator();
+  const id = accountId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid account id." };
+  }
+  if (!isPlanTier(planTier)) {
+    return { ok: false, message: "Invalid plan tier." };
+  }
+  const tier: PlanTier = planTier;
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { data, error } = await admin
+    .from("accounts")
+    .update({ plan_tier: tier, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+  if (!data?.length) {
+    return { ok: false, message: "Account not found." };
+  }
+
+  revalidatePath("/admin");
+  await recordAdminEvent(operator, {
+    eventType: "admin_account_plan_updated",
+    outcome: "success",
+    metadata: { account_id: id, plan_tier: tier },
+  });
+  return { ok: true };
 }
 
 export type TestSendGridResult = { ok: true } | { ok: false; message: string };

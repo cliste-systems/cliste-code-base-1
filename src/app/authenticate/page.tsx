@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/app/login/login-form";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { describeAuthCallbackError } from "@/lib/auth-error-message";
+import { isPublicSignupEnabled } from "@/lib/public-signup";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { createClient } from "@/utils/supabase/server";
 
@@ -43,7 +44,7 @@ export default async function AuthenticatePage({
         urlError={urlError}
       >
         <LoginForm />
-        <AuthenticateSignUpLink />
+        {isPublicSignupEnabled() ? <AuthenticateSignUpLink /> : null}
       </AuthMarketingShell>
     </>
   );

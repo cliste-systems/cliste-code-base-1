@@ -52,7 +52,7 @@ export function SendGridTestPanel() {
               <code className="rounded bg-gray-100 px-1 py-0.5 text-[11px]">
                 SENDGRID_FROM_NAME
               </code>
-              . Salon invites still go through Supabase Auth unless you configure
+              . Client invites still go through Supabase Auth unless you configure
               Supabase SMTP with SendGrid.
             </p>
           </div>

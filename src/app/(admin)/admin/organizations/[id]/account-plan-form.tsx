@@ -4,39 +4,39 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  ORGANIZATION_NICHES,
-  ORGANIZATION_NICHE_ADMIN_LABELS,
-  PRODUCT_NAME_BY_NICHE,
-  type OrganizationNiche,
-} from "@/lib/organization-niche";
 import { cn } from "@/lib/utils";
 
-import { updateOrganizationNiche } from "../../actions";
+import { updateAccountPlanTier } from "../../actions";
 
-type OrganizationNicheFormProps = {
-  organizationId: string;
-  initialNiche: OrganizationNiche;
+const PLAN_TIER_LABELS: Record<string, string> = {
+  starter: "Starter",
+  pro: "Professional",
+  business: "Business",
+  enterprise: "Custom / Enterprise",
 };
 
-export function OrganizationNicheForm({
-  organizationId,
-  initialNiche,
-}: OrganizationNicheFormProps) {
-  const [niche, setNiche] = useState<OrganizationNiche>(initialNiche);
+type AccountPlanFormProps = {
+  accountId: string;
+  initialPlanTier: string;
+};
+
+/** Manual plan assignment — pilot clients are invoiced outside Stripe. */
+export function AccountPlanForm({
+  accountId,
+  initialPlanTier,
+}: AccountPlanFormProps) {
+  const [tier, setTier] = useState(initialPlanTier);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
       <h2 className="text-lg font-semibold tracking-tight text-slate-900">
-        Product niche
+        Plan
       </h2>
       <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-        Controls the label beside Cliste in the client dashboard. Preview:{" "}
-        <span className="text-slate-800 font-medium">
-          Cliste {PRODUCT_NAME_BY_NICHE[niche]}
-        </span>
+        Set the plan manually — pilot clients are invoiced directly, not
+        through in-app checkout. Controls included minutes and location limits.
       </p>
       <form
         className="mt-6 space-y-4"
@@ -44,37 +44,38 @@ export function OrganizationNicheForm({
           e.preventDefault();
           setMsg(null);
           startTransition(async () => {
-            const r = await updateOrganizationNiche(organizationId, niche);
-            if (r.ok) setMsg("Saved.");
-            else setMsg(r.message);
+            const r = await updateAccountPlanTier(accountId, tier);
+            setMsg(r.ok ? "Saved." : r.message);
           });
         }}
       >
         <div className="space-y-2">
-          <Label htmlFor="org-niche">Niche</Label>
+          <Label htmlFor="account-plan-tier">Plan tier</Label>
           <select
-            id="org-niche"
-            value={niche}
-            onChange={(e) => setNiche(e.target.value as OrganizationNiche)}
+            id="account-plan-tier"
+            value={tier}
+            onChange={(e) => setTier(e.target.value)}
             disabled={pending}
             className="border-input bg-background h-9 w-full max-w-md rounded-md border px-3 text-sm"
           >
-            {ORGANIZATION_NICHES.map((key) => (
+            {Object.entries(PLAN_TIER_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
-                {ORGANIZATION_NICHE_ADMIN_LABELS[key]}
+                {label}
               </option>
             ))}
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save niche"}
+            {pending ? "Saving…" : "Save plan"}
           </Button>
           {msg ? (
             <p
               className={cn(
                 "text-sm",
-                msg === "Saved." ? "font-medium text-emerald-700" : "text-destructive",
+                msg === "Saved."
+                  ? "font-medium text-emerald-700"
+                  : "text-destructive",
               )}
             >
               {msg}
