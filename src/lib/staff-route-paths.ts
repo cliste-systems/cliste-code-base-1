@@ -1,6 +1,5 @@
 /**
- * Path boundaries for staff-only areas vs public `/[salonSlug]` routes.
- * Slugs like `admin-salon` must not match agency `/admin`.
+ * Path boundaries for staff-only areas (agency `/admin` vs tenant `/dashboard`).
  */
 
 export function pathIsAgencyAdminSection(path: string): boolean {

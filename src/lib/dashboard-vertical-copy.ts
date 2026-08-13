@@ -217,17 +217,6 @@ const ROUTING_OVERRIDES_BY_NICHE: Partial<
     namePlaceholder: "e.g. Service bookings",
     fieldHintExample: "service booking vs parts enquiry",
   },
-  retail: {
-    exampleBlock: {
-      name: "Product enquiries — your label in the list",
-      keywords: "in stock, opening hours, click and collect",
-      description: "When they ask about products or visiting — not complaints",
-      rules: "Text the product or store link — don't guess stock levels",
-    },
-    keywordPlaceholder: "e.g. in stock",
-    namePlaceholder: "e.g. Product enquiries",
-    fieldHintExample: "stock check vs complaint",
-  },
   ecommerce: {
     exampleBlock: {
       name: "Order help — your label in the list",
@@ -276,10 +265,10 @@ const ROUTING_OVERRIDES_BY_NICHE: Partial<
 function routingCopyForNiche(
   niche: OrganizationNiche,
   base: DashboardVerticalCopy["routing"],
-  isSalon: boolean,
+  isTailoredVertical: boolean,
   businessType?: string,
 ): DashboardVerticalCopy["routing"] {
-  if (isSalon) return base;
+  if (isTailoredVertical) return base;
   const overrides = ROUTING_OVERRIDES_BY_NICHE[niche];
   let routing = overrides
     ? { ...base, ...overrides }
@@ -375,6 +364,85 @@ const SALON_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"
   },
 };
 
+const RETAIL_ROUTING_EXAMPLE: RoutingExampleBlock = {
+  name: "Stock & product enquiries — your label in the list",
+  keywords: "in stock, do you have, do you sell",
+  description: "When they ask if you carry or have a product — not a complaint",
+  rules: "Don't guess stock levels — take the product and a callback number",
+};
+
+const RETAIL_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"> & {
+  caraSetupBase: Pick<
+    DashboardVerticalCopy["caraSetup"],
+    "servicesEmptyWarning" | "callHandlingRulesPlaceholder" | "detailsToCollectPlaceholder"
+  >;
+} = {
+  customerNoun: { singular: "customer", plural: "customers" },
+  contacts: {
+    pageDescription:
+      "People who have called or are saved in your customer list — with call history and open follow-ups.",
+    emptyDescription:
+      "When Cara answers calls, customers appear here. Saved contacts show up here too.",
+    savedContactLabel: "Saved customer",
+    savedContactNoCalls: "Saved customer · no calls yet",
+    savedContactNoCallsRecorded: "Saved customer · no calls recorded yet",
+  },
+  routing: {
+    bookPresetLabel: "Click & collect order",
+    bookPresetName: "Place a click & collect order",
+    menuPresetLabel: "Weekly offers",
+    menuPresetName: "Hear this week's offers",
+    quotePresetLabel: "Check if something's in stock",
+    quotePresetName: "Ask if a product is in stock",
+    directionsPresetLabel: "Get directions",
+    directionsPresetName: "Where are you based",
+    speakPresetLabel: "Speak to someone",
+    speakPresetName: "Speak to someone",
+    starterBookLabel: "Opening hours",
+    starterBookDescription:
+      "Answer opening hours, bank holiday hours, and directions straight away.",
+    keywordPlaceholder: "e.g. in stock",
+    namePlaceholder: "e.g. Stock enquiries",
+    descriptionPlaceholder:
+      "e.g. When they ask if you carry a product — not a complaint",
+    rulesPlaceholder:
+      "e.g. Don't guess stock levels — take the product and a callback number",
+    exampleBlock: RETAIL_ROUTING_EXAMPLE,
+    fieldHintExample: "stock check vs complaint",
+    flowTestPhrases: [
+      "Are you open on Sunday?",
+      "Do you have turkeys in for Christmas?",
+      "Can I speak to the deli counter?",
+    ],
+    flowTestPlaceholder: 'e.g. "Are you open on Sunday?"',
+    routeNameExamples: [
+      "what time are you open until",
+      "is something in stock",
+      "speak to a department",
+    ],
+    routeNamePlaceholder: 'e.g. "Are you open bank holiday Monday?"',
+    saveConfirmLinkNoun: "store links",
+    traceSamplePhrases: ["What time are you open until tonight?"],
+  },
+  caraSetupBase: {
+    servicesEmptyWarning:
+      "Cara can't confirm what your store offers until you add it — she'll take a message for anything she isn't sure of.",
+    callHandlingRulesPlaceholder:
+      "e.g. Never promise stock without checking, Deli orders need 24 hours notice",
+    detailsToCollectPlaceholder:
+      "e.g. Product they're after, name, best number to call back",
+  },
+  privacy: {
+    exportNoun: "record",
+    exportListIntro:
+      "every record, call log, and action-inbox ticket for that phone number in your account.",
+    eraseCountNoun: "records",
+  },
+  setupSteps: {
+    addServicesLabel: "Add what your store offers",
+  },
+};
+
 const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetup"> & {
   caraSetupBase: Pick<
     DashboardVerticalCopy["caraSetup"],
@@ -447,15 +515,21 @@ const GENERIC_COPY: Omit<DashboardVerticalCopy, "vertical" | "niche" | "caraSetu
   },
 };
 
-/** Dashboard user-facing copy keyed off the org's vertical (salon vs generic). */
+/** Dashboard user-facing copy keyed off the org's vertical (salon / retail / generic). */
 export function dashboardVerticalCopy(
   rawNiche: string | null | undefined,
   businessType?: string | null,
 ): DashboardVerticalCopy {
   const niche = parseOrganizationNiche(rawNiche);
   const vertical = verticalPackForNiche(niche);
-  const isSalon = verticalIdForNiche(niche) === "salon_beauty";
-  const base = isSalon ? SALON_COPY : GENERIC_COPY;
+  const verticalId = verticalIdForNiche(niche);
+  const isTailored = verticalId !== "generic";
+  const base =
+    verticalId === "salon_beauty"
+      ? SALON_COPY
+      : verticalId === "retail"
+        ? RETAIL_COPY
+        : GENERIC_COPY;
   const bt = businessType?.trim() ?? "";
 
   return {
@@ -463,7 +537,7 @@ export function dashboardVerticalCopy(
     niche,
     customerNoun: vertical.customerNoun,
     contacts: base.contacts,
-    routing: routingCopyForNiche(niche, base.routing, isSalon, bt || undefined),
+    routing: routingCopyForNiche(niche, base.routing, isTailored, bt || undefined),
     caraSetup: {
       trainCara: trainCaraVerticalCopy(niche),
       services: packServicesStepCopy(bt, niche),

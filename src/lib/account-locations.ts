@@ -40,5 +40,6 @@ export function canAddLocation(planTier: PlanTier, locationCount: number): boole
 }
 
 export function locationLabelForVertical(verticalId: string): string {
+  if (verticalId === "retail") return "Store";
   return verticalId === "salon_beauty" ? "Location" : "Site";
 }

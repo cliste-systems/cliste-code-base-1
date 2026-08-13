@@ -15,8 +15,11 @@ import {
  *
  * `generic` is the deliberate fallback: anything we haven't tailored yet uses
  * neutral, business-agnostic copy.
+ *
+ * `retail` is the current pilot focus (supermarkets / convenience stores —
+ * SuperValu pilot). All admin-provisioned tenants default to it.
  */
-export type VerticalId = "salon_beauty" | "generic";
+export type VerticalId = "salon_beauty" | "retail" | "generic";
 
 export type VerticalSelectionChoice = {
   id: VerticalId;
@@ -59,6 +62,23 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   customerNoun: { singular: "client", plural: "clients" },
 };
 
+/** Niches that roll up into the Retail vertical. */
+const RETAIL_NICHES = ["retail"] as const;
+
+const RETAIL_PACK: VerticalPack = {
+  id: "retail",
+  defaultNiche: "retail",
+  niches: RETAIL_NICHES,
+  selection: {
+    label: "Retail & Grocery",
+    description:
+      "Supermarkets, convenience stores, and shops — Cara answers opening-hours and stock questions, takes messages for departments, and captures callbacks.",
+    examples: ["Supermarket", "Convenience store", "Butcher", "Off-licence", "Homeware shop"],
+  },
+  productNoun: "Store",
+  customerNoun: { singular: "customer", plural: "customers" },
+};
+
 const GENERIC_PACK: VerticalPack = {
   id: "generic",
   defaultNiche: "other",
@@ -75,6 +95,7 @@ const GENERIC_PACK: VerticalPack = {
 
 export const VERTICAL_PACKS: Record<VerticalId, VerticalPack> = {
   salon_beauty: SALON_BEAUTY_PACK,
+  retail: RETAIL_PACK,
   generic: GENERIC_PACK,
 };
 
@@ -88,9 +109,14 @@ export const VERTICAL_CHOICES: VerticalSelectionChoice[] = [
   { id: GENERIC_PACK.id, ...GENERIC_PACK.selection },
 ];
 
-const NICHE_TO_VERTICAL: ReadonlyMap<OrganizationNiche, VerticalId> = new Map(
-  SALON_BEAUTY_NICHES.map((niche) => [niche, "salon_beauty" as VerticalId]),
-);
+const NICHE_TO_VERTICAL: ReadonlyMap<OrganizationNiche, VerticalId> = new Map([
+  ...SALON_BEAUTY_NICHES.map(
+    (niche) => [niche, "salon_beauty"] as [OrganizationNiche, VerticalId],
+  ),
+  ...RETAIL_NICHES.map(
+    (niche) => [niche, "retail"] as [OrganizationNiche, VerticalId],
+  ),
+]);
 
 /** Which vertical a stored niche belongs to. */
 export function verticalIdForNiche(
@@ -107,7 +133,7 @@ export function verticalPackForNiche(
 }
 
 export function isVerticalId(v: string): v is VerticalId {
-  return v === "salon_beauty" || v === "generic";
+  return v === "salon_beauty" || v === "retail" || v === "generic";
 }
 
 export function parseVerticalId(
@@ -142,10 +168,10 @@ export function resolveNicheForVerticalChoice(
   choice: VerticalId | null,
   classifiedNiche: OrganizationNiche,
 ): OrganizationNiche {
-  if (choice === "salon_beauty") {
-    return verticalIdForNiche(classifiedNiche) === "salon_beauty"
+  if (choice && choice !== "generic") {
+    return verticalIdForNiche(classifiedNiche) === choice
       ? classifiedNiche
-      : SALON_BEAUTY_PACK.defaultNiche;
+      : VERTICAL_PACKS[choice].defaultNiche;
   }
   return classifiedNiche;
 }
