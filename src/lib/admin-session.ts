@@ -2,9 +2,11 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
+import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
 import { createClient } from "@/utils/supabase/server";
 
 const DEFAULT_ADMIN_EMAIL = "brendan@clistesystems.ie";
+const LOCAL_DEV_ADMIN_ID = "local-admin-gate";
 
 function parseAllowedAdminEmails(): Set<string> {
   const raw = process.env.CLISTE_ADMIN_ALLOWED_EMAILS?.trim();
@@ -42,8 +44,40 @@ type ResolveAdminAuth =
   | { tag: "no_session" }
   | { tag: "forbidden" };
 
+function devGateAdminUser(): User {
+  const label = process.env.CLISTE_ADMIN_DISPLAY_NAME?.trim() || "admin";
+  const email = label.includes("@") ? label : `${label}@local.dev`;
+  return {
+    id: LOCAL_DEV_ADMIN_ID,
+    aud: "authenticated",
+    role: "authenticated",
+    email,
+    phone: "",
+    confirmation_sent_at: undefined,
+    confirmed_at: undefined,
+    last_sign_in_at: undefined,
+    app_metadata: { cliste_admin_console: true },
+    user_metadata: {},
+    identities: [],
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+    is_anonymous: false,
+  };
+}
+
 async function resolveAdminAuth(): Promise<ResolveAdminAuth> {
-  const supabase = await createClient();
+  if (allowAdminDevWithoutSupabase()) {
+    return { tag: "ok", user: devGateAdminUser() };
+  }
+
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch (err) {
+    console.error("[admin-session] Supabase client unavailable", err);
+    return { tag: "no_session" };
+  }
+
   const {
     data: { user },
     error,

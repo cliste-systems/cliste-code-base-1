@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Building2 } from "lucide-react";
 
 import { requireAdminSessionUser } from "@/lib/admin-session";
+import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
 
 import { AdminNav } from "./admin-nav";
 
@@ -20,10 +21,27 @@ export default async function AdminShellLayout({
   const user = await requireAdminSessionUser();
   const loggedInAs =
     user.email?.trim().toLowerCase() || adminSessionLabel();
+  const supabaseOffline = allowAdminDevWithoutSupabase();
 
   return (
-    <div className="flex min-h-screen w-full overflow-hidden bg-[#fafafa] antialiased text-gray-900">
-      <aside className="relative z-20 hidden h-screen w-[260px] shrink-0 flex-col border-r border-gray-200/60 bg-[#fafafa] md:flex">
+    <div className="flex min-h-screen w-full flex-col overflow-hidden bg-[#fafafa] antialiased text-gray-900">
+      {supabaseOffline ? (
+        <div
+          className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950"
+          role="status"
+        >
+          Local dev mode — Supabase is not configured. Admin data and actions
+          need{" "}
+          <code className="rounded bg-amber-100 px-1 text-xs">.env.local</code>.
+          Run{" "}
+          <code className="rounded bg-amber-100 px-1 text-xs">
+            npm run bootstrap:env
+          </code>{" "}
+          when ready.
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <aside className="relative z-20 hidden h-full w-[260px] shrink-0 flex-col border-r border-gray-200/60 bg-[#fafafa] md:flex">
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
           <div className="shrink-0 p-4 pt-6">
             <Link
@@ -60,9 +78,10 @@ export default async function AdminShellLayout({
         </div>
       </aside>
 
-      <main className="relative z-10 h-screen min-w-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <main className="relative z-10 h-full min-w-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </main>
+      </div>
     </div>
   );
 }
