@@ -38,11 +38,11 @@ async function assertProjectReachable(): Promise<void> {
   console.log(`✓ Project host is online (${PROJECT_REF}.supabase.co)`);
 }
 
-async function smokeTestPublicApi(url: string, anonKey: string): Promise<void> {
+async function smokeTestPublicApi(url: string, serviceRoleKey: string): Promise<void> {
   const response = await fetch(`${url}/rest/v1/organizations?select=id&limit=1`, {
     headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
     },
     signal: AbortSignal.timeout(15_000),
   });
@@ -52,7 +52,7 @@ async function smokeTestPublicApi(url: string, anonKey: string): Promise<void> {
       `Supabase REST smoke test failed (${response.status}): ${text.slice(0, 200)}`,
     );
   }
-  console.log("✓ REST API accepts anon key (organizations reachable)");
+  console.log("✓ REST API accepts service role (organizations reachable)");
 }
 
 function runScript(script: string): void {
@@ -76,12 +76,14 @@ async function main() {
 
   const env = parseEnv(await readFile(ENV_LOCAL, "utf8"));
   const url = env.get("NEXT_PUBLIC_SUPABASE_URL")?.trim();
-  const anonKey = env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")?.trim();
-  if (!url || !anonKey) {
-    throw new Error(".env.local is missing Supabase URL or anon key after bootstrap.");
+  const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      ".env.local is missing Supabase URL or service role key after bootstrap.",
+    );
   }
 
-  await smokeTestPublicApi(url, anonKey);
+  await smokeTestPublicApi(url, serviceRoleKey);
 
   console.log("\nSupabase reconnected.");
   console.log("Restart dev server: rm -rf .next && npm run dev");
