@@ -11,8 +11,8 @@ export type SendGridDomainStatus = {
 };
 
 /**
- * Check whether hellocara.ie is domain-authenticated in SendGrid.
- * Domain auth allows per-org `{slug}@hellocara.ie` senders without
+ * Check whether clistesystems.ie is domain-authenticated in SendGrid.
+ * Domain auth allows per-org `{slug}@clistesystems.ie` senders without
  * verifying each address individually.
  */
 export async function getSendGridDomainAuthStatus(): Promise<SendGridDomainStatus> {

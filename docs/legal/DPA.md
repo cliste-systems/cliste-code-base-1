@@ -98,7 +98,7 @@ organisational measures in Annex II.
 ## 7. Sub-processors
 
 The current list of sub-processors is published at
-`https://app.hellocara.ie/legal/sub-processors`. The Controller
+`https://app.clistesystems.ie/legal/sub-processors`. The Controller
 provides general written authorisation for Cliste to engage these and
 future sub-processors. Cliste will give at least **30 days' notice** of
 any new or replaced sub-processor by updating that page and notifying
@@ -113,7 +113,7 @@ The Controller's dashboard provides self-service tools at
 `/dashboard/legal/data-requests` for handling Article 15 (access) and Article 17
 (erasure) requests. For Articles 18, 20, 21 and 22 requests, or where
 data spans multiple controllers, the Controller may request assistance
-by emailing **support@hellocara.ie**.
+by emailing **support@clistesystems.ie**.
 
 ## 9. Deletion / return
 
@@ -140,7 +140,7 @@ have exclusive jurisdiction.
 | ---------------------- | ----------------------------------------------------------- |
 | Controller             | The customer salon (Account holder of the Cliste account)   |
 | Processor              | Cliste Systems, Ireland                                     |
-| Processor contact      | privacy@hellocara.ie                                    |
+| Processor contact      | privacy@clistesystems.ie                                    |
 | Frequency              | Continuous, for the duration of the subscription            |
 | Storage location       | EEA — Supabase AWS eu-west-1 (Ireland); Vercel dub1 (Dublin); Railway EU West; see Annex III |
 

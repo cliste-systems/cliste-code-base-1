@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { DEFAULT_APP_SITE_URL } from "./src/lib/company-details";
 import {
   ADMIN_GATE_COOKIE_PREFIX,
   isValidGateCookieValue,
@@ -16,18 +15,6 @@ import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
 
 const ADMIN_GATE_COOKIE = "cliste_admin_gate";
-
-const LEGACY_APP_HOSTS = new Set(["app.clistesystems.ie"]);
-
-function legacyAppHostRedirect(request: NextRequest): NextResponse | null {
-  const host = request.headers.get("host")?.split(":")[0]?.toLowerCase();
-  if (!host || !LEGACY_APP_HOSTS.has(host)) return null;
-  const destination = new URL(
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-    DEFAULT_APP_SITE_URL,
-  );
-  return NextResponse.redirect(destination, 308);
-}
 
 function copySessionCookies(from: NextResponse, to: NextResponse) {
   for (const c of from.cookies.getAll()) {
@@ -245,9 +232,6 @@ async function legalAcceptRedirect(
 }
 
 export async function middleware(request: NextRequest) {
-  const legacyHostRedirect = legacyAppHostRedirect(request);
-  if (legacyHostRedirect) return legacyHostRedirect;
-
   const forwardHeaders = buildForwardRequestHeaders(request);
   const { response, user } = await updateSession(request, forwardHeaders);
 

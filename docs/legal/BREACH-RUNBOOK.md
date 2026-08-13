@@ -33,7 +33,7 @@ Detection sources:
 - Security audit log alert (anomaly in `admin_*` events).
 - Sentry / log alert (e.g. RLS errors, 500 spike on auth routes).
 - Sub-processor advisory (e.g. Stripe / Twilio status page).
-- Researcher email to `security@hellocara.ie`.
+- Researcher email to `security@clistesystems.ie`.
 - Internal employee report.
 
 **Action:** Anyone who notices a potential breach pages the privacy
@@ -124,7 +124,7 @@ Within 14 days, publish an internal post-mortem covering:
 6. What was good about the response.
 
 If a customer-facing summary is appropriate (P0 / P1), publish at
-`status.hellocara.ie` once remediation is verified.
+`status.clistesystems.ie` once remediation is verified.
 
 ---
 
@@ -156,7 +156,7 @@ If a customer-facing summary is appropriate (P0 / P1), publish at
 > the DPC directly because <…>.
 >
 > Our incident reference is <ID>. Please reply to this email or
-> contact privacy@hellocara.ie with any questions.
+> contact privacy@clistesystems.ie with any questions.
 >
 > — Cliste Systems Limited
 

@@ -170,7 +170,7 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 | Erasure | 17 | `/dashboard/privacy` → `eraseCustomerData` (anonymise PII; keep tax fields) |
 | Rectification | 16 | Dashboard bookings/contacts (salon-operated) |
 | Portability | 20 | `/dashboard/legal/data-requests` → org-wide JSON or CSV export |
-| Restrict / object | 18 / 21 | Manual via privacy@hellocara.ie |
+| Restrict / object | 18 / 21 | Manual via privacy@clistesystems.ie |
 | Complain to DPC | — | Linked from `/legal/privacy` |
 
 **Retention (operational):** `docs/legal/RETENTION.md` and cron `src/app/api/cron/data-retention/route.ts`
@@ -304,7 +304,7 @@ Medium-term:
 - `docs/legal/RETENTION.md`
 - `docs/legal/BREACH-RUNBOOK.md`
 - `docs/VOICE-WORKER-CONTRACT.md`
-- Public: `https://app.hellocara.ie/legal/privacy` (and `/legal/sub-processors`, `/legal/cookies`, `/legal/terms`)
+- Public: `https://app.clistesystems.ie/legal/privacy` (and `/legal/sub-processors`, `/legal/cookies`, `/legal/terms`)
 
 ### Guidance (secondary)
 

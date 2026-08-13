@@ -12,7 +12,7 @@ Last reviewed: 2026-06-16.
 
 - **Name:** Cliste Systems Limited
 - **Address:** Ireland (full address on request)
-- **Contact:** privacy@hellocara.ie
+- **Contact:** privacy@clistesystems.ie
 - **DPO / privacy lead:** Brendan O'Toole (acting). Cliste does not
   meet the Article 37 threshold for mandatory DPO appointment;
   this contact is the Single Point of Contact for the DPC.

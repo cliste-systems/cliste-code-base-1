@@ -5,10 +5,10 @@
 ## Reporting a vulnerability
 
 If you believe you have found a security vulnerability in any Hello Cara service
-(`*.hellocara.ie`, the dashboard, the booking storefront, the AI voice
+(`*.clistesystems.ie`, the dashboard, the booking storefront, the AI voice
 agent worker, or our infrastructure), please report it privately to:
 
-- **Email:** security@hellocara.ie
+- **Email:** security@clistesystems.ie
 - PGP key: available on request.
 
 Please include enough detail for us to reproduce: a clear description, steps,
@@ -28,8 +28,8 @@ quickly. We will not pursue legal action against good-faith researchers who:
 
 ## What's in scope
 
-- Production hosts: `app.hellocara.ie`, `hellocara.ie`, and any tenant subdomains we operate.
-- Legacy hosts (`app.clistesystems.ie`, `clistesystems.ie`) during the redirect transition.
+- Production hosts: `app.clistesystems.ie`, `clistesystems.ie`, and any tenant subdomains we operate.
+- Planned brand hosts (`app.hellocara.ie`, `hellocara.ie`) once DNS cutover is complete.
 - The Hello Cara dashboard, the admin console, the
   Stripe webhook (`/api/stripe/webhook`), the voice webhook
   (`/api/voice/call-complete`), and our cron endpoints.
