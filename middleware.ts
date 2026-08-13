@@ -12,7 +12,7 @@ import {
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
 import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
 import { isPublicSignupEnabled } from "./src/lib/public-signup";
-import { pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
+import { pathIsAdminLogin, pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
 import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
 
@@ -87,8 +87,24 @@ function dashboardUnlockRedirect(
   return redirectRes;
 }
 
+/** Legacy URL — renamed to /admin/login. */
+function legacyAdminUnlockRedirect(
+  request: NextRequest,
+  response: NextResponse,
+): NextResponse {
+  const path = request.nextUrl.pathname;
+  if (path !== "/admin-unlock" && !path.startsWith("/admin-unlock/")) {
+    return response;
+  }
+  const url = new URL("/admin/login", request.url);
+  url.search = request.nextUrl.search;
+  const redirectRes = NextResponse.redirect(url);
+  copySessionCookies(response, redirectRes);
+  return redirectRes;
+}
+
 /**
- * Extra password gate for /admin routes. This is separate from salon login and
+ * Extra password gate for /admin routes. This is separate from tenant sign-in and
  * must be set in deploy envs to keep internal pages private.
  */
 async function adminGate(
@@ -100,15 +116,15 @@ async function adminGate(
 
   const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
   if (!secret) {
-    if (path === "/admin-unlock") return response;
+    if (pathIsAdminLogin(path)) return response;
     const redirectRes = NextResponse.redirect(
-      new URL("/admin-unlock?error=config", request.url),
+      new URL("/admin/login?error=config", request.url),
     );
     copySessionCookies(response, redirectRes);
     return redirectRes;
   }
 
-  if (path === "/admin-unlock") return response;
+  if (pathIsAdminLogin(path)) return response;
 
   const cookie = request.cookies.get(ADMIN_GATE_COOKIE)?.value ?? "";
   const ok = await isValidGateCookieValue(
@@ -118,7 +134,7 @@ async function adminGate(
   );
   if (!ok) {
     const redirectRes = NextResponse.redirect(
-      new URL("/admin-unlock", request.url),
+      new URL("/admin/login", request.url),
     );
     copySessionCookies(response, redirectRes);
     return redirectRes;
@@ -218,6 +234,8 @@ export async function middleware(request: NextRequest) {
   if (legacyNavRedirect !== response) return legacyNavRedirect;
   const unlockRedirect = dashboardUnlockRedirect(request, response);
   if (unlockRedirect !== response) return unlockRedirect;
+  const legacyAdminRedirect = legacyAdminUnlockRedirect(request, response);
+  if (legacyAdminRedirect !== response) return legacyAdminRedirect;
   return adminGate(request, response);
 }
 

@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 
 import { createAdminClient } from "@/utils/supabase/admin";
 
-type Scope = "authenticate" | "admin_unlock" | "dashboard_unlock";
+type Scope = "authenticate" | "admin_login" | "dashboard_unlock";
 
 type ScopeConfig = {
   windowMs: number;
@@ -29,12 +29,12 @@ const CONFIG: Record<Scope, ScopeConfig> = {
     captchaAfterFailures: 2,
     eventTypes: ["auth_password_sign_in", "auth_signup"],
   },
-  admin_unlock: {
+  admin_login: {
     windowMs: 15 * 60 * 1000,
     maxFailures: 5,
     lockMs: 30 * 60 * 1000,
     captchaAfterFailures: 1,
-    eventTypes: ["admin_unlock"],
+    eventTypes: ["admin_login"],
   },
   dashboard_unlock: {
     windowMs: 15 * 60 * 1000,

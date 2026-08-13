@@ -52,7 +52,7 @@ Last applied: 2026-04-17 via `scripts/cloudflare-harden.py` and direct API.
 
 ### Rate limit (phase `http_ratelimit`)
 
-1. **Brute-force lockout** for `/admin-unlock`, `/dashboard-unlock`,
+1. **Brute-force lockout** for `/admin/login`, `/dashboard-unlock`,
    `/authenticate`, `/signup`, and `POST /api/onboarding/voice-preview`:
    5 hits in 10 s per IP → 429 for 10 s.
 

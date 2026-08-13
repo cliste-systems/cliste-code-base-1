@@ -1,17 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { unlockAdminGate } from "./actions";
+import { submitAdminLogin } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-type AdminUnlockPageProps = {
+type AdminLoginPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
-export default async function AdminUnlockPage({
+export default async function AdminLoginPage({
   searchParams,
-}: AdminUnlockPageProps) {
+}: AdminLoginPageProps) {
   const { error } = await searchParams;
   const gateConfigured = Boolean(process.env.CLISTE_ADMIN_SECRET?.trim());
   const showConfigError = !gateConfigured || error === "config";
@@ -37,13 +37,13 @@ export default async function AdminUnlockPage({
               Cliste Systems
             </div>
             <h2 className="mb-6 text-3xl leading-[1.12] font-light tracking-tight text-white lg:text-4xl">
-              The New Standard for
+              Internal operations
               <br />
-              <span className="text-zinc-300/90">AI Voice in Ireland.</span>
+              <span className="text-zinc-300/90">console access.</span>
             </h2>
             <p className="max-w-sm text-sm leading-relaxed font-light text-zinc-300/85">
-              Automate the ringing phone. We build hyper-realistic Irish voice
-              agents to handle admin 24/7 so your team can focus on their work.
+              Provision retail clients, manage phone pools, and monitor tenant
+              health. This area is restricted to Cliste staff.
             </p>
           </div>
           <div className="relative z-10 mt-auto flex items-center gap-3 pt-16 text-xs font-light text-zinc-300/80">
@@ -68,19 +68,19 @@ export default async function AdminUnlockPage({
               />
             </div>
             <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
-              Authenticate
+              Admin access
             </h1>
             <p className="text-sm font-light text-slate-500">
-              Continue to your Cliste account
+              Enter the operations password to continue
             </p>
           </div>
 
           <div className="mb-10 hidden lg:block">
             <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
-              Authenticate
+              Admin access
             </h1>
             <p className="text-sm font-light text-slate-500">
-              Continue to your Cliste account
+              Enter the operations password to continue
             </p>
           </div>
 
@@ -92,13 +92,13 @@ export default async function AdminUnlockPage({
             </p>
           ) : null}
 
-          <form action={unlockAdminGate} className="space-y-5">
+          <form action={submitAdminLogin} className="space-y-5">
             <div className="space-y-2">
               <label
                 htmlFor="admin-gate-pw"
                 className="block text-xs font-normal text-slate-500"
               >
-                Password
+                Operations password
               </label>
               <input
                 id="admin-gate-pw"
@@ -142,7 +142,7 @@ export default async function AdminUnlockPage({
 
             <div className="text-center text-xs text-slate-500">
               <Link href="/authenticate" className="underline-offset-4 hover:underline">
-                Sign-in page
+                Client sign-in
               </Link>
               {" · "}
               <Link href="/" className="underline-offset-4 hover:underline">

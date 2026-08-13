@@ -7,7 +7,7 @@
 
 User-agent: *
 Disallow: /admin
-Disallow: /admin-unlock
+Disallow: /admin/login
 Disallow: /dashboard
 Disallow: /dashboard-unlock
 Disallow: /authenticate
