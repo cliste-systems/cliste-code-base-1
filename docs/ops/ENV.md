@@ -39,6 +39,13 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 
 Production signups use `email_confirm: false` and email a confirmation link before onboarding.
 
+**Local `.env.local`:** pull Supabase keys from your hosted project (after `supabase login` or with `SUPABASE_ACCESS_TOKEN` set):
+
+```bash
+npm run bootstrap:env
+npx tsx scripts/patch-supabase-auth-urls.ts
+```
+
 **Supabase Auth URLs:** production site URL `https://app.clistesystems.ie`, redirect `https://app.clistesystems.ie/auth/callback`. Agent/script patch (not dashboard):
 
 ```bash
