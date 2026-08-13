@@ -30,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+import { useDashboardVertical } from "../dashboard-vertical-context";
+
 type LocationsViewProps = {
   locations: AccountLocationRow[];
   accountName: string;
@@ -55,6 +57,8 @@ export function LocationsView({
     addAccountLocation,
     initialState,
   );
+  // Retail pilot: plans are managed by Cliste, not self-serve.
+  const isRetail = useDashboardVertical().vertical.id === "retail";
 
   const locationLabelLower = locationLabel.toLowerCase();
   const locationLabelPlural = `${locationLabelLower}s`;
@@ -209,12 +213,16 @@ export function LocationsView({
         ) : upgradeMessage ? (
           <p className="shrink-0 text-[13px] leading-relaxed text-slate-500">
             {upgradeMessage}{" "}
-            <Link
-              href={DASHBOARD_ROUTES.usage}
-              className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
-            >
-              View plans
-            </Link>
+            {isRetail ? (
+              <span>Contact Cliste to add another store.</span>
+            ) : (
+              <Link
+                href={DASHBOARD_ROUTES.usage}
+                className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+              >
+                View plans
+              </Link>
+            )}
           </p>
         ) : null}
       </DashboardAnimatedPageSections>

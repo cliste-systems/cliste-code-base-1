@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
+import { verticalIdForNiche } from "@/lib/verticals";
 import { PLANS, type PlanTier } from "@/lib/cliste-plans";
 
 import { finaliseBillingCheckout } from "./actions";
@@ -40,7 +41,35 @@ export default async function BillingPage({ searchParams }: PageProps) {
     redirect("/dashboard/usage?billing=ready");
   }
 
-  const { supabase, accountId } = await requireDashboardSession();
+  const { supabase, accountId, organizationId } = await requireDashboardSession();
+
+  // Retail pilot clients are invoiced directly by Cliste — no self-serve
+  // billing surface. Suspended stores get a plain notice instead.
+  const { data: orgNicheRow } = await supabase
+    .from("organizations")
+    .select("niche")
+    .eq("id", organizationId)
+    .maybeSingle();
+  if (verticalIdForNiche(orgNicheRow?.niche) === "retail") {
+    if (!suspendedQuery) {
+      redirect("/dashboard");
+    }
+    return (
+      <div className="mx-auto w-full max-w-xl py-16">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-6">
+          <h1 className="text-lg font-semibold tracking-tight text-amber-950">
+            This account is suspended
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-amber-950/90">
+            Cara has stopped answering calls for this store. Contact Cliste to
+            reactivate the account — billing for pilot stores is handled
+            directly, not through this dashboard.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [accountBilling, locations] = await Promise.all([
     loadAccountBilling(accountId),
     loadAccountLocations(accountId),

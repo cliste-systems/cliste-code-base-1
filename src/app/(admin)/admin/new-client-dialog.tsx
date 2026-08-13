@@ -194,7 +194,8 @@ export function NewClientDialog() {
               autoComplete="postal-code"
             />
             <p className="text-muted-foreground text-xs">
-              Resolved with Google Maps Geocoding to pin the store's location.
+              Resolved with Google Maps Geocoding to pin the store&apos;s
+              location.
             </p>
           </div>
           <div className="space-y-2">

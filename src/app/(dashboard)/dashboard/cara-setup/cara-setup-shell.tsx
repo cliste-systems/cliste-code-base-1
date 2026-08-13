@@ -18,9 +18,12 @@ import { CaraSetupPreviewModal } from "./cara-setup-preview-modal";
 import { CaraSetupTabs } from "./cara-setup-tabs";
 import { CaraSetupUnsavedGuard } from "./cara-setup-unsaved-guard";
 import { useCaraSetupForm } from "./cara-setup-form-context";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 
 export function CaraSetupShell({ children }: { children: React.ReactNode }) {
   const form = useCaraSetupForm();
+  const { vertical } = useDashboardVertical();
+  const isRetail = vertical.id === "retail";
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
@@ -36,10 +39,12 @@ export function CaraSetupShell({ children }: { children: React.ReactNode }) {
               <div className="min-w-0 space-y-2">
                 <div>
                   <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
-                    Cara Setup
+                    {isRetail ? "Store info" : "Cara Setup"}
                   </h1>
                   <p className="mt-0.5 max-w-xl text-[13px] leading-snug text-slate-600">
-                    What Cara says, knows, and captures on calls.
+                    {isRetail
+                      ? "Your opening hours, location, and the answers Cara gives customers."
+                      : "What Cara says, knows, and captures on calls."}
                   </p>
                 </div>
                 {form.businessFiles.length > 0 ? (

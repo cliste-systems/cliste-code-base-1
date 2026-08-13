@@ -25,6 +25,8 @@ import {
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { cn } from "@/lib/utils";
 
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
+
 function lineMetricValue(caraStatus: CaraStatusSnapshot): string {
   const phoneConnected = caraStatus.phoneLine.value === "Connected";
   if (!phoneConnected) return "Setup";
@@ -116,6 +118,10 @@ export function CaraStatusCard({
   const completeCount = setupSteps.filter((s) => s.complete).length;
   const continueHref = firstIncompleteSetupHref(setupSteps);
   const isLive = caraStatus.isOnline;
+  // Retail pilot: Cliste provisions and configures Cara for stores, so the
+  // self-serve setup checklist (services, call flow) is hidden.
+  const showSetupProgress =
+    useDashboardVertical().vertical.id !== "retail";
 
   return (
     <section
@@ -154,6 +160,7 @@ export function CaraStatusCard({
           />
         </div>
 
+        {showSetupProgress ? (
         <div className="flex flex-col">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-[13px] font-medium text-[#0b1220]">
@@ -180,6 +187,7 @@ export function CaraStatusCard({
             {isLive ? "Manage Cara setup" : "Continue setup"}
           </Link>
         </div>
+        ) : null}
       </div>
     </section>
   );

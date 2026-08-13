@@ -30,6 +30,7 @@ import { sumBillableMinutesFromDurations } from "@/lib/billable-minutes";
 import { buildHomeAttentionItems } from "@/lib/dashboard-home-attention";
 import { isRoutedCallOutcome } from "@/lib/dashboard-routed-outcomes";
 import { ALL_LOCATIONS_VIEW_COOKIE } from "@/lib/account-locations";
+import { verticalIdForNiche } from "@/lib/verticals";
 import { resolveDashboardOrganizationScope } from "@/lib/dashboard-scope";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { cookies } from "next/headers";
@@ -259,7 +260,7 @@ export default async function DashboardHomePage({
     ),
     supabase
       .from("organizations")
-      .select("is_active, status, phone_number")
+      .select("is_active, status, phone_number, niche")
       .eq("id", organizationId)
       .maybeSingle(),
     supabase
@@ -291,6 +292,11 @@ export default async function DashboardHomePage({
   );
 
   const org = orgRes.error ? null : orgRes.data;
+  // Retail pilot: call flow, training, and billing live in the admin console,
+  // so home metrics must not deep-link stores into hidden pages.
+  const isRetail =
+    verticalIdForNiche((org as { niche?: string | null } | null)?.niche) ===
+    "retail";
   const callOutcomes = callsForPanels.map((row) => row.outcome);
   const callDurationSeconds = callsForPanels.map((row) => row.duration_seconds);
 
@@ -317,9 +323,11 @@ export default async function DashboardHomePage({
     ? []
     : (openTicketsRes.data ?? [])) as TicketRow[];
 
-  const openTrainingRows = (openTrainingRes.error
+  const openTrainingRows = isRetail
     ? []
-    : (openTrainingRes.data ?? [])) as TrainingRow[];
+    : ((openTrainingRes.error
+        ? []
+        : (openTrainingRes.data ?? [])) as TrainingRow[]);
 
   const attentionItems = buildHomeAttentionItems({
     openTickets: openTicketRows,
@@ -397,7 +405,7 @@ export default async function DashboardHomePage({
               {
                 label: "Routed",
                 value: String(routedCount),
-                href: DASHBOARD_ROUTES.routing,
+                ...(isRetail ? {} : { href: DASHBOARD_ROUTES.routing }),
               },
               {
                 label: "Needs attention",
@@ -407,7 +415,7 @@ export default async function DashboardHomePage({
               {
                 label: "Minutes used",
                 value: String(minutesUsed),
-                href: DASHBOARD_ROUTES.usage,
+                ...(isRetail ? {} : { href: DASHBOARD_ROUTES.usage }),
               },
             ]}
           />

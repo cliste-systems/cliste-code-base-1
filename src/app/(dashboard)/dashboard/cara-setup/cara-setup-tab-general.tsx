@@ -31,9 +31,13 @@ import { cn } from "@/lib/utils";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 import { CountyChipEditor } from "./county-chip-editor";
 import { ServiceAreaExclusionsEditor } from "./service-area-exclusions-editor";
+import { useDashboardVertical } from "../dashboard-vertical-context";
 
 export function CaraSetupTabGeneral() {
   const form = useCaraSetupForm();
+  // Retail pilot: greeting and service area are managed by Cliste from the
+  // admin console — stores edit location and opening hours here.
+  const isRetail = useDashboardVertical().vertical.id === "retail";
   const defaultIntro = defaultVoiceGreetingIntro(form.businessName);
   const assistantName = VOICE_ASSISTANT_DEFAULT_NAME;
   const legal = voiceLegalDisclosure(assistantName);
@@ -63,6 +67,7 @@ export function CaraSetupTabGeneral() {
 
   return (
     <DashboardAnimatedGroup className="space-y-6">
+      {isRetail ? null : (
       <SectionCard
         flat
         icon={PhoneCall}
@@ -131,6 +136,7 @@ export function CaraSetupTabGeneral() {
           onPlayToggle={() => void handlePlayToggle()}
         />
       </SectionCard>
+      )}
 
       <SectionCard
         flat
@@ -207,6 +213,7 @@ export function CaraSetupTabGeneral() {
         />
       </SectionCard>
 
+      {isRetail ? null : (
       <SectionCard
         flat
         icon={MapPin}
@@ -252,6 +259,7 @@ export function CaraSetupTabGeneral() {
           </Field>
         </div>
       </SectionCard>
+      )}
     </DashboardAnimatedGroup>
   );
 }

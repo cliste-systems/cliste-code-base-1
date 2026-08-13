@@ -42,11 +42,13 @@ import { cn } from "@/lib/utils";
 
 import { DashboardViewportLock } from "./dashboard-viewport-lock";
 
-const navItems: {
+type DashboardNavConfigItem = {
   href: string;
   label: string;
   section: "core" | "agent" | "account";
-}[] = [
+};
+
+const navItems: DashboardNavConfigItem[] = [
   { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
   { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
@@ -65,6 +67,37 @@ const navItems: {
   { href: DASHBOARD_ROUTES.team, label: "Team", section: "account" },
   { href: DASHBOARD_ROUTES.settings, label: "Settings", section: "account" },
 ];
+
+/**
+ * Retail pilot: the client dashboard is intentionally minimal. Stores see
+ * calls, follow-ups, and their own store info (hours + FAQs); call flow,
+ * training, and billing are managed by Cliste from the admin console.
+ */
+const RETAIL_HIDDEN_NAV_HREFS: ReadonlySet<string> = new Set([
+  DASHBOARD_ROUTES.routing,
+  DASHBOARD_ROUTES.caraTraining,
+  DASHBOARD_ROUTES.usage,
+]);
+
+function navItemsForVertical(
+  verticalId: string,
+  locationCount: number,
+): DashboardNavConfigItem[] {
+  if (verticalId !== "retail") return navItems;
+  return navItems
+    .filter((item) => {
+      if (RETAIL_HIDDEN_NAV_HREFS.has(item.href)) return false;
+      if (item.href === DASHBOARD_ROUTES.locations && locationCount < 2) {
+        return false;
+      }
+      return true;
+    })
+    .map((item) =>
+      item.href === DASHBOARD_ROUTES.caraSetup
+        ? { ...item, label: "Store info" }
+        : item,
+    );
+}
 
 function toNavItem(
   item: (typeof navItems)[number],
@@ -136,24 +169,26 @@ export default async function DashboardLayout({
   const needsPassword =
     userMeta?.needs_password === true || userMeta?.needs_password === "true";
 
-  const coreNav = navItems
+  const vertical = verticalPackForNiche(orgRow?.niche);
+  const visibleNavItems = navItemsForVertical(vertical.id, locations.length);
+
+  const coreNav = visibleNavItems
     .filter((i) => i.section === "core")
     .map((item) => toNavItem(item, navBadges));
-  const caraNav = navItems
+  const caraNav = visibleNavItems
     .filter((i) => i.section === "agent")
     .map((item) => toNavItem(item, navBadges));
-  const adminNav = navItems
+  const adminNav = visibleNavItems
     .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = navItems.map((item) =>
-    toNavItem(item, navBadges),
+  const mobileNavItems: DashboardSidebarNavItem[] = visibleNavItems.map(
+    (item) => toNavItem(item, navBadges),
   );
 
   const accountSummary = buildDashboardAccountSummary(profile, user, {
     name: accountBilling?.name ?? orgRow?.name ?? null,
     slug: orgRow?.slug ?? null,
   });
-  const vertical = verticalPackForNiche(orgRow?.niche);
   const productNoun = vertical.id === "generic" ? null : vertical.productNoun;
   const locationLabel = locationLabelForVertical(vertical.id);
   const accountName =

@@ -1,14 +1,28 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { StripeEmbeddedCheckout } from "@/components/billing/stripe-embedded-checkout";
 import { DASHBOARD_PAGE_SHELL_FILL_WHITE } from "@/components/dashboard/dashboard-surface";
+import { requireDashboardSession } from "@/lib/dashboard-session";
 import { stripePublishableConfigured } from "@/lib/stripe-publishable";
+import { verticalIdForNiche } from "@/lib/verticals";
 
 import { prepareEmbeddedBillingCheckout } from "../../billing/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsageCheckoutPage() {
+  // Retail pilot clients never self-serve checkout — invoiced directly.
+  const { supabase, organizationId } = await requireDashboardSession();
+  const { data: orgNicheRow } = await supabase
+    .from("organizations")
+    .select("niche")
+    .eq("id", organizationId)
+    .maybeSingle();
+  if (verticalIdForNiche(orgNicheRow?.niche) === "retail") {
+    redirect("/dashboard");
+  }
+
   if (!stripePublishableConfigured()) {
     return (
       <CheckoutShell>

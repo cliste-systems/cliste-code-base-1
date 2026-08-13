@@ -7,6 +7,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { onboardingSpring } from "@/components/onboarding/onboarding-motion";
 import { cn } from "@/lib/utils";
 
+import { useDashboardVertical } from "../dashboard-vertical-context";
+
 const TABS = [
   { href: "/dashboard/cara-setup/general", label: "General" },
   { href: "/dashboard/cara-setup/services", label: "Services" },
@@ -14,16 +16,24 @@ const TABS = [
   { href: "/dashboard/cara-setup/answers", label: "Answers & files" },
 ] as const;
 
+/** Retail stores edit store info (hours, location) and FAQs only. */
+const RETAIL_TABS = [
+  { href: "/dashboard/cara-setup/general", label: "Store info" },
+  { href: "/dashboard/cara-setup/answers", label: "Answers & files" },
+] as const;
+
 export function CaraSetupTabs() {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
+  const { vertical } = useDashboardVertical();
+  const tabs = vertical.id === "retail" ? RETAIL_TABS : TABS;
 
   return (
     <nav
       className="-mx-1 flex gap-1 overflow-x-auto overscroll-x-contain px-1 pb-0.5 [scrollbar-width:none] sm:gap-1.5"
       aria-label="Cara Setup sections"
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = pathname === tab.href;
         return (
           <Link

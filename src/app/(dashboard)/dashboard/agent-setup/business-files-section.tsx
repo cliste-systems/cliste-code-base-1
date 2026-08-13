@@ -5,6 +5,7 @@ import { FileText, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
 import {
   Dialog,
   DialogContent,
@@ -465,6 +466,8 @@ function BusinessFileRow({
   const status = fileReadinessLabel(file);
   const truncated = sliceFileTextForPrompt(file.extractedText)?.wasTruncated;
   const kindLabel = businessFileKindLabel(file.documentKind);
+  // Retail pilot: Call flow is admin-managed, so don't deep-link stores there.
+  const showCallFlowLink = useDashboardVertical().vertical.id !== "retail";
 
   return (
     <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4">
@@ -550,8 +553,10 @@ function BusinessFileRow({
               <span className="mt-0.5 block text-slate-500">
                 {sendConfigured
                   ? "Cara can text this file when callers ask."
-                  : "Set up text links in Call flow first."}{" "}
-                {!sendConfigured ? (
+                  : showCallFlowLink
+                    ? "Set up text links in Call flow first."
+                    : "Contact Cliste to enable text links for this store."}{" "}
+                {!sendConfigured && showCallFlowLink ? (
                   <Link
                     href="/dashboard/routing"
                     className="font-medium text-[#0b1220] underline underline-offset-2"
