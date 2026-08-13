@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type Stripe from "stripe";
 
 import {
   assertPlatformCheckoutSessionComplete,
@@ -7,12 +8,16 @@ import {
 } from "./platform-checkout-session-validation";
 
 function session(
-  overrides: Partial<{
-    status: string;
-    payment_status: string;
-    subscription: string | { id: string } | null;
-  }> = {},
-) {
+  overrides: Partial<
+    Pick<
+      Stripe.Checkout.Session,
+      "status" | "payment_status" | "subscription"
+    >
+  > = {},
+): Pick<
+  Stripe.Checkout.Session,
+  "status" | "payment_status" | "subscription"
+> {
   return {
     status: "complete",
     payment_status: "paid",
@@ -69,7 +74,9 @@ describe("assertPlatformCheckoutSessionComplete", () => {
   it("accepts expanded subscription objects", () => {
     assert.doesNotThrow(() =>
       assertPlatformCheckoutSessionComplete(
-        session({ subscription: { id: "sub_expanded" } }),
+        session({
+          subscription: { id: "sub_expanded" } as Stripe.Subscription,
+        }),
       ),
     );
   });
