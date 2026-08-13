@@ -10,11 +10,7 @@ import type { CaraSetupPromptInput } from "@/lib/compile-cara-prompt";
 import { emptyWeekSchedule } from "@/lib/business-hours";
 import { buildHoursPromptBlock } from "@/lib/general-boundary";
 import { routePhraseForPrompt } from "@/lib/cara-capabilities";
-import { serviceAreaAnchorTown } from "@/lib/base-town";
-import {
-  formatServiceAreaForPrompt,
-  SERVICE_AREA_COVERAGE_INSTRUCTION,
-} from "@/lib/service-area-boundary";
+import { formatLocationPhrase, parseStoredLocation } from "@/lib/location-fields";
 import {
   assistantNameLabel,
   voiceLegalDisclosure,
@@ -45,10 +41,20 @@ function formatListPhrase(items: string[]): string {
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
-function locationPhrase(address?: string, eircode?: string): string | null {
-  const parts = [address?.trim(), eircode?.trim()].filter(Boolean);
-  if (!parts.length) return null;
-  return parts.join(", ");
+function locationPhrase(
+  street?: string,
+  town?: string,
+  county?: string,
+  eircode?: string,
+): string | null {
+  return formatLocationPhrase(
+    parseStoredLocation({
+      address: street,
+      baseTown: town,
+      county,
+    }),
+    eircode,
+  );
 }
 
 function callFlowVoiceLines(input: CaraSetupPromptInput): string[] {
@@ -136,7 +142,12 @@ export function compileCaraOwnerPreview(
   );
 
   const aboutBits: string[] = [];
-  const location = locationPhrase(input.locationAddress, input.locationEircode);
+  const location = locationPhrase(
+    input.locationAddress,
+    input.baseTown,
+    input.locationCounty,
+    input.locationEircode,
+  );
   if (location) aboutBits.push(`We're at ${location}.`);
 
   const hoursBlock = buildHoursPromptBlock({
@@ -145,31 +156,14 @@ export function compileCaraOwnerPreview(
     schedule: input.openingHoursSchedule ?? emptyWeekSchedule(),
     formattedHours: input.openingHours?.trim() ?? "",
     note: input.hoursNote,
+    bankHolidays: input.bankHolidays,
   });
   if (hoursBlock) {
     parts.push(hoursBlock);
   }
 
-  const baseTown = serviceAreaAnchorTown(input.baseTown, input.locationAddress);
-  if (baseTown && input.baseTown?.trim()) {
-    aboutBits.push(`We're based in ${baseTown}.`);
-  }
-
-  const areas = listItems(input.serviceArea);
-  const townExclusions = listItems(input.serviceAreaExclusions);
-  if (areas.length > 0) {
-    const areaPhrase = formatServiceAreaForPrompt(
-      areas,
-      baseTown ?? location ?? undefined,
-      townExclusions,
-    );
-    aboutBits.push(`We cover ${areaPhrase}.`);
-  }
   if (aboutBits.length > 0) {
     parts.push(aboutBits.join(" "));
-  }
-  if (areas.length > 0) {
-    parts.push(SERVICE_AREA_COVERAGE_INSTRUCTION);
   }
 
   const offered = listItems(input.servicesOffered);

@@ -48,7 +48,7 @@ export function DetailPanelShell({
     <section
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden",
-        surface === "embedded" && "bg-white",
+        surface === "embedded" && "bg-[#fbfcfb]",
         surface === "home" && DASHBOARD_HOME_CARD,
         surface === "default" && DASHBOARD_CARD_SURFACE,
       )}
@@ -72,17 +72,17 @@ export function DetailPanelHeader({
   badges?: ReactNode;
 }) {
   return (
-    <div className="shrink-0 border-b border-slate-100 px-5 py-5">
-      <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
+    <div className="shrink-0 border-b border-[#dfe7e2] bg-[#f6faf7] px-5 py-5">
+      <p className="text-[11px] font-semibold tracking-[0.12em] text-[#6b7c75] uppercase">
         {eyebrow}
       </p>
-      <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[#0b1220]">
+      <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-[#11181d]">
         {title}
       </h2>
       {subtitle ? (
-        <p className="mt-1 text-[13px] text-slate-600">{subtitle}</p>
+        <p className="mt-1 text-[13px] text-[#5b6b65]">{subtitle}</p>
       ) : null}
-      {meta ? <p className="mt-1 text-[12px] text-slate-500">{meta}</p> : null}
+      {meta ? <p className="mt-1 text-[12px] text-[#6b7c75]">{meta}</p> : null}
       {badges ? <div className="mt-4 flex flex-wrap gap-2">{badges}</div> : null}
     </div>
   );
@@ -99,7 +99,7 @@ export function DetailPanelBody({
   return (
     <div
       className={cn(
-        "min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain px-5 py-5",
+        "min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain bg-[#fbfcfb] px-5 py-5",
         className,
       )}
       {...props}
@@ -111,7 +111,7 @@ export function DetailPanelBody({
 
 export function DetailPanelFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="flex shrink-0 flex-wrap gap-2 border-t border-slate-100 px-5 py-4">
+    <div className="flex shrink-0 flex-wrap gap-2 border-t border-[#dfe7e2] bg-[#f6faf7] px-5 py-4">
       {children}
     </div>
   );
@@ -126,7 +126,7 @@ export function DetailSection({
 }) {
   return (
     <div>
-      <h3 className="text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">
+      <h3 className="text-[11px] font-semibold tracking-[0.1em] text-[#6b7c75] uppercase">
         {title}
       </h3>
       <div className="mt-2">{children}</div>
@@ -145,7 +145,7 @@ export function DetailInset({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200 bg-slate-50/60 p-4",
+        "rounded-lg border border-[#d9e2dd] bg-white p-4",
         className,
       )}
     >
@@ -169,7 +169,7 @@ export function DetailActionButton({
   type?: "button" | "submit";
 }) {
   const className = cn(
-    "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-50",
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-3 text-[13px] font-medium text-[#35443f] transition-colors hover:bg-white",
     disabled && "pointer-events-none opacity-40",
   );
 

@@ -1,5 +1,5 @@
 import type { AgentFaq } from "./agent-faqs";
-import type { WeekSchedule } from "@/lib/business-hours";
+import type { WeekSchedule, BankHolidayConfig } from "@/lib/business-hours";
 import type { DetailsCollectMode } from "@/lib/details-collect-mode";
 import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
 import type { ServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
@@ -21,6 +21,7 @@ export type AgentSetupInitial = {
   hoursNeverConfigured: boolean;
   open24_7: boolean;
   hoursNote: string;
+  bankHolidays: BankHolidayConfig;
   serviceAreaItems: string[];
   serviceAreaExclusionItems: string[];
   servicesItems: string[];
@@ -37,6 +38,7 @@ export type AgentSetupInitial = {
   locationAddress: string;
   locationEircode: string;
   baseTown: string;
+  locationCounty: string;
   quotePricesOnCalls: boolean;
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bot, ChevronDown } from "lucide-react";
@@ -10,7 +10,6 @@ import {
   isCaraNavPath,
   type CaraNavChild,
 } from "@/lib/dashboard-cara-nav";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import {
   DASHBOARD_SIDEBAR_CHEVRON_CLASS,
@@ -54,32 +53,31 @@ function NavSubRow({
 
 export function CaraSidebarNav({
   children: items = CARA_SIDEBAR_CHILDREN,
-  trainingBadge,
 }: {
   children?: CaraNavChild[];
-  trainingBadge?: number;
 }) {
   const pathname = usePathname();
   const onCaraRoute = isCaraNavPath(pathname);
-  const [expanded, setExpanded] = useState(onCaraRoute);
-
-  useEffect(() => {
-    if (onCaraRoute) setExpanded(true);
-  }, [onCaraRoute]);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const [routeCollapsed, setRouteCollapsed] = useState(false);
 
   const childActive = items.some(
     (item) =>
       pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   const sectionActive = onCaraRoute && childActive;
+  const expanded = onCaraRoute ? !routeCollapsed : manuallyExpanded;
 
   return (
     <div className={dashboardSidebarGroupClassName()}>
       <button
         type="button"
         onClick={() => {
-          if (onCaraRoute) return;
-          setExpanded((open) => !open);
+          if (onCaraRoute) {
+            setRouteCollapsed((open) => !open);
+            return;
+          }
+          setManuallyExpanded((open) => !open);
         }}
         className={dashboardSidebarHeaderClassName(sectionActive)}
         aria-expanded={expanded}
@@ -110,15 +108,12 @@ export function CaraSidebarNav({
         {items.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const badge =
-            item.href === DASHBOARD_ROUTES.caraTraining ? trainingBadge : undefined;
           return (
             <NavSubRow
               key={item.href}
               href={item.href}
               label={item.label}
               active={active}
-              badge={badge}
             />
           );
         })}

@@ -9,7 +9,10 @@ import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
 import {
   type WeekSchedule,
   weekScheduleHasOpenDay,
+  type BankHolidayConfig,
 } from "@/lib/business-hours";
+import { formatBankHolidaysForAgent } from "@/lib/agent-knowledge-format";
+import { parseHoursBreaks } from "@/lib/hours-breaks";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { GREETING_LEGAL_OVERLAP_PATTERN } from "@/lib/voice-greeting-guardrails";
 import {
@@ -20,6 +23,28 @@ import {
 } from "@/lib/voice-greeting";
 
 export const HOURS_NOTE_MAX_LENGTH = 120;
+
+function looksLikeOpeningHoursText(text: string): boolean {
+  return /\b(mon|tue|wed|thu|fri|sat|sun|monday|sunday)\b/i.test(text) && /\d/.test(text);
+}
+
+function breaksNoteForPrompt(
+  note?: string,
+  schedule?: WeekSchedule,
+  formattedHours?: string,
+): string | undefined {
+  const hasFormattedHours = Boolean(formattedHours?.trim());
+  const items = parseHoursBreaks(note ?? "").filter((item) => {
+    if (schedule && weekScheduleHasOpenDay(schedule)) {
+      if (/^closed all week$/i.test(item.trim())) return false;
+      // Breaks field sometimes gets the opening-hours block pasted in by mistake.
+      if (hasFormattedHours && looksLikeOpeningHoursText(item)) return false;
+    }
+    return true;
+  });
+  if (items.length === 0) return undefined;
+  return items.join("; ");
+}
 
 export const HOURS_NEVER_CONFIGURED_INSTRUCTION =
   "Opening hours have not been provided yet. When callers ask about hours, I say I'll need to check with the team and take their details — I never guess.";
@@ -257,6 +282,7 @@ export function buildHoursPromptBlock(input: {
   schedule: WeekSchedule;
   formattedHours: string;
   note?: string;
+  bankHolidays?: BankHolidayConfig;
 }): string | null {
   if (input.neverConfigured) {
     return HOURS_NEVER_CONFIGURED_INSTRUCTION;
@@ -264,15 +290,25 @@ export function buildHoursPromptBlock(input: {
 
   if (input.open24_7) {
     const parts = [HOURS_OPEN_24_7_INSTRUCTION];
-    if (input.note?.trim()) parts.push(input.note.trim());
+    const bankLine = formatBankHolidaysForAgent(input.bankHolidays);
+    if (bankLine) parts.push(bankLine);
+    const breaksNote = breaksNoteForPrompt(input.note, input.schedule, input.formattedHours);
+    if (breaksNote) parts.push(breaksNote);
     return parts.join(" ");
   }
 
   if (!weekScheduleHasOpenDay(input.schedule)) {
     if (input.formattedHours.trim()) {
       const parts = [`Our opening hours are:\n${input.formattedHours.trim()}`];
-      if (input.note?.trim()) {
-        parts.push(`Hours note: ${input.note.trim()}`);
+      const bankLine = formatBankHolidaysForAgent(input.bankHolidays);
+      if (bankLine) parts.push(bankLine);
+      const breaksNote = breaksNoteForPrompt(
+        input.note,
+        input.schedule,
+        input.formattedHours,
+      );
+      if (breaksNote) {
+        parts.push(`Breaks & exceptions: ${breaksNote}`);
       }
       parts.push(HOURS_CLOSED_DAY_INSTRUCTION);
       return parts.join("\n\n");
@@ -283,8 +319,11 @@ export function buildHoursPromptBlock(input: {
   if (!input.formattedHours.trim()) return HOURS_NEVER_CONFIGURED_INSTRUCTION;
 
   const parts = [`Our opening hours are:\n${input.formattedHours.trim()}`];
-  if (input.note?.trim()) {
-    parts.push(`Hours note: ${input.note.trim()}`);
+  const bankLine = formatBankHolidaysForAgent(input.bankHolidays);
+  if (bankLine) parts.push(bankLine);
+  const breaksNote = breaksNoteForPrompt(input.note, input.schedule, input.formattedHours);
+  if (breaksNote) {
+    parts.push(`Breaks & exceptions: ${breaksNote}`);
   }
   parts.push(HOURS_CLOSED_DAY_INSTRUCTION);
   return parts.join("\n\n");

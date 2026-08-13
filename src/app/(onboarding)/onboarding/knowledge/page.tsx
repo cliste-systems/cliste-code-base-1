@@ -5,11 +5,22 @@ import {
 } from "@/app/(dashboard)/dashboard/routing/route-models";
 import { parseRoutingLinks } from "@/app/(dashboard)/dashboard/routing/routing-links";
 import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
+import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
+import {
+  defaultBankHolidayConfig,
+  emptyWeekSchedule,
+  isBusinessHoursUnset,
+  parseBusinessHoursBundle,
+  weekScheduleHasOpenDay,
+} from "@/lib/business-hours";
 import { defaultBusinessDescription } from "@/lib/onboarding-business-type";
 import { parseCaraGoal } from "@/lib/cara-goal";
 import { guardOnboardingPage } from "@/lib/onboarding-page-guard";
 import { requireOnboardingSession } from "@/lib/onboarding-session";
+import { parseStoredLocation } from "@/lib/location-fields";
+import { parsePlainTextOpeningHours } from "@/lib/parse-plain-text-hours";
 import { listServicesForOrg } from "@/lib/service-catalog";
+import { normalizeServiceAreaCountyItems } from "@/lib/service-area-boundary";
 import { verticalPackForNiche } from "@/lib/verticals";
 import { createClient } from "@/utils/supabase/server";
 
@@ -43,7 +54,7 @@ export default async function OnboardingKnowledgePage({
     supabase
       .from("organizations")
       .select(
-        "name, address, storefront_eircode, niche, agent_business_type, agent_location_address, raw_business_description, business_knowledge_summary, agent_opening_hours, agent_service_area, agent_services_departments, agent_services_departments_raw, agent_services_not_offered, agent_services_not_offered_raw, agent_details_to_collect, agent_faqs, agent_capture_fields, cara_handle_options, cara_goal, routing_links, fallback_number, notification_email, notification_phone, onboarding_ui_copy, train_cara_step",
+        "name, address, storefront_eircode, niche, agent_business_type, agent_location_address, agent_base_town, agent_location_county, agent_location_eircode, raw_business_description, business_knowledge_summary, business_hours, agent_opening_hours, agent_service_area, agent_services_departments, agent_services_departments_raw, agent_services_not_offered, agent_services_not_offered_raw, agent_details_to_collect, agent_faqs, agent_capture_fields, cara_handle_options, cara_goal, routing_links, fallback_number, notification_email, notification_phone, onboarding_ui_copy, train_cara_step",
       )
       .eq("id", session.organizationId)
       .maybeSingle(),
@@ -88,8 +99,52 @@ export default async function OnboardingKnowledgePage({
     (org?.agent_services_not_offered as string | null) ?? "";
   const servicesNotOfferedRaw =
     (org?.agent_services_not_offered_raw as string | null)?.trim() ?? "";
-  const openingHours = (org?.agent_opening_hours as string | null) ?? "";
+  const openingHoursLegacy = (org?.agent_opening_hours as string | null) ?? "";
   const serviceArea = (org?.agent_service_area as string | null) ?? "";
+  const hoursUnset = isBusinessHoursUnset(org?.business_hours);
+  const hoursBundle = hoursUnset
+    ? { schedule: emptyWeekSchedule(), meta: {} }
+    : parseBusinessHoursBundle(org?.business_hours);
+
+  let openingHoursSchedule = hoursBundle.schedule;
+  let open24_7 = hoursBundle.meta.open24_7 === true;
+  let bankHolidays =
+    hoursBundle.meta.bankHolidays ?? defaultBankHolidayConfig();
+  let hoursNeverConfigured = hoursUnset;
+
+  if (hoursUnset && openingHoursLegacy.trim()) {
+    const parsed = parsePlainTextOpeningHours(openingHoursLegacy);
+    if (parsed) {
+      openingHoursSchedule = parsed.schedule;
+      open24_7 = /\bopen\s*24\s*\/\s*7\b/i.test(openingHoursLegacy);
+      hoursNeverConfigured = false;
+    }
+  }
+
+  const location = parseStoredLocation({
+    address:
+      (org?.agent_location_address as string | null)?.trim() ||
+      (org?.address as string | null)?.trim() ||
+      "",
+    baseTown: (org?.agent_base_town as string | null)?.trim() ?? "",
+    county: (org?.agent_location_county as string | null)?.trim() ?? "",
+  });
+  const locationEircode =
+    (org?.agent_location_eircode as string | null)?.trim() ||
+    (org?.storefront_eircode as string | null)?.trim() ||
+    "";
+  const serviceAreaItems = normalizeServiceAreaCountyItems(
+    parseAgentKnowledgeList(serviceArea),
+  );
+  const hoursPrefilled =
+    Boolean(openingHoursLegacy.trim()) ||
+    (!hoursUnset && weekScheduleHasOpenDay(openingHoursSchedule));
+  const locationPrefilled = Boolean(
+    location.street.trim() ||
+      location.town.trim() ||
+      location.county.trim() ||
+      locationEircode.trim(),
+  );
   const caraGoal = parseCaraGoal(org?.cara_goal);
   const detailsToCollect =
     (org?.agent_details_to_collect as string | null)?.trim() ?? "";
@@ -135,8 +190,17 @@ export default async function OnboardingKnowledgePage({
           servicesOfferedRaw: servicesOfferedRawForStep,
           servicesNotOffered,
           servicesNotOfferedRaw,
-          openingHours,
-          serviceArea,
+          openingHoursSchedule,
+          open24_7,
+          bankHolidays,
+          hoursNeverConfigured,
+          locationAddress: location.street,
+          baseTown: location.town,
+          locationCounty: location.county,
+          locationEircode,
+          serviceAreaItems,
+          hoursPrefilled,
+          locationPrefilled,
           captureFields,
           faqs,
           businessType: classifiedBusinessType,

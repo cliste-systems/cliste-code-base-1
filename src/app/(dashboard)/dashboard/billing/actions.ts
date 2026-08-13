@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { CLISTE_COMPANY } from "@/lib/company-details";
 import { planSupportsSelfServeCheckout } from "@/lib/cliste-plans";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import {
@@ -61,7 +62,7 @@ export async function prepareEmbeddedBillingCheckout(): Promise<EmbeddedBillingC
     return {
       ok: false,
       message:
-        "Custom plans are arranged with our team. Email hello@clistesystems.ie to update billing.",
+        `Custom plans are arranged with our team. Email ${CLISTE_COMPANY.helloEmail} to update billing.`,
     };
   }
 
@@ -131,8 +132,7 @@ export async function openBillingPortal(): Promise<BillingPortalResult> {
   }
 
   const stripe = getStripeClient();
-  const appOrigin = resolveAppSiteOrigin();
-  const returnBase = appOrigin?.origin ?? "https://app.clistesystems.ie";
+  const returnBase = resolveAppSiteOrigin().origin;
 
   try {
     const session = await stripe.billingPortal.sessions.create({

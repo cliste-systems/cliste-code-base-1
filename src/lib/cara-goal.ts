@@ -10,8 +10,6 @@ export const CARA_GOAL_DEFAULT: CaraGoal = "full_agent";
 
 export const FULL_AGENT_HANDLE_OPTIONS = [
   "send_link",
-  "email_request",
-  "send_whatsapp",
 ] as const satisfies readonly CaraHandleOptionId[];
 
 export type CaraGoalChoice = {
@@ -24,17 +22,17 @@ export type CaraGoalChoice = {
 export const CARA_GOAL_CHOICES: readonly CaraGoalChoice[] = [
   {
     id: "faq_only",
-    label: "Answer common questions",
-    tagline: "FAQ voice agent",
+    label: "Answer calls about your business",
+    tagline: "Questions & messages",
     description:
-      "Cara answers calls about hours, location, and your FAQs — and takes messages.",
+      "Cara handles questions on your services, hours, location, and anything you've taught her — and takes a message when she can't help on the call.",
   },
   {
     id: "full_agent",
-    label: "Answer questions & follow up",
+    label: "Answer calls & send links",
     tagline: "Full call handling",
     description:
-      "Cara can also text booking links, email your team, and send WhatsApp follow-ups.",
+      "Everything above — plus Cara can send booking links, directions, and other links to callers by SMS or email.",
   },
 ] as const;
 

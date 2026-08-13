@@ -11,7 +11,6 @@ import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
   DetailActionButton,
-  DetailInset,
   DetailPanelBody,
   DetailPanelFooter,
   DetailPanelHeader,
@@ -34,7 +33,6 @@ import {
   ANONYMOUS_CALLER_E164,
   normalizeBlockedCallerE164,
 } from "@/lib/blocked-callers";
-import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 
 import {
   addBlockedCaller,
@@ -45,15 +43,12 @@ import { useDashboardVertical } from "../dashboard-vertical-context";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
-  fullTranscriptForDisplay,
-  hasFullTranscript,
+  cleanedTranscriptForDisplay,
   matchesOutcomeFilter,
   matchesSearch,
   outcomeBadgeVariant,
-  reviewTranscriptForDisplay,
-  summaryForDisplay,
+  primaryTranscriptForDisplay,
   callSummaryForDisplay,
-  whatHappenedNextLabel,
   type CallHistoryListItem,
   type CallHistoryMetrics,
   type OutcomeFilterValue,
@@ -115,13 +110,10 @@ export function CallHistoryView({
   const [detailById, setDetailById] = useState<
     Record<string, { transcriptVerbatim: string; transcriptReview: string | null }>
   >({});
-  const [blockedSet, setBlockedSet] = useState(
+  const blockedSet = useMemo(
     () => new Set(blockedCallerE164s),
+    [blockedCallerE164s],
   );
-
-  useEffect(() => {
-    setBlockedSet(new Set(blockedCallerE164s));
-  }, [blockedCallerE164s]);
 
   const filtered = useMemo(() => {
     return calls.filter(
@@ -205,13 +197,13 @@ export function CallHistoryView({
       <ListDetailLayout
         className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.15fr)_420px]"
         list={
-          <div className="flex h-full min-h-0 flex-col overflow-hidden max-xl:border-b max-xl:border-slate-100 xl:border-r xl:border-slate-100">
-            <div className="flex shrink-0 flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#fbfcfb] max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r xl:border-[#dfe7e2]">
+            <div className="flex shrink-0 flex-col gap-2 border-b border-[#dfe7e2] bg-[#fbfcfb] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <h2 className="text-[15px] font-semibold tracking-tight text-[#11181d]">
                 Calls
               </h2>
-              <div className="flex items-center gap-2">
-                <div className="relative w-44 shrink-0">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative w-full shrink-0 sm:w-44">
                   <Search
                     className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
                     aria-hidden
@@ -222,7 +214,7 @@ export function CallHistoryView({
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search calls"
                     aria-label="Search calls"
-                    className="h-9 w-full border-slate-300 bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
+                    className="h-9 w-full border-[#b9c8c1] bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
                   />
                 </div>
                 <select
@@ -231,7 +223,7 @@ export function CallHistoryView({
                     setOutcomeFilter(e.target.value as OutcomeFilterValue)
                   }
                   aria-label="Filter by outcome"
-                  className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-[11rem] shrink-0")}
+                  className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-full shrink-0 sm:w-[11rem]")}
                 >
                   {OUTCOME_FILTER_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -249,14 +241,16 @@ export function CallHistoryView({
               )}
             >
               {filtered.length === 0 ? (
-                <EmptyState
-                  icon={Phone}
-                  title="No calls yet"
-                  description={copy.calls.emptyDescription}
-                  className="w-full py-10"
-                />
+                <div className="flex h-full w-full items-center justify-center p-6">
+                  <EmptyState
+                    icon={Phone}
+                    title="No calls yet"
+                    description={copy.calls.emptyDescription}
+                    className="w-full max-w-xl px-4 py-10"
+                  />
+                </div>
               ) : (
-                <ul className="divide-y divide-slate-100" role="listbox" aria-label="Calls">
+                <ul className="space-y-2 p-2 sm:p-3" role="listbox" aria-label="Calls">
                   {filtered.map((row) => (
                     <CallListRow
                       key={row.id}
@@ -289,7 +283,6 @@ export function CallHistoryView({
             contactHref={contactHref}
             blockedSet={blockedSet}
             businessName={businessName}
-            onBlockedChange={setBlockedSet}
             onRefresh={() => router.refresh()}
           />
         }
@@ -318,17 +311,17 @@ function CallListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "flex w-full min-h-[76px] cursor-pointer gap-3 border-l-2 px-4 py-4 text-left transition-colors sm:gap-4 sm:px-5",
+          "flex min-h-[82px] w-full cursor-pointer gap-3 rounded-lg border px-3 py-3 text-left shadow-[0_1px_0_rgba(17,24,29,0.04)] transition-colors sm:gap-4 sm:px-4",
           selected
-            ? "border-l-[#0b1220] bg-slate-50"
-            : "border-l-transparent hover:bg-slate-50/80",
+            ? "border-[#353D42] bg-white shadow-[inset_3px_0_0_#353D42,0_1px_0_rgba(17,24,29,0.04)]"
+            : "border-[#dfe7e2] bg-white/78 hover:border-[#9da9a4] hover:bg-white",
         )}
       >
         <span className={DASHBOARD_ICON_CHIP_ROW}>
           <Phone className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold text-[#0b1220]">
+          <span className="block truncate text-[14px] font-semibold text-[#11181d]">
             {name}
           </span>
           <span className="mt-0.5 block truncate text-[12px] text-slate-500">
@@ -380,7 +373,7 @@ function CallHistoryPaginationBar({
   const to = Math.min(page * pageSize, totalCount);
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 sm:px-5">
+    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#dfe7e2] bg-[#fbfcfb] px-4 py-2.5 sm:px-5">
       <p className="text-[12px] text-slate-500 tabular-nums">
         {from}–{to} of {totalCount}
       </p>
@@ -425,7 +418,6 @@ function CallDetailPanel({
   contactHref,
   blockedSet,
   businessName,
-  onBlockedChange,
   onRefresh,
 }: {
   call: CallHistoryListItem | null;
@@ -435,7 +427,6 @@ function CallDetailPanel({
   contactHref: string;
   blockedSet: Set<string>;
   businessName: string;
-  onBlockedChange: (next: Set<string>) => void;
   onRefresh: () => void;
 }) {
   if (!call) {
@@ -445,8 +436,8 @@ function CallDetailPanel({
           <EmptyState
             icon={PhoneCall}
             title="Select a call"
-            description="Choose a call to review the summary, transcript, outcome, and follow-up."
-            className="w-full py-10"
+            description="Choose a call to review the summary and transcript."
+            className="mx-6 w-full max-w-sm px-4 py-9"
           />
         </div>
       </DetailPanelShell>
@@ -463,7 +454,6 @@ function CallDetailPanel({
       contactHref={contactHref}
       blockedSet={blockedSet}
       businessName={businessName}
-      onBlockedChange={onBlockedChange}
       onRefresh={onRefresh}
     />
   );
@@ -477,7 +467,6 @@ function CallDetailPanelContent({
   contactHref,
   blockedSet,
   businessName,
-  onBlockedChange,
   onRefresh,
 }: {
   call: CallHistoryListItem;
@@ -487,10 +476,10 @@ function CallDetailPanelContent({
   contactHref: string;
   blockedSet: Set<string>;
   businessName: string;
-  onBlockedChange: (next: Set<string>) => void;
   onRefresh: () => void;
 }) {
-  const [showFullTranscript, setShowFullTranscript] = useState(false);
+  const [showCleanedTranscript, setShowCleanedTranscript] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [unblockConfirmOpen, setUnblockConfirmOpen] = useState(false);
   const [blockMsg, setBlockMsg] = useState<string | null>(null);
@@ -505,15 +494,16 @@ function CallDetailPanelContent({
     businessName,
     callerIsBlocked: isBlocked,
   });
-  const safeTranscript = reviewTranscriptForDisplay(call);
-  const fullTranscript = fullTranscriptForDisplay(call);
-  const showFull = showFullTranscript && fullTranscript != null;
+  const safeTranscript = primaryTranscriptForDisplay(call);
+  const cleanedTranscript = cleanedTranscriptForDisplay(call);
+  const showCleaned =
+    showCleanedTranscript && cleanedTranscript != null && cleanedTranscript !== safeTranscript;
+  const hasCleanedToggle =
+    cleanedTranscript != null &&
+    safeTranscript != null &&
+    cleanedTranscript.trim() !== safeTranscript.trim();
   const name = callDisplayName(call);
-  const whatHappenedNext = whatHappenedNextLabel(call.outcome, call.hasOpenAction);
   const showOutcomeBadge = call.outcome !== "answered";
-  const showWhatHappenedNext =
-    call.hasOpenAction ||
-    (call.outcome !== "answered" && whatHappenedNext !== "Handled");
 
   function onConfirmBlock() {
     if (!callerE164) return;
@@ -525,7 +515,6 @@ function CallDetailPanelContent({
         setBlockMsg(result.message);
         return;
       }
-      onBlockedChange(new Set([...blockedSet, callerE164]));
       setBlockMsg("Caller blocked.");
       onRefresh();
     });
@@ -541,9 +530,6 @@ function CallDetailPanelContent({
         setBlockMsg(result.message);
         return;
       }
-      const next = new Set(blockedSet);
-      next.delete(callerE164);
-      onBlockedChange(next);
       setBlockMsg("Caller unblocked.");
       onRefresh();
     });
@@ -584,67 +570,54 @@ function CallDetailPanelContent({
           </p>
         </DetailSection>
 
-        {showWhatHappenedNext ? (
-          <DetailSection title="What happened next">
-            <p className="text-[14px] font-medium text-slate-800">
-              {whatHappenedNext}
-            </p>
-          </DetailSection>
-        ) : null}
-
-        <DetailSection title="Related follow-up">
-          {call.followUp ? (
-            <DetailInset>
-              <p className="text-[13px] leading-relaxed text-slate-700">
-                {call.followUp.summary}
-              </p>
-              <p className="mt-2 text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-                {call.followUp.status === "open" ? "Open" : "Resolved"}
-              </p>
-              <Link
-                href="/dashboard/action-inbox"
-                className="mt-3 inline-flex text-[13px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
-              >
-                Open in Action Inbox
-              </Link>
-            </DetailInset>
-          ) : (
-            <p className="text-[13px] text-slate-500">No follow-up needed</p>
-          )}
-        </DetailSection>
-
         <DetailSection title="Transcript">
-          <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
-            Calls are transcribed for up to 30 days. Card numbers and IDs are
-            redacted automatically. Callers may mention personal details — use{" "}
-            <Link
-              href="/dashboard/legal/data-requests"
-              className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
-            >
-              Legal → Data requests
-            </Link>{" "}
-            to erase if asked.
-          </p>
           {detailLoading ? (
             <p className="text-[13px] text-slate-500">Loading transcript…</p>
-          ) : safeTranscript || showFull ? (
-            <pre className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-slate-800">
-              {showFull ? fullTranscript : safeTranscript}
-            </pre>
-          ) : (
+          ) : !safeTranscript && !showCleaned ? (
             <p className="text-[13px] text-slate-500">No transcript available.</p>
-          )}
-          {hasFullTranscript(call) ? (
+          ) : !transcriptOpen ? (
             <button
               type="button"
-              onClick={() => setShowFullTranscript((v) => !v)}
-              className="mt-2 text-[12px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
+              onClick={() => setTranscriptOpen(true)}
+              className="text-[13px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
             >
-              {showFull
-                ? "Hide full transcript"
-                : "Show full transcript (30-day retention)"}
+              Show full transcript
             </button>
-          ) : null}
+          ) : (
+            <>
+              <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
+                Stored for 30 days. Personal details can be erased via{" "}
+                <Link
+                  href="/dashboard/legal/data-requests"
+                  className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+                >
+                  Legal → Data requests
+                </Link>
+                .
+              </p>
+              <pre className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-slate-700 shadow-inner">
+                {showCleaned ? cleanedTranscript : safeTranscript}
+              </pre>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {hasCleanedToggle ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCleanedTranscript((v) => !v)}
+                    className="text-[12px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
+                  >
+                    {showCleaned ? "Show full transcript" : "Show cleaned transcript"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setTranscriptOpen(false)}
+                  className="text-[12px] font-medium text-slate-500 underline-offset-2 hover:underline"
+                >
+                  Hide transcript
+                </button>
+              </div>
+            </>
+          )}
         </DetailSection>
       </DetailPanelBody>
 

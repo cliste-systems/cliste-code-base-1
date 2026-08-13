@@ -88,7 +88,7 @@ function homeRequestTitle(category: ActionCategory): string {
 
 function summaryPreview(summary: string | null | undefined): string {
   const trimmed = String(summary ?? "").replace(/\s+/g, " ").trim();
-  return trimmed || "Request captured";
+  return trimmed || "Enquiry captured";
 }
 
 export function buildHomeTodaysRequestRows(input: {

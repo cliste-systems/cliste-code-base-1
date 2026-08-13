@@ -1,3 +1,5 @@
+import { MARKETING_SITE_URL, PRODUCT_NAME } from "@/lib/company-details";
+
 /**
  * Normalise common Irish Eircode shapes (e.g. `F94H002`, `f94 h002`) to
  * `F94 H002` so the geocoder resolves reliably.
@@ -82,7 +84,7 @@ async function geocodeViaGoogle(
 
 const nominatimHeaders = {
   Accept: "application/json",
-  "User-Agent": "Cliste/1.0 (Ireland geocoding; https://clistesystems.ie)",
+  "User-Agent": `${PRODUCT_NAME}/1.0 (Ireland geocoding; ${MARKETING_SITE_URL})`,
 } as const;
 
 /** Legacy OSM Nominatim fallback used only when no Google key is configured. */

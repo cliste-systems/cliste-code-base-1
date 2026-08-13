@@ -20,11 +20,11 @@ export type DashboardStatStripItem = {
 
 const DEFAULT_STAT_ICONS: Record<string, LucideIcon> = {
   "Calls answered": Phone,
-  "Requests captured": Inbox,
-  Routed: ArrowUpRight,
+  "Enquiries captured": Inbox,
+  "Info sent": ArrowUpRight,
   "Follow-ups due": Clock3,
   "Needs attention": AlertCircle,
-  "Minutes used": Timer,
+  "Minutes this period": Timer,
 };
 
 /**

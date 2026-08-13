@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, CircleUser } from "lucide-react";
@@ -78,21 +78,22 @@ export function AccountSidebarNav({
 }) {
   const pathname = usePathname();
   const onAccountRoute = isAccountNavPath(pathname);
-  const [expanded, setExpanded] = useState(onAccountRoute);
-
-  useEffect(() => {
-    if (onAccountRoute) setExpanded(true);
-  }, [onAccountRoute]);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const [routeCollapsed, setRouteCollapsed] = useState(false);
 
   const childActive = items.some((item) => isChildActive(pathname, item.href));
+  const expanded = onAccountRoute ? !routeCollapsed : manuallyExpanded;
 
   return (
     <div className={dashboardSidebarGroupClassName()}>
       <button
         type="button"
         onClick={() => {
-          if (onAccountRoute) return;
-          setExpanded((open) => !open);
+          if (onAccountRoute) {
+            setRouteCollapsed((open) => !open);
+            return;
+          }
+          setManuallyExpanded((open) => !open);
         }}
         className={dashboardSidebarHeaderClassName(onAccountRoute && childActive)}
         aria-expanded={expanded}

@@ -1,5 +1,7 @@
+import { OUTBOUND_EMAIL_DOMAIN } from "@/lib/company-details";
+
 /** Outbound mail domain for per-business Cara / owner notification senders. */
-export const CLISTE_OUTBOUND_EMAIL_DOMAIN = "clistesystems.ie";
+export const CLISTE_OUTBOUND_EMAIL_DOMAIN = OUTBOUND_EMAIL_DOMAIN;
 
 const RESERVED_LOCAL_PARTS = new Set([
   "admin",
@@ -44,7 +46,7 @@ export function sanitizeOrgEmailLocalPart(slug: string): string | null {
 }
 
 /**
- * Per-business From address: `{slug}@clistesystems.ie` with display name from
+ * Per-business From address: `{slug}@hellocara.ie` with display name from
  * org name. Reply-To routes to the business notification inbox when set.
  */
 export function resolveOrgSenderEmail(
@@ -55,7 +57,7 @@ export function resolveOrgSenderEmail(
   if (!localPart) return null;
 
   const displayName =
-    String(input.name ?? "").trim() || slug.replace(/-/g, " ") || "Cliste";
+    String(input.name ?? "").trim() || slug.replace(/-/g, " ") || "Hello Cara";
   const replyTo = String(input.notificationEmail ?? "").trim() || null;
 
   return {

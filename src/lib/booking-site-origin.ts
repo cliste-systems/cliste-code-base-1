@@ -1,3 +1,5 @@
+import { DEFAULT_APP_SITE_URL } from "@/lib/company-details";
+
 /**
  * Resolves the production app hostname from env (dashboard, billing links).
  */
@@ -12,8 +14,11 @@ export function parseConfiguredOrigin(raw: string | undefined): URL | null {
   }
 }
 
-export function resolveAppSiteOrigin(): URL | null {
-  return parseConfiguredOrigin(process.env.NEXT_PUBLIC_APP_URL);
+export function resolveAppSiteOrigin(): URL {
+  return (
+    parseConfiguredOrigin(process.env.NEXT_PUBLIC_APP_URL) ??
+    parseConfiguredOrigin(DEFAULT_APP_SITE_URL)!
+  );
 }
 
 /** When `Host` is missing (e.g. some server actions); must match `npm run dev` port in package.json. */

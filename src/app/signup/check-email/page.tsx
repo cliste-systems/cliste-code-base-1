@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
 import { SIGNUP_EMAIL_OTP_LENGTH } from "@/lib/signup-email-otp";
@@ -9,8 +10,8 @@ import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { VerifyCodeForm } from "./verify-code-form";
 
 export const metadata: Metadata = {
-  title: "Confirm your email — Cliste Systems",
-  description: "Enter the verification code to confirm your Cliste account.",
+  title: `Confirm your email — ${PRODUCT_NAME}`,
+  description: `Enter the verification code to confirm your ${PRODUCT_NAME} account.`,
 };
 
 type CheckEmailPageProps = {

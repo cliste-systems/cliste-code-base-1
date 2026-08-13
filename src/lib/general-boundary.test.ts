@@ -128,4 +128,29 @@ describe("buildHoursPromptBlock", () => {
     });
     assert.match(block ?? "", /next time we're open/i);
   });
+
+  it("drops stale Closed all week breaks note when schedule has open days", () => {
+    const block = buildHoursPromptBlock({
+      neverConfigured: false,
+      open24_7: false,
+      schedule: defaultWeekSchedule(),
+      formattedHours: "Mon–Fri: 9am–5:30pm",
+      note: "Closed all week",
+    });
+    assert.match(block ?? "", /Mon–Fri: 9am–5:30pm/);
+    assert.doesNotMatch(block ?? "", /Breaks & exceptions: Closed all week/i);
+  });
+
+  it("drops breaks note that duplicates formatted opening hours", () => {
+    const formatted = "Mon–Fri: 9am–5:30pm\nSaturday: 10am–4pm\nSunday: closed";
+    const block = buildHoursPromptBlock({
+      neverConfigured: false,
+      open24_7: false,
+      schedule: defaultWeekSchedule(),
+      formattedHours: formatted,
+      note: formatted,
+    });
+    assert.match(block ?? "", /Our opening hours are/i);
+    assert.doesNotMatch(block ?? "", /Breaks & exceptions/i);
+  });
 });

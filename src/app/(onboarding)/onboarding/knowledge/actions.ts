@@ -24,7 +24,15 @@ import {
   requireOnboardingSession,
 } from "@/lib/onboarding-session";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
-import { extractServiceExclusions } from "@/lib/extract-service-exclusions";
+import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
+import {
+  serializeBusinessHours,
+  weekScheduleHasOpenDay,
+  type BankHolidayConfig,
+  type WeekSchedule,
+} from "@/lib/business-hours";
+import { normalizeBaseTown } from "@/lib/base-town";
+import { compactEircode, normalizeIrelandLocationQuery } from "@/lib/geocode-ireland";
 import { extractServiceOfferings } from "@/lib/extract-service-offerings";
 import { sanitizeServicesOfferedRaw } from "@/lib/service-offered-raw";
 import { extractServiceCatalogSupplement } from "@/lib/extract-service-supplement";
@@ -70,6 +78,10 @@ async function advanceToNumberStep(organizationId: string): Promise<never> {
 
 import type { CaraHandleOptionId, TrainCaraStepId } from "./train-cara-constants";
 import { ensureSalonBookingRouteInPayload } from "./ensure-salon-booking-route";
+import {
+  buildTrainCaraFaqGuardContextFromPayload,
+  sanitizeOnboardingFaqs,
+} from "./train-cara-faq-guardrails";
 
 export type TrainCaraPayload = BusinessKnowledgePayload & {
   preserveFaqs?: boolean;
@@ -89,6 +101,13 @@ export type TrainCaraPayload = BusinessKnowledgePayload & {
   meetingLink?: string;
   logNote?: string;
   serviceCatalogSupplement?: ServiceCatalogSupplement | null;
+  businessHours?: WeekSchedule;
+  open24_7?: boolean;
+  bankHolidays?: BankHolidayConfig;
+  locationAddress?: string;
+  baseTown?: string;
+  locationCounty?: string;
+  locationEircode?: string;
 };
 
 export type TrainCaraSaveResult = { ok: true } | { ok: false; message: string };
@@ -145,6 +164,19 @@ async function persistTrainCara(
   const pack = verticalPackForNiche(niche);
   const skipServiceArea = pack.capabilities.skipServiceArea;
 
+  const faqGuardContext = buildTrainCaraFaqGuardContextFromPayload({
+    businessHours: payload.businessHours,
+    open24_7: payload.open24_7,
+    openingHours: payload.openingHours,
+    locationAddress: payload.locationAddress,
+    baseTown: payload.baseTown,
+    locationCounty: payload.locationCounty,
+    locationEircode: payload.locationEircode,
+    serviceArea: skipServiceArea ? "" : payload.serviceArea,
+    servicesOffered: payload.servicesOffered,
+  });
+  const sanitizedFaqs = sanitizeOnboardingFaqs(payload.faqs, faqGuardContext);
+
   const supabase = await createClient();
 
   const knowledgeSaved = await persistBusinessKnowledge(supabase, organizationId, {
@@ -157,7 +189,7 @@ async function persistTrainCara(
     extraNotes: payload.extraNotes,
     refinedBusinessType: payload.refinedBusinessType,
     preserveFaqs: payload.preserveFaqs,
-    faqs: payload.faqs,
+    faqs: sanitizedFaqs,
     onboardingUiCopy: payload.onboardingUiCopy,
     captureFields: payload.captureFields,
     businessRules: [],
@@ -195,6 +227,41 @@ async function persistTrainCara(
       payload.serviceCatalogSupplement ?? emptyServiceCatalogSupplement(),
     );
   }
+
+  if (payload.businessHours) {
+    const open24_7 = payload.open24_7 === true;
+    const formattedHours = open24_7
+      ? "Open 24 hours, 7 days a week"
+      : weekScheduleHasOpenDay(payload.businessHours)
+        ? formatWeekScheduleForAgent(payload.businessHours)
+        : "Closed all week";
+    update.agent_opening_hours = formattedHours;
+    update.business_hours = serializeBusinessHours(payload.businessHours, {
+      open24_7,
+      bankHolidays: payload.bankHolidays,
+    });
+  }
+
+  const locationAddress = String(payload.locationAddress ?? "").trim();
+  const baseTown = normalizeBaseTown(String(payload.baseTown ?? ""));
+  const locationCounty = normalizeBaseTown(String(payload.locationCounty ?? ""));
+  let locationEircode = String(payload.locationEircode ?? "").trim();
+  if (payload.locationAddress !== undefined) {
+    if (locationEircode) {
+      locationEircode = normalizeIrelandLocationQuery(locationEircode);
+      if (!compactEircode(locationEircode)) {
+        return {
+          ok: false,
+          message: "Enter a valid Eircode (e.g. D06 X2P6), or leave it blank.",
+        };
+      }
+    }
+    update.agent_location_address = locationAddress || null;
+    update.agent_base_town = baseTown || null;
+    update.agent_location_county = locationCounty || null;
+    update.agent_location_eircode = locationEircode || null;
+  }
+
   if (payload.emailAddress?.trim()) {
     update.notification_email = payload.emailAddress.trim();
   }
@@ -325,19 +392,6 @@ export async function extractServiceOfferingsForTrainCara(
   }
 
   const result = await extractServiceOfferings(raw);
-  if (!result.ok) return result;
-  return { ok: true, formatted: result.formatted, raw, chips: result.chips };
-}
-
-export type ExtractExclusionsResult =
-  | { ok: true; formatted: string; raw: string; chips: string[] }
-  | { ok: false; message: string };
-
-export async function extractServiceExclusionsForTrainCara(
-  rawParagraph: string,
-): Promise<ExtractExclusionsResult> {
-  const raw = rawParagraph.trim();
-  const result = await extractServiceExclusions(raw);
   if (!result.ok) return result;
   return { ok: true, formatted: result.formatted, raw, chips: result.chips };
 }
@@ -514,38 +568,4 @@ export async function persistTrainCaraServicesStep(
   if (!saved.ok) return saved;
   await regenerateCaraCustomPrompt(admin, session.organizationId);
   return { ok: true, offerings: servicesOffered };
-}
-
-export async function persistTrainCaraExclusionsStep(
-  payload: TrainCaraPayload,
-): Promise<TrainCaraSaveResult & { formatted?: string }> {
-  const session = await requireOnboardingSession();
-  const raw = String(payload.servicesNotOfferedRaw ?? "").trim();
-  let servicesNotOffered = "";
-  let servicesNotOfferedChips: string[] = [];
-
-  if (raw) {
-    const extracted = await extractServiceExclusionsForTrainCara(raw);
-    if (!extracted.ok) {
-      return { ok: false, message: extracted.message };
-    }
-    servicesNotOffered = extracted.formatted;
-    servicesNotOfferedChips = extracted.chips;
-  }
-
-  const snapshot = trainCaraKnowledgeSnapshot(payload, { servicesNotOffered });
-  const blocker = firstExtractedKnowledgeBlock(snapshot, {
-    servicesNotOffered: servicesNotOfferedChips,
-  });
-  if (blocker) {
-    return { ok: false, message: blocker.message };
-  }
-
-  const saved = await persistTrainCara(session.organizationId, {
-    ...payload,
-    servicesNotOffered,
-    servicesNotOfferedRaw: raw,
-  });
-  if (!saved.ok) return saved;
-  return { ok: true, formatted: servicesNotOffered };
 }

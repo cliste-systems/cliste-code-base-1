@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PRODUCT_NAME } from "@/lib/company-details";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
@@ -7,7 +8,7 @@ const linkButton =
   "inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export const metadata: Metadata = {
-  title: "Cliste Systems",
+  title: PRODUCT_NAME,
   description: "AI voice agent that answers every call for your business.",
 };
 
@@ -15,7 +16,7 @@ export default function Home() {
   return (
     <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-6 p-8">
       <div className="max-w-lg space-y-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Cliste Systems</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{PRODUCT_NAME}</h1>
         <p className="text-muted-foreground text-sm">
           AI voice agent for your business. Sign in to manage calls, your Action
           Inbox, routing, and agent setup.

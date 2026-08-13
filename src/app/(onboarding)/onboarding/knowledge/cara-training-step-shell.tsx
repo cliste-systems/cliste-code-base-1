@@ -150,6 +150,8 @@ type ShellProps = {
   className?: string;
   /** Tighter vertical rhythm for the review summary card. */
   compact?: boolean;
+  /** Fill remaining Train Cara viewport; scroll lives in children. */
+  viewportFit?: boolean;
 };
 
 export function CaraTrainingStepShell({
@@ -159,16 +161,23 @@ export function CaraTrainingStepShell({
   children,
   className,
   compact = false,
+  viewportFit = false,
 }: ShellProps) {
   return (
     <div
       className={cn(
         "flex w-full flex-col items-center self-center",
-        compact ? "gap-3" : "gap-4 sm:gap-5",
+        viewportFit && "min-h-0 flex-1 overflow-hidden",
+        compact ? "gap-3" : viewportFit ? "gap-2.5 sm:gap-3" : "gap-4 sm:gap-5",
         className,
       )}
     >
-      <header className={cn("w-full space-y-1 text-center", compact && "space-y-0.5")}>
+      <header
+        className={cn(
+          "w-full shrink-0 space-y-1 text-center",
+          compact && "space-y-0.5",
+        )}
+      >
         <h1
           className={cn(
             compact
@@ -189,10 +198,22 @@ export function CaraTrainingStepShell({
         </p>
       </header>
 
-      <div className="min-h-0 w-full space-y-2">{children}</div>
+      <div
+        className={cn(
+          "w-full",
+          viewportFit ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "min-h-0 space-y-2",
+        )}
+      >
+        {children}
+      </div>
 
       {helper ? (
-        <p className="w-full text-center text-[12px] leading-relaxed text-slate-400/90">
+        <p
+          className={cn(
+            "w-full shrink-0 text-center text-[12px] leading-relaxed text-slate-400/90",
+            viewportFit && "hidden sm:block",
+          )}
+        >
           {helper}
         </p>
       ) : null}

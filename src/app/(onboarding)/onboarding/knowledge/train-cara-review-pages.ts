@@ -3,7 +3,6 @@ import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faq
 import {
   buildReviewAvailabilitySpeech,
   buildReviewCallsSpeech,
-  buildReviewExclusionsSpeech,
   buildReviewFaqItems,
   buildReviewFaqsSpeech,
   buildReviewServicesSpeech,
@@ -15,7 +14,6 @@ export type { ReviewFaqItem };
 
 export type ReviewPageId =
   | "services"
-  | "exclusions"
   | "availability"
   | "calls"
   | "faqs";
@@ -89,14 +87,6 @@ export function buildReviewPages(
     "What I can help with",
     "The jobs and requests I'll handle on the phone.",
     buildReviewServicesSpeech(content.services),
-  );
-
-  pushSpeechPage(
-    pages,
-    "exclusions",
-    "What I'll pass on",
-    "Work I'll decline or refer elsewhere.",
-    buildReviewExclusionsSpeech(content.exclusions),
   );
 
   pushSpeechPage(

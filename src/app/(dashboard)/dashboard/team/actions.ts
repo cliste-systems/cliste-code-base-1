@@ -43,7 +43,9 @@ export async function inviteTeamMember(
 
   const admin = createAdminClient();
   const appOrigin =
-    resolveAppSiteOrigin()?.origin ??
+    (process.env.NEXT_PUBLIC_APP_URL?.trim()
+      ? resolveAppSiteOrigin().origin
+      : null) ??
     (await headers()).get("origin") ??
     "http://localhost:3001";
   const inviteRedirectTo = `${appOrigin}/auth/callback?next=/dashboard/set-password`;

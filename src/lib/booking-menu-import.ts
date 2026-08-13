@@ -1,7 +1,10 @@
 import "server-only";
 
 import { completeOpenRouterChat } from "@/lib/openrouter-chat";
-import { parseBookingMenuFromHtml } from "@/lib/booking-menu-platform-parsers";
+import {
+  parseBookingMenuFromHtml,
+  parseFreshaBusinessNameFromHtml,
+} from "@/lib/booking-menu-platform-parsers";
 import { isRegulatedBusinessText } from "@/lib/classify-business-description";
 import type { ServiceCatalogDraft } from "@/lib/service-catalog-format";
 import {
@@ -61,6 +64,33 @@ function hostLooksLikeBookingPlatform(host: string): boolean {
 function hostIsPhorest(host: string): boolean {
   const lower = host.toLowerCase();
   return lower === "phorest.com" || lower.endsWith(".phorest.com");
+}
+
+function hostIsFresha(host: string): boolean {
+  const lower = host.toLowerCase();
+  return lower === "fresha.com" || lower.endsWith(".fresha.com");
+}
+
+/** Regulated check scoped to imported menu content — not Fresha footer / nearby venues. */
+function regulatedFromImportedMenu(
+  services: BookingMenuImportService[],
+  businessHint = "",
+): boolean {
+  const blob = [
+    businessHint,
+    ...services.map((s) => `${s.name} ${s.category} ${s.notes}`.trim()),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return blob.length > 0 && isRegulatedBusinessText(blob);
+}
+
+function freshaBusinessHintFromHtml(htmlPages: string[]): string {
+  for (const html of htmlPages) {
+    const name = parseFreshaBusinessNameFromHtml(html);
+    if (name) return name;
+  }
+  return "";
 }
 
 function asImportedServices(value: unknown): BookingMenuImportService[] {
@@ -202,7 +232,9 @@ export async function importBookingMenuFromUrl(
   }
 
   if (structuredServices.length > 0) {
-    const text = htmlToText(htmlPages.join("\n")).slice(0, 2000);
+    const businessHint = hostIsFresha(host)
+      ? freshaBusinessHintFromHtml(htmlPages)
+      : "";
     const deduped = dedupeBookingImportServicesWithStats(
       structuredServices.slice(0, MAX_SERVICE_CATALOG_ITEMS),
     );
@@ -212,7 +244,7 @@ export async function importBookingMenuFromUrl(
       data: {
         services: deduped.services,
         bookingUrl: url.toString(),
-        regulated: isRegulatedBusinessText(text),
+        regulated: regulatedFromImportedMenu(deduped.services, businessHint),
         mergedCount: deduped.mergedCount,
         ...assessed,
       },
@@ -280,13 +312,16 @@ Rules:
       };
     }
 
+    const businessHint = hostIsFresha(host)
+      ? freshaBusinessHintFromHtml(htmlPages)
+      : "";
     const assessed = assessBookingImportQuality(services);
     return {
       ok: true,
       data: {
         services,
         bookingUrl: url.toString(),
-        regulated: isRegulatedBusinessText(text.slice(0, 2000)),
+        regulated: regulatedFromImportedMenu(services, businessHint),
         mergedCount: deduped.mergedCount,
         ...assessed,
       },

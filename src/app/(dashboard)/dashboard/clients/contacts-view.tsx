@@ -111,12 +111,12 @@ export function ContactsView({ contacts, metrics: _metrics, className }: Contact
         <ListDetailLayout
           className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.2fr)_400px]"
           list={
-            <div className="flex h-full min-h-0 flex-col overflow-hidden border-slate-100 bg-white max-xl:border-b xl:border-r">
-              <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
-                <p className="min-w-0 flex-1 text-[13px] font-medium text-[#0b1220]">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden border-[#dfe7e2] bg-[#fbfcfb] max-xl:border-b xl:border-r">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-[#dfe7e2] bg-[#f6faf7] px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+                <p className="min-w-0 flex-1 text-[13px] font-semibold text-[#11181d]">
                   Directory
                 </p>
-                <div className="relative w-44 shrink-0">
+                <div className="relative w-full shrink-0 sm:w-44">
                   <Search
                     className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
                     aria-hidden
@@ -127,14 +127,14 @@ export function ContactsView({ contacts, metrics: _metrics, className }: Contact
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search contacts"
                     aria-label="Search contacts"
-                    className="h-9 w-full border-slate-300 bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
+                    className="h-9 w-full border-[#b9c8c1] bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
                   />
                 </div>
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value as ContactFilter)}
                   aria-label="Filter contacts"
-                  className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-[10.5rem] shrink-0")}
+                  className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-full shrink-0 sm:w-[10.5rem]")}
                 >
                   {CONTACT_FILTER_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -160,7 +160,7 @@ export function ContactsView({ contacts, metrics: _metrics, className }: Contact
                     className="min-h-[12rem]"
                   />
                 ) : (
-                  <ul className="divide-y divide-slate-100" role="listbox" aria-label="Contacts">
+                  <ul className="space-y-2" role="listbox" aria-label="Contacts">
                     {filtered.map((row) => (
                       <ContactListRow
                         key={row.id}
@@ -222,9 +222,9 @@ function ContactListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "grid w-full cursor-pointer grid-cols-[2.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2.5 py-2.5 text-left transition-colors",
-          "hover:bg-slate-50/90",
-          selected && "bg-slate-100/80",
+          "grid w-full cursor-pointer grid-cols-[2.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg border bg-white/78 px-2.5 py-2.5 text-left shadow-[0_1px_0_rgba(17,24,29,0.04)] transition-colors",
+          "border-[#dfe7e2] hover:border-[#9da9a4] hover:bg-white",
+          selected && "border-[#353D42] bg-[#f6faf7] shadow-[inset_3px_0_0_#353D42,0_1px_0_rgba(17,24,29,0.04)]",
         )}
       >
         <span
@@ -242,7 +242,7 @@ function ContactListRow({
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-1.5">
             {row.openFollowUps > 0 ? (
-              <StatusPill variant="info" className="h-5 px-1.5 py-0 text-[10px] leading-none">
+              <StatusPill variant="brand" className="h-5 px-1.5 py-0 text-[10px] leading-none">
                 {row.openFollowUps === 1
                   ? "1 follow-up"
                   : `${row.openFollowUps} follow-ups`}
@@ -372,10 +372,10 @@ function ContactDetailPanel({
 
   return (
     <DetailPanelShell surface="embedded">
-      <div className="shrink-0 border-b border-slate-100 bg-white px-5 py-5">
+      <div className="shrink-0 border-b border-[#dfe7e2] bg-[#f6faf7] px-5 py-5">
         <div className="flex flex-wrap items-center gap-2">
           {contact.openFollowUps > 0 ? (
-            <StatusPill variant="info" dot>
+            <StatusPill variant="brand" dot>
               {contact.openFollowUps === 1
                 ? "1 open follow-up"
                 : `${contact.openFollowUps} open follow-ups`}
@@ -413,7 +413,7 @@ function ContactDetailPanel({
                   <DetailInset>
                     <div className="flex flex-wrap items-center gap-2">
                       <FollowUpPill action={action} />
-                      <StatusPill variant="info" dot className="h-5 px-1.5 py-0 text-[10px]">
+                      <StatusPill variant="brand" dot className="h-5 px-1.5 py-0 text-[10px]">
                         Open
                       </StatusPill>
                     </div>

@@ -11,6 +11,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { CLISTE_COMPANY, PRODUCT_NAME } from "@/lib/company-details";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
 import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
 import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
@@ -106,7 +107,7 @@ export function OnboardingNumberView({
         <OnboardingEnter className="w-full">
           <div className={cn(ONBOARDING_FIELD_BOX, "flex items-center justify-between gap-3")}>
             <div className="min-w-0">
-              <p className={ONBOARDING_FIELD_LABEL}>Your new Cliste number</p>
+              <p className={ONBOARDING_FIELD_LABEL}>Your new {PRODUCT_NAME} number</p>
               {formatted ? (
                 <p className="mt-1 text-[20px] font-semibold tracking-tight text-[#0b1220] tabular-nums">
                   {formatted}
@@ -390,7 +391,7 @@ function ForwardingInstructions({
         <span className="font-mono text-slate-500">{CANCEL_ALL_FORWARDING_CODE}</span>.
         Landline?{" "}
         <a
-          href="mailto:hello@clistesystems.ie"
+          href={`mailto:${CLISTE_COMPANY.helloEmail}`}
           className="font-medium text-slate-500 underline-offset-2 hover:underline"
         >
           Email us

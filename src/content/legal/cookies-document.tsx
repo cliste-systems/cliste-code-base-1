@@ -4,6 +4,7 @@ import {
   LegalSection,
   LegalTable,
 } from "@/components/legal/legal-document";
+import { CLISTE_COMPANY } from "@/lib/company-details";
 
 
 type Cookie = {
@@ -24,7 +25,7 @@ const COOKIES: Cookie[] = [
   },
   {
     name: "cliste_admin_gate",
-    purpose: "Extra gate for the agency admin console (Cliste staff only).",
+    purpose: "Extra gate for the agency admin console (Hello Cara staff only).",
     category: "security",
     duration: "Up to 12 hours",
     party: "first",
@@ -32,7 +33,7 @@ const COOKIES: Cookie[] = [
   {
     name: "cliste_support_dashboard",
     purpose:
-      "Marks a support session when Cliste staff act on behalf of a customer (banner shown in dashboard).",
+      "Marks a support session when Hello Cara staff act on behalf of a customer (banner shown in dashboard).",
     category: "security",
     duration: "Session",
     party: "first",
@@ -69,7 +70,7 @@ export function CookiesDocument() {
     <>
       <LegalPageHeader
         title="Cookies"
-        description="What cookies and similar technologies we use on the Cliste dashboard, login, and marketing site — and how to manage them."
+        description="What cookies and similar technologies we use on the Hello Cara dashboard, login, and marketing site — and how to manage them."
       />
 
       <p className="text-[15px] leading-relaxed text-slate-700">
@@ -119,7 +120,7 @@ export function CookiesDocument() {
 
       <LegalSection title="Contact">
         <p>
-          <strong>privacy@clistesystems.ie</strong>
+          <strong>{CLISTE_COMPANY.privacyEmail}</strong>
         </p>
       </LegalSection>
     </>

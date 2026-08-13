@@ -5,6 +5,7 @@ import { sendTwilioBookingSms } from "@/lib/booking-confirmation-sms";
 import { formatCallerSmsBody } from "@/lib/caller-sms-content";
 import { resolveOrgAssignedPhoneE164 } from "@/lib/org-assigned-phone";
 import { getCallerSmsQuotaStatus } from "@/lib/sms-quota";
+import { smsDestinationAllowed } from "@/lib/voice-sms-destination-guard";
 import {
   authorizeVoiceWebhook,
   voiceWebhookNoSecretResponse,
@@ -168,6 +169,21 @@ export async function POST(request: Request) {
   }
 
   const toE164 = normalizeCustomerPhoneE164(toRaw) || toRaw;
+  if (!smsDestinationAllowed(toE164)) {
+    console.warn("[voice/send-sms] blocked destination", {
+      orgId,
+      prefix: toE164.slice(0, 4),
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "destination_not_allowed",
+        error:
+          "Destination country is not permitted for SMS on this account. Set VOICE_SMS_ALLOWED_DIAL_PREFIXES to widen.",
+      },
+      { status: 422 },
+    );
+  }
   const purpose = String(body.purpose ?? "caller_outbound").trim() || "caller_outbound";
 
   const businessName = String(orgRow?.name ?? "").trim() || "Your business";

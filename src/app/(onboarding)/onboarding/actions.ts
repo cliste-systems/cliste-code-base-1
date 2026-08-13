@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { CLISTE_COMPANY } from "@/lib/company-details";
 import { resolveAccountIdFromBillingMetadata } from "@/lib/account-billing";
 import {
   activatePlatformSubscriptionGoLive,
@@ -47,6 +48,7 @@ import {
   profileDefaultsForVertical,
   resolveNicheForVerticalChoice,
 } from "@/lib/verticals";
+import { parseStoredLocation } from "@/lib/location-fields";
 import { importBusinessFromWebsite } from "@/lib/website-import";
 import { isValidIrishEircode } from "@/lib/irish-eircode";
 import type { WebsiteImportLocation } from "@/lib/website-import-types";
@@ -191,6 +193,23 @@ export async function importWebsiteForProfile(
   if (d.serviceArea && !skipServiceArea) update.agent_service_area = d.serviceArea;
   if (d.faqs.length) update.agent_faqs = cleanAgentFaqs(d.faqs);
 
+  const multipleLocations = d.locations.length > 1;
+  if (!multipleLocations) {
+    const primaryAddress = d.address.trim() || d.locations[0]?.address?.trim() || "";
+    const primaryEircode = d.eircode.trim() || d.locations[0]?.eircode?.trim() || "";
+    if (primaryAddress) {
+      const parsed = parseStoredLocation({ address: primaryAddress });
+      update.address = primaryAddress;
+      update.agent_location_address = parsed.street || primaryAddress;
+      if (parsed.town) update.agent_base_town = parsed.town;
+      if (parsed.county) update.agent_location_county = parsed.county;
+    }
+    if (primaryEircode) {
+      update.storefront_eircode = primaryEircode;
+      update.agent_location_eircode = primaryEircode;
+    }
+  }
+
   const { error } = await admin
     .from("organizations")
     .update(update)
@@ -201,8 +220,6 @@ export async function importWebsiteForProfile(
   }
 
   await regenerateCaraCustomPrompt(admin, session.organizationId);
-
-  const multipleLocations = d.locations.length > 1;
 
   return {
     ok: true,
@@ -313,7 +330,7 @@ export async function saveProfileStep(
     return {
       ok: false,
       message:
-        "We don't support medical, legal, or financial services yet — they need extra compliance. Email hello@clistesystems.ie and we'll let you know when that changes.",
+        `We don't support medical, legal, or financial services yet — they need extra compliance. Email ${CLISTE_COMPANY.helloEmail} and we'll let you know when that changes.`,
     };
   }
 
@@ -604,7 +621,7 @@ export async function startPlanCheckout(
     return {
       ok: false,
       message:
-        "Custom plans are arranged directly with our team. Email hello@clistesystems.ie to get started.",
+        `Custom plans are arranged directly with our team. Email ${CLISTE_COMPANY.helloEmail} to get started.`,
     };
   }
   if (formData.get("acceptDpa") !== "on") {
@@ -751,7 +768,7 @@ export async function prepareOnboardingEmbeddedCheckout(): Promise<OnboardingEmb
     return {
       ok: false,
       message:
-        "Custom plans are arranged directly with our team. Email hello@clistesystems.ie to get started.",
+        `Custom plans are arranged directly with our team. Email ${CLISTE_COMPANY.helloEmail} to get started.`,
     };
   }
 
@@ -822,7 +839,7 @@ export async function prepareOnboardingElementsCheckout(): Promise<OnboardingEle
     return {
       ok: false,
       message:
-        "Custom plans are arranged directly with our team. Email hello@clistesystems.ie to get started.",
+        `Custom plans are arranged directly with our team. Email ${CLISTE_COMPANY.helloEmail} to get started.`,
     };
   }
 
@@ -861,6 +878,7 @@ export async function prepareOnboardingElementsCheckout(): Promise<OnboardingEle
 
 export async function persistOnboardingElementsCheckout(
   subscriptionId: string,
+  setupIntentId?: string,
 ): Promise<void> {
   const session = await requireOnboardingSession();
   const trimmed = subscriptionId.trim();
@@ -877,6 +895,7 @@ export async function persistOnboardingElementsCheckout(
     organizationId: session.organizationId,
     subscriptionId: trimmed,
     accountId,
+    setupIntentId: setupIntentId?.trim(),
   });
 
   await activatePlatformSubscriptionGoLive(session.organizationId);
@@ -902,7 +921,10 @@ export async function finaliseElementsCheckoutReturn(input: {
     throw new Error("Organisation is not linked to an account.");
   }
 
-  const { subscription } = await assertElementsSubscriptionReady(subscriptionId);
+  const { subscription } = await assertElementsSubscriptionReady(
+    subscriptionId,
+    setupIntentId,
+  );
   assertPlatformSubscriptionOwnership(subscription, {
     organizationId: session.organizationId,
     accountId,
@@ -913,6 +935,7 @@ export async function finaliseElementsCheckoutReturn(input: {
     organizationId: session.organizationId,
     subscriptionId,
     accountId,
+    setupIntentId,
   });
 
   await activatePlatformSubscriptionGoLive(session.organizationId);

@@ -14,6 +14,7 @@ type StepCopy = { title: string; subtitle: string; helper: string };
 export type TrainCaraVerticalCopy = {
   about: StepCopy;
   hours: StepCopy;
+  location: StepCopy;
   capture: StepCopy;
   faqs: StepCopy;
   labels: {
@@ -44,6 +45,7 @@ function stepById(id: string): (typeof TRAIN_CARA_STEPS)[number] {
 function genericCopy(caraGoal?: CaraGoal): TrainCaraVerticalCopy {
   const about = stepById("about");
   const hours = stepById("hours");
+  const location = stepById("location");
   const capture = stepById("capture");
   const faqs = stepById("faqs");
   return {
@@ -53,6 +55,11 @@ function genericCopy(caraGoal?: CaraGoal): TrainCaraVerticalCopy {
       helper: about.helper,
     },
     hours: { title: hours.title, subtitle: hours.subtitle, helper: hours.helper },
+    location: {
+      title: location.title,
+      subtitle: location.subtitle,
+      helper: location.helper,
+    },
     capture: {
       title:
         caraGoal === "faq_only"
@@ -83,10 +90,14 @@ function salonCopy(caraGoal?: CaraGoal): TrainCaraVerticalCopy {
       helper: "Write it like you're showing a new stylist the ropes.",
     },
     hours: {
-      title: "When are you open, and where are you?",
-      subtitle:
-        "Your opening hours, late nights, and where the salon is — Cara shares this with callers.",
-      helper: "Plain language is perfect — Cara reads this out on calls.",
+      title: "When are you open?",
+      subtitle: "Your opening days and times — Cara shares these when callers ask.",
+      helper: "Tap a day, then mark it open and set your times.",
+    },
+    location: {
+      title: "Where is the salon?",
+      subtitle: "Street, town, county, and Eircode — callers ask about this all the time.",
+      helper: "Same fields as Cara Setup in your dashboard.",
     },
     capture: {
       title:

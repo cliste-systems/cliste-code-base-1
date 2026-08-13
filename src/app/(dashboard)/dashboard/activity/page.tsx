@@ -94,12 +94,27 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
     ticketsQuery,
   ]);
 
+  const calls = callsRes.error ? [] : (callsRes.data ?? []);
+  const tickets = ticketsRes.error ? [] : (ticketsRes.data ?? []);
+
   const rows = buildDashboardActivityFeed({
-    calls: callsRes.error ? [] : (callsRes.data ?? []),
-    tickets: ticketsRes.error ? [] : (ticketsRes.data ?? []),
+    calls,
+    tickets,
     formatTime: formatDashboardFeedRelativeTime,
     limit: ACTIVITY_FEED_LIMIT,
   });
 
-  return <ActivityView rows={rows} />;
+  const linksSent = calls.filter((c) => c.outcome === "link_sent").length;
+  const callbacks = calls.filter((c) => c.outcome === "callback_requested").length;
+  const summary = [
+    { value: String(calls.length), label: calls.length === 1 ? "call" : "calls" },
+    { value: String(linksSent), label: "links sent" },
+    { value: String(callbacks), label: "callbacks" },
+    {
+      value: String(tickets.length),
+      label: tickets.length === 1 ? "request" : "requests",
+    },
+  ];
+
+  return <ActivityView rows={rows} summary={summary} />;
 }

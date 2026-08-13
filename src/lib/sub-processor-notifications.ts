@@ -1,6 +1,6 @@
 import "server-only";
 
-import { CLISTE_COMPANY } from "@/lib/company-details";
+import { CLISTE_COMPANY, DEFAULT_APP_SITE_URL, PRODUCT_NAME } from "@/lib/company-details";
 import { SUB_PROCESSOR_LIST_VERSION } from "@/lib/sub-processors.data";
 import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -109,7 +109,7 @@ export async function notifySubProcessorListChangeIfNeeded(): Promise<SubProcess
   const appOrigin =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     process.env.VERCEL_URL?.trim()?.replace(/^/, "https://") ||
-    "https://app.clistesystems.ie";
+    DEFAULT_APP_SITE_URL;
 
   const subProcessorsUrl = `${appOrigin.replace(/\/$/, "")}/dashboard/legal/sub-processors`;
   let emailsSent = 0;
@@ -117,7 +117,7 @@ export async function notifySubProcessorListChangeIfNeeded(): Promise<SubProcess
   for (const to of recipients) {
     const result = await sendTransactionalEmail({
       to,
-      subject: "Cliste sub-processor list update",
+      subject: `${PRODUCT_NAME} sub-processor list update`,
       text: [
         "Hello,",
         "",
@@ -127,7 +127,7 @@ export async function notifySubProcessorListChangeIfNeeded(): Promise<SubProcess
         subProcessorsUrl,
         "",
         "Under our Data Processing Agreement you have 30 days to object on reasonable grounds.",
-        "Reply to privacy@clistesystems.ie with any concerns.",
+        `Reply to ${CLISTE_COMPANY.privacyEmail} with any concerns.`,
         "",
         `— ${CLISTE_COMPANY.legalName}`,
       ].join("\n"),

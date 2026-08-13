@@ -65,6 +65,10 @@ function setupIntentPaymentMethodId(
   return typeof pm === "string" ? pm : (pm.id ?? null);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Reject dev-preview or metadata-mismatched subscriptions before persisting. */
 export function assertPlatformSubscriptionOwnership(
   subscription: Stripe.Subscription,
@@ -298,27 +302,95 @@ export async function createPlatformElementsCheckout(
   }
 }
 
-/** After Elements confirmSetup — verify subscription is ready with a payment method. */
-export async function assertElementsSubscriptionReady(
+/**
+ * Stripe can lag attaching default_payment_method after confirmSetup — apply the
+ * succeeded SetupIntent's payment method when the subscription is still empty.
+ */
+export async function syncSubscriptionDefaultPaymentMethod(
   subscriptionId: string,
-): Promise<{ customerId: string | null; subscription: Stripe.Subscription }> {
+  setupIntentId?: string,
+): Promise<Stripe.Subscription> {
   const stripe = getStripeClient();
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+  let subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ["default_payment_method", "pending_setup_intent"],
+  });
+
+  if (subscriptionDefaultPaymentMethodId(subscription)) {
+    return subscription;
+  }
+
+  let setupIntent: Stripe.SetupIntent | null = null;
+  const trimmedSetupIntentId = setupIntentId?.trim();
+
+  if (trimmedSetupIntentId) {
+    setupIntent = await stripe.setupIntents.retrieve(trimmedSetupIntentId);
+  } else {
+    const pending = subscription.pending_setup_intent;
+    const pendingId =
+      typeof pending === "string" ? pending : (pending?.id ?? null);
+    if (pendingId) {
+      setupIntent = await stripe.setupIntents.retrieve(pendingId);
+    }
+  }
+
+  if (!setupIntent || setupIntent.status !== "succeeded") {
+    return subscription;
+  }
+
+  const metaSub = (setupIntent.metadata?.cliste_subscription_id ?? "").trim();
+  if (metaSub && metaSub !== subscriptionId) {
+    throw new Error("Payment setup does not match this subscription.");
+  }
+
+  const paymentMethodId = setupIntentPaymentMethodId(setupIntent);
+  if (!paymentMethodId) return subscription;
+
+  const customerId = subscriptionCustomerId(subscription);
+  if (customerId) {
+    await stripe.customers.update(customerId, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    });
+  }
+
+  subscription = await stripe.subscriptions.update(subscriptionId, {
+    default_payment_method: paymentMethodId,
     expand: ["default_payment_method"],
   });
 
-  if (subscription.status !== "trialing" && subscription.status !== "active") {
-    throw new Error("Subscription is not active yet. Please try again.");
+  return subscription;
+}
+
+/** After Elements confirmSetup — verify subscription is ready with a payment method. */
+export async function assertElementsSubscriptionReady(
+  subscriptionId: string,
+  setupIntentId?: string,
+): Promise<{ customerId: string | null; subscription: Stripe.Subscription }> {
+  const attempts = setupIntentId?.trim() ? 3 : 5;
+  let subscription: Stripe.Subscription | null = null;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    subscription = await syncSubscriptionDefaultPaymentMethod(
+      subscriptionId,
+      setupIntentId,
+    );
+
+    if (subscription.status !== "trialing" && subscription.status !== "active") {
+      throw new Error("Subscription is not active yet. Please try again.");
+    }
+
+    if (subscriptionDefaultPaymentMethodId(subscription)) {
+      return {
+        customerId: subscriptionCustomerId(subscription),
+        subscription,
+      };
+    }
+
+    if (attempt < attempts - 1) {
+      await sleep(300 * (attempt + 1));
+    }
   }
 
-  if (!subscriptionDefaultPaymentMethodId(subscription)) {
-    throw new Error("Payment method has not been confirmed yet.");
-  }
-
-  return {
-    customerId: subscriptionCustomerId(subscription),
-    subscription,
-  };
+  throw new Error("Payment method has not been confirmed yet.");
 }
 
 /** Persist Stripe customer + subscription ids after Elements checkout. */
@@ -326,6 +398,7 @@ export async function persistPlatformElementsSubscription(input: {
   organizationId: string;
   subscriptionId: string;
   accountId?: string;
+  setupIntentId?: string;
 }): Promise<{ customerId: string | null }> {
   const trimmed = input.subscriptionId.trim();
   if (!trimmed) {
@@ -339,8 +412,10 @@ export async function persistPlatformElementsSubscription(input: {
     throw new Error("Organisation is not linked to an account.");
   }
 
-  const { customerId, subscription } =
-    await assertElementsSubscriptionReady(trimmed);
+  const { customerId, subscription } = await assertElementsSubscriptionReady(
+    trimmed,
+    input.setupIntentId,
+  );
   assertPlatformSubscriptionOwnership(subscription, {
     organizationId: input.organizationId,
     accountId,

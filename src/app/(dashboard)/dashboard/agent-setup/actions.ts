@@ -32,6 +32,7 @@ import {
   serializeBusinessHours,
   weekScheduleHasOpenDay,
   type WeekSchedule,
+  type BankHolidayConfig,
 } from "@/lib/business-hours";
 import {
   ensureCompliantStoredGreeting,
@@ -60,6 +61,7 @@ export type AgentSetupPayload = {
   businessHours: WeekSchedule;
   open24_7: boolean;
   hoursNote: string;
+  bankHolidays: BankHolidayConfig;
   serviceArea: string;
   serviceAreaExclusions: string;
   servicesDepartments: string;
@@ -71,6 +73,7 @@ export type AgentSetupPayload = {
   locationAddress: string;
   locationEircode: string;
   baseTown: string;
+  locationCounty: string;
   captureFields: CaraCaptureField[];
   rawBusinessDescription?: string;
 };
@@ -87,6 +90,7 @@ const MAX_DETAILS_TO_COLLECT = 2000;
 const MAX_LOCATION_ADDRESS = 500;
 const MAX_EIRCODE = 16;
 const MAX_BASE_TOWN = 80;
+const MAX_LOCATION_COUNTY = 80;
 
 import {
   AGENT_CONFIG_REVALIDATE_PATHS,
@@ -164,6 +168,7 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   const businessHours = payload.businessHours;
   const open24_7 = payload.open24_7 === true;
   const hoursNote = String(payload?.hoursNote ?? "").trim().slice(0, 120);
+  const bankHolidays = payload.bankHolidays;
   const openingHours = open24_7
     ? "Open 24 hours, 7 days a week"
     : weekScheduleHasOpenDay(businessHours)
@@ -179,6 +184,7 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   const caraConduct = parseCaraConduct(payload?.caraConduct);
   const locationAddress = String(payload?.locationAddress ?? "").trim();
   const baseTown = normalizeBaseTown(String(payload?.baseTown ?? ""));
+  const locationCounty = normalizeBaseTown(String(payload?.locationCounty ?? ""));
   let locationEircode = String(payload?.locationEircode ?? "").trim();
   const faqs = cleanAgentFaqs(payload?.faqs);
 
@@ -248,7 +254,10 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     return { ok: false, message: "Eircode looks too long." };
   }
   if (baseTown.length > MAX_BASE_TOWN) {
-    return { ok: false, message: "Based-in town is too long." };
+    return { ok: false, message: "Town is too long." };
+  }
+  if (locationCounty.length > MAX_LOCATION_COUNTY) {
+    return { ok: false, message: "County is too long." };
   }
 
   const { data: orgMeta } = await supabase
@@ -293,6 +302,10 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     businessName,
     assistantDisplayName,
     businessType: String(orgMeta?.agent_business_type ?? "").trim(),
+    locationAddress: locationAddress || undefined,
+    baseTown: baseTown || undefined,
+    locationCounty: locationCounty || undefined,
+    locationEircode: locationEircode || undefined,
     businessRules,
     caraConduct,
     faqs: faqs.map((f) => ({ question: f.question, answer: f.answer })),
@@ -313,6 +326,7 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     businessHours: serializeBusinessHours(businessHours, {
       open24_7,
       hoursNote,
+      bankHolidays: payload.bankHolidays,
     }),
     serviceArea,
     serviceAreaExclusions,
@@ -334,6 +348,9 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
     agent_location_address: locationAddress || null,
     agent_location_eircode: locationEircode || null,
     agent_base_town: baseTown || null,
+    agent_location_county: locationCounty || null,
+    agent_service_area: serviceArea || null,
+    agent_service_area_exclusions: serviceAreaExclusions || null,
     agent_cara_conduct: caraConduct,
     agent_cara_rules: [],
     ...knowledgePatch.update,

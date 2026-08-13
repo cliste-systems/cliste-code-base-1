@@ -49,13 +49,11 @@ const NAV_ICONS: Record<string, LucideIcon> = {
 type DashboardMobileNavProps = {
   items: DashboardSidebarNavItem[];
   accountNav: DashboardSidebarNavItem[];
-  caraTrainingBadge?: number;
 };
 
 export function DashboardMobileNav({
   items,
   accountNav,
-  caraTrainingBadge = 0,
 }: DashboardMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -73,11 +71,11 @@ export function DashboardMobileNav({
             priority
           />
           <span className="leading-none">
-            <span className="block text-[13px] font-semibold tracking-[0.2em] text-slate-950">
-              CLISTE
+            <span className="block text-[13px] font-semibold tracking-[0.12em] text-slate-950">
+              HELLO
             </span>
             <span className="mt-1 block text-[9px] font-medium tracking-[0.14em] text-slate-500">
-              Voice
+              CARA
             </span>
           </span>
         </Link>
@@ -141,7 +139,7 @@ export function DashboardMobileNav({
             );
           })}
           <div className="col-span-2 space-y-2 border-t border-slate-100 pt-2">
-            <CaraSidebarNav trainingBadge={caraTrainingBadge} />
+            <CaraSidebarNav />
             <BusinessSidebarNav />
             <AccountSidebarNav
               items={accountNav.map((item) => ({

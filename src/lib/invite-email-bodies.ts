@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { buildTransactionalEmailHtml } from "@/lib/transactional-email-layout";
 
 export function inviteEmailLogoUrl(origin: string, logoPath: string): string {
@@ -22,13 +23,13 @@ export function buildInviteEmailBodies(input: BuildInviteEmailBodiesInput): {
   const productName = input.productName.trim() || "Business";
 
   const subject = recipientName
-    ? `${recipientName}, you've been invited to Cliste`
-    : "You've been invited to Cliste";
+    ? `${recipientName}, you've been invited to ${PRODUCT_NAME}`
+    : `You've been invited to ${PRODUCT_NAME}`;
 
   const text = [
     recipientName ? `Hi ${recipientName},` : "Hi,",
     "",
-    `You've been invited to join ${businessName} on Cliste.`,
+    `You've been invited to join ${businessName} on ${PRODUCT_NAME}.`,
     `You'll set up your password and access the ${productName} dashboard.`,
     "",
     "Accept your invitation:",
@@ -40,7 +41,7 @@ export function buildInviteEmailBodies(input: BuildInviteEmailBodiesInput): {
   const html = buildTransactionalEmailHtml({
     subject,
     logoUrl: input.logoUrl,
-    headline: `Join ${businessName} on Cliste`,
+    headline: `Join ${businessName} on ${PRODUCT_NAME}`,
     bodyHtml: `You&apos;ve been invited to the ${productName} dashboard. Tap below to accept, set your password, and get started.`,
     ctaLabel: "Accept invitation",
     ctaHref: input.actionLink,

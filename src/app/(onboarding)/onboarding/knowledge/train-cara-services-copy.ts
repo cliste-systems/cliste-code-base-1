@@ -2,13 +2,6 @@ import type { OnboardingUiCopy } from "@/lib/onboarding-ui-copy-shared";
 
 import { verticalPackForNiche } from "@/lib/verticals";
 
-export type ExclusionsStepCopy = {
-  subtitle: string;
-  placeholder: string;
-  helper: string;
-  previewLabel: string;
-};
-
 export type ServicesStepCopy = {
   subtitle: string;
   primaryLabel: string;
@@ -260,102 +253,8 @@ export function resolveServicesStepCopy(input: {
     catalogListLabel: base.catalogListLabel,
     plainEnglishLabel: base.plainEnglishLabel,
     plainEnglishOptionalPlaceholder: base.plainEnglishOptionalPlaceholder,
-  };
-}
-
-function salonExclusionsCopy(): ExclusionsStepCopy {
-  return {
-    subtitle:
-      "Write like you'd tell a new stylist — Cara picks out what she must never agree to.",
-    placeholder:
-      "We don't take walk-ins, do hair or laser, and we don't offer same-day colour.",
-    helper: "Plain English is fine — Cara extracts the list she needs.",
-    previewLabel: "Cara won't agree to",
-  };
-}
-
-function barberExclusionsCopy(): ExclusionsStepCopy {
-  return {
-    subtitle:
-      "Write like you'd tell a new barber — Cara picks out what she must never agree to.",
-    placeholder:
-      "We don't do colour, extensions, or walk-ins on Saturdays.",
-    helper: "Plain English is fine — Cara extracts the list she needs.",
-    previewLabel: "Cara won't agree to",
-  };
-}
-
-function tradesExclusionsCopy(businessType: string): ExclusionsStepCopy {
-  const lower = businessType.toLowerCase();
-  if (lower.includes("electric")) {
-    return {
-      subtitle: "Jobs and requests you never take — write normally.",
-      placeholder:
-        "We don't do plumbing, gas work, alarm systems, or jobs outside our area.",
-      helper: "Plain English is fine — Cara extracts the list she needs.",
-      previewLabel: "Cara won't take",
-    };
-  }
-  if (lower.includes("heat") || lower.includes("boiler")) {
-    return {
-      subtitle: "Jobs and requests you never take — write normally.",
-      placeholder:
-        "We don't do oil boilers, gas appliance repairs, or electrical work.",
-      helper: "Plain English is fine — Cara extracts the list she needs.",
-      previewLabel: "Cara won't take",
-    };
-  }
-  if (lower.includes("plumb")) {
-    return {
-      subtitle: "Jobs and requests you never take — write normally.",
-      placeholder:
-        "We don't do electrical work, gas safety certs, or full rewires.",
-      helper: "Plain English is fine — Cara extracts the list she needs.",
-      previewLabel: "Cara won't take",
-    };
-  }
-  return {
-    subtitle: "Jobs and requests you never take — write normally.",
-    placeholder:
-      "We don't do electrical work, gas, or jobs outside our coverage area.",
-    helper: "Plain English is fine — Cara extracts the list she needs.",
-    previewLabel: "Cara won't take",
-  };
-}
-
-function defaultExclusionsCopy(): ExclusionsStepCopy {
-  return {
-    subtitle:
-      "Write like you'd tell a new team member — Cara picks out what she must never agree to.",
-    placeholder:
-      "We don't handle anything outside what we listed on the last step.",
-    helper: "Plain English is fine — Cara extracts the list she needs.",
-    previewLabel: "Cara won't agree to",
-  };
-}
-
-export function packExclusionsStepCopy(
-  businessType: string,
-  niche: string,
-): ExclusionsStepCopy {
-  if (!verticalPackForNiche(niche).capabilities.usesServiceCatalog) {
-    return tradesExclusionsCopy(businessType);
-  }
-  if (niche === "barber") return barberExclusionsCopy();
-  return salonExclusionsCopy();
-}
-
-export function resolveExclusionsStepCopy(input: {
-  businessType: string;
-  niche: string;
-  servicesCopy: ServicesStepCopy;
-}): ExclusionsStepCopy {
-  const base = packExclusionsStepCopy(input.businessType, input.niche);
-  return {
-    subtitle: base.subtitle,
-    placeholder:
-      input.servicesCopy.secondaryPlaceholder?.trim() || base.placeholder,
-    helper: base.helper,
-    previewLabel: base.previewLabel,
+    bookingImportLabel: base.bookingImportLabel,
+    bookingImportHint: base.bookingImportHint,
+    bookingImportPlaceholder: base.bookingImportPlaceholder,
   };
 }

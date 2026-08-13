@@ -40,8 +40,8 @@ export function CaraSetupTabServices() {
       bodyClassName="p-0"
     >
       {offerEmpty ? (
-        <div className="border-b border-amber-200/80 bg-amber-50/80 px-5 py-3">
-          <p className="text-[12.5px] leading-relaxed text-amber-950">
+        <div className="border-b border-[#d9e2dd] bg-[#fbfcfb] px-5 py-3">
+          <p className="text-[12.5px] leading-relaxed text-[#35443f]">
             {verticalCopy.caraSetup.servicesEmptyWarning}
           </p>
         </div>
@@ -75,7 +75,7 @@ export function CaraSetupTabServices() {
             )}
           >
             <div className="mb-4 flex items-start gap-2.5">
-              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] text-[#353D42]">
                 <CheckCircle2 className="size-4" aria-hidden />
               </span>
               <div className="min-w-0">

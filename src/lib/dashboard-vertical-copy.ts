@@ -326,16 +326,16 @@ const _PROFESSIONAL_SERVICES_ROUTING_EXAMPLE_ROUTING: RoutingNicheOverrides = {
 };
 
 const SALON_ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
-  booking_request: "Booking request — callback needed",
-  callback: "Callback",
+  booking_request: "Booking requested",
+  callback: "Callback needed",
   urgent: "Urgent",
-  confirm: "Booking to confirm",
+  confirm: "Confirm booking",
   quote: "Price enquiry",
-  lead: "New client enquiry",
+  lead: "New enquiry",
   complaint: "Complaint",
-  unclear: "Unclear request",
+  unclear: "Needs review",
   failed: "Missed call",
-  follow_up: "Follow-up needed",
+  follow_up: "Follow-up",
 };
 
 type VerticalCopyBase = Omit<

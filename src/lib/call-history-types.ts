@@ -29,9 +29,9 @@ export type CallHistoryRow = {
 /** Universal outcome labels (visible in UI). */
 export const OUTCOME_LABELS: Record<CallOutcome, string> = {
   answered: "Answered",
-  link_sent: "Routed",
+  link_sent: "Info sent",
   callback_requested: "Callback requested",
-  action_created: "Request captured",
+  action_created: "Enquiry captured",
   failed: "Failed",
   voicemail_or_no_speech: "No speech",
   spam_or_abuse: "Spam or abuse",

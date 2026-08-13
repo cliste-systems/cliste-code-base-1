@@ -35,7 +35,7 @@ export function DashboardHomeUsageCard({
 
       <div className="grid shrink-0 grid-cols-2 gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] leading-none text-slate-500">Minutes used</p>
+          <p className="text-[11px] leading-none text-slate-500">Minutes this period</p>
           <p className="mt-1 text-[20px] font-semibold leading-none tracking-tight text-[#0b1220] tabular-nums">
             {usage.minutesUsed.toLocaleString("en-IE")}
           </p>

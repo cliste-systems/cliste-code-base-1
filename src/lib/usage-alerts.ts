@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DEFAULT_APP_SITE_URL, PRODUCT_NAME } from "@/lib/company-details";
 import { PLANS, type PlanTier } from "@/lib/cliste-plans.data";
 import { recordComplianceEvent } from "@/lib/compliance-events";
 import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
@@ -95,10 +96,10 @@ export async function runUsageAlerts(): Promise<UsageAlertResult> {
 
     const subject =
       threshold === "100"
-        ? `Cliste: you've used your included minutes for ${primaryOrg.name}`
-        : `Cliste: ${pct}% of included minutes used for ${primaryOrg.name}`;
+        ? `${PRODUCT_NAME}: you've used your included minutes for ${primaryOrg.name}`
+        : `${PRODUCT_NAME}: ${pct}% of included minutes used for ${primaryOrg.name}`;
 
-    const text = `Hi,\n\nYour Cliste account has used ${Math.round(usedMinutes)} of ${plan.includedMinutes} included minutes this billing period (${pct}%).\n\nReview usage: https://clistesystems.ie/dashboard/billing\n`;
+    const text = `Hi,\n\nYour ${PRODUCT_NAME} account has used ${Math.round(usedMinutes)} of ${plan.includedMinutes} included minutes this billing period (${pct}%).\n\nReview usage: ${DEFAULT_APP_SITE_URL}/dashboard/billing\n`;
 
     const mail = await sendTransactionalEmail({ to: ownerEmail, subject, text });
     if (!mail.ok) {

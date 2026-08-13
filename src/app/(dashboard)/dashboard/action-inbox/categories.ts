@@ -16,29 +16,30 @@ export type ActionCategory =
   | "follow_up";
 
 export const ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
-  booking_request: "Booking request — callback needed",
-  callback: "Callback requested",
-  urgent: "Urgent issue",
-  confirm: "Needs confirmation",
-  quote: "Quote request",
-  lead: "Sales enquiry",
+  booking_request: "Booking requested",
+  callback: "Callback needed",
+  urgent: "Urgent",
+  confirm: "Confirm booking",
+  quote: "Price enquiry",
+  lead: "New enquiry",
   complaint: "Complaint",
-  unclear: "Unclear request",
-  failed: "Failed call",
-  follow_up: "Follow-up needed",
+  unclear: "Needs review",
+  failed: "Missed call",
+  follow_up: "Follow-up",
 };
 
-/** Compact pill label in list rows. */
+/** Compact pill label in list rows — kept identical to the full label so the
+ *  list chip and the detail badge read the same. Rendered UPPERCASE as a tag. */
 export const ACTION_CATEGORY_SHORT: Record<ActionCategory, string> = {
-  booking_request: "Booking",
-  callback: "Callback",
+  booking_request: "Booking requested",
+  callback: "Callback needed",
   urgent: "Urgent",
-  confirm: "Confirm",
-  quote: "Quote",
-  lead: "Sales",
+  confirm: "Confirm booking",
+  quote: "Price enquiry",
+  lead: "New enquiry",
   complaint: "Complaint",
-  unclear: "Unclear",
-  failed: "Failed",
+  unclear: "Needs review",
+  failed: "Missed call",
   follow_up: "Follow-up",
 };
 
@@ -73,23 +74,17 @@ export const ACTION_CATEGORY_FILTER_OPTIONS = actionCategoryFilterOptions(
   ACTION_CATEGORY_LABELS,
 );
 
-/** Status pill colour per inbox category (meaning-only). */
+/**
+ * Status pill tone per inbox category. The category is read from the text label,
+ * while urgency is handled with neutral Cliste contrast rather than extra hues.
+ */
 export function categoryStatusVariant(category: ActionCategory): StatusVariant {
   switch (category) {
     case "urgent":
     case "complaint":
       return "attention";
-    case "callback":
-      return "info";
-    case "booking_request":
-    case "confirm":
-    case "quote":
-    case "lead":
-      return "info";
     case "failed":
       return "muted";
-    case "follow_up":
-    case "unclear":
     default:
       return "brand";
   }

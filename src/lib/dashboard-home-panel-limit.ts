@@ -20,7 +20,7 @@ export const DASHBOARD_CHROME_BAR_HEIGHT_PX = 48;
 /** Minimum card row height: padding + header + 3 list rows + footer CTA. */
 export const DASHBOARD_HOME_FIRST_ROW_HEIGHT_PX = 242;
 
-/** Four-column analytics row (Request types, Call outcomes, Cara, Usage). */
+/** Four-column analytics row (What callers wanted, Call outcomes, Cara, Usage). */
 export const DASHBOARD_HOME_ANALYTICS_ROW_HEIGHT_PX = 200;
 
 /** Full-width Meet Cara footer card below the analytics row. */

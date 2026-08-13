@@ -15,14 +15,14 @@ export function PrivacyNoticeDocument() {
     <>
       <LegalPageHeader
         title="Privacy notice"
-        description={`How ${CLISTE_COMPANY.legalName} processes personal data when you use our platform as a business customer, when your team uses the dashboard, and when people call your Cliste number.`}
+        description={`How ${CLISTE_COMPANY.legalName} processes personal data when you use our platform as a business customer, when your team uses the dashboard, and when people call your Hello Cara number.`}
       />
 
       <LegalCallout variant="info">
-        Cliste v1 is an <strong>AI voice receptionist and Action Inbox</strong> for
+        Hello Cara is an <strong>AI voice receptionist and Action Inbox</strong> for
         local businesses. We do not host public online booking storefronts or
         take card payments from your customers on your behalf. Subscription
-        billing for your Cliste account is handled by Stripe separately.
+        billing for your Hello Cara account is handled by Stripe separately.
       </LegalCallout>
 
       <LegalSection title="1. Who we are and our roles under GDPR">
@@ -35,7 +35,7 @@ export function PrivacyNoticeDocument() {
             decide why and how that data is used.
           </li>
           <li>
-            <strong>Cliste</strong> is your <em>data processor</em> for that
+            <strong>Hello Cara</strong> is your <em>data processor</em> for that
             data — we act only on your documented instructions (this notice and
             the{" "}
             <LegalInlineLink href="/legal/dpa">
@@ -44,7 +44,7 @@ export function PrivacyNoticeDocument() {
             ).
           </li>
           <li>
-            <strong>Cliste</strong> is the <em>controller</em> for our own
+            <strong>Hello Cara</strong> is the <em>controller</em> for our own
             account data (your email, dashboard activity, platform billing
             records).
           </li>
@@ -69,14 +69,14 @@ export function PrivacyNoticeDocument() {
               "Voice call data",
               <>
                 Caller number, duration, redacted transcript, AI summary. Audio
-                is <strong>not retained</strong> by Cliste; it is processed live
+                is <strong>not retained</strong> by Cliste Systems Limited; it is processed live
                 by speech vendors and discarded.
               </>,
-              "Calls to your Cliste number",
+              "Calls to your Hello Cara number",
             ],
             [
               "Appointments (optional)",
-              "If your voice agent books into Cliste, service, time, reference",
+              "If your voice agent books through Hello Cara, service, time, reference",
               "AI call flow / legacy data",
             ],
             [
@@ -150,7 +150,7 @@ export function PrivacyNoticeDocument() {
         <p>
           Callers and contacts should normally exercise rights with you as
           controller. We assist you via dashboard GDPR tools and{" "}
-          <strong>privacy@clistesystems.ie</strong>.
+          <strong>{CLISTE_COMPANY.privacyEmail}</strong>.
         </p>
         <LegalList>
           <li>Access, rectification, erasure, restriction, portability</li>
@@ -175,7 +175,7 @@ export function PrivacyNoticeDocument() {
 
       <LegalSection title="8. AI transparency">
         <p>
-          Calls to your Cliste number are answered by an AI agent that identifies
+          Calls to your Hello Cara number are answered by an AI agent that identifies
           itself as AI where required. Callers may ask for a callback or use your
           direct line.
         </p>
@@ -232,7 +232,7 @@ export function PrivacyNoticeDocument() {
 
       <LegalSection title="12. Contact">
         <p>
-          <strong>privacy@clistesystems.ie</strong> — we aim to acknowledge within
+          <strong>{CLISTE_COMPANY.privacyEmail}</strong> — we aim to acknowledge within
           5 working days and respond within 30 days (extendable for complex
           requests, with notice).
         </p>

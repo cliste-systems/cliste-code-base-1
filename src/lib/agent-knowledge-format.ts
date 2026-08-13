@@ -2,6 +2,7 @@ import {
   DAY_KEYS,
   DAY_LABELS,
   DAY_LABELS_SHORT,
+  type BankHolidayConfig,
   type DayKey,
   type WeekSchedule,
   weekScheduleHasOpenDay,
@@ -114,4 +115,13 @@ export function formatWeekScheduleForAgent(schedule: WeekSchedule): string {
     }
   }
   return lines.join("\n");
+}
+
+/** Spoken/prompt line for bank & public holidays when configured. */
+export function formatBankHolidaysForAgent(
+  config: BankHolidayConfig | undefined,
+): string {
+  if (!config?.configured) return "";
+  if (!config.open) return "Closed on bank and public holidays.";
+  return `Bank & public holidays: ${formatHoursRange(config.start, config.end)}.`;
 }

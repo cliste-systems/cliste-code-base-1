@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, Clock, MapPin, Sparkles } from "lucide-react";
+import { Briefcase, Clock, Sparkles } from "lucide-react";
 
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
 import { Field } from "@/components/dashboard/field";
@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 
 import { useCaraSetupForm } from "./cara-setup-form-context";
 import { useDashboardVertical } from "../dashboard-vertical-context";
-import { CountyChipEditor } from "./county-chip-editor";
 import { ABOUT_PLACEHOLDER } from "@/app/(onboarding)/onboarding/knowledge/train-cara-constants";
 
 export function BusinessProfileTab() {
@@ -73,24 +72,54 @@ export function BusinessProfileTab() {
             {form.businessType.trim() || "Not set"}
           </div>
         </Field>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_11rem]">
+        <Field
+          label="Street"
+          htmlFor="cara-location-street"
+          hint="Street address — Cara uses this when callers ask where you are."
+        >
+          <Input
+            id="cara-location-street"
+            value={form.locationAddress}
+            placeholder="e.g. 14 Grafton Street"
+            onChange={(e) => form.setLocationAddress(e.target.value)}
+            className={DASHBOARD_INPUT_CLASS}
+            autoComplete="street-address"
+          />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8.75rem]">
           <Field
-            label="Location"
-            htmlFor="cara-location-address"
-            hint="Street and town — Cara can give directions when callers ask where you are."
+            label="Town"
+            htmlFor="cara-location-town"
+            hint={copy.caraSetup.locationHint}
           >
             <Input
-              id="cara-location-address"
-              value={form.locationAddress}
-              placeholder="Street, town"
-              onChange={(e) => form.setLocationAddress(e.target.value)}
+              id="cara-location-town"
+              value={form.baseTown}
+              placeholder="e.g. Dublin 2"
+              onChange={(e) => form.setBaseTown(e.target.value)}
               className={DASHBOARD_INPUT_CLASS}
+              autoComplete="address-level2"
+            />
+          </Field>
+          <Field
+            label="County"
+            htmlFor="cara-location-county"
+            hint="County or city — helps Cara answer location questions."
+          >
+            <Input
+              id="cara-location-county"
+              value={form.locationCounty}
+              placeholder="e.g. Dublin"
+              onChange={(e) => form.setLocationCounty(e.target.value)}
+              className={DASHBOARD_INPUT_CLASS}
+              autoComplete="address-level1"
             />
           </Field>
           <Field
             label="Eircode"
             htmlFor="cara-location-eircode"
             hint="Optional but helps callers find you."
+            className="sm:col-span-2 lg:col-span-1"
           >
             <Input
               id="cara-location-eircode"
@@ -117,44 +146,11 @@ export function BusinessProfileTab() {
           onChange={form.setOpeningHoursSchedule}
           open24_7={form.open24_7}
           onOpen24_7Change={form.setOpen24_7}
-          hoursNote={form.hoursNote}
-          onHoursNoteChange={form.setHoursNote}
+          bankHolidays={form.bankHolidays}
+          onBankHolidaysChange={form.setBankHolidays}
           hoursNeverConfigured={form.hoursNeverConfigured}
           variant="dashboard"
         />
-      </SectionCard>
-
-      <SectionCard
-        flat
-        icon={MapPin}
-        title="Service area"
-        description="Where you're based and the counties you cover."
-      >
-        <div className="space-y-5">
-          <Field
-            label="Based in"
-            htmlFor="cara-base-town"
-            hint={copy.caraSetup.locationHint}
-          >
-            <Input
-              id="cara-base-town"
-              value={form.baseTown}
-              placeholder="e.g. Letterkenny"
-              onChange={(e) => form.setBaseTown(e.target.value)}
-              className={DASHBOARD_INPUT_CLASS}
-              autoComplete="address-level2"
-            />
-          </Field>
-          <Field
-            label="Counties covered"
-            hint="Tap each county you serve."
-          >
-            <CountyChipEditor
-              value={form.serviceAreaItems}
-              onChange={form.setServiceAreaItems}
-            />
-          </Field>
-        </div>
       </SectionCard>
     </DashboardAnimatedStack>
   );

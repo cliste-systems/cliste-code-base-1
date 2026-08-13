@@ -24,7 +24,15 @@ import {
   catalogHasExtractedPrices,
   type ServiceCatalogItem,
 } from "@/lib/service-catalog-format";
-import { compileServiceCatalogKnowledgeLine } from "@/lib/service-policy-presets";
+import {
+  catalogHasCallbackOnlyPolicy,
+  catalogHasPatchTestPolicy,
+  catalogHasServicePolicies,
+  compileCallbackOnlyBookingGuidance,
+  compilePatchTestBookingGuidance,
+  compileServiceCatalogKnowledgeLine,
+  SERVICE_POLICY_INSTRUCTION,
+} from "@/lib/service-policy-presets";
 import {
   filterSupplementAgainstCatalog,
   hasServiceCatalogSupplement,
@@ -58,9 +66,11 @@ import {
 import {
   emptyWeekSchedule,
   type WeekSchedule,
+  type BankHolidayConfig,
 } from "@/lib/business-hours";
 import { buildHoursPromptBlock } from "@/lib/general-boundary";
-import { normalizeBaseTown, serviceAreaAnchorTown } from "@/lib/base-town";
+import { normalizeBaseTown } from "@/lib/base-town";
+import { formatLocationPhrase, parseStoredLocation } from "@/lib/location-fields";
 import {
   formatServiceAreaForPrompt,
   SERVICE_AREA_COVERAGE_INSTRUCTION,
@@ -85,6 +95,7 @@ export type CaraSetupPromptInput = {
   assistantDisplayName: string;
   businessType: string;
   locationAddress?: string;
+  locationCounty?: string;
   locationEircode?: string;
   baseTown?: string;
   /** Formatted week schedule text (when structured hours are saved). */
@@ -93,6 +104,7 @@ export type CaraSetupPromptInput = {
   hoursNeverConfigured?: boolean;
   open24_7?: boolean;
   hoursNote?: string;
+  bankHolidays?: BankHolidayConfig;
   /** Stored caller greeting — backstopped with AI + recording disclosure. */
   greeting?: string;
   serviceArea?: string;
@@ -173,10 +185,20 @@ function bulletBlock(items: string[]): string {
   return items.map((item) => `• ${item}`).join("\n");
 }
 
-function locationPhrase(address?: string, eircode?: string): string | null {
-  const parts = [address?.trim(), eircode?.trim()].filter(Boolean);
-  if (!parts.length) return null;
-  return parts.join(", ");
+function locationPhrase(
+  street?: string,
+  town?: string,
+  county?: string,
+  eircode?: string,
+): string | null {
+  return formatLocationPhrase(
+    parseStoredLocation({
+      address: street,
+      baseTown: town,
+      county,
+    }),
+    eircode,
+  );
 }
 
 /** Sanitize owner free text embedded in quoted prompt lines. */
@@ -230,6 +252,7 @@ function hoursSection(input: CaraSetupPromptInput): string | null {
     schedule: input.openingHoursSchedule ?? emptyWeekSchedule(),
     formattedHours: input.openingHours?.trim() ?? "",
     note: input.hoursNote,
+    bankHolidays: input.bankHolidays,
   });
 }
 
@@ -338,13 +361,27 @@ function serviceCatalogCoreSection(
     .map((s) => compileServiceCatalogKnowledgeLine(s))
     .filter(Boolean);
 
-  return [
+  const parts = [
     "Services menu:",
     bulletBlock(lines),
     "When someone asks how long a service takes, I use the durations above when listed.",
     catalogPricingLine(services, businessRules, quotePricesOnCalls),
     "If a service is not listed, I do not guess — I take their name, number, and what they need.",
-  ].join("\n");
+  ];
+
+  if (catalogHasServicePolicies(services)) {
+    parts.splice(parts.length - 1, 0, SERVICE_POLICY_INSTRUCTION);
+  }
+
+  if (catalogHasPatchTestPolicy(services)) {
+    parts.splice(parts.length - 1, 0, compilePatchTestBookingGuidance(services));
+  }
+
+  if (catalogHasCallbackOnlyPolicy(services)) {
+    parts.splice(parts.length - 1, 0, compileCallbackOnlyBookingGuidance(services));
+  }
+
+  return parts.join("\n");
 }
 
 function serviceCatalogSupplementSection(
@@ -379,6 +416,7 @@ function nonNegotiablesSection(assistant: string): string {
   return [
     "A few things never change — even if one of your rules says otherwise:",
     `• Every call I say I'm AI and that the call may be recorded and transcribed: "${voiceLegalDisclosure(assistant)}" — I never skip that.`,
+    "• On live calls I ask one question per turn — I never stack multiple questions in the same reply.",
     "• If I don't know the answer, I don't guess — I take their name, number, and what they need, and pass it to your Action Inbox.",
     "• I never take card numbers, PINs, PPS numbers, IBANs, or passwords on a call.",
     `• ${SPECIAL_CATEGORY_MINIMISATION_INSTRUCTION}`,
@@ -602,7 +640,7 @@ function buildProtectedParts(
         "If they didn't receive a text, I resend once — then take their details with a delivery-failed note. If they decline an action, I answer from knowledge or take a message — I never insist.",
         'When they have several requests, I handle each in turn and ask "anything else?" before wrapping up.',
         "I match on meaning, not exact words. I never invent links, files, prices, or details.",
-        "When texting a link or file, I confirm it's a mobile number. On landlines, failed SMS, or exhausted monthly SMS quota, I take a message and flag the owner — I never fail silently.",
+        "When texting a link or file, I confirm sending to the number they're calling from when caller ID shows a mobile — I do not ask them to recite their number. On landlines, failed SMS, or exhausted monthly SMS quota, I take a message and flag the owner — I never fail silently.",
       ].join("\n"),
     );
   }
@@ -675,16 +713,16 @@ function buildDroppableSections(
 
   const locationParts: string[] = [];
   const aboutBits: string[] = [];
-  const location = locationPhrase(input.locationAddress, input.locationEircode);
+  const location = locationPhrase(
+    input.locationAddress,
+    input.baseTown,
+    input.locationCounty,
+    input.locationEircode,
+  );
   if (location) aboutBits.push(`We're based at ${location}.`);
 
   const hoursBlock = hoursSection(input);
   if (hoursBlock) locationParts.push(hoursBlock);
-
-  const baseTown = serviceAreaAnchorTown(input.baseTown, input.locationAddress);
-  if (baseTown && normalizeBaseTown(input.baseTown ?? "")) {
-    aboutBits.push(`We're based in ${baseTown}.`);
-  }
 
   const areas = listItems(input.serviceArea);
   const townExclusions = listItems(input.serviceAreaExclusions);
@@ -693,7 +731,7 @@ function buildDroppableSections(
   if (areas.length > 0 && !skipServiceArea) {
     const areaPhrase = formatServiceAreaForPrompt(
       areas,
-      baseTown ?? location ?? undefined,
+      normalizeBaseTown(input.baseTown ?? "") || location || undefined,
       townExclusions,
     );
     aboutBits.push(`We cover ${areaPhrase}.`);

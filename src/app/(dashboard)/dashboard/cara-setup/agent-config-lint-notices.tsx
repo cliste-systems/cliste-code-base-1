@@ -19,6 +19,10 @@ type AgentConfigLintNoticesProps = {
   dialogTitle: string;
   dialogDescription: string;
   className?: string;
+  /** Standalone = above page content; inset = top strip inside a SectionCard body. */
+  variant?: "standalone" | "inset";
+  importError?: string | null;
+  onImportErrorHandled?: () => void;
 };
 
 function readIntroDismissed(key: string): boolean {
@@ -29,12 +33,23 @@ function readIntroDismissed(key: string): boolean {
   }
 }
 
+function compactSummary(issues: KnowledgeLintIssue[], isBlock: boolean): string {
+  if (isBlock) {
+    const count = issues.filter((issue) => issue.severity === "block").length;
+    return `${count} issue${count === 1 ? "" : "s"} blocking save`;
+  }
+  return `${issues.length} item${issues.length === 1 ? "" : "s"} to review`;
+}
+
 export function AgentConfigLintNotices({
   issues,
   sessionKey,
   dialogTitle,
   dialogDescription,
   className,
+  variant = "standalone",
+  importError = null,
+  onImportErrorHandled,
 }: AgentConfigLintNoticesProps) {
   const [open, setOpen] = useState(false);
   const [introDismissed, setIntroDismissed] = useState<boolean | null>(null);
@@ -45,6 +60,11 @@ export function AgentConfigLintNotices({
   }, [sessionKey]);
 
   useEffect(() => {
+    if (importError) {
+      setOpen(true);
+      return;
+    }
+
     if (introCheckedRef.current || introDismissed === null) return;
     if (issues.length === 0) return;
 
@@ -52,51 +72,70 @@ export function AgentConfigLintNotices({
     if (!introDismissed) {
       setOpen(true);
     }
-  }, [introDismissed, issues.length]);
+  }, [importError, introDismissed, issues.length]);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
-      try {
-        sessionStorage.setItem(sessionKey, "1");
-      } catch {
-        /* ignore */
+      if (importError) {
+        onImportErrorHandled?.();
+      } else {
+        try {
+          sessionStorage.setItem(sessionKey, "1");
+        } catch {
+          /* ignore */
+        }
+        setIntroDismissed(true);
       }
-      setIntroDismissed(true);
     }
   }
 
-  if (issues.length === 0) return null;
+  const hasLintIssues = issues.length > 0;
+  if (!hasLintIssues && !importError) return null;
 
   const isBlock = issues.some((issue) => issue.severity === "block");
-  const showCompact = introDismissed === true && !open;
+  const showCompact =
+    (introDismissed === true || Boolean(importError)) &&
+    !open &&
+    (hasLintIssues || Boolean(importError));
+
+  const resolvedDialogTitle = importError
+    ? "Couldn't import"
+    : isBlock
+      ? "Fix these before saving"
+      : dialogTitle;
 
   return (
     <>
       {showCompact ? (
-        <div className={cn("mb-3", className)}>
+        <div
+          className={cn(
+            variant === "inset"
+              ? "border-b border-slate-200 px-5 py-2.5"
+              : "mb-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-2.5",
+            className,
+          )}
+        >
           <button
             type="button"
             onClick={() => setOpen(true)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-lg text-[12.5px] font-medium transition-colors",
+              "flex w-full items-center gap-2 text-left text-[12.5px] font-medium transition-colors",
               isBlock
-                ? "text-red-800 hover:text-red-950"
+                ? "text-[#353D42] hover:text-[#11181d]"
                 : "text-slate-700 hover:text-slate-900",
             )}
           >
             {isBlock ? (
-              <AlertCircle className="size-3.5 shrink-0 text-red-600" aria-hidden />
+              <AlertCircle className="size-3.5 shrink-0 text-[#353D42]" aria-hidden />
             ) : (
               <AlertTriangle className="size-3.5 shrink-0 text-slate-500" aria-hidden />
             )}
-            {isBlock
-              ? `${issues.filter((i) => i.severity === "block").length} issue${
-                  issues.filter((i) => i.severity === "block").length === 1 ? "" : "s"
-                } blocking save`
-              : `${issues.length} item${issues.length === 1 ? "" : "s"} to review`}
-            <span className="text-slate-400">·</span>
-            <span className="underline underline-offset-2">Show</span>
+            <span className="min-w-0 flex-1">
+              {importError ? "Import failed" : compactSummary(issues, isBlock)}
+            </span>
+            <span className="shrink-0 text-slate-400">·</span>
+            <span className="shrink-0 underline underline-offset-2">Show</span>
           </button>
         </div>
       ) : null}
@@ -105,15 +144,17 @@ export function AgentConfigLintNotices({
         <DialogContent className="max-w-lg gap-0 overflow-hidden p-0 sm:max-w-lg">
           <DialogHeader className="border-b border-slate-100 px-5 py-4 text-left">
             <DialogTitle className="text-[17px] font-semibold text-[#0b1220]">
-              {isBlock ? "Fix these before saving" : dialogTitle}
+              {resolvedDialogTitle}
             </DialogTitle>
             <p className="mt-1 text-[13px] leading-relaxed text-slate-600">
-              {dialogDescription}
+              {importError ?? dialogDescription}
             </p>
           </DialogHeader>
-          <div className="max-h-[min(24rem,60vh)] overflow-y-auto px-5 py-3">
-            <KnowledgeLintIssueList issues={issues} />
-          </div>
+          {!importError && hasLintIssues ? (
+            <div className="max-h-[min(24rem,60vh)] overflow-y-auto px-5 py-3">
+              <KnowledgeLintIssueList issues={issues} />
+            </div>
+          ) : null}
           <div className="border-t border-slate-100 px-5 py-3">
             <button
               type="button"

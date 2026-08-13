@@ -41,7 +41,7 @@ import { saveAgentSetup } from "../agent-setup/actions";
 import type { AgentFaq } from "../agent-setup/agent-faqs";
 import type { AgentSetupInitial } from "../agent-setup/agent-setup-helpers";
 import type { BusinessFileListItem } from "@/lib/business-files";
-import type { WeekSchedule } from "@/lib/business-hours";
+import type { WeekSchedule, BankHolidayConfig } from "@/lib/business-hours";
 import type { CaraSetupPromptInput } from "@/lib/compile-cara-prompt";
 import type { DetailsCollectMode } from "@/lib/details-collect-mode";
 import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
@@ -58,6 +58,7 @@ type FormSnapshot = {
   hoursNeverConfigured: boolean;
   open24_7: boolean;
   hoursNote: string;
+  bankHolidays: BankHolidayConfig;
   serviceAreaItems: string[];
   serviceAreaExclusionItems: string[];
   servicesItems: string[];
@@ -73,6 +74,7 @@ type FormSnapshot = {
   locationAddress: string;
   locationEircode: string;
   baseTown: string;
+  locationCounty: string;
 };
 
 type CaraSetupFormContextValue = {
@@ -95,6 +97,8 @@ type CaraSetupFormContextValue = {
   setLocationEircode: (v: string) => void;
   baseTown: string;
   setBaseTown: (v: string) => void;
+  locationCounty: string;
+  setLocationCounty: (v: string) => void;
   openingHoursSchedule: WeekSchedule;
   setOpeningHoursSchedule: (v: WeekSchedule) => void;
   openingHoursLegacy: string;
@@ -103,6 +107,8 @@ type CaraSetupFormContextValue = {
   setOpen24_7: (v: boolean) => void;
   hoursNote: string;
   setHoursNote: (v: string) => void;
+  bankHolidays: BankHolidayConfig;
+  setBankHolidays: (v: BankHolidayConfig) => void;
   serviceAreaItems: string[];
   setServiceAreaItems: (v: string[]) => void;
   serviceAreaExclusionItems: string[];
@@ -188,6 +194,7 @@ export function CaraSetupFormProvider({
     initial.locationEircode,
   );
   const [baseTown, setBaseTown] = useState(initial.baseTown);
+  const [locationCounty, setLocationCounty] = useState(initial.locationCounty);
   const [openingHoursSchedule, setOpeningHoursSchedule] = useState(
     initial.openingHoursSchedule,
   );
@@ -199,6 +206,7 @@ export function CaraSetupFormProvider({
   );
   const [open24_7, setOpen24_7] = useState(initial.open24_7);
   const [hoursNote, setHoursNote] = useState(initial.hoursNote);
+  const [bankHolidays, setBankHolidays] = useState(initial.bankHolidays);
   const [serviceAreaItems, setServiceAreaItems] = useState(
     initial.serviceAreaItems,
   );
@@ -251,6 +259,7 @@ export function CaraSetupFormProvider({
         hoursNeverConfigured: initial.hoursNeverConfigured,
         open24_7: initial.open24_7,
         hoursNote: initial.hoursNote,
+        bankHolidays: initial.bankHolidays,
         serviceAreaItems: initial.serviceAreaItems,
         serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
         servicesItems: initial.servicesItems,
@@ -266,6 +275,7 @@ export function CaraSetupFormProvider({
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
         baseTown: initial.baseTown,
+        locationCounty: initial.locationCounty,
       },
       initial.openingHoursLegacy ?? "",
     ),
@@ -287,6 +297,7 @@ export function CaraSetupFormProvider({
         hoursNeverConfigured: initial.hoursNeverConfigured,
         open24_7: initial.open24_7,
         hoursNote: initial.hoursNote,
+        bankHolidays: initial.bankHolidays,
         serviceAreaItems: initial.serviceAreaItems,
         serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
         servicesItems: initial.servicesItems,
@@ -302,6 +313,7 @@ export function CaraSetupFormProvider({
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
         baseTown: initial.baseTown,
+        locationCounty: initial.locationCounty,
       }),
     [initial],
   );
@@ -319,6 +331,7 @@ export function CaraSetupFormProvider({
         hoursNeverConfigured,
         open24_7,
         hoursNote,
+        bankHolidays,
         serviceAreaItems,
         serviceAreaExclusionItems,
         servicesItems,
@@ -334,6 +347,7 @@ export function CaraSetupFormProvider({
         locationAddress,
         locationEircode,
         baseTown,
+        locationCounty,
       },
       openingHoursLegacy,
     );
@@ -353,11 +367,13 @@ export function CaraSetupFormProvider({
     setLocationAddress(initial.locationAddress);
     setLocationEircode(initial.locationEircode);
     setBaseTown(initial.baseTown);
+    setLocationCounty(initial.locationCounty);
     setOpeningHoursSchedule(initial.openingHoursSchedule);
     setOpeningHoursLegacy(initial.openingHoursLegacy ?? "");
     setHoursNeverConfigured(initial.hoursNeverConfigured);
     setOpen24_7(initial.open24_7);
     setHoursNote(initial.hoursNote);
+    setBankHolidays(initial.bankHolidays);
     setServiceAreaItems(initial.serviceAreaItems);
     setServiceAreaExclusionItems(initial.serviceAreaExclusionItems);
     setServicesItems(initial.servicesItems);
@@ -384,6 +400,7 @@ export function CaraSetupFormProvider({
         hoursNeverConfigured: initial.hoursNeverConfigured,
         open24_7: initial.open24_7,
         hoursNote: initial.hoursNote,
+        bankHolidays: initial.bankHolidays,
         serviceAreaItems: initial.serviceAreaItems,
         serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
         servicesItems: initial.servicesItems,
@@ -399,6 +416,7 @@ export function CaraSetupFormProvider({
         locationAddress: initial.locationAddress,
         locationEircode: initial.locationEircode,
         baseTown: initial.baseTown,
+        locationCounty: initial.locationCounty,
       },
       initial.openingHoursLegacy ?? "",
     );
@@ -416,6 +434,7 @@ export function CaraSetupFormProvider({
       hoursNeverConfigured,
       open24_7,
       hoursNote,
+      bankHolidays,
       serviceAreaItems,
       serviceAreaExclusionItems,
       servicesItems,
@@ -431,6 +450,7 @@ export function CaraSetupFormProvider({
       locationAddress,
       locationEircode,
       baseTown,
+      locationCounty,
     },
     openingHoursLegacy,
   );
@@ -454,6 +474,7 @@ export function CaraSetupFormProvider({
     setHoursNeverConfigured(base.hoursNeverConfigured);
     setOpen24_7(base.open24_7);
     setHoursNote(base.hoursNote);
+    setBankHolidays(base.bankHolidays);
     setServiceAreaItems(base.serviceAreaItems);
     setServiceAreaExclusionItems(base.serviceAreaExclusionItems);
     setServicesItems(base.servicesItems);
@@ -469,6 +490,7 @@ export function CaraSetupFormProvider({
     setLocationAddress(base.locationAddress);
     setLocationEircode(base.locationEircode);
     setBaseTown(base.baseTown);
+    setLocationCounty(base.locationCounty);
   }, []);
 
   const updateDetailsToCollectItems = useCallback((next: string[]) => {
@@ -491,8 +513,9 @@ export function CaraSetupFormProvider({
       businessHours: openingHoursSchedule,
       open24_7,
       hoursNote,
-      serviceArea: formatAgentKnowledgeList(serviceAreaItems),
-      serviceAreaExclusions: formatAgentKnowledgeList(serviceAreaExclusionItems),
+      bankHolidays,
+      serviceArea: "",
+      serviceAreaExclusions: "",
       servicesDepartments: formatAgentKnowledgeList(
         dedupeServiceChips(servicesItems),
       ),
@@ -506,6 +529,7 @@ export function CaraSetupFormProvider({
       locationAddress,
       locationEircode,
       baseTown,
+      locationCounty,
       captureFields,
       rawBusinessDescription,
     };
@@ -516,6 +540,7 @@ export function CaraSetupFormProvider({
     openingHoursSchedule,
     open24_7,
     hoursNote,
+    bankHolidays,
     serviceAreaItems,
     serviceAreaExclusionItems,
     servicesItems,
@@ -527,6 +552,7 @@ export function CaraSetupFormProvider({
     locationAddress,
     locationEircode,
     baseTown,
+    locationCounty,
     rawBusinessDescription,
   ]);
 
@@ -560,6 +586,7 @@ export function CaraSetupFormProvider({
       locationAddress,
       locationEircode,
       baseTown: baseTown.trim() || undefined,
+      locationCounty: locationCounty.trim() || undefined,
       greeting: resolveVoiceGreetingPreview(
         greetingIntro,
         VOICE_ASSISTANT_DEFAULT_NAME,
@@ -568,6 +595,7 @@ export function CaraSetupFormProvider({
       hoursNeverConfigured,
       open24_7,
       hoursNote: hoursNote.trim() || undefined,
+      bankHolidays,
       openingHoursSchedule,
       openingHours: open24_7
         ? "Open 24 hours, 7 days a week"
@@ -576,9 +604,8 @@ export function CaraSetupFormProvider({
           : hoursNeverConfigured
             ? undefined
             : "Closed all week",
-      serviceArea: formatAgentKnowledgeList(serviceAreaItems) || undefined,
-      serviceAreaExclusions:
-        formatAgentKnowledgeList(serviceAreaExclusionItems) || undefined,
+      serviceArea: undefined,
+      serviceAreaExclusions: undefined,
       servicesOffered: formatAgentKnowledgeList(servicesItems) || undefined,
       servicesNotOffered:
         formatAgentKnowledgeList(servicesNotOfferedItems) || undefined,
@@ -602,11 +629,13 @@ export function CaraSetupFormProvider({
     locationAddress,
     locationEircode,
     baseTown,
+    locationCounty,
     greetingIntro,
     greetingClosing,
     hoursNeverConfigured,
     open24_7,
     hoursNote,
+    bankHolidays,
     openingHoursSchedule,
     openingHoursLegacy,
     serviceAreaItems,
@@ -640,6 +669,8 @@ export function CaraSetupFormProvider({
     setLocationEircode,
     baseTown,
     setBaseTown,
+    locationCounty,
+    setLocationCounty,
     openingHoursSchedule,
     setOpeningHoursSchedule,
     openingHoursLegacy,
@@ -648,6 +679,8 @@ export function CaraSetupFormProvider({
     setOpen24_7,
     hoursNote,
     setHoursNote,
+    bankHolidays,
+    setBankHolidays,
     serviceAreaItems,
     setServiceAreaItems,
     serviceAreaExclusionItems,

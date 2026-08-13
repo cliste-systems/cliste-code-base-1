@@ -4,14 +4,11 @@ import { useMemo } from "react";
 
 import type { AgentFaq } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
 import { MAX_FAQS } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
-import type { OnboardingUiCopy } from "@/lib/onboarding-ui-copy-shared";
 
 import { CaraTrainingStepShell } from "./cara-training-step-shell";
-import {
-  resolveFaqPlaceholders,
-  resolveFaqSuggestions,
-} from "./train-cara-faq-suggestions";
-import type { FaqSuggestionContext } from "./train-cara-prefill-heuristics";
+import { resolveFaqPlaceholders } from "./train-cara-faq-suggestions";
+import type { TrainCaraFaqGuardContext } from "./train-cara-faq-guardrails";
+import { TrainCaraInlineNotice } from "./train-cara-inline-notice";
 import { CaraCommonQuestionsField } from "./train-cara-shared";
 
 type Props = {
@@ -22,8 +19,8 @@ type Props = {
   niche: string;
   faqs: AgentFaq[];
   disabled?: boolean;
-  suggestContext: FaqSuggestionContext;
-  uiCopy?: OnboardingUiCopy | null;
+  guardContext: TrainCaraFaqGuardContext;
+  strippedNotice?: string | null;
   onChange: (faqs: AgentFaq[]) => void;
 };
 
@@ -35,38 +32,23 @@ export function CaraFaqsStep({
   niche,
   faqs,
   disabled = false,
-  suggestContext,
-  uiCopy,
+  guardContext,
+  strippedNotice,
   onChange,
 }: Props) {
-  const suggestions = useMemo(
-    () =>
-      resolveFaqSuggestions({
-        businessType,
-        niche,
-        context: suggestContext,
-        uiCopy,
-      }),
-    [businessType, niche, suggestContext, uiCopy],
-  );
-
   const placeholders = useMemo(
-    () => resolveFaqPlaceholders({ businessType, niche, uiCopy }),
-    [businessType, niche, uiCopy],
+    () => resolveFaqPlaceholders({ businessType, niche }),
+    [businessType, niche],
   );
 
   return (
     <CaraTrainingStepShell title={title} subtitle={subtitle} helper={helper}>
-      {uiCopy?.faqStepHint?.trim() ? (
-        <p className="mb-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-700">
-          {uiCopy.faqStepHint.trim()}
-        </p>
-      ) : null}
+      <TrainCaraInlineNotice message={strippedNotice ?? undefined} tone="attention" />
       <CaraCommonQuestionsField
         faqs={faqs}
-        suggestions={suggestions}
         maxFaqs={MAX_FAQS}
         disabled={disabled}
+        guardContext={guardContext}
         questionPlaceholder={placeholders.questionPlaceholder}
         answerPlaceholder={placeholders.answerPlaceholder}
         onChange={onChange}

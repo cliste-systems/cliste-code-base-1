@@ -98,7 +98,8 @@ export function DashboardHomeLiveActivityCard({
         <>
           <ul className={cn(HOME_FIRST_ROW_LIST, "min-h-0 flex-1 overflow-y-auto overscroll-y-contain")}>
             {rows.map((row) => {
-              const Icon = activityRowIcon(row.subtitle ?? row.badge);
+              const detail = row.subtitle ?? row.badge;
+              const Icon = activityRowIcon(detail);
               return (
                 <li key={row.id} className="border-b border-slate-100 last:border-b-0">
                   <Link href={row.href} className={HOME_FIRST_ROW_LIST_ROW}>
@@ -107,9 +108,9 @@ export function DashboardHomeLiveActivityCard({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className={HOME_FIRST_ROW_LIST_TITLE}>{row.title}</span>
-                      {row.subtitle ? (
+                      {detail ? (
                         <span className={HOME_FIRST_ROW_LIST_SUBTITLE}>
-                          {row.subtitle}
+                          {detail}
                         </span>
                       ) : null}
                     </span>

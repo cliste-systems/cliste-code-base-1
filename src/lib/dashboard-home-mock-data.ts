@@ -33,7 +33,7 @@ export const DASHBOARD_HOME_MOCK = {
       subtitle: "Saturday blow-dry slot",
       time: "18m ago",
       href: DASHBOARD_ROUTES.actionInbox,
-      badge: "Request captured",
+      badge: "Enquiry captured",
     },
     {
       id: "mock-activity-3",

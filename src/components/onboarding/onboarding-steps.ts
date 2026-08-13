@@ -1,19 +1,21 @@
-export const ONBOARDING_TOTAL_STEPS = 6;
+export const ONBOARDING_TOTAL_STEPS = 5;
 
 export const ONBOARDING_STEPS_META = [
   { path: "/onboarding/profile", label: "Profile", shortLabel: "Profile" },
   { path: "/onboarding/voice", label: "Voice", shortLabel: "Voice" },
   { path: "/onboarding/knowledge", label: "Train Cara", shortLabel: "Cara" },
   { path: "/onboarding/number", label: "Your number", shortLabel: "Number" },
-  { path: "/onboarding/test-call", label: "Test call", shortLabel: "Test" },
   { path: "/onboarding/plan", label: "Go live", shortLabel: "Plan" },
 ] as const;
 
-/** Maps legacy DB steps (actions was step 4) to the current funnel. */
+/** Maps legacy DB `onboarding_step` values to the current funnel. */
 export function normalizeOnboardingDbStep(step: number): number {
   if (!Number.isFinite(step)) return 1;
   const n = Math.trunc(step);
-  if (n >= 5) return n - 1;
+  if (n <= 4) return n;
+  // Legacy DB 5 was test-call (removed); 6 was go-live; 7 was done.
+  if (n === 5 || n === 6) return 5;
+  if (n >= 7) return 6;
   return n;
 }
 

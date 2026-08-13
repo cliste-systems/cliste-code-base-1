@@ -20,6 +20,12 @@ import {
 import { deriveCaraCapabilities } from "@/lib/cara-capabilities";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import {
+  listServicesForOrg,
+  syncServiceNamesToBoundary,
+  upsertServiceForOrg,
+} from "@/lib/service-catalog";
+import { verticalPackForNiche } from "@/lib/verticals";
+import {
   dedupeCaraSetupChips,
   normalizeCaraSetupChip,
 } from "@/lib/cara-setup-chips";
@@ -83,6 +89,13 @@ function rowToItem(row: Record<string, unknown>): CaraTrainingItemRow {
     applied_at: row.applied_at ? String(row.applied_at) : null,
     applied_by: row.applied_by ? String(row.applied_by) : null,
     dismissed_at: row.dismissed_at ? String(row.dismissed_at) : null,
+    occurrence_count:
+      typeof row.occurrence_count === "number" && row.occurrence_count > 0
+        ? row.occurrence_count
+        : 1,
+    last_seen_at: row.last_seen_at
+      ? String(row.last_seen_at)
+      : String(row.created_at ?? new Date().toISOString()),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -159,6 +172,8 @@ type OrgKnowledgeFields = {
   agent_services_departments: string;
   agent_services_not_offered: string;
   agent_business_rules: string[];
+  agent_services_not_offered_raw?: string | null;
+  niche?: string | null;
 };
 
 function patchDedupeKey(patch: CaraTrainingPatch): string {
@@ -320,18 +335,37 @@ export async function createTrainingItem(
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: recentOpen } = await admin
     .from("cara_training_items")
-    .select("id, gap_summary")
+    .select("id, gap_summary, caller_context, occurrence_count")
     .eq("organization_id", input.organizationId)
     .in("status", CARA_TRAINING_OPEN_STATUSES)
     .gte("created_at", weekAgo);
 
   for (const row of recentOpen ?? []) {
     if (normalizeTrainingTopic(String(row.gap_summary ?? "")) === normalizedTopic) {
-      return {
-        ok: false,
-        message: "A similar training item is already open.",
-        skipped: true,
+      const now = new Date().toISOString();
+      const priorCount =
+        typeof row.occurrence_count === "number" && row.occurrence_count > 0
+          ? row.occurrence_count
+          : 1;
+      const callerContext = input.callerContext?.trim() || null;
+      const patch: Record<string, unknown> = {
+        occurrence_count: priorCount + 1,
+        last_seen_at: now,
+        updated_at: now,
       };
+      if (callerContext) {
+        patch.caller_context = callerContext;
+      }
+      const { error: bumpErr } = await admin
+        .from("cara_training_items")
+        .update(patch)
+        .eq("id", row.id);
+      if (bumpErr) {
+        console.error("[cara-training] bump occurrence", bumpErr);
+        return { ok: false, message: "Failed to update training item." };
+      }
+      revalidateCaraTraining();
+      return { ok: true, itemId: String(row.id) };
     }
   }
 
@@ -552,6 +586,203 @@ export async function dismissTrainingItem(
 
   revalidateCaraTraining();
   return { ok: true };
+}
+
+async function loadCallGapItem(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+): Promise<
+  { ok: true; item: CaraTrainingItemRow } | { ok: false; message: string }
+> {
+  const { data: row, error } = await supabase
+    .from("cara_training_items")
+    .select("*")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !row) {
+    return { ok: false, message: "Training item not found." };
+  }
+
+  const item = rowToItem(row as Record<string, unknown>);
+  if (item.source !== "call_gap") {
+    return { ok: false, message: "This quick action is only for call gaps." };
+  }
+  if (item.status !== "awaiting_answer") {
+    return { ok: false, message: "This item is not waiting for an answer." };
+  }
+
+  return { ok: true, item };
+}
+
+async function applyCallGapPatch(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+  patch: CaraTrainingPatch,
+  appliedByUserId: string,
+  extraOrgUpdate?: { agent_services_not_offered_raw?: string | null },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const knowledge = await loadKnowledgeSnapshot(supabase, organizationId);
+  const validation = validatePatchForApply(patch, knowledge);
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select(
+      "agent_faqs, agent_services_departments, agent_services_not_offered, agent_business_rules, agent_services_not_offered_raw, niche",
+    )
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  let current: OrgKnowledgeFields = {
+    agent_faqs: cleanAgentFaqs(org?.agent_faqs),
+    agent_services_departments: String(org?.agent_services_departments ?? ""),
+    agent_services_not_offered: String(org?.agent_services_not_offered ?? ""),
+    agent_business_rules: parseAgentBusinessRules(org?.agent_business_rules),
+    agent_services_not_offered_raw: String(org?.agent_services_not_offered_raw ?? "").trim() || null,
+    niche: (org?.niche as string | null) ?? null,
+  };
+
+  if (patch.kind === "service_offered") {
+    const label = normalizeCaraSetupChip(patch.label);
+    const pack = verticalPackForNiche(String(current.niche ?? ""));
+    if (pack.capabilities.usesServiceCatalog) {
+      try {
+        await upsertServiceForOrg(supabase, organizationId, {
+          name: label,
+          source: "manual",
+          category: null,
+          price: 0,
+          durationMinutes: 0,
+          description: null,
+          policyFlags: [],
+          aiVoiceNotes: null,
+        });
+        const catalog = await listServicesForOrg(supabase, organizationId);
+        current = {
+          ...current,
+          agent_services_departments: syncServiceNamesToBoundary(catalog),
+        };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Failed to add service.";
+        return { ok: false, message };
+      }
+    } else {
+      current = mergePatchIntoOrgFields(current, patch);
+    }
+  } else {
+    current = mergePatchIntoOrgFields(current, patch);
+  }
+
+  const now = new Date().toISOString();
+  const orgUpdate: Record<string, unknown> = {
+    agent_faqs: current.agent_faqs,
+    agent_services_departments: current.agent_services_departments,
+    agent_services_not_offered: current.agent_services_not_offered,
+    agent_business_rules: current.agent_business_rules,
+    updated_at: now,
+  };
+  if (extraOrgUpdate?.agent_services_not_offered_raw !== undefined) {
+    orgUpdate.agent_services_not_offered_raw =
+      extraOrgUpdate.agent_services_not_offered_raw;
+  }
+
+  const { error: orgError } = await supabase
+    .from("organizations")
+    .update(orgUpdate)
+    .eq("id", organizationId);
+
+  if (orgError) {
+    return { ok: false, message: orgError.message };
+  }
+
+  const regen = await regenerateCaraCustomPrompt(supabase, organizationId);
+  if (!regen.ok) {
+    return { ok: false, message: regen.message };
+  }
+
+  const { error: itemError } = await supabase
+    .from("cara_training_items")
+    .update({
+      status: "applied",
+      proposed_patch: patch,
+      applied_patch: patch,
+      target_section: targetSectionForPatch(patch),
+      applied_at: now,
+      applied_by: appliedByUserId,
+      updated_at: now,
+    })
+    .eq("id", itemId)
+    .eq("organization_id", organizationId);
+
+  if (itemError) {
+    return { ok: false, message: itemError.message };
+  }
+
+  revalidateCaraTraining();
+  return { ok: true };
+}
+
+export async function resolveCallGapYes(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+  appliedByUserId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const loaded = await loadCallGapItem(supabase, organizationId, itemId);
+  if (!loaded.ok) return loaded;
+
+  const label = normalizeCaraSetupChip(loaded.item.gap_summary);
+  if (!label) {
+    return { ok: false, message: "Service label cannot be empty." };
+  }
+
+  return applyCallGapPatch(
+    supabase,
+    organizationId,
+    itemId,
+    { kind: "service_offered", label },
+    appliedByUserId,
+  );
+}
+
+export async function resolveCallGapNo(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+  appliedByUserId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const loaded = await loadCallGapItem(supabase, organizationId, itemId);
+  if (!loaded.ok) return loaded;
+
+  const label = normalizeCaraSetupChip(loaded.item.gap_summary);
+  if (!label) {
+    return { ok: false, message: "Exclusion label cannot be empty." };
+  }
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("agent_services_not_offered_raw")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  const existingRaw = String(org?.agent_services_not_offered_raw ?? "").trim();
+  const sentence = `We don't offer ${label}.`;
+  const nextRaw = existingRaw ? `${existingRaw} ${sentence}` : sentence;
+
+  return applyCallGapPatch(
+    supabase,
+    organizationId,
+    itemId,
+    { kind: "service_not_offered", label },
+    appliedByUserId,
+    { agent_services_not_offered_raw: nextRaw },
+  );
 }
 
 export async function resetTrainingItemToAnswer(

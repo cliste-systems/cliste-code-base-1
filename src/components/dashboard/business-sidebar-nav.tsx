@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Briefcase, ChevronDown } from "lucide-react";
@@ -48,25 +48,26 @@ export function BusinessSidebarNav({
 }) {
   const pathname = usePathname();
   const onBusinessRoute = isBusinessNavPath(pathname);
-  const [expanded, setExpanded] = useState(onBusinessRoute);
-
-  useEffect(() => {
-    if (onBusinessRoute) setExpanded(true);
-  }, [onBusinessRoute]);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const [routeCollapsed, setRouteCollapsed] = useState(false);
 
   const childActive = items.some(
     (item) =>
       pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   const sectionActive = onBusinessRoute && childActive;
+  const expanded = onBusinessRoute ? !routeCollapsed : manuallyExpanded;
 
   return (
     <div className={dashboardSidebarGroupClassName()}>
       <button
         type="button"
         onClick={() => {
-          if (onBusinessRoute) return;
-          setExpanded((open) => !open);
+          if (onBusinessRoute) {
+            setRouteCollapsed((open) => !open);
+            return;
+          }
+          setManuallyExpanded((open) => !open);
         }}
         className={dashboardSidebarHeaderClassName(sectionActive)}
         aria-expanded={expanded}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition, type ComponentType } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -26,8 +25,6 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import {
   DASHBOARD_CARD_SURFACE,
-  DASHBOARD_HOME_ATTENTION_DIVIDER,
-  DASHBOARD_HOME_ATTENTION_ROW_HOVER,
   DASHBOARD_ICON_CHIP_LG,
   DASHBOARD_ICON_CHIP_SM,
   DASHBOARD_ICON_GLYPH_LG,
@@ -36,9 +33,7 @@ import {
 } from "@/components/dashboard/dashboard-surface";
 import {
   DetailActionButton,
-  DetailInset,
   DetailPanelBody,
-  DetailPanelFooter,
   DetailPanelShell,
   DetailSection,
   ListDetailLayout,
@@ -170,7 +165,7 @@ export function ActionInboxView({
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden", className)}>
       <div
-        className="inline-flex w-full max-w-md shrink-0 rounded-full border border-slate-200 bg-slate-50/90 p-0.5"
+        className="inline-flex w-full max-w-md shrink-0 rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-0.5"
         role="tablist"
         aria-label="Inbox status"
       >
@@ -187,10 +182,10 @@ export function ActionInboxView({
             aria-selected={statusTab === tab.id}
             onClick={() => setStatusTab(tab.id)}
             className={cn(
-              "min-w-0 flex-1 rounded-full px-4 py-2 text-[13px] font-medium transition-colors",
+              "min-w-0 flex-1 rounded-md px-4 py-2 text-[13px] font-medium transition-colors",
               statusTab === tab.id
-                ? "bg-[#353D42] text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-[#0b1220]",
+                ? "bg-[#11181d] text-white shadow-sm"
+                : "text-[#5b6b65] hover:bg-white hover:text-[#11181d]",
             )}
           >
             {tab.label}
@@ -213,48 +208,48 @@ export function ActionInboxView({
         )}
       >
         <ListDetailLayout
-          className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.2fr)_400px]"
+          className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(400px,460px)]"
           list={
             <div
               className={cn(
-                "flex h-full min-h-0 flex-col overflow-hidden max-xl:border-b max-xl:border-slate-100 xl:border-r",
-                isOpenQueue
-                  ? "border-[#353D42]/12 bg-[#353D42]/[0.05] xl:border-r-[#353D42]/18"
-                  : "border-slate-100 bg-white",
+                "flex h-full min-h-0 flex-col overflow-hidden max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r",
+                "border-[#dfe7e2] bg-[#fbfcfb] xl:border-r-[#dfe7e2]",
               )}
             >
-              <div className="flex shrink-0 items-center gap-2 border-b border-inherit px-4 py-3 sm:px-5">
-                <p className="min-w-0 flex-1 text-[13px] font-medium text-[#0b1220]">
+              <div className="flex shrink-0 flex-col gap-2 border-b border-inherit px-4 py-3 sm:px-5">
+                <p className="min-w-0 flex-1 text-[13px] font-semibold text-[#11181d]">
                   {isOpenQueue ? "Work queue" : "Archive"}
                 </p>
-                <div className="relative w-44 shrink-0">
-                  <Search
-                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
-                    aria-hidden
-                  />
-                  <Input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search inbox"
-                    aria-label="Search inbox"
-                    className="h-9 w-full border-slate-300 bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
-                  />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative w-full shrink-0 sm:w-44">
+                    <Search
+                      className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
+                      aria-hidden
+                    />
+                    <Input
+                      type="search"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search inbox"
+                      aria-label="Search inbox"
+                      className="h-9 w-full border-[#b9c8c1] bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
+                    />
+                  </div>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) =>
+                      setCategoryFilter(e.target.value as ActionCategoryFilter)
+                    }
+                    aria-label="Filter by type"
+                    className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-full shrink-0 sm:w-[10.5rem]")}
+                  >
+                    {categoryFilterOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) =>
-                    setCategoryFilter(e.target.value as ActionCategoryFilter)
-                  }
-                  aria-label="Filter by type"
-                  className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-[10.5rem] shrink-0")}
-                >
-                  {categoryFilterOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div
@@ -275,15 +270,7 @@ export function ActionInboxView({
                     className="w-full py-10"
                   />
                 ) : (
-                  <ul
-                    className={cn(
-                      isOpenQueue
-                        ? DASHBOARD_HOME_ATTENTION_DIVIDER
-                        : "divide-y divide-slate-100",
-                    )}
-                    role="listbox"
-                    aria-label="Inbox items"
-                  >
+                  <ul className="space-y-2" role="listbox" aria-label="Inbox items">
                     {filtered.map((row) => (
                       <ActionListRow
                         key={row.id}
@@ -357,9 +344,12 @@ function ActionListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "grid w-full cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-2.5 rounded-lg px-2.5 py-2.5 text-left transition-colors sm:grid-cols-[1.75rem_minmax(0,1fr)_auto]",
-          tinted ? DASHBOARD_HOME_ATTENTION_ROW_HOVER : "hover:bg-slate-50/90",
-          selected && (tinted ? "bg-[#353D42]/[0.09]" : "bg-slate-100/80"),
+          "grid w-full cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-2.5 rounded-lg border bg-white/78 px-2.5 py-2.5 text-left shadow-[0_1px_0_rgba(17,24,29,0.04)] transition-colors sm:grid-cols-[1.75rem_minmax(0,1fr)_auto]",
+          tinted
+            ? "border-[#cfd9d4] hover:border-[#9da9a4] hover:bg-white"
+            : "border-[#dfe7e2] hover:border-[#9da9a4] hover:bg-white",
+          selected &&
+            "border-[#353D42] bg-white shadow-[inset_3px_0_0_#353D42,0_1px_0_rgba(17,24,29,0.04)]",
         )}
       >
         <span className={cn("mt-0.5", DASHBOARD_ICON_CHIP_SM)} aria-hidden>
@@ -370,7 +360,7 @@ function ActionListRow({
             <CategoryPill
               category={row.category}
               label={row.categoryShort}
-              className="h-5 shrink-0 px-1.5 py-0 text-[10px] leading-none"
+              className="h-5 shrink-0 px-1.5 py-0 text-[10px] font-semibold uppercase leading-none tracking-wide"
             />
             <span className="min-w-0 truncate text-[13px] font-semibold leading-snug text-[#0b1220]">
               {primary}
@@ -486,7 +476,7 @@ function ActionDetailPanelContent({
       <div
         className={cn(
           "shrink-0 border-b px-5 py-5",
-          isOpen ? "border-[#353D42]/12 bg-[#353D42]/[0.04]" : "border-slate-100 bg-white",
+          isOpen ? "border-[#cfd9d4] bg-[#fbfcfb]" : "border-[#dfe7e2] bg-[#fbfcfb]",
         )}
       >
         <div className="flex items-start gap-3">
@@ -498,7 +488,7 @@ function ActionDetailPanelContent({
               <CategoryPill
                 category={item.category}
                 label={item.categoryTitle}
-                className="h-6 px-2 text-[11px]"
+                className="h-6 px-2 text-[11px] font-semibold uppercase tracking-wide"
               />
               <StatusPill variant={isOpen ? "brand" : "success"} dot>
                 {isOpen ? "Open" : "Resolved"}
@@ -510,49 +500,6 @@ function ActionDetailPanelContent({
             <p className="mt-1 text-[12px] text-slate-500 tabular-nums">
               {inboxCallerMetaLine(item)}
             </p>
-            <div className="mt-3">
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-slate-500 uppercase">
-                Contact
-              </p>
-              <dl className="mt-1.5 space-y-1.5 text-[13px]">
-                <div className="flex gap-2">
-                  <dt className="w-12 shrink-0 text-slate-500">Phone</dt>
-                  <dd className="min-w-0 font-medium text-[#0b1220] tabular-nums">
-                    {hasPhone && tel ? (
-                      <a href={tel} className="underline-offset-2 hover:underline">
-                        {item.callerDisplay}
-                      </a>
-                    ) : (
-                      <span className="font-normal text-slate-500">Not on file</span>
-                    )}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-12 shrink-0 text-slate-500">Email</dt>
-                  <dd className="min-w-0">
-                    {email ? (
-                      <a
-                        href={mailto!}
-                        className="truncate font-medium text-[#0b1220] underline-offset-2 hover:underline"
-                      >
-                        {email}
-                      </a>
-                    ) : (
-                      <span className="text-slate-500">
-                        Not on file
-                        <span className="sr-only"> — caller did not leave an email</span>
-                      </span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-              {!hasContactEmail(item) ? (
-                <p className="mt-2 text-[12px] leading-snug text-slate-500">
-                  Callers often share phone only. Use call or text below, or check
-                  Contacts if you have saved details.
-                </p>
-              ) : null}
-            </div>
           </div>
         </div>
       </div>
@@ -589,82 +536,112 @@ function ActionDetailPanelContent({
           )}
         </DetailSection>
 
+        <DetailSection title="Contact">
+          <div className="rounded-lg border border-[#d9e2dd] bg-white px-4 py-3">
+            <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-slate-400">
+                  Phone
+                </dt>
+                <dd className="mt-0.5 min-w-0 font-medium text-[#0b1220] tabular-nums">
+                  {hasPhone && tel ? (
+                    <a href={tel} className="underline-offset-2 hover:underline">
+                      {item.callerDisplay}
+                    </a>
+                  ) : (
+                    <span className="font-normal text-slate-500">Not on file</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.06em] text-slate-400">
+                  Email
+                </dt>
+                <dd className="mt-0.5 min-w-0">
+                  {email ? (
+                    <a
+                      href={mailto!}
+                      className="block truncate font-medium text-[#0b1220] underline-offset-2 hover:underline"
+                    >
+                      {email}
+                    </a>
+                  ) : (
+                    <span className="text-slate-500">
+                      Not on file
+                      <span className="sr-only"> — caller did not leave an email</span>
+                    </span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            {!hasContactEmail(item) ? (
+              <p className="mt-2 text-[12px] leading-snug text-slate-500">
+                Callers often share phone only. Use call or text below, or check Contacts if you have saved details.
+              </p>
+            ) : null}
+          </div>
+        </DetailSection>
+
         <DetailSection title="Next step">
           <p className="text-[14px] font-medium text-slate-800">
             {nextStepForCategory(item.category)}
           </p>
         </DetailSection>
 
-        {item.relatedCall ? (
-          <DetailSection title="Related call">
-            <DetailInset>
-              <p className="line-clamp-4 text-[13px] leading-relaxed text-slate-700">
-                {item.relatedCall.summary?.trim() || "No summary on this call."}
-              </p>
-              <p className="mt-2 text-[12px] text-slate-500">{item.relatedCall.dateLabel}</p>
-              <Link
-                href={`${DASHBOARD_ROUTES.calls}?call=${item.relatedCall.id}`}
-                className="mt-3 inline-flex text-[13px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
+        <DetailSection title="Actions">
+          <div className="flex flex-wrap gap-2">
+            {canBlockAndDismiss ? (
+              <DetailActionButton
+                type="button"
+                onClick={() => setBlockDismissOpen(true)}
+                disabled={pending}
               >
-                View call
-              </Link>
-            </DetailInset>
-          </DetailSection>
-        ) : null}
+                <Ban className="size-3.5" aria-hidden />
+                Block + dismiss
+              </DetailActionButton>
+            ) : null}
+            {item.status === "open" ? (
+              <form action={markTicketResolved}>
+                <input type="hidden" name="ticketId" value={item.id} />
+                <DetailActionButton type="submit">Mark resolved</DetailActionButton>
+              </form>
+            ) : (
+              <form action={markTicketReopen}>
+                <input type="hidden" name="ticketId" value={item.id} />
+                <DetailActionButton type="submit">Reopen</DetailActionButton>
+              </form>
+            )}
+            <DetailActionButton type="button" onClick={onCopyDetails}>
+              {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+              {copied ? "Copied" : "Copy details"}
+            </DetailActionButton>
+            {tel ? (
+              <DetailActionButton href={tel}>
+                <Phone className="size-3.5" aria-hidden />
+                Call back
+              </DetailActionButton>
+            ) : null}
+            {sms ? (
+              <DetailActionButton href={sms}>
+                <MessageSquare className="size-3.5" aria-hidden />
+                Text contact
+              </DetailActionButton>
+            ) : null}
+            {mailto ? (
+              <DetailActionButton href={mailto}>
+                <Mail className="size-3.5" aria-hidden />
+                Email
+              </DetailActionButton>
+            ) : null}
+            <DetailActionButton href={DASHBOARD_ROUTES.contacts}>
+              Open contact
+            </DetailActionButton>
+          </div>
+          {blockMsg ? (
+            <p className="mt-2 text-[12px] text-red-600">{blockMsg}</p>
+          ) : null}
+        </DetailSection>
       </DetailPanelBody>
-
-      <DetailPanelFooter>
-        {canBlockAndDismiss ? (
-          <DetailActionButton
-            type="button"
-            onClick={() => setBlockDismissOpen(true)}
-            disabled={pending}
-          >
-            <Ban className="size-3.5" aria-hidden />
-            Block + dismiss
-          </DetailActionButton>
-        ) : null}
-        {item.status === "open" ? (
-          <form action={markTicketResolved}>
-            <input type="hidden" name="ticketId" value={item.id} />
-            <DetailActionButton type="submit">Mark resolved</DetailActionButton>
-          </form>
-        ) : (
-          <form action={markTicketReopen}>
-            <input type="hidden" name="ticketId" value={item.id} />
-            <DetailActionButton type="submit">Reopen</DetailActionButton>
-          </form>
-        )}
-        <DetailActionButton type="button" onClick={onCopyDetails}>
-          {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
-          {copied ? "Copied" : "Copy details"}
-        </DetailActionButton>
-        {tel ? (
-          <DetailActionButton href={tel}>
-            <Phone className="size-3.5" aria-hidden />
-            Call back
-          </DetailActionButton>
-        ) : null}
-        {sms ? (
-          <DetailActionButton href={sms}>
-            <MessageSquare className="size-3.5" aria-hidden />
-            Text contact
-          </DetailActionButton>
-        ) : null}
-        {mailto ? (
-          <DetailActionButton href={mailto}>
-            <Mail className="size-3.5" aria-hidden />
-            Email
-          </DetailActionButton>
-        ) : null}
-        <DetailActionButton href={DASHBOARD_ROUTES.contacts}>
-          Open contact
-        </DetailActionButton>
-      </DetailPanelFooter>
-
-      {blockMsg ? (
-        <p className="px-5 pb-3 text-[12px] text-red-600">{blockMsg}</p>
-      ) : null}
 
       <ConfirmDialog
         open={blockDismissOpen}

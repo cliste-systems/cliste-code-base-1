@@ -1,6 +1,6 @@
 # Voice worker → dashboard contract (v1)
 
-The LiveKit/voice worker reports each finished call to the Cliste app. This is
+The LiveKit/voice worker reports each finished call to the Hello Cara app. This is
 the single integration point between the worker and the dashboard. Keep the
 worker aligned with this document.
 
@@ -36,7 +36,7 @@ When blocked:
 
 - Play a short message — **no** AI disclosure, **no** LLM session, **no** TTS
   beyond the clip. Use the business name from org config, e.g. “We're unable to
-  put you through to {business}. This line is operated by Cliste Systems on
+  put you through to {business}. This line is operated by Hello Cara on
   behalf of the business, and your number isn't authorised to connect. Goodbye.”
 - Hang up.
 - `POST /api/voice/call-complete` with `outcome: "blocked"`, `duration_seconds` near
@@ -87,7 +87,7 @@ worker build must send the stable Twilio/LiveKit call identifier.
 ## Compliance requirements (mandatory)
 
 These settings are **not optional** — they implement GDPR transparency, EU AI Act
-Art 50, and Cliste's DPA commitments.
+Art 50, and Hello Cara's DPA commitments.
 
 1. **AI disclosure on first turn** — Speak the compiled greeting from
    `organizations.greeting`, which always includes the fixed legal segment from
@@ -139,7 +139,7 @@ worker. If it is unset on the app side the route returns `503` (fail-closed).
 
 | Field                | Type            | Required | Notes |
 |----------------------|-----------------|----------|-------|
-| `called_number`      | string (E.164)  | yes¹     | The Cliste DID the caller dialled. Used to resolve the tenant — the secret alone must **not** decide the org. |
+| `called_number`      | string (E.164)  | yes¹     | The Hello Cara DID the caller dialled. Used to resolve the tenant — the secret alone must **not** decide the org. |
 | `call_sid`           | string          | yes      | Stable Twilio/LiveKit call identifier. **Required** for idempotent `call-complete` retries. |
 | `room_name`          | string \| null  | no       | LiveKit room name when available. |
 | `caller_number`      | string          | yes      | Caller number in **E.164** when possible. Use `+anonymous` for withheld caller ID. |
@@ -165,6 +165,10 @@ Optional array on `POST /api/voice/call-complete`. Send when post-call review
 finds moments where Cara took a message or could not answer from FAQs, services,
 or business rules. The app redacts `caller_context`, dedupes open items, notifies
 the owner, and surfaces items at `/dashboard/cara-training`.
+
+The worker may send `knowledge_gaps` on a **follow-up** POST with the same
+`call_sid` after post-call LLM review; the route is idempotent and still ingests
+gaps when the call log already exists.
 
 Each element:
 

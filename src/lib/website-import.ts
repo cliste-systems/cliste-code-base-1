@@ -1,5 +1,6 @@
 import "server-only";
 
+import { MARKETING_SITE_URL } from "@/lib/company-details";
 import { completeOpenRouterChat } from "@/lib/openrouter-chat";
 import type {
   WebsiteImportFaq,
@@ -90,7 +91,7 @@ async function fetchPublicPageHtmlDetailed(
     const res = await fetch(parsed.toString(), {
       signal: controller.signal,
       redirect: "manual",
-      headers: { "User-Agent": "ClisteBot/1.0 (+https://clistesystems.ie)" },
+      headers: { "User-Agent": `HelloCaraBot/1.0 (+${MARKETING_SITE_URL})` },
       cache: "no-store",
     });
     if (res.status >= 300 && res.status < 400) {

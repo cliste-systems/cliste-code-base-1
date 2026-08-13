@@ -3,9 +3,10 @@ import test from "node:test";
 
 import { buildInviteEmailBodies } from "./invite-email-bodies";
 
+
 const actionLink =
-  "https://app.clistesystems.ie/auth/callback?token_hash=abc&type=invite";
-const logoUrl = "https://app.clistesystems.ie/m8x4p2n7.png";
+  "https://app.hellocara.ie/auth/callback?token_hash=abc&type=invite";
+const logoUrl = "https://app.hellocara.ie/m8x4p2n7.png";
 
 test("invite subject includes name without leading comma", () => {
   const bodies = buildInviteEmailBodies({
@@ -15,7 +16,7 @@ test("invite subject includes name without leading comma", () => {
     businessName: "Last Look Hair",
     productName: "Salon",
   });
-  assert.equal(bodies.subject, "Jane, you've been invited to Cliste");
+  assert.equal(bodies.subject, "Jane, you've been invited to Hello Cara");
   assert.equal(bodies.subject.startsWith(","), false);
 });
 
@@ -26,10 +27,10 @@ test("invite subject omits name when empty", () => {
     businessName: "Last Look Hair",
     productName: "Salon",
   });
-  assert.equal(bodies.subject, "You've been invited to Cliste");
+  assert.equal(bodies.subject, "You've been invited to Hello Cara");
 });
 
-test("invite html uses cliste branding and first-party link", () => {
+test("invite html uses Hello Cara branding and first-party link", () => {
   const bodies = buildInviteEmailBodies({
     actionLink,
     logoUrl,
@@ -38,7 +39,7 @@ test("invite html uses cliste branding and first-party link", () => {
   });
   assert.match(bodies.html, /m8x4p2n7\.png/);
   assert.match(bodies.html, /Accept invitation/);
-  assert.match(bodies.html, /Join Last Look Hair on Cliste/);
+  assert.match(bodies.html, /Join Last Look Hair on Hello Cara/);
   assert.doesNotMatch(bodies.text, /supabase\.co/);
   assert.ok(bodies.text.includes(actionLink));
 });

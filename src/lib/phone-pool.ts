@@ -376,21 +376,47 @@ export async function provisionOrganizationPhoneNumber(
   return result;
 }
 
+function devPreferredPoolE164(): string | null {
+  if (process.env.NODE_ENV === "production") return null;
+  const raw = process.env.CLISTE_DEV_POOL_E164?.trim();
+  return raw?.startsWith("+") ? raw : null;
+}
+
 export async function assignFromPool(
   organizationId: string,
   country: "IE" | "US" = "IE"
 ): Promise<AssignFromPoolResult> {
   const admin = createAdminClient();
+  const preferredE164 = devPreferredPoolE164();
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    const { data: candidate, error: pickErr } = await admin
-      .from("phone_numbers")
-      .select("id, e164")
-      .eq("status", "available")
-      .eq("country_code", country)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    let candidate: { id: string; e164: string } | null = null;
+    let pickErr: { message: string; code?: string } | null = null;
+
+    if (attempt === 0 && preferredE164) {
+      const { data, error } = await admin
+        .from("phone_numbers")
+        .select("id, e164")
+        .eq("status", "available")
+        .eq("country_code", country)
+        .eq("e164", preferredE164)
+        .maybeSingle();
+      candidate = data;
+      pickErr = error;
+    }
+
+    if (!candidate) {
+      const { data, error } = await admin
+        .from("phone_numbers")
+        .select("id, e164")
+        .eq("status", "available")
+        .eq("country_code", country)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      candidate = data;
+      pickErr = error;
+    }
 
     if (pickErr) {
       return { ok: false, message: pickErr.message };

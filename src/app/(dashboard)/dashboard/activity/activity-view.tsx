@@ -3,13 +3,12 @@
 import { Activity } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
+import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import { DashboardTimelineFeed } from "@/components/dashboard/dashboard-timeline-feed";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
   DASHBOARD_CARD_SURFACE,
   DASHBOARD_HOME_CONTENT_COLUMN,
-  DASHBOARD_ICON_CHIP_LG,
-  DASHBOARD_ICON_GLYPH_LG,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
@@ -17,28 +16,60 @@ import { cn } from "@/lib/utils";
 
 import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
 
-export function ActivityView({ rows }: { rows: TimelineFeedRow[] }) {
+/** Today / Yesterday / "Mon 23 Jun" — the heading for a day group. */
+function dayGroupLabel(iso: string | undefined): string {
+  if (!iso) return "Earlier";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Earlier";
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const startYesterday = new Date(startToday);
+  startYesterday.setDate(startYesterday.getDate() - 1);
+  if (d >= startToday) return "Today";
+  if (d >= startYesterday) return "Yesterday";
+  return d.toLocaleDateString("en-IE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/** Bucket the (already newest-first) feed into consecutive day groups. */
+function groupRowsByDay(
+  rows: TimelineFeedRow[],
+): { label: string; rows: TimelineFeedRow[] }[] {
+  const groups: { label: string; rows: TimelineFeedRow[] }[] = [];
+  let current: { label: string; rows: TimelineFeedRow[] } | null = null;
+  for (const row of rows) {
+    const label = dayGroupLabel(row.isoDate);
+    if (!current || current.label !== label) {
+      current = { label, rows: [] };
+      groups.push(current);
+    }
+    current.rows.push(row);
+  }
+  return groups;
+}
+
+export function ActivityView({
+  rows,
+  summary,
+}: {
+  rows: TimelineFeedRow[];
+  summary: { value: string; label: string }[];
+}) {
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
-        <DashboardAnimatedPageSections>
-          <header className="flex shrink-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className={DASHBOARD_ICON_CHIP_LG}>
-                <Activity className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
-                  Activity
-                </h1>
-                <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-600">
-                  Everything Cara does on calls — links and PDFs sent, files
-                  shared, calls answered, and requests captured.
-                </p>
-              </div>
-            </div>
-            <DashboardHeaderRangeControls />
-          </header>
+        <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-hidden">
+          <ClistePageHeader
+            tone="activity"
+            icon={Activity}
+            title="Activity"
+            description="Calls answered, links sent, and enquiries captured."
+            summary={summary}
+            actions={<DashboardHeaderRangeControls />}
+          />
 
           <section
             className={cn(
@@ -53,20 +84,31 @@ export function ActivityView({ rows }: { rows: TimelineFeedRow[] }) {
               )}
             >
               {rows.length === 0 ? (
-                <EmptyState
-                  icon={Activity}
-                  title="No activity yet"
-                  description="When Cara sends links, PDFs, or handles calls, it will show up here."
-                  className="w-full py-10"
-                />
+                <div className="flex h-full w-full items-center justify-center p-6">
+                  <EmptyState
+                    icon={Activity}
+                    title="No activity yet"
+                    description="When Cara sends links, PDFs, or handles calls, it will show up here."
+                    className="w-full max-w-xl px-4 py-12"
+                  />
+                </div>
               ) : (
-                <DashboardTimelineFeed
-                  rows={rows}
-                  emptyIcon={Activity}
-                  emptyTitle="No activity yet"
-                  emptyBody="When Cara sends links, PDFs, or handles calls, it will show up here."
-                  className="px-4 py-2 sm:px-5"
-                />
+                <div className="py-1">
+                  {groupRowsByDay(rows).map((group) => (
+                    <div key={group.label}>
+                      <div className="sticky top-0 z-10 bg-white/95 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 backdrop-blur-sm">
+                        {group.label}
+                      </div>
+                      <DashboardTimelineFeed
+                        rows={group.rows}
+                        pageFeed
+                        emptyIcon={Activity}
+                        emptyTitle="No activity yet"
+                        emptyBody="When Cara sends links, PDFs, or handles calls, it will show up here."
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </section>

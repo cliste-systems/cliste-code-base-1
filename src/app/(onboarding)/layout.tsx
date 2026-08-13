@@ -31,8 +31,10 @@ export default async function OnboardingLayout({
             freeNav={freeNav}
           >
             <OnboardingKnowledgeNavProvider>
-              <OnboardingMotionShell>{children}</OnboardingMotionShell>
-              <OnboardingStepDots />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <OnboardingMotionShell>{children}</OnboardingMotionShell>
+                <OnboardingStepDots />
+              </div>
             </OnboardingKnowledgeNavProvider>
           </OnboardingProgressProvider>
         </div>

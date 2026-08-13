@@ -5,11 +5,13 @@ import { parseCaraConduct, inferCaraConductFromLegacyRules } from "@/lib/agent-c
 import {
   emptyWeekSchedule,
   isBusinessHoursUnset,
+  defaultBankHolidayConfig,
   parseBusinessHoursBundle,
 } from "@/lib/business-hours";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { buildCaraSetupPromptInputFromOrg } from "@/lib/cara-prompt-from-org";
 import { listServicesForOrg } from "@/lib/service-catalog";
+import { parseStoredLocation } from "@/lib/location-fields";
 import { normalizeServiceAreaCountyItems } from "@/lib/service-area-boundary";
 import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 import { recoverHoursNoteFromSources } from "@/lib/parse-plain-text-hours";
@@ -43,7 +45,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "name, address, storefront_eircode, niche, quote_prices_on_calls, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
+      "name, address, storefront_eircode, niche, quote_prices_on_calls, assistant_display_name, greeting, custom_prompt, agent_business_type, agent_faqs, agent_opening_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_capture_fields, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_location_address, agent_location_eircode, agent_location_county, business_hours, business_knowledge_summary, raw_business_description, cara_goal, routing_links, fallback_number, call_routing_mode, prompt_compile_warnings",
     )
     .eq("id", organizationId)
     .maybeSingle();
@@ -119,6 +121,8 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
         openingHoursLegacy,
         businessRules,
       ),
+      bankHolidays:
+        hoursBundle.meta.bankHolidays ?? defaultBankHolidayConfig(),
       serviceAreaItems: normalizeServiceAreaCountyItems(
         parseAgentKnowledgeList(serviceArea),
       ),
@@ -137,15 +141,25 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
       captureFields,
       rawBusinessDescription:
         (org?.raw_business_description as string | null)?.trim() ?? "",
-      locationAddress:
-        (org?.agent_location_address as string | null)?.trim() ||
-        (org?.address as string | null)?.trim() ||
-        "",
+      ...(() => {
+        const loc = parseStoredLocation({
+          address:
+            (org?.agent_location_address as string | null)?.trim() ||
+            (org?.address as string | null)?.trim() ||
+            "",
+          baseTown: (org?.agent_base_town as string | null)?.trim() ?? "",
+          county: (org?.agent_location_county as string | null)?.trim() ?? "",
+        });
+        return {
+          locationAddress: loc.street,
+          baseTown: loc.town,
+          locationCounty: loc.county,
+        };
+      })(),
       locationEircode:
         (org?.agent_location_eircode as string | null)?.trim() ||
         (org?.storefront_eircode as string | null)?.trim() ||
         "",
-      baseTown: (org?.agent_base_town as string | null)?.trim() ?? "",
       quotePricesOnCalls: org?.quote_prices_on_calls === true,
     },
   };

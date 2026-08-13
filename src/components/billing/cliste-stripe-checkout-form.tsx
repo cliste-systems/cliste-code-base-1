@@ -32,7 +32,7 @@ type Props = {
   subscriptionId: string;
   summary: PlatformElementsCheckoutSummary;
   returnUrl: string;
-  onPersist?: (subscriptionId: string) => Promise<void>;
+  onPersist?: (subscriptionId: string, setupIntentId?: string) => Promise<void>;
   onActivated: () => void;
 };
 
@@ -90,7 +90,7 @@ function CheckoutFormInner({
       return;
     }
 
-    const { error: confirmError } = await stripe.confirmSetup({
+    const { error: confirmError, setupIntent } = await stripe.confirmSetup({
       elements,
       confirmParams: { return_url: returnUrl },
       redirect: "if_required",
@@ -103,7 +103,7 @@ function CheckoutFormInner({
     }
 
     try {
-      await onPersist?.(subscriptionId);
+      await onPersist?.(subscriptionId, setupIntent?.id);
       setSubmitPhase("success");
       window.setTimeout(() => {
         onActivated();

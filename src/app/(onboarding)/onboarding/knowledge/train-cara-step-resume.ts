@@ -2,6 +2,8 @@ import { TRAIN_CARA_STEPS, type TrainCaraStepId } from "./train-cara-constants";
 
 const LEGACY_STEP_MAP: Record<string, TrainCaraStepId> = {
   know: "about",
+  exclusions: "hours",
+  capture: "faqs",
   handle: "faqs",
   "call-flow": "faqs",
   rules: "faqs",

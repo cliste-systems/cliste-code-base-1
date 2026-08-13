@@ -31,7 +31,7 @@ export function AccountSecuritySection({
   if (isLocalPreview) {
     return (
       <SettingsSection title="Sign-in & security" id="sign-in-security">
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 text-[12px] leading-relaxed text-amber-950">
+        <div className="rounded-xl border border-[#d9e2dd] bg-[#fbfcfb] px-4 py-3.5 text-[12px] leading-relaxed text-[#35443f]">
           Email and password changes need a real sign-in — they are not available
           in local preview.{" "}
           <Link
@@ -129,7 +129,7 @@ function EmailChangeForm({
         <p
           className={cn(
             "text-[13px]",
-            isSuccess ? "text-emerald-600" : "text-red-600",
+            isSuccess ? "text-slate-600" : "text-red-600",
           )}
           role="status"
         >
@@ -232,7 +232,7 @@ function PasswordChangeForm({ fieldClass }: { fieldClass: string }) {
         <p
           className={cn(
             "text-[13px]",
-            isSuccess ? "text-emerald-600" : "text-red-600",
+            isSuccess ? "text-slate-600" : "text-red-600",
           )}
           role="status"
         >

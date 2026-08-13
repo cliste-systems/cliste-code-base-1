@@ -1,4 +1,6 @@
-const CLISTE_OUTBOUND_DOMAIN = "clistesystems.ie";
+import { OUTBOUND_EMAIL_DOMAIN } from "@/lib/company-details";
+
+const CLISTE_OUTBOUND_DOMAIN = OUTBOUND_EMAIL_DOMAIN;
 
 export type SendGridDomainStatus = {
   configured: boolean;
@@ -9,8 +11,8 @@ export type SendGridDomainStatus = {
 };
 
 /**
- * Check whether clistesystems.ie is domain-authenticated in SendGrid.
- * Domain auth allows per-org `{slug}@clistesystems.ie` senders without
+ * Check whether hellocara.ie is domain-authenticated in SendGrid.
+ * Domain auth allows per-org `{slug}@hellocara.ie` senders without
  * verifying each address individually.
  */
 export async function getSendGridDomainAuthStatus(): Promise<SendGridDomainStatus> {

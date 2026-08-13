@@ -8,20 +8,17 @@ import { createClient } from "@/utils/supabase/client";
 const IS_DEV = process.env.NODE_ENV === "development";
 
 /**
- * Fallback polling when Realtime is unavailable or tables aren’t in the
- * `supabase_realtime` publication. Realtime is the primary path — the three
- * activity tables are added in migration
- * `034_realtime_publication_activity_tables.sql`, so events arrive in <1s
- * — and polling is a safety net for the dashboards where activity data is
- * actively rendered.
- *
- * Polling is disabled while Realtime is healthy to avoid ~10+ Supabase queries
- * per `router.refresh()` on a fixed timer.
+ * Supabase Realtime on activity tables (migration 034) is the primary path — events
+ * arrive in ~1s. Migration 062 sets REPLICA IDENTITY FULL so org-scoped filters work.
+ * Polling is a fallback when Realtime is down (12s dev / 30s prod).
  */
-const POLL_INTERVAL_MS = IS_DEV ? 90_000 : 120_000;
+const POLL_INTERVAL_MS = IS_DEV ? 12_000 : 30_000;
+
+/** Coalesce Realtime bursts (insert + enrichment update) into one RSC refresh. */
+const REALTIME_DEBOUNCE_MS = 250;
 
 /** Coalesce interval + focus refreshes so RSC fetches don’t overlap. */
-const MIN_MS_BETWEEN_POLL_REFRESH = 8_000;
+const MIN_MS_BETWEEN_POLL_REFRESH = 4_000;
 
 /**
  * Realtime is event-driven (no cost unless data actually changes) and the
@@ -36,29 +33,14 @@ function shouldEnableRealtime(pathname: string | null): boolean {
 }
 
 /**
- * Polling re-renders the layout on a timer regardless of whether anything
- * changed, so keep it scoped to pages that actually display the activity
- * streams. Other pages still update instantly via Realtime.
+ * Fallback polling runs on all dashboard pages (sidebar badges + activity feeds).
+ * Settings is excluded — it does not show live call/ticket streams.
  */
 function shouldPoll(pathname: string | null): boolean {
   if (!shouldEnableRealtime(pathname)) return false;
-  // `shouldEnableRealtime` already verified `pathname` starts with
-  // "/dashboard", so it can't be null here — re-assert for TS.
   if (!pathname) return false;
   if (pathname === "/dashboard/settings") return false;
-  if (pathname === "/dashboard") return true;
-  const prefixes = [
-    "/dashboard/calls",
-    "/dashboard/call-history",
-    "/dashboard/action-inbox",
-    "/dashboard/cara-training",
-    "/dashboard/contacts",
-    "/dashboard/clients",
-    "/dashboard/support",
-  ];
-  return prefixes.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  return true;
 }
 
 function isRealtimeHealthyStatus(status: string): boolean {
@@ -133,7 +115,7 @@ export function DashboardLiveRefresh({
       realtimeDebounceRef.current = null;
       lastPollRefreshAt.current = Date.now();
       router.refresh();
-    }, 400);
+    }, REALTIME_DEBOUNCE_MS);
   }, [router]);
 
   useEffect(() => {
@@ -147,11 +129,14 @@ export function DashboardLiveRefresh({
 
   useEffect(() => {
     if (!shouldPoll(pathname)) return;
-    const FOCUS_REFRESH_THRESHOLD_MS = 30_000;
+    const FOCUS_REFRESH_THRESHOLD_MS = 15_000;
     const onResume = () => {
       if (document.visibilityState !== "visible") return;
-      if (realtimeHealthyRef.current) return;
       if (Date.now() - lastPollRefreshAt.current < FOCUS_REFRESH_THRESHOLD_MS) {
+        return;
+      }
+      if (realtimeHealthyRef.current) {
+        scheduleRealtimeRefresh();
         return;
       }
       pollRefresh();
@@ -162,7 +147,7 @@ export function DashboardLiveRefresh({
       document.removeEventListener("visibilitychange", onResume);
       window.removeEventListener("focus", onResume);
     };
-  }, [pathname, pollRefresh]);
+  }, [pathname, pollRefresh, scheduleRealtimeRefresh]);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -180,6 +165,16 @@ export function DashboardLiveRefresh({
         "postgres_changes",
         {
           event: "INSERT",
+          schema: "public",
+          table: "call_logs",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
           schema: "public",
           table: "call_logs",
           filter,
@@ -251,12 +246,15 @@ export function DashboardLiveRefresh({
         realtimeHealthyRef.current = healthy;
         if (healthy) {
           stopPolling();
+          scheduleRealtimeRefresh();
         } else if (shouldPoll(pathnameRef.current)) {
           startPolling();
         }
-        if (IS_DEV && status === "CHANNEL_ERROR") {
+        if (IS_DEV && (status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
           console.warn(
-            "[DashboardLiveRefresh] Realtime error — enable Realtime and add call_logs, action_tickets, appointments to the publication in Supabase; polling fallback will run.",
+            "[DashboardLiveRefresh] Realtime unavailable — check Supabase Realtime is enabled and migrations 034 + 062 are applied; polling fallback every",
+            POLL_INTERVAL_MS,
+            "ms.",
           );
         }
       });

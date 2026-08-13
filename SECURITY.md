@@ -1,12 +1,14 @@
-# Cliste — Security Policy
+# Hello Cara — Security Policy
+
+**Operator:** Cliste Systems Limited
 
 ## Reporting a vulnerability
 
-If you believe you have found a security vulnerability in any Cliste service
-(`*.clistesystems.ie`, the dashboard, the booking storefront, the AI voice
+If you believe you have found a security vulnerability in any Hello Cara service
+(`*.hellocara.ie`, the dashboard, the booking storefront, the AI voice
 agent worker, or our infrastructure), please report it privately to:
 
-- **Email:** security@clistesystems.ie
+- **Email:** security@hellocara.ie
 - PGP key: available on request.
 
 Please include enough detail for us to reproduce: a clear description, steps,
@@ -26,18 +28,18 @@ quickly. We will not pursue legal action against good-faith researchers who:
 
 ## What's in scope
 
-- Production hosts: `app.clistesystems.ie`, `book.clistesystems.ie`,
-  `clistesystems.ie`, and any tenant subdomains we operate.
-- The Cliste booking storefront, the dashboard, the admin console, the
+- Production hosts: `app.hellocara.ie`, `hellocara.ie`, and any tenant subdomains we operate.
+- Legacy hosts (`app.clistesystems.ie`, `clistesystems.ie`) during the redirect transition.
+- The Hello Cara dashboard, the admin console, the
   Stripe webhook (`/api/stripe/webhook`), the voice webhook
   (`/api/voice/call-complete`), and our cron endpoints.
 - The AI voice agent (LiveKit worker) and its inbound SIP integration,
-  insofar as the worker is operated by Cliste.
+  insofar as the worker is operated by Cliste Systems Limited.
 
 ## Out of scope
 
 - Findings that require physical access to a salon's reception device.
-- Social engineering against Cliste employees or salon staff.
+- Social engineering against Hello Cara / Cliste Systems Limited employees or salon staff.
 - Volumetric DDoS / DoS without a clear amplification primitive.
 - Reports of best-practice / hardening suggestions with no concrete
   exploit path (we welcome them, but they're not eligible for any bounty

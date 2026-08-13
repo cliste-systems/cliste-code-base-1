@@ -47,11 +47,11 @@ function minutesAgo(iso: string, now: Date): number | null {
 export function formatDashboardCallOutcomeLabel(outcome: string | null): string {
   switch (normalizeCallOutcome(String(outcome ?? ""))) {
     case "link_sent":
-      return "Routed";
+      return "Info sent";
     case "callback_requested":
       return "Callback requested";
     case "action_created":
-      return "Request captured";
+      return "Enquiry captured";
     case "voicemail_or_no_speech":
       return "Voicemail";
     case "failed":

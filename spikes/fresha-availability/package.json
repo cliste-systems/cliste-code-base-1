@@ -1,0 +1,15 @@
+{
+  "name": "fresha-availability-spike",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Standalone PoC: capture Fresha public-booking availability via headed Playwright",
+  "scripts": {
+    "check": "node check-slots.mjs",
+    "sniff": "node sniff.mjs",
+    "replay": "node replay.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  }
+}

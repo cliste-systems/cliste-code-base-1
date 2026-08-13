@@ -75,7 +75,7 @@ export function OnboardingStepShell({
           className={cn(
             "min-h-0 flex-1",
             isKnowledge && contentOnly
-              ? "overflow-hidden"
+              ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain"
               : "overflow-y-auto overscroll-y-contain",
           )}
         >
@@ -85,9 +85,9 @@ export function OnboardingStepShell({
               isCheckout
                 ? "min-h-full justify-center py-5 sm:py-6"
                 : isPlan
-                  ? "min-h-full pb-5 pt-8 sm:pb-6 sm:pt-10"
+                  ? "pb-5 pt-8 sm:pb-6 sm:pt-10"
                   : isKnowledge && contentOnly
-                    ? "flex min-h-0 flex-1 pb-2 pt-3 sm:pt-4"
+                    ? "flex min-h-0 w-full flex-1 flex-col items-center justify-center px-4 pb-3 pt-3 sm:px-6 sm:pt-4"
                     : compact
                       ? "pb-4 pt-3 sm:pb-5 sm:pt-4"
                       : "min-h-full py-6 sm:py-8",
@@ -97,9 +97,10 @@ export function OnboardingStepShell({
               className={cn(
                 "mx-auto flex w-full flex-col items-center",
                 isKnowledge && contentOnly
-                  ? "min-h-0 flex-1"
+                  ? "shrink-0"
                   : !compact && !isPlan && !isCheckout && "my-auto",
                 VARIANT_MAX_WIDTH[variant],
+                isKnowledge && contentOnly && "max-w-none",
                 isPlan
                   ? "gap-4 sm:gap-5"
                   : isCheckout
@@ -151,8 +152,8 @@ export function OnboardingStepShell({
 
               <div
                 className={cn(
-                  "flex w-full flex-col items-stretch",
-                  isKnowledge && contentOnly ? "min-h-0 flex-1" : "shrink-0",
+                  "flex w-full flex-col items-center",
+                  isKnowledge && contentOnly ? "shrink-0" : "shrink-0 items-stretch",
                 )}
               >
                 {children}

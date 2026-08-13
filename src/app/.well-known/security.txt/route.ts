@@ -4,11 +4,17 @@
 // can discover where to send reports. Expires field must be ISO 8601 UTC
 // and ideally <12 months out — bump on each release that touches this.
 
-const SECURITY_TXT = `Contact: mailto:security@clistesystems.ie
+import {
+  CLISTE_COMPANY,
+  DEFAULT_APP_SITE_URL,
+  MARKETING_SITE_URL,
+} from "@/lib/company-details";
+
+const SECURITY_TXT = `Contact: mailto:${CLISTE_COMPANY.securityEmail}
 Expires: 2027-04-18T00:00:00.000Z
 Preferred-Languages: en
-Canonical: https://clistesystems.ie/.well-known/security.txt
-Policy: https://clistesystems.ie/SECURITY.md
+Canonical: ${DEFAULT_APP_SITE_URL}/.well-known/security.txt
+Policy: ${MARKETING_SITE_URL}/SECURITY.md
 `;
 
 export const dynamic = "force-static";

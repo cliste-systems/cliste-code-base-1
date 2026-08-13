@@ -31,7 +31,7 @@ export default function DevOnboardingPreviewLayout({
             Local preview — not signed in. Changes here are dev-only and are not
             deployed.
           </div>
-          <OnboardingProgressProvider furthestDbStep={6} freeNav>
+          <OnboardingProgressProvider furthestDbStep={5} freeNav>
             <OnboardingKnowledgeNavProvider>
               <OnboardingMotionShell>{children}</OnboardingMotionShell>
             </OnboardingKnowledgeNavProvider>

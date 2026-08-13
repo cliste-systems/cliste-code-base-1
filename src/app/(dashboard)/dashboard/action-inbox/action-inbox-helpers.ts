@@ -8,13 +8,6 @@ const EMAIL_IN_TEXT_RE =
 
 export type ActionTicketStatus = "open" | "resolved";
 
-export type RelatedCallPreview = {
-  id: string;
-  summary: string | null;
-  dateLabel: string;
-  callerName?: string | null;
-};
-
 export type ActionInboxItem = {
   id: string;
   callerNumber: string;
@@ -32,7 +25,6 @@ export type ActionInboxItem = {
   category: ActionCategory;
   categoryTitle: string;
   categoryShort: string;
-  relatedCall: RelatedCallPreview | null;
 };
 
 export type ActionInboxMetrics = {
@@ -249,6 +241,38 @@ export function matchesCategoryFilter(
 ): boolean {
   if (filter === "all") return true;
   return item.category === filter;
+}
+
+/**
+ * Work-queue priority: act-now items first, then revenue (bookings/callbacks),
+ * then the rest. Drives the open-queue order so the important work surfaces
+ * regardless of when it came in. Lower number = higher up.
+ */
+const ACTION_CATEGORY_PRIORITY: Record<ActionCategory, number> = {
+  urgent: 0,
+  complaint: 1,
+  booking_request: 2,
+  callback: 3,
+  confirm: 4,
+  quote: 5,
+  lead: 6,
+  follow_up: 7,
+  unclear: 8,
+  failed: 9,
+};
+
+/**
+ * Sort the inbox: open items by priority then newest-first; resolved items by
+ * recency only (they're not a work queue). Open/resolved live in separate tabs,
+ * so cross-status order doesn't matter.
+ */
+export function sortActionInboxItems(items: ActionInboxItem[]): ActionInboxItem[] {
+  return [...items].sort((a, b) => {
+    const pa = a.status === "resolved" ? 99 : (ACTION_CATEGORY_PRIORITY[a.category] ?? 50);
+    const pb = b.status === "resolved" ? 99 : (ACTION_CATEGORY_PRIORITY[b.category] ?? 50);
+    if (pa !== pb) return pa - pb;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 export function buildActionInboxMetrics(items: ActionInboxItem[]): ActionInboxMetrics {

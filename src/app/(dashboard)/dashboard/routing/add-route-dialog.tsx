@@ -395,7 +395,7 @@ export function AddRouteDialog({
         </DialogHeader>
 
         <div className="max-h-[min(60vh,520px)] overflow-y-auto overscroll-y-contain">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             {stage === "flow" ? (
               <motion.div key="flow" {...motionProps} className="space-y-4 px-5 py-4">
                 <FlowLine n={1} label="Call comes in" muted />

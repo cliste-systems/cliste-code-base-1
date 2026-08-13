@@ -11,7 +11,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 export { buildInviteEmailBodies } from "@/lib/invite-email-bodies";
 
 export function inviteEmailRedirectOrigin(): string {
-  return resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+  return resolveAppSiteOrigin().origin;
 }
 
 export function inviteEmailLogoUrl(): string {

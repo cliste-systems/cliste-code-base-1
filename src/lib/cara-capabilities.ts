@@ -72,8 +72,8 @@ export function routePhraseForPrompt(
   let line: string;
   if (lower.includes("tell them the address")) {
     line = `If they ask about ${topic}, I say the address out loud first, then offer to send the maps link the way they prefer.`;
-  } else if (lower.includes("offer the booking link")) {
-    line = `If they ask about ${topic}, I offer the booking link and send it by text or email the way they prefer.`;
+  } else if (lower.includes("offer the booking link") || lower.includes("booking link")) {
+    line = `If they ask about ${topic}, appointments are booked online via link — I offer the booking link and send it by text or email the way they prefer. I do not take name, service, or time over the phone first.`;
   } else if (lower.includes("link")) {
     line = `If they ask about ${topic}, I can text them the link.`;
   } else if (lower.includes("file")) {

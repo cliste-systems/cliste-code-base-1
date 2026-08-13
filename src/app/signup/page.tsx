@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { isSignupOnboardingDevRelaxed } from "@/lib/onboarding-dev";
 import {
   parseMarketingPlanIntent,
@@ -9,9 +10,9 @@ import { createClient } from "@/utils/supabase/server";
 import { SignupFlow } from "./signup-flow";
 
 export const metadata = {
-  title: "Sign up — Cliste Systems",
+  title: `Sign up — ${PRODUCT_NAME}`,
   description:
-    "Create your Cliste account and set up your AI receptionist in under 10 minutes.",
+    `Create your ${PRODUCT_NAME} account and set up your AI receptionist in under 10 minutes.`,
 };
 
 type SearchParams = Promise<{

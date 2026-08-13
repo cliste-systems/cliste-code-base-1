@@ -90,13 +90,12 @@ export function CaraSetupTabAnswers() {
 
   return (
     <DashboardAnimatedStack embedded>
-      <FaqsLintNotices />
       {answersConflictWarnings.length > 0 ? (
-        <div className="space-y-2 border-b border-amber-200/80 bg-amber-50/60 px-5 py-4">
+        <div className="space-y-2 border-b border-[#d9e2dd] bg-[#fbfcfb] px-5 py-4">
           {answersConflictWarnings.map((warning) => (
             <p
               key={warning.id}
-              className="text-[12.5px] leading-relaxed text-amber-950"
+              className="text-[12.5px] leading-relaxed text-[#35443f]"
             >
               {warning.message}{" "}
               {warning.href ? (
@@ -128,6 +127,7 @@ export function CaraSetupTabAnswers() {
         icon={HelpCircle}
         title={copy.caraSetup.commonQuestionsTitle}
         description="Questions callers ask most, with the answer Cara should give out loud."
+        bodyClassName="p-0"
         action={
           <Button
             type="button"
@@ -149,8 +149,10 @@ export function CaraSetupTabAnswers() {
           </Button>
         }
       >
+        <FaqsLintNotices />
+        <div className="space-y-4 px-5 py-5">
         {atFaqCap ? (
-          <p className="mb-3 text-[12.5px] text-amber-900">
+          <p className="mb-3 text-[12.5px] text-[#35443f]">
             {hasServiceCatalog ? (
               <>
                 Question limit reached — add more services or prices in your{" "}
@@ -221,6 +223,7 @@ export function CaraSetupTabAnswers() {
             onRemove={removeFaq}
           />
         )}
+        </div>
       </SectionCard>
 
       <AddQuestionDialog

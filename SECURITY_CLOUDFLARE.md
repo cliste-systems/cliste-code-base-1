@@ -1,6 +1,6 @@
 # Cloudflare hardening — status
 
-Zone: `clistesystems.ie`
+Zone: `hellocara.ie` (primary) · legacy `clistesystems.ie` (301 redirects during transition)
 Last applied: 2026-04-17 via `scripts/cloudflare-harden.py` and direct API.
 
 ## Zone settings (live)
@@ -72,7 +72,7 @@ endpoint is enterprise-only (Bot Fight Mode), returned a Cloudflare-side 500
 1. **Security → Bots → Bot Fight Mode** → turn on.
    Stops most classic scrapers. Free-tier feature, dashboard only.
 2. **Scrape Shield → Hotlink Protection** → turn on.
-   Blocks other sites embedding images from `clistesystems.ie`. The API
+   Blocks other sites embedding images from `hellocara.ie`. The API
    returned a 500 when we tried — it's dashboard-only for now.
 3. **DNS → Settings → DNSSEC** → Enable.
    Cloudflare will then display a DS record. Log into
@@ -94,25 +94,25 @@ Everything else is already applied.
   middleware. Also available on request.
 - **DMARC/SPF/DKIM** — needs coordination with whichever provider sends
   your outbound mail (SendGrid, Twilio, Google Workspace). A one-line
-  `v=DMARC1; p=reject; rua=mailto:dmarc@clistesystems.ie` is the goal, but
+  `v=DMARC1; p=reject; rua=mailto:dmarc@hellocara.ie` is the goal, but
   you want SPF/DKIM aligned first or legitimate mail gets rejected.
 
 ## Verification
 
 ```bash
 # should return 403 / Stripe-IP block
-curl -I https://clistesystems.ie/api/stripe/webhook
+curl -I https://hellocara.ie/api/stripe/webhook
 
 # should eventually 429 after 5 rapid hits
 for i in $(seq 1 10); do
-  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://clistesystems.ie/dashboard-unlock
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://app.hellocara.ie/dashboard-unlock
 done
 ```
 
 After you do the 7 dashboard steps above, also check:
 
-- <https://securityheaders.com/?q=clistesystems.ie> — should be A+
-- <https://www.ssllabs.com/ssltest/analyze.html?d=clistesystems.ie> — should be A+
+- <https://securityheaders.com/?q=hellocara.ie> — should be A+
+- <https://www.ssllabs.com/ssltest/analyze.html?d=hellocara.ie> — should be A+
 
 ## Re-running the script
 

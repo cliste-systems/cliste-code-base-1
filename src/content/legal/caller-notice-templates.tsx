@@ -108,7 +108,7 @@ export function CallerNoticeTemplates({
       <div className="space-y-3">
         <p className="text-[14px] leading-relaxed text-slate-600">
           You are the <strong className="font-medium text-[#0b1220]">data controller</strong>{" "}
-          for your callers&rsquo; personal data. Cliste acts as your{" "}
+          for your callers&rsquo; personal data. Cliste Systems Limited acts as your{" "}
           <strong className="font-medium text-[#0b1220]">processor</strong>. Under GDPR
           Articles 13 and 14 you must tell callers —{" "}
           <em>before they call</em> — that an AI assistant may answer, and that calls

@@ -15,6 +15,7 @@ import {
   reorderRoutes,
   type SavedRoute,
 } from "./route-models";
+import type { RouteActionType } from "./route-templates";
 import { buildAllRouteLintWarnings } from "./routing-validation";
 
 function otherActiveNames(routes: SavedRoute[], exceptId: string): string[] {
@@ -48,8 +49,8 @@ export function RoutingFlowCanvas() {
     return map;
   }, [lintWarnings]);
 
-  const startNewRoute = () => {
-    const route = buildRouteForActionType("send_link", caraContext, { name: "" });
+  const startNewRoute = (actionType: RouteActionType = "send_link") => {
+    const route = buildRouteForActionType(actionType, caraContext, { name: "" });
     setDraft({ ...route, name: "", keywords: "", description: "", note: "" });
     setEditingId(route.id);
     setIsNewDraft(true);
@@ -101,8 +102,9 @@ export function RoutingFlowCanvas() {
     <>
       <div
         className={cn(
-          "grid min-h-[min(520px,60vh)] flex-1 grid-cols-1 overflow-hidden",
-          "lg:grid-cols-2 lg:divide-x lg:divide-slate-100",
+          "grid min-h-0 flex-1 grid-cols-1 overflow-hidden bg-[#fbfcfb]",
+          "max-lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]",
+          "lg:grid-cols-[minmax(300px,400px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:divide-x lg:divide-[#dfe7e2]",
         )}
       >
         <DetailPanelShell surface="embedded">

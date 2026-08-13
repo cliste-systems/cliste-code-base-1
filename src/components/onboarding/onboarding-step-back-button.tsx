@@ -24,10 +24,7 @@ export function OnboardingStepBackButton({ className }: { className?: string }) 
   // Production funnel is forward-only — back would desync step 2 → step 1.
   if (!freeNav) return null;
 
-  if (
-    pathname === "/onboarding/knowledge" ||
-    pathname === "/onboarding/test-call"
-  ) {
+  if (pathname === "/onboarding/knowledge") {
     return null;
   }
 

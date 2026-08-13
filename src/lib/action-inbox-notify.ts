@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { sendTwilioBookingSms } from "@/lib/booking-confirmation-sms";
@@ -49,7 +50,7 @@ export async function notifyActionInboxOwner(
     input.callerNumber;
   const summary =
     input.summary.trim().slice(0, 500) || "A caller needs follow-up.";
-  const origin = resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+  const origin = resolveAppSiteOrigin().origin;
   const inboxUrl = `${origin}/dashboard/action-inbox`;
 
   if (email && isSendGridConfigured()) {
@@ -85,7 +86,7 @@ export async function notifyActionInboxOwner(
   }
 
   if (phone) {
-    const sms = `${biz}: new Action Inbox item from ${caller}. Open Cliste to review.`;
+    const sms = `${biz}: new Action Inbox item from ${caller}. Open ${PRODUCT_NAME} to review.`;
     const res = await sendTwilioBookingSms(phone, sms, {
       organizationId,
       purpose: "action_inbox_notify",

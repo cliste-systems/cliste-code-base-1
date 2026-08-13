@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { CLISTE_DEFAULT_ELEVENLABS_VOICE_ID } from "@/lib/onboarding-voice-presets";
+import { resolveOrgElevenLabsVoiceId } from "@/lib/cara-elevenlabs-voice";
 import { synthesizeElevenLabsSpeech } from "@/lib/elevenlabs-voice";
 import {
   getVoiceApiRateLimitStatus,
@@ -156,10 +156,23 @@ export async function POST(request: Request) {
 
   await recordVoiceApiRequest("voice_preview", fingerprint);
 
+  let agentVoiceId: string | null = null;
+  if (organizationId) {
+    const admin = createAdminClient();
+    const { data: orgVoice } = await admin
+      .from("organizations")
+      .select("agent_voice_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+    agentVoiceId = (orgVoice?.agent_voice_id as string | null) ?? null;
+  }
+
+  const voiceId = resolveOrgElevenLabsVoiceId(agentVoiceId);
+
   try {
     const audio = await synthesizeElevenLabsSpeech({
       text,
-      voiceId: CLISTE_DEFAULT_ELEVENLABS_VOICE_ID,
+      voiceId,
     });
     return new NextResponse(audio, {
       status: 200,

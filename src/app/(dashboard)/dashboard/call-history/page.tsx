@@ -1,10 +1,8 @@
 import { Phone } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
-import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-summary";
+import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import {
-  DASHBOARD_ICON_CHIP_LG,
-  DASHBOARD_ICON_GLYPH_LG,
   DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
@@ -27,6 +25,8 @@ import {
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
 import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
+
+import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
 
 import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
 import {
@@ -65,25 +65,11 @@ type TicketDbRow = {
   created_at: string;
 };
 
-function phoneKey(raw: string | null | undefined): string | null {
-  const digits = (raw ?? "").replace(/\D/g, "");
-  return digits.length >= 6 ? digits : null;
-}
-
-function buildFollowUpMap(tickets: TicketDbRow[]): Map<string, CallFollowUp> {
-  const openByKey = new Map<string, CallFollowUp>();
-  for (const t of tickets) {
-    if (t.status !== "open") continue;
-    const key = phoneKey(t.caller_number);
-    if (!key || openByKey.has(key)) continue;
-    openByKey.set(key, {
-      id: t.id,
-      summary: t.summary,
-      status: "open",
-    });
-  }
-  return openByKey;
-}
+type CallLinkRow = {
+  id: string;
+  caller_number: string;
+  created_at: string;
+};
 
 function parsePageParam(raw: string | undefined): number {
   const n = Number.parseInt(String(raw ?? "1"), 10);
@@ -92,7 +78,7 @@ function parsePageParam(raw: string | undefined): number {
 
 function toListItem(
   row: CallLogListRow,
-  openFollowUpByKey: Map<string, CallFollowUp>,
+  followUpByCallId: Map<string, CallFollowUp>,
   businessName: string,
   blockedSet: Set<string>,
 ): CallHistoryListItem {
@@ -101,8 +87,7 @@ function toListItem(
     transcript: null,
     transcript_review: null,
   });
-  const key = phoneKey(mapped.callerId);
-  const followUp = key ? (openFollowUpByKey.get(key) ?? null) : null;
+  const followUp = followUpByCallId.get(row.id) ?? null;
   const outcome = normalizeCallOutcome(row.outcome);
   const item: CallHistoryListItem = {
     id: mapped.id,
@@ -167,6 +152,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     { count: totalCount, error: countError },
     { data: metricsData, error: metricsError },
     { data: pageData, error: listError },
+    { data: linkRows },
     { data: ticketRows },
     { data: blockedRows },
   ] = await Promise.all([
@@ -192,6 +178,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         .order("created_at", { ascending: false })
         .range(listFrom, listTo),
     ),
+    applyRangeFilters(
+      supabase
+        .from("call_logs")
+        .select("id, caller_number, created_at")
+        .eq("organization_id", organizationId),
+    ),
     supabase
       .from("action_tickets")
       .select("id, caller_number, caller_name, summary, status, created_at")
@@ -207,7 +199,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
   const error = countError ?? metricsError ?? listError;
 
-  const openFollowUpByKey = buildFollowUpMap((ticketRows ?? []) as TicketDbRow[]);
+  const tickets = (ticketRows ?? []) as TicketDbRow[];
+  const followUpByCallId = assignOpenTicketsToCalls(
+    (linkRows ?? []) as CallLinkRow[],
+    tickets,
+  );
+  const openTicketCount = tickets.filter((t) => t.status === "open").length;
 
   const total = totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / CALL_HISTORY_PAGE_SIZE));
@@ -215,51 +212,42 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
   const metrics = buildCallHistoryMetricsFromSummaryRows(
     (metricsData ?? []) as CallLogMetricsRow[],
-    openFollowUpByKey.size,
+    openTicketCount,
   );
   if (total > 0) {
     metrics.totalCalls = total;
   }
-
-  const calls = !error
-    ? ((pageData ?? []) as CallLogListRow[]).map((row) =>
-        toListItem(row, openFollowUpByKey, businessName, blockedSet),
-      )
-    : [];
 
   const blockedCallerE164s = (blockedRows ?? []).map(
     (row) => String((row as { caller_e164: string }).caller_e164),
   );
   const blockedSet = new Set(blockedCallerE164s);
 
+  const calls = !error
+    ? ((pageData ?? []) as CallLogListRow[]).map((row) =>
+        toListItem(row, followUpByCallId, businessName, blockedSet),
+      )
+    : [];
+
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <DashboardAnimatedPageSections>
-      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
-          <div className="flex items-center gap-3">
-            <span className={DASHBOARD_ICON_CHIP_LG}>
-              <Phone className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
-                Calls
-              </h1>
-              <p className="mt-0.5 text-[13px] text-slate-500">{greetingSubline}</p>
-            </div>
-          </div>
-          <DashboardInlineSummary
-            segments={[
-              { value: String(metrics.totalCalls), label: "total calls" },
-              { value: String(metrics.routedCount), label: "routed" },
-              { value: String(metrics.needsAttentionCount), label: "need attention" },
-              { value: metrics.avgDurationLabel, label: "avg. length" },
-            ]}
-          />
-        </div>
-        <DashboardHeaderRangeControls />
-      </header>
+      <ClistePageHeader
+        tone="calls"
+        icon={Phone}
+        title="Calls"
+        description={greetingSubline}
+        actions={<DashboardHeaderRangeControls />}
+        summary={
+          [
+            { value: String(metrics.totalCalls), label: "total calls" },
+            { value: String(metrics.routedCount), label: "routed" },
+            { value: String(metrics.needsAttentionCount), label: "need attention" },
+            { value: metrics.avgDurationLabel, label: "avg. length" },
+          ]
+        }
+      />
 
       {error ? (
         <p className="shrink-0 text-[13px] text-red-700">

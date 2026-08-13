@@ -82,5 +82,5 @@ export function formatLiveActivityCallAction(
 
 /** Action Inbox items in the live feed — never the ticket summary text. */
 export function formatLiveActivityTicketAction(): string {
-  return "Request captured";
+  return "Enquiry captured";
 }

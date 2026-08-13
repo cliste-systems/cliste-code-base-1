@@ -1,10 +1,8 @@
 import { Users } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
-import { DashboardInlineSummary } from "@/components/dashboard/dashboard-inline-summary";
+import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import {
-  DASHBOARD_ICON_CHIP_LG,
-  DASHBOARD_ICON_GLYPH_LG,
   DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
@@ -281,35 +279,21 @@ export default async function ContactsPage() {
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
       <DashboardAnimatedPageSections>
-      <header className="shrink-0">
-        <div className="flex items-start gap-3">
-          <span className={DASHBOARD_ICON_CHIP_LG}>
-            <Users className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
-          </span>
-          <div className="min-w-0 space-y-2">
-            <div>
-              <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
-                Contacts
-              </h1>
-              <p className="mt-0.5 max-w-xl text-[13px] leading-snug text-slate-600">
-                People who have called or are saved on your client list — with call
-                history and open follow-ups.
-              </p>
-            </div>
-            <DashboardInlineSummary
-              segments={[
-                {
-                  value: String(metrics.totalContacts),
-                  label: metrics.totalContacts === 1 ? "contact" : "contacts",
-                },
-                { value: String(metrics.repeatCallers), label: "repeat" },
-                { value: String(metrics.openFollowUps), label: "open follow-ups" },
-                { value: String(metrics.newContacts), label: "new this week" },
-              ]}
-            />
-          </div>
-        </div>
-      </header>
+      <ClistePageHeader
+        tone="clients"
+        icon={Users}
+        title="Clients"
+        description="Everyone who has called or is saved on your client list, with call history and open follow-ups."
+        summary={[
+          {
+            value: String(metrics.totalContacts),
+            label: metrics.totalContacts === 1 ? "contact" : "contacts",
+          },
+          { value: String(metrics.repeatCallers), label: "repeat" },
+          { value: String(metrics.openFollowUps), label: "open follow-ups" },
+          { value: String(metrics.newContacts), label: "new this week" },
+        ]}
+      />
 
       {callError ? (
         <p className="shrink-0 text-[13px] text-red-700">

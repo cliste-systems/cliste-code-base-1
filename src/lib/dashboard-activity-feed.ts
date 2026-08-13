@@ -1,4 +1,5 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
+import { formatE164ForDisplay } from "@/lib/call-history-types";
 import {
   formatLiveActivityCallAction,
   formatLiveActivityTicketAction,
@@ -26,7 +27,7 @@ function callerLabelFor(row: ActivityFeedSourceCall): string {
   const name = row.caller_name?.trim();
   if (name) return name;
   const phone = row.caller_number?.trim();
-  if (phone) return phone;
+  if (phone) return formatE164ForDisplay(phone) || phone;
   return "Unknown caller";
 }
 
@@ -45,10 +46,10 @@ export function buildDashboardActivityFeed(input: {
       return {
         id: `${row.id}-call`,
         title: callerLabelFor(row),
-        subtitle: action,
         time: input.formatTime(row.created_at),
         href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(row.id)}`,
         badge: action,
+        isoDate: row.created_at,
         timestamp: new Date(row.created_at).getTime(),
       };
     }),
@@ -57,10 +58,10 @@ export function buildDashboardActivityFeed(input: {
       return {
         id: `${row.id}-ticket`,
         title: ticketCallerLabel(row),
-        subtitle: action,
         time: input.formatTime(row.created_at),
         href: `${DASHBOARD_ROUTES.actionInbox}?ticket=${encodeURIComponent(row.id)}`,
         badge: action,
+        isoDate: row.created_at,
         timestamp: new Date(row.created_at).getTime(),
       };
     }),

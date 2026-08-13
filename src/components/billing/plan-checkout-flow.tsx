@@ -18,7 +18,7 @@ type Props = {
   returnUrl: string;
   continueHref: string;
   continueLabel?: string;
-  onPersist?: (subscriptionId: string) => Promise<void>;
+  onPersist?: (subscriptionId: string, setupIntentId?: string) => Promise<void>;
 };
 
 export function PlanCheckoutFlow(props: Props) {

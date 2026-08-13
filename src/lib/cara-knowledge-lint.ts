@@ -555,19 +555,8 @@ export function lintCrossSurfaceKnowledge(
         });
       }
     }
-    for (const item of offered) {
-      if (isCatalogDuplicate(item, catalogNames)) {
-        issues.push({
-          id: `cross-svc-name-offered-${caraSetupChipKey(item)}`,
-          severity: "warn",
-          field: "servicesOffered",
-          placement: "inline",
-          targetKey: item,
-          message: `"${item}" is already on your Services menu — you don't need it in both places.`,
-          href: DASHBOARD_ROUTES.businessServices,
-        });
-      }
-    }
+    // Salon catalog mode mirrors menu names into servicesOffered for legacy
+    // prompt fields — not a second source of truth.
   }
 
   if (

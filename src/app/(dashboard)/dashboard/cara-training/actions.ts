@@ -8,6 +8,8 @@ import {
   confirmTrainingItem,
   createTrainingItem,
   dismissTrainingItem,
+  resolveCallGapNo,
+  resolveCallGapYes,
   resetTrainingItemToAnswer,
   revertTrainingItem,
   submitOwnerAnswer,
@@ -45,6 +47,28 @@ export async function dismissTrainingDraft(itemId: string): Promise<ActionResult
   const session = await requireDashboardAdmin();
   const supabase = await createClient();
   return dismissTrainingItem(supabase, session.organizationId, itemId);
+}
+
+export async function resolveCallGapYesAction(itemId: string): Promise<ActionResult> {
+  const session = await requireDashboardAdmin();
+  const supabase = await createClient();
+  return resolveCallGapYes(
+    supabase,
+    session.organizationId,
+    itemId,
+    session.user.id,
+  );
+}
+
+export async function resolveCallGapNoAction(itemId: string): Promise<ActionResult> {
+  const session = await requireDashboardAdmin();
+  const supabase = await createClient();
+  return resolveCallGapNo(
+    supabase,
+    session.organizationId,
+    itemId,
+    session.user.id,
+  );
 }
 
 export async function editTrainingAnswer(itemId: string): Promise<ActionResult> {

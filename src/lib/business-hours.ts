@@ -18,10 +18,29 @@ export type WeekSchedule = Record<DayKey, DaySchedule>;
 export type WeekScheduleMeta = {
   open24_7?: boolean;
   hoursNote?: string;
+  bankHolidays?: BankHolidayConfig;
 };
+
+/** Bank & public holiday handling — optional add-on to the weekly schedule. */
+export type BankHolidayConfig = {
+  /** Owner opted in to bank-holiday rules. */
+  configured: boolean;
+  /** When configured: open on bank/public holidays vs closed. */
+  open: boolean;
+  start: string;
+  end: string;
+};
+
+export function defaultBankHolidayConfig(): BankHolidayConfig {
+  return { configured: false, open: false, start: "10:00", end: "14:00" };
+}
 
 const META_OPEN_24_7 = "_open24_7";
 const META_HOURS_NOTE = "_hoursNote";
+const META_BANK_HOLIDAYS_CONFIGURED = "_bankHolidaysConfigured";
+const META_BANK_HOLIDAYS_OPEN = "_bankHolidaysOpen";
+const META_BANK_HOLIDAYS_START = "_bankHolidaysStart";
+const META_BANK_HOLIDAYS_END = "_bankHolidaysEnd";
 
 export const DAY_KEYS: DayKey[] = [
   "monday",
@@ -89,6 +108,25 @@ export function isBusinessHoursUnset(raw: unknown): boolean {
   return Object.keys(raw as Record<string, unknown>).length === 0;
 }
 
+function readBankHolidayConfig(raw: Record<string, unknown>): BankHolidayConfig {
+  const defaults = defaultBankHolidayConfig();
+  if (raw[META_BANK_HOLIDAYS_CONFIGURED] !== true) {
+    return defaults;
+  }
+  const open = raw[META_BANK_HOLIDAYS_OPEN] === true;
+  const start =
+    typeof raw[META_BANK_HOLIDAYS_START] === "string" &&
+    raw[META_BANK_HOLIDAYS_START].trim()
+      ? raw[META_BANK_HOLIDAYS_START].trim()
+      : defaults.start;
+  const end =
+    typeof raw[META_BANK_HOLIDAYS_END] === "string" &&
+    raw[META_BANK_HOLIDAYS_END].trim()
+      ? raw[META_BANK_HOLIDAYS_END].trim()
+      : defaults.end;
+  return { configured: true, open, start, end };
+}
+
 function readWeekScheduleMeta(raw: Record<string, unknown>): WeekScheduleMeta {
   return {
     open24_7: raw[META_OPEN_24_7] === true,
@@ -96,6 +134,7 @@ function readWeekScheduleMeta(raw: Record<string, unknown>): WeekScheduleMeta {
       typeof raw[META_HOURS_NOTE] === "string"
         ? raw[META_HOURS_NOTE].trim().slice(0, 120)
         : "",
+    bankHolidays: readBankHolidayConfig(raw),
   };
 }
 
@@ -127,6 +166,14 @@ export function serializeBusinessHours(
   if (meta.open24_7) payload[META_OPEN_24_7] = true;
   if (meta.hoursNote?.trim()) {
     payload[META_HOURS_NOTE] = meta.hoursNote.trim().slice(0, 120);
+  }
+  if (meta.bankHolidays?.configured) {
+    payload[META_BANK_HOLIDAYS_CONFIGURED] = true;
+    payload[META_BANK_HOLIDAYS_OPEN] = meta.bankHolidays.open;
+    if (meta.bankHolidays.open) {
+      payload[META_BANK_HOLIDAYS_START] = meta.bankHolidays.start;
+      payload[META_BANK_HOLIDAYS_END] = meta.bankHolidays.end;
+    }
   }
   return payload;
 }

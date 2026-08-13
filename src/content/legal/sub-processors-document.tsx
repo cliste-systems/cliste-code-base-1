@@ -4,6 +4,7 @@ import {
   LegalTable,
 } from "@/components/legal/legal-document";
 import { LegalInlineLink } from "@/components/legal/legal-path-context";
+import { CLISTE_COMPANY } from "@/lib/company-details";
 import {
   SUB_PROCESSOR_CATEGORIES_PUBLIC,
   SUB_PROCESSOR_GROUP_LABELS,
@@ -33,8 +34,8 @@ export function SubProcessorsDocument({
         title="Sub-processors"
         description={
           isCustomer
-            ? "Named third parties we use to deliver Cliste. This annex forms part of our DPA with your business."
-            : "How Cliste uses third parties to run the platform. Categories below; business customers receive the named list in their dashboard."
+            ? "Named third parties we use to deliver Hello Cara. This annex forms part of our DPA with your business."
+            : "How Hello Cara uses third parties to run the platform. Categories below; business customers receive the named list in their dashboard."
         }
       />
 
@@ -107,7 +108,7 @@ export function SubProcessorsDocument({
                 Legal &amp; privacy → Sub-processors
               </LegalInlineLink>{" "}
               for the current named vendor list, or email{" "}
-              <strong>privacy@clistesystems.ie</strong>.
+              <strong>{CLISTE_COMPANY.privacyEmail}</strong>.
             </p>
           </LegalSection>
         </>
@@ -157,7 +158,7 @@ export function SubProcessorsDocument({
           Our DPA with you is at{" "}
           <LegalInlineLink href="/legal/dpa">/legal/dpa</LegalInlineLink>.
           Enterprise customers may request a countersigned copy — email{" "}
-          <strong>privacy@clistesystems.ie</strong>.
+          <strong>{CLISTE_COMPANY.privacyEmail}</strong>.
         </p>
       </LegalSection>
     </>

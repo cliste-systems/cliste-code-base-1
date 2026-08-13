@@ -1,8 +1,9 @@
 import "server-only";
 
 import {
-  CLISTE_DEFAULT_ELEVENLABS_MODEL_ID,
-} from "@/lib/onboarding-voice-presets";
+  CLISTE_ELEVENLABS_VOICE_SETTINGS,
+  resolveElevenLabsModelId,
+} from "@/lib/cara-elevenlabs-voice";
 import { MAX_GREETING_SCRIPT_LENGTH } from "@/lib/voice-greeting-security";
 
 function elevenLabsTtsBaseUrl(): string {
@@ -15,6 +16,7 @@ function elevenLabsTtsBaseUrl(): string {
 export async function synthesizeElevenLabsSpeech(input: {
   text: string;
   voiceId: string;
+  modelId?: string;
 }): Promise<ArrayBuffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   if (!apiKey) {
@@ -40,7 +42,8 @@ export async function synthesizeElevenLabsSpeech(input: {
       },
       body: JSON.stringify({
         text,
-        model_id: CLISTE_DEFAULT_ELEVENLABS_MODEL_ID,
+        model_id: input.modelId ?? resolveElevenLabsModelId(),
+        voice_settings: CLISTE_ELEVENLABS_VOICE_SETTINGS,
       }),
       cache: "no-store",
     },

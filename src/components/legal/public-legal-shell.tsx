@@ -5,6 +5,7 @@ import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import { LegalPathProvider } from "@/components/legal/legal-path-context";
 import { PublicLegalTabs } from "@/components/legal/public-legal-tabs";
 import {
+  CLISTE_COMPANY,
   companyRegistrationLine,
 } from "@/lib/company-details";
 
@@ -23,7 +24,7 @@ export function PublicLegalShell({ children }: Props) {
           >
             <ClisteLogoMark size={32} priority />
             <span className="truncate text-[14px] font-semibold tracking-tight">
-              Cliste Systems
+              {CLISTE_COMPANY.productName}
             </span>
           </Link>
           <Link
@@ -48,17 +49,17 @@ export function PublicLegalShell({ children }: Props) {
           <p>
             {companyRegistrationLine()} ·{" "}
             <a
-              href="mailto:hello@clistesystems.ie"
+              href={`mailto:${CLISTE_COMPANY.helloEmail}`}
               className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
             >
-              hello@clistesystems.ie
+              {CLISTE_COMPANY.helloEmail}
             </a>{" "}
             ·{" "}
             <a
-              href="mailto:privacy@clistesystems.ie"
+              href={`mailto:${CLISTE_COMPANY.privacyEmail}`}
               className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
             >
-              privacy@clistesystems.ie
+              {CLISTE_COMPANY.privacyEmail}
             </a>
           </p>
           <p>

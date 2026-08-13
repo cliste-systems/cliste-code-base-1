@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/company-details";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -26,7 +27,7 @@ export default async function AdminUnlockPage({
             <div className="mb-16 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
               <Image
                 src="/m8x4p2n7.png"
-                alt="Cliste"
+                alt={PRODUCT_NAME}
                 width={30}
                 height={30}
                 className="h-7 w-7 object-contain"
@@ -34,7 +35,7 @@ export default async function AdminUnlockPage({
               />
             </div>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-100/95 backdrop-blur-md">
-              Cliste Systems
+              {PRODUCT_NAME}
             </div>
             <h2 className="mb-6 text-3xl leading-[1.12] font-light tracking-tight text-white lg:text-4xl">
               The New Standard for
@@ -60,7 +61,7 @@ export default async function AdminUnlockPage({
             <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
               <Image
                 src="/m8x4p2n7.png"
-                alt="Cliste"
+                alt={PRODUCT_NAME}
                 width={30}
                 height={30}
                 className="h-7 w-7 object-contain"
@@ -71,7 +72,7 @@ export default async function AdminUnlockPage({
               Authenticate
             </h1>
             <p className="text-sm font-light text-slate-500">
-              Continue to your Cliste account
+              Continue to your {PRODUCT_NAME} account
             </p>
           </div>
 
@@ -80,7 +81,7 @@ export default async function AdminUnlockPage({
               Authenticate
             </h1>
             <p className="text-sm font-light text-slate-500">
-              Continue to your Cliste account
+              Continue to your {PRODUCT_NAME} account
             </p>
           </div>
 

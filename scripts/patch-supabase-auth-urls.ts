@@ -9,12 +9,13 @@
  *   npx tsx scripts/patch-supabase-auth-urls.ts
  */
 
+import { DEFAULT_APP_SITE_URL } from "../src/lib/company-details";
 import { SIGNUP_EMAIL_OTP_LENGTH } from "../src/lib/signup-email-otp";
 
 const PROJECT_REF = "rtoebbwzwxcnscsxghww";
-const SITE_URL = "https://app.clistesystems.ie";
+const SITE_URL = DEFAULT_APP_SITE_URL;
 const REDIRECT_URLS = [
-  "https://app.clistesystems.ie/auth/callback",
+  `${DEFAULT_APP_SITE_URL}/auth/callback`,
   "http://localhost:3000/auth/callback",
   "http://localhost:3001/auth/callback",
   "http://127.0.0.1:3000/auth/callback",

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Shield } from "lucide-react";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Cliste Admin — Security",
+  title: `${PRODUCT_NAME} Admin — Security`,
 };
 
 type SecurityEventRow = {

@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   parseBookingMenuFromHtml,
   parseDurationCaption,
+  parseFreshaBusinessNameFromHtml,
 } from "./booking-menu-platform-parsers";
 
 const FRESHA_FIXTURE = `
@@ -87,7 +88,50 @@ describe("parseDurationCaption", () => {
   });
 });
 
+const FRESHA_LITE_FIXTURE = `
+<html>
+<body>
+<script id="__NEXT_DATA__" type="application/json">{
+  "props": {
+    "pageProps": {
+      "liteLocation": {
+        "name": "Studio 5 Hair Salon",
+        "offeredCategories": [
+          {
+            "name": "Hair & styling",
+            "treatments": [
+              "Balayage",
+              "Blow Dry",
+              "Children's Haircut",
+              "Keratin Treatment"
+            ]
+          }
+        ],
+        "nearbyLocations": [
+          { "name": "Sculptic Clinic" }
+        ]
+      }
+    }
+  }
+}</script>
+Sculptic Clinic 5 rating nearby venue footer
+</body>
+</html>
+`;
+
 describe("parseBookingMenuFromHtml", () => {
+  it("extracts Fresha lite landing page (/lvp/) categories", () => {
+    const services = parseBookingMenuFromHtml(
+      "www.fresha.com",
+      FRESHA_LITE_FIXTURE,
+    );
+    assert.ok(services);
+    assert.equal(services.length, 4);
+    assert.equal(services[0]?.name, "Balayage");
+    assert.equal(services[0]?.category, "Hair & styling");
+    assert.equal(parseFreshaBusinessNameFromHtml(FRESHA_LITE_FIXTURE), "Studio 5 Hair Salon");
+  });
+
   it("extracts Fresha services from __NEXT_DATA__", () => {
     const services = parseBookingMenuFromHtml(
       "www.fresha.com",

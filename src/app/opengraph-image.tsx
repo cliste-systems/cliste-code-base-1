@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -5,7 +6,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "nodejs";
 
-export const alt = "Cliste Systems";
+export const alt = PRODUCT_NAME;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -44,7 +45,7 @@ export default async function OpenGraphImage() {
             letterSpacing: "-0.02em",
           }}
         >
-          Cliste Systems
+          {PRODUCT_NAME}
         </p>
         <p
           style={{

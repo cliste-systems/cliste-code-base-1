@@ -33,6 +33,8 @@ export type TimelineFeedRow = {
   badge?: string;
   /** When true, badge reads as needing attention. */
   urgent?: boolean;
+  /** Source timestamp (ISO) — used by the Activity page to group rows by day. */
+  isoDate?: string;
 };
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
@@ -51,7 +53,7 @@ function homePanelBadgeLabel(badge: string): string {
   if (hay === "call answered") return "Answered";
   if (hay === "routed") return "Routed";
   if (hay === "callback requested") return "Callback";
-  if (hay === "request captured") return "Request";
+  if (hay === "enquiry captured") return "Enquiry";
   if (hay === "missed call") return "Missed";
   if (hay === "voicemail") return "Voicemail";
   if (hay === "spam call") return "Spam";
@@ -114,6 +116,7 @@ export function DashboardTimelineFeed({
   emptyBody,
   emptySize = "default",
   dense = false,
+  pageFeed = false,
   homePanel = false,
   homePanelTone = "activity",
   fillPanel = false,
@@ -126,6 +129,8 @@ export function DashboardTimelineFeed({
   /** Bounded empty layouts for the home dashboard. */
   emptySize?: DashboardTimelineFeedEmptySize;
   dense?: boolean;
+  /** Full-width Activity page — icon, badge pill, aligned columns. */
+  pageFeed?: boolean;
   /** Home list panels — compact rows, shared styling. */
   homePanel?: boolean;
   /** Slight visual distinction between activity vs inbox on Home. */
@@ -181,6 +186,56 @@ export function DashboardTimelineFeed({
           </>
         )}
       </div>
+    );
+  }
+
+  if (pageFeed) {
+    return (
+      <ul className={cn("divide-y divide-slate-100", className)} role="list">
+        {rows.map((row) => {
+          const RowIcon = homeFeedRowIcon(row.badge, row.urgent);
+
+          return (
+            <li key={row.id}>
+              <Link
+                href={row.href}
+                className="group grid w-full grid-cols-[2rem_minmax(0,1fr)_auto_5.75rem] items-center gap-x-3 px-3 py-2.5 transition-colors hover:bg-slate-50/80 sm:px-4"
+              >
+                <span className={DASHBOARD_ICON_CHIP_SM} aria-hidden>
+                  <RowIcon className={DASHBOARD_ICON_GLYPH_SM} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[14px] font-medium leading-snug text-[#0b1220]">
+                    {row.title}
+                  </span>
+                  {row.subtitle && row.subtitle !== row.badge ? (
+                    <span className="mt-0.5 block truncate text-[12px] leading-snug text-slate-500">
+                      {row.subtitle}
+                    </span>
+                  ) : null}
+                </span>
+                {row.badge ? (
+                  <StatusPill
+                    variant={homePanelBadgeVariant(
+                      row.badge,
+                      "activity",
+                      row.urgent,
+                    )}
+                    className={HOME_PANEL_BADGE_CLASS}
+                  >
+                    {homePanelBadgeLabel(row.badge)}
+                  </StatusPill>
+                ) : (
+                  <span aria-hidden />
+                )}
+                <span className="shrink-0 text-right text-[12px] leading-none tabular-nums text-slate-400">
+                  {row.time}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     );
   }
 

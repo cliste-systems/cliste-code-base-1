@@ -10,6 +10,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { ensureSalonBookingRouteInPayload } from "../src/app/(onboarding)/onboarding/knowledge/ensure-salon-booking-route";
+import type { CaraHandleOptionId } from "../src/app/(onboarding)/onboarding/knowledge/train-cara-constants";
 import { serializeRoutes } from "../src/app/(dashboard)/dashboard/routing/route-models";
 import { syncServiceNamesToBoundary, upsertServiceForOrg } from "../src/lib/service-catalog";
 import { createAdminClient } from "../src/utils/supabase/admin";
@@ -79,6 +80,9 @@ async function main() {
       price: service.price,
       durationMinutes: service.durationMinutes,
       source: "manual",
+      description: null,
+      policyFlags: [],
+      aiVoiceNotes: null,
     });
   }
 
@@ -126,7 +130,7 @@ async function main() {
     { id: "stylist", label: "Stylist preference" },
     { id: "first_visit", label: "First visit?" },
   ];
-  const handleOptions = [
+  const handleOptions: CaraHandleOptionId[] = [
     "answer_common_questions",
     "take_message",
     "send_link",

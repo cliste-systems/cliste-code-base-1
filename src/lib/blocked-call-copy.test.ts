@@ -13,10 +13,10 @@ describe("blocked-call-copy", () => {
     assert.match(text, /blocklist/i);
   });
 
-  it("includes business name and Cliste Systems in spoken message", () => {
+  it("includes business name and Hello Cara in spoken message", () => {
     const text = blockedCallSpokenMessage("Bloom Beauty Studio");
     assert.match(text, /Bloom Beauty Studio/);
-    assert.match(text, /Cliste Systems/i);
+    assert.match(text, /Hello Cara/i);
     assert.match(text, /Goodbye/i);
   });
 

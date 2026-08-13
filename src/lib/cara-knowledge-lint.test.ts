@@ -220,4 +220,40 @@ describe("cara-knowledge-lint", () => {
       issues.some((issue) => issue.id.startsWith("cross-svc-name-supplement-")),
     );
   });
+
+  it("does not warn when servicesOffered mirrors the service catalog", () => {
+    const snapshot = snapshotFromLists({
+      servicesOffered: "Ladies Cut & Blow Dry, Root Colour",
+      serviceCatalog: [
+        {
+          id: "svc-1",
+          name: "Ladies Cut & Blow Dry",
+          category: null,
+          price: 60,
+          durationMinutes: 55,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [],
+          source: "manual",
+        },
+        {
+          id: "svc-2",
+          name: "Root Colour",
+          category: null,
+          price: 65,
+          durationMinutes: 90,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [],
+          source: "manual",
+        },
+      ],
+    });
+
+    const issues = lintCaraKnowledge(snapshot);
+    assert.equal(
+      issues.some((issue) => issue.id.startsWith("cross-svc-name-offered-")),
+      false,
+    );
+  });
 });

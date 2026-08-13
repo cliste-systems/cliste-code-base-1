@@ -26,9 +26,9 @@ describe("dashboardBreadcrumbs", () => {
     ]);
   });
 
-  it("uses Cara > Training for training", () => {
+  it("uses Workspace > Training for training", () => {
     assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.caraTraining), [
-      { label: "Cara", href: DASHBOARD_ROUTES.caraGreeting },
+      { label: "Workspace", href: DASHBOARD_ROUTES.home },
       { label: "Training" },
     ]);
   });

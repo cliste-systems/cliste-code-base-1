@@ -69,7 +69,6 @@ export type DashboardSidebarNavItem = {
 type DashboardSidebarProps = {
   coreNav: DashboardSidebarNavItem[];
   accountNav: DashboardSidebarNavItem[];
-  caraTrainingBadge?: number;
   needsPassword: boolean;
   account: DashboardAccountSummary;
   locations: AccountLocationRow[];
@@ -168,7 +167,6 @@ function NavSection({
 export function DashboardSidebar({
   coreNav,
   accountNav,
-  caraTrainingBadge,
   needsPassword,
   account,
   locations,
@@ -190,11 +188,11 @@ export function DashboardSidebar({
             priority
           />
           <div className="min-w-0 leading-none">
-            <p className="text-[15px] font-semibold tracking-[0.18em] text-[#0f172a]">
-              CLISTE
+            <p className="text-[15px] font-semibold tracking-[0.12em] text-[#0f172a]">
+              HELLO
             </p>
             <p className="mt-1 text-[10px] font-medium tracking-[0.14em] text-[#64748b]">
-              Voice
+              CARA
             </p>
           </div>
         </div>
@@ -206,7 +204,7 @@ export function DashboardSidebar({
             <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
               Cara
             </p>
-            <CaraSidebarNav trainingBadge={caraTrainingBadge} />
+            <CaraSidebarNav />
           </section>
           <section className="space-y-1.5">
             <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">

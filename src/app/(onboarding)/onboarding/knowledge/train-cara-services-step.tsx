@@ -36,10 +36,6 @@ import {
 } from "@/lib/service-catalog-format";
 import { ServicePolicyPresetsEditor } from "@/components/agent-knowledge/service-policy-presets-editor";
 import { verticalPackForNiche } from "@/lib/verticals";
-import {
-  findCatalogDuplicateLineHints,
-  sanitizeServicesOfferedRaw,
-} from "@/lib/service-offered-raw";
 import { cn } from "@/lib/utils";
 
 import {
@@ -194,14 +190,11 @@ export function TrainCaraServicesStep({
       <SalonServicesStep
         title={title}
         subtitle={subtitle}
-        helper={helper}
         caraGoal={caraGoal}
         servicesCopy={servicesCopy}
         catalog={catalog}
         bookingLinkUrl={bookingLinkUrl}
-        servicesOfferedRaw={servicesOfferedRaw}
         onCatalogChange={onCatalogChange}
-        onServicesOfferedRawChange={onServicesOfferedRawChange}
         onSkip={onSkip}
         disabled={disabled}
       />
@@ -252,17 +245,17 @@ function FaqOnlySkipHint({
 function SalonServicesStep({
   title,
   subtitle,
-  helper,
   caraGoal,
   servicesCopy,
   catalog,
   bookingLinkUrl = "",
-  servicesOfferedRaw,
   onCatalogChange,
-  onServicesOfferedRawChange,
   onSkip,
   disabled,
-}: Omit<Props, "niche">) {
+}: Omit<
+  Props,
+  "niche" | "servicesOfferedRaw" | "onServicesOfferedRawChange" | "helper"
+>) {
   const savedLink = bookingLinkUrl.trim();
   const hasImportedMenu = catalog.length > 0;
   const [connectedLink, setConnectedLink] = useState(savedLink);
@@ -291,61 +284,17 @@ function SalonServicesStep({
   const [editDraft, setEditDraft] = useState<ServiceCatalogDraft>(emptyDraft());
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [linkPanelOpen, setLinkPanelOpen] = useState(() => !hasImportedMenu);
-  const [ownWordsPanelOpen, setOwnWordsPanelOpen] = useState(
-    () => !hasImportedMenu && Boolean(servicesOfferedRaw.trim()),
-  );
-  const [ownWordsDumpHint, setOwnWordsDumpHint] = useState<string | null>(null);
-  const [ownWordsDupHint, setOwnWordsDupHint] = useState<string | null>(null);
 
   const busy = disabled || importing || pending;
 
   useEffect(() => {
-    if (!hasImportedMenu) return;
-    const catalogNames = catalog.map((item) => item.name);
-    const cleaned = sanitizeServicesOfferedRaw({
-      raw: servicesOfferedRaw,
-      catalogNames,
-    });
-    if (servicesOfferedRaw.trim() && !cleaned) {
-      setOwnWordsDumpHint(
-        "That looks like your imported menu — use this box only for things not listed above.",
-      );
-      onServicesOfferedRawChange("");
-      setOwnWordsPanelOpen(true);
-      return;
-    }
-    setOwnWordsDumpHint(null);
-  }, [hasImportedMenu, catalog, servicesOfferedRaw, onServicesOfferedRawChange]);
-
-  function handleOwnWordsChange(value: string) {
-    if (ownWordsDumpHint) setOwnWordsDumpHint(null);
-    if (ownWordsDupHint) setOwnWordsDupHint(null);
-    onServicesOfferedRawChange(value);
-  }
-
-  function handleOwnWordsBlur() {
-    if (!hasImportedMenu) return;
-    const catalogNames = catalog.map((item) => item.name);
-    const hints = findCatalogDuplicateLineHints(servicesOfferedRaw, catalogNames);
-    setOwnWordsDupHint(
-      hints.length > 0
-        ? `Already in your menu: ${hints.slice(0, 3).join(", ")}${hints.length > 3 ? "…" : ""}`
-        : null,
-    );
-  }
-
-  useEffect(() => {
     if (hasImportedMenu && !editingLink) {
       setLinkPanelOpen(false);
-      if (!servicesOfferedRaw.trim()) {
-        setOwnWordsPanelOpen(false);
-      }
     }
-  }, [hasImportedMenu, editingLink, servicesOfferedRaw]);
+  }, [hasImportedMenu, editingLink]);
 
   function openLinkPanel() {
     setLinkPanelOpen(true);
-    setOwnWordsPanelOpen(false);
   }
 
   function toggleLinkPanel() {
@@ -357,37 +306,19 @@ function SalonServicesStep({
     openLinkPanel();
   }
 
-  function openOwnWordsPanel() {
-    setOwnWordsPanelOpen(true);
-    setLinkPanelOpen(false);
-    setEditingLink(false);
-  }
-
-  function toggleOwnWordsPanel() {
-    if (ownWordsPanelOpen) {
-      setOwnWordsPanelOpen(false);
-      return;
-    }
-    openOwnWordsPanel();
-  }
-
-  function handleOwnWordsTextareaExpand(expanded: boolean) {
-    if (expanded) {
-      setLinkPanelOpen(false);
-      setEditingLink(false);
-    }
-  }
+  const bookingImportLabel =
+    servicesCopy.bookingImportLabel?.trim() || "Import from booking link";
+  const bookingImportPlaceholder =
+    servicesCopy.bookingImportPlaceholder?.trim() ||
+    "fresha.com/… or booksy.com/…";
+  const bookingImportHint =
+    servicesCopy.bookingImportHint?.trim() ||
+    "Paste Fresha, Phorest, or Booksy — we’ll pull your service menu.";
 
   const linkPanelSummary =
     connectedLink ||
     importUrl.trim() ||
-    servicesCopy.bookingImportPlaceholder ||
-    "Paste a booking link";
-
-  const ownWordsSummary = servicesOfferedRaw.trim()
-    ? servicesOfferedRaw.trim().slice(0, 72) +
-      (servicesOfferedRaw.trim().length > 72 ? "…" : "")
-    : "Optional — only if something isn't in your menu";
+    bookingImportPlaceholder;
 
   const sortedCatalog = useMemo(
     () => [...catalog].sort((a, b) => a.name.localeCompare(b.name)),
@@ -498,7 +429,7 @@ function SalonServicesStep({
         <ServicesCollapsibleSection
           open={linkPanelOpen}
           onToggle={toggleLinkPanel}
-          title="Booking link"
+          title={bookingImportLabel}
           summary={linkPanelSummary}
           disabled={busy}
         >
@@ -509,31 +440,20 @@ function SalonServicesStep({
                   {connectedLink}
                 </span>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    openLinkPanel();
-                    setEditingLink(true);
-                    setImportUrl(connectedLink);
-                  }}
-                  disabled={busy}
-                  className={SERVICES_TOOLBAR_OUTLINE_BTN}
-                >
-                  Change link
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openEdit()}
-                  disabled={busy}
-                  className={SERVICES_TOOLBAR_OUTLINE_BTN}
-                >
-                  <Plus className="size-4" aria-hidden />
-                  Add
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  openLinkPanel();
+                  setEditingLink(true);
+                  setImportUrl(connectedLink);
+                }}
+                disabled={busy}
+                className={cn(SERVICES_TOOLBAR_OUTLINE_BTN, "sm:shrink-0")}
+              >
+                Change link
+              </button>
             </div>
-          ) : servicesCopy.bookingImportLabel ? (
+          ) : (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
                 type="url"
@@ -546,10 +466,10 @@ function SalonServicesStep({
                     handleImport();
                   }
                 }}
-                placeholder={servicesCopy.bookingImportPlaceholder}
+                placeholder={bookingImportPlaceholder}
                 disabled={busy}
                 className={SERVICES_TOOLBAR_INPUT}
-                aria-label="Booking link"
+                aria-label={bookingImportLabel}
               />
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -578,36 +498,11 @@ function SalonServicesStep({
                     Cancel
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => openEdit()}
-                  disabled={busy}
-                  className={SERVICES_TOOLBAR_OUTLINE_BTN}
-                >
-                  <Plus className="size-4" aria-hidden />
-                  Add
-                </button>
               </div>
-            </div>
-          ) : (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => openEdit()}
-                disabled={busy}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 disabled:opacity-50"
-              >
-                <Plus className="size-4" aria-hidden />
-                Add service
-              </button>
             </div>
           )}
 
-          {!showConnectedLink && servicesCopy.bookingImportHint ? (
-            <p className={cn(ONBOARDING_FIELD_HINT, "!mt-0")}>
-              {servicesCopy.bookingImportHint}
-            </p>
-          ) : null}
+          <p className={cn(ONBOARDING_FIELD_HINT, "!mt-0")}>{bookingImportHint}</p>
         </ServicesCollapsibleSection>
 
         {message ? (
@@ -669,10 +564,21 @@ function SalonServicesStep({
         ) : null}
 
         <div className="rounded-xl border border-slate-200/90 bg-white/80">
-          <p className="border-b border-slate-100 px-4 py-2.5 text-[13px] font-medium text-slate-900">
-            {servicesCopy.catalogListLabel}
-            {catalog.length > 0 ? ` (${catalog.length})` : ""}
-          </p>
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+            <p className="text-[13px] font-medium text-slate-900">
+              {servicesCopy.catalogListLabel}
+              {catalog.length > 0 ? ` (${catalog.length})` : ""}
+            </p>
+            <button
+              type="button"
+              onClick={() => openEdit()}
+              disabled={busy}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-slate-700 disabled:opacity-50"
+            >
+              <Plus className="size-3.5" aria-hidden />
+              Add service
+            </button>
+          </div>
           {sortedCatalog.length === 0 ? (
             <p className="px-4 py-3 text-[12.5px] leading-relaxed text-slate-500">
               No services yet — import from a booking link or add them manually.
@@ -716,53 +622,6 @@ function SalonServicesStep({
             </ul>
           )}
         </div>
-
-        {hasImportedMenu ? (
-          <ServicesCollapsibleSection
-            open={ownWordsPanelOpen}
-            onToggle={toggleOwnWordsPanel}
-            title={`${servicesCopy.plainEnglishLabel} (optional)`}
-            summary={ownWordsSummary}
-            disabled={busy}
-          >
-            <ExpandableTrainingTextarea
-              value={servicesOfferedRaw}
-              onChange={handleOwnWordsChange}
-              onBlur={handleOwnWordsBlur}
-              placeholder={servicesCopy.plainEnglishOptionalPlaceholder}
-              aria-label={servicesCopy.plainEnglishLabel}
-              disabled={busy}
-              onExpandedChange={handleOwnWordsTextareaExpand}
-              collapsedHeight={SERVICES_PLAIN_ENGLISH_TEXTAREA.collapsedHeight}
-              expandedHeight={SERVICES_PLAIN_ENGLISH_TEXTAREA.expandedHeight}
-            />
-            {ownWordsDumpHint ? (
-              <p className="text-[11px] leading-relaxed text-amber-700">{ownWordsDumpHint}</p>
-            ) : null}
-            {ownWordsDupHint ? (
-              <p className="text-[11px] leading-relaxed text-slate-500">{ownWordsDupHint}</p>
-            ) : null}
-          </ServicesCollapsibleSection>
-        ) : (
-          <div className="space-y-1.5">
-            <p className="text-[12px] font-medium text-slate-600">
-              {servicesCopy.plainEnglishLabel}
-            </p>
-            <ExpandableTrainingTextarea
-              value={servicesOfferedRaw}
-              onChange={onServicesOfferedRawChange}
-              placeholder={servicesCopy.primaryPlaceholder}
-              aria-label={servicesCopy.plainEnglishLabel}
-              disabled={busy}
-              onExpandedChange={handleOwnWordsTextareaExpand}
-              collapsedHeight={SERVICES_PLAIN_ENGLISH_TEXTAREA.collapsedHeight}
-              expandedHeight={SERVICES_PLAIN_ENGLISH_TEXTAREA.expandedHeight}
-            />
-            {helper ? (
-              <p className="text-[11px] leading-relaxed text-slate-400">{helper}</p>
-            ) : null}
-          </div>
-        )}
 
         <FaqOnlySkipHint caraGoal={caraGoal} onSkip={onSkip} disabled={busy} />
       </div>

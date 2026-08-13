@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState, type FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
@@ -16,6 +16,7 @@ import {
   ONBOARDING_SELECTION_CARD_ACTIVE,
   ONBOARDING_PRIMARY_BUTTON,
 } from "@/components/onboarding/onboarding-ui";
+import { CLISTE_COMPANY, PRODUCT_NAME } from "@/lib/company-details";
 import { cn } from "@/lib/utils";
 import type { BillingInterval, PlanTier } from "@/lib/cliste-plans";
 
@@ -48,7 +49,27 @@ type Props = {
 
 const INITIAL = { ok: false as const, message: "" };
 const CUSTOM_MAILTO =
-  "mailto:hello@clistesystems.ie?subject=Cliste%20Custom%20plan";
+  `mailto:${CLISTE_COMPANY.helloEmail}?subject=${encodeURIComponent(`${PRODUCT_NAME} Custom plan`)}`;
+
+type LegalHighlight = {
+  acceptDpa: boolean;
+  acceptCallerPrivacy: boolean;
+};
+
+const LEGAL_HIGHLIGHT_INITIAL: LegalHighlight = {
+  acceptDpa: false,
+  acceptCallerPrivacy: false,
+};
+
+function legalHighlightFromMessage(message: string): LegalHighlight {
+  return {
+    acceptDpa: message.includes("Data Processing Agreement"),
+    acceptCallerPrivacy: message.toLowerCase().includes("caller privacy"),
+  };
+}
+
+const LEGAL_FIELD_ERROR_RING =
+  "border-red-300/90 bg-red-50/70 ring-1 ring-red-200";
 
 export function PlanPicker({
   plans,
@@ -69,6 +90,9 @@ export function PlanPicker({
   const [plan, setPlan] = useState<PlanTier>(defaultSelfServe);
   const [interval, setInterval] = useState<BillingInterval>(defaultInterval);
   const [submittingTier, setSubmittingTier] = useState<PlanTier | null>(null);
+  const [legalHighlight, setLegalHighlight] = useState<LegalHighlight>(
+    LEGAL_HIGHLIGHT_INITIAL,
+  );
   const reduceMotion = useReducedMotion();
 
   const [state, formAction, pending] = useActionState(
@@ -82,10 +106,52 @@ export function PlanPicker({
     (initialError
       ? "We couldn't confirm your payment. Please try again."
       : null);
+  const legalErrorFromMessage = errorMessage
+    ? legalHighlightFromMessage(errorMessage)
+    : null;
+  const isPaymentError =
+    Boolean(errorMessage) &&
+    !legalErrorFromMessage?.acceptDpa &&
+    !legalErrorFromMessage?.acceptCallerPrivacy;
+
+  useEffect(() => {
+    if (!errorMessage) return;
+    const fromServer = legalHighlightFromMessage(errorMessage);
+    if (fromServer.acceptDpa || fromServer.acceptCallerPrivacy) {
+      setLegalHighlight((prev) => ({
+        acceptDpa: prev.acceptDpa || fromServer.acceptDpa,
+        acceptCallerPrivacy: prev.acceptCallerPrivacy || fromServer.acceptCallerPrivacy,
+      }));
+    }
+  }, [errorMessage]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const form = event.currentTarget;
+    const dpaChecked = (
+      form.elements.namedItem("acceptDpa") as HTMLInputElement | null
+    )?.checked;
+    const privacyChecked = (
+      form.elements.namedItem("acceptCallerPrivacy") as HTMLInputElement | null
+    )?.checked;
+
+    const next: LegalHighlight = {
+      acceptDpa: !dpaChecked,
+      acceptCallerPrivacy: !privacyChecked,
+    };
+
+    if (next.acceptDpa || next.acceptCallerPrivacy) {
+      event.preventDefault();
+      setLegalHighlight(next);
+      return;
+    }
+
+    setLegalHighlight(LEGAL_HIGHLIGHT_INITIAL);
+  }
 
   return (
     <form
       action={formAction}
+      onSubmit={handleSubmit}
       noValidate
       className="flex w-full flex-col items-center gap-4 text-center sm:gap-5"
     >
@@ -268,13 +334,19 @@ export function PlanPicker({
         </div>
       ) : null}
 
-      <div className="grid w-full gap-2.5 text-left md:grid-cols-2">
+      <div className="grid w-full gap-2.5 md:grid-cols-2 md:items-stretch">
         <LegalAcceptanceCheckbox
           id="acceptCallerPrivacy"
           name="acceptCallerPrivacy"
           required={false}
           compact
-          className="h-full"
+          onCheckedChange={() =>
+            setLegalHighlight((prev) => ({ ...prev, acceptCallerPrivacy: false }))
+          }
+          className={cn(
+            "h-full self-stretch",
+            legalHighlight.acceptCallerPrivacy && LEGAL_FIELD_ERROR_RING,
+          )}
         >
           I confirm I have added (or will display before go-live) caller privacy
           information on my website or in my premises — including that calls may be
@@ -290,16 +362,25 @@ export function PlanPicker({
           name="acceptDpa"
           required={false}
           compact
-          className="h-full"
+          onCheckedChange={() =>
+            setLegalHighlight((prev) => ({ ...prev, acceptDpa: false }))
+          }
+          className={cn(
+            "h-full self-stretch",
+            legalHighlight.acceptDpa && LEGAL_FIELD_ERROR_RING,
+          )}
         >
           I accept the{" "}
           <LegalDocLink href="/legal/dpa">Data Processing Agreement</LegalDocLink>{" "}
-          so Cliste may process my callers&apos; data when I go live.
+          so {PRODUCT_NAME} may process my callers&apos; data when I go live.
         </LegalAcceptanceCheckbox>
       </div>
 
-      {errorMessage ? (
-        <p className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[12px] text-red-700">
+      {isPaymentError && errorMessage ? (
+        <p
+          role="alert"
+          className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-[13px] font-medium leading-snug text-red-800 shadow-sm"
+        >
           {errorMessage}
         </p>
       ) : null}

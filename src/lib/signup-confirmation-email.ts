@@ -6,11 +6,12 @@ import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { SIGNUP_EMAIL_OTP_PATTERN } from "@/lib/signup-email-otp";
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { buildTransactionalEmailHtml } from "@/lib/transactional-email-layout";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export function signupConfirmationRedirectOrigin(): string {
-  return resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+  return resolveAppSiteOrigin().origin;
 }
 
 export function signupConfirmationLogoUrl(): string {
@@ -26,10 +27,10 @@ export function buildSignupConfirmationEmailBodies(
   html: string;
 } {
   const subject = emailOtp
-    ? `${emailOtp} is your Cliste verification code`
-    : "Confirm your Cliste account";
+    ? `${emailOtp} is your ${PRODUCT_NAME} verification code`
+    : `Confirm your ${PRODUCT_NAME} account`;
   const text = [
-    "Thanks for signing up for Cliste.",
+    `Thanks for signing up for ${PRODUCT_NAME}.`,
     "",
     ...(emailOtp
       ? [`Your verification code: ${emailOtp}`, "", "Or confirm via this link:"]

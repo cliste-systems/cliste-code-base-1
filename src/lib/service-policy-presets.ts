@@ -20,7 +20,8 @@ export type ServicePolicyFlagType =
   | "no_pregnancy"
   | "over_18"
   | "appointment_only"
-  | "walk_ins_welcome";
+  | "walk_ins_welcome"
+  | "callback_only";
 
 export type ServicePolicyFlag =
   | { type: "patch_test"; hours: number }
@@ -29,7 +30,8 @@ export type ServicePolicyFlag =
   | { type: "no_pregnancy" }
   | { type: "over_18" }
   | { type: "appointment_only" }
-  | { type: "walk_ins_welcome" };
+  | { type: "walk_ins_welcome" }
+  | { type: "callback_only" };
 
 export type ServicePolicyPreset = {
   type: ServicePolicyFlagType;
@@ -40,6 +42,80 @@ export type ServicePolicyPreset = {
 export const PATCH_TEST_HOURS_DEFAULT = 48;
 export const PATCH_TEST_HOURS_MIN = 1;
 export const PATCH_TEST_HOURS_MAX = 168;
+
+/** Compiled into Services menu when any catalog row has policyFlags. */
+export const SERVICE_POLICY_INSTRUCTION =
+  "Some services include extra requirements on the same line (patch test, consultation, pregnancy, age). When a caller asks about booking or suitability for that service, I mention any requirement on that line in one short sentence before offering the booking link. I do not invent requirements that are not listed.";
+
+export function catalogHasServicePolicies(
+  services: Array<Pick<ServiceCatalogItem, "policyFlags">>,
+): boolean {
+  return services.some((s) => (s.policyFlags?.length ?? 0) > 0);
+}
+
+export function catalogHasPatchTestPolicy(
+  services: Array<Pick<ServiceCatalogItem, "policyFlags">>,
+): boolean {
+  return services.some((s) =>
+    isServicePolicyFlagSelected(s.policyFlags ?? [], "patch_test"),
+  );
+}
+
+export function catalogHasCallbackOnlyPolicy(
+  services: Array<Pick<ServiceCatalogItem, "policyFlags">>,
+): boolean {
+  return services.some((s) =>
+    isServicePolicyFlagSelected(s.policyFlags ?? [], "callback_only"),
+  );
+}
+
+export function compilePatchTestBookingGuidance(
+  services: Array<Pick<ServiceCatalogItem, "name" | "policyFlags">>,
+): string {
+  const flagged = services.filter((s) =>
+    isServicePolicyFlagSelected(s.policyFlags ?? [], "patch_test"),
+  );
+  if (flagged.length === 0) return "";
+
+  const names = flagged.map((s) => s.name.trim()).filter(Boolean);
+  const patchFlag = flagged[0]?.policyFlags?.find((f) => f.type === "patch_test");
+  const hours =
+    patchFlag?.type === "patch_test"
+      ? clampPatchTestHours(patchFlag.hours)
+      : PATCH_TEST_HOURS_DEFAULT;
+  const nameList =
+    names.length > 0
+      ? names.join(", ")
+      : "services marked with a patch test on the menu";
+
+  return [
+    `Patch-test services (${nameList}):`,
+    `• For new clients or anyone without recent colour with us, a patch test is needed about ${hours} hours before colour (see each service line above).`,
+    "• The team arranges the patch test and the colour appointment together — nothing is confirmed on this call.",
+    "• Offer both texting the online booking link and a team callback — let the caller choose.",
+  ].join("\n");
+}
+
+export function compileCallbackOnlyBookingGuidance(
+  services: Array<Pick<ServiceCatalogItem, "name" | "policyFlags">>,
+): string {
+  const flagged = services.filter((s) =>
+    isServicePolicyFlagSelected(s.policyFlags ?? [], "callback_only"),
+  );
+  if (flagged.length === 0) return "";
+
+  const names = flagged.map((s) => s.name.trim()).filter(Boolean);
+  const nameList =
+    names.length > 0
+      ? names.join(", ")
+      : "services marked callback-only on the menu";
+
+  return [
+    `Callback-only services (${nameList}):`,
+    "• Do not offer the online booking link for these services — take a callback request only.",
+    "• The team will ring back to arrange the appointment.",
+  ].join("\n");
+}
 
 const ALL_SERVICE_POLICY_PRESETS: ServicePolicyPreset[] = [
   {
@@ -82,6 +158,12 @@ const ALL_SERVICE_POLICY_PRESETS: ServicePolicyPreset[] = [
     type: "walk_ins_welcome",
     label: "Walk-ins welcome",
     compile: () => "Walk-ins are welcome for this service.",
+  },
+  {
+    type: "callback_only",
+    label: "Callback only (no online link)",
+    compile: () =>
+      "I don't offer the online booking link for this service — I take a callback and the team will arrange it.",
   },
 ];
 
@@ -133,6 +215,8 @@ function parsePolicyFlag(raw: unknown): ServicePolicyFlag | null {
       return { type: "appointment_only" };
     case "walk_ins_welcome":
       return { type: "walk_ins_welcome" };
+    case "callback_only":
+      return { type: "callback_only" };
     default:
       return null;
   }

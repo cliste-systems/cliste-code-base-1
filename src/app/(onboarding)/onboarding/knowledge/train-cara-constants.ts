@@ -17,31 +17,20 @@ export const TRAIN_CARA_STEPS = [
     progressLabel: "Services offered",
   },
   {
-    id: "exclusions",
-    label: "Exclusions",
-    title: "What you don't offer",
-    subtitle:
-      "Write normally — Cara will pick out what she must never agree to.",
-    helper: "One sentence is fine.",
-    progressLabel: "Services not offered",
-  },
-  {
     id: "hours",
     label: "Hours",
-    title: "When and where do you operate?",
-    subtitle:
-      "Tell Cara when you're open, where you cover, and when callers should expect a response.",
-    helper: "Use plain language — Cara will read this on calls.",
-    progressLabel: "Hours and areas",
+    title: "When are you open?",
+    subtitle: "Set your opening days and times — Cara shares these on calls.",
+    helper: "Tap a day, then mark it open and set your times.",
+    progressLabel: "Opening hours",
   },
   {
-    id: "capture",
-    label: "Details",
-    title: "What should Cara get from each caller?",
-    subtitle:
-      "Pick the details Cara should note when someone wants to book or follow up.",
-    helper: "Name and number are always collected.",
-    progressLabel: "Caller details",
+    id: "location",
+    label: "Location",
+    title: "Where are you based?",
+    subtitle: "Street, town, county, and Eircode — callers ask about this a lot.",
+    helper: "Same fields as Cara Setup in your dashboard.",
+    progressLabel: "Your location",
   },
   {
     id: "faqs",
@@ -53,8 +42,8 @@ export const TRAIN_CARA_STEPS = [
   },
 ] as const;
 
-/** Parent shell owns max-width + horizontal centering. */
-export const TRAIN_CARA_CONTENT_WIDTH = "w-full";
+/** Centered column for intro + training steps (shell stays full width). */
+export const TRAIN_CARA_CONTENT_WIDTH = "mx-auto w-full max-w-[720px]";
 
 export type TrainCaraStepId = (typeof TRAIN_CARA_STEPS)[number]["id"];
 

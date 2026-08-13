@@ -7,12 +7,11 @@ import {
   Settings as SettingsIcon,
 } from "lucide-react";
 
+import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
 import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form-scroll-region";
 import { DashboardProfileEditor, type DashboardProfileEditorHandle } from "@/components/dashboard/dashboard-profile-editor";
 import {
-  DASHBOARD_ICON_CHIP_LG,
-  DASHBOARD_ICON_GLYPH_LG,
   DASHBOARD_INPUT_CLASS,
   DASHBOARD_PRIMARY_BUTTON_CLASS,
 } from "@/components/dashboard/dashboard-surface";
@@ -125,39 +124,33 @@ export function SettingsView({
         className,
       )}
     >
-      <header className="shrink-0">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className={DASHBOARD_ICON_CHIP_LG}>
-              <SettingsIcon className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-[24px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[26px]">
-                Settings
-              </h1>
-              <p className="mt-0.5 max-w-xl text-[13px] leading-snug text-slate-600">
-                {canManageAccount
-                  ? "Your profile, sign-in, business details, and notifications."
-                  : "Business details, phone line, and notifications."}
+      <ClistePageHeader
+        tone="account"
+        icon={SettingsIcon}
+        title="Settings"
+        description={
+          canManageAccount
+            ? "Your profile, sign-in, business details, and notifications."
+            : "Business details, phone line, and notifications."
+        }
+        actions={
+          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+            {saveButton}
+            {saveMsg ? (
+              <p
+                className={cn(
+                  "text-[13px]",
+                  saveMsg === "Changes saved." ? "text-slate-600" : "text-red-600",
+                )}
+              >
+                {saveMsg}
               </p>
-            </div>
+            ) : null}
           </div>
-          <div className="shrink-0 sm:pt-0.5">{saveButton}</div>
-        </div>
-      </header>
+        }
+      />
 
-      {saveMsg ? (
-        <p
-          className={cn(
-            "shrink-0 text-[13px]",
-            saveMsg === "Changes saved." ? "text-emerald-600" : "text-red-600",
-          )}
-        >
-          {saveMsg}
-        </p>
-      ) : null}
-
-      <DashboardFormScrollRegion>
+      <DashboardFormScrollRegion scrollClassName="bg-[#fbfcfb] divide-y divide-[#dfe7e2]">
         <DashboardAnimatedStack embedded>
           <SettingsSection title="Your profile">
             <DashboardProfileEditor

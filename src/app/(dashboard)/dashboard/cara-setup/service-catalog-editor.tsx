@@ -273,7 +273,7 @@ export function ServiceCatalogEditor({
           className={cn(
             "text-[12.5px]",
             statusKind === "success"
-              ? "font-medium text-emerald-800"
+              ? "font-medium text-[#35443f]"
               : "text-slate-600",
           )}
           role="status"
@@ -368,7 +368,7 @@ export function ServiceCatalogEditor({
               <button
                 type="button"
                 onClick={() => setDeleteId(service.id)}
-                className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                className="shrink-0 rounded p-1 text-slate-400 hover:bg-[#f3f6f4] hover:text-[#11181d]"
                 aria-label={`Delete ${service.name}`}
               >
                 <Trash2 className="size-4" />

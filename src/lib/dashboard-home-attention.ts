@@ -82,7 +82,7 @@ export function buildHomeAttentionItems(input: {
   for (const row of input.openTickets) {
     const ts = new Date(row.created_at).getTime();
     if (!Number.isFinite(ts)) continue;
-    const summary = row.summary?.replace(/\s+/g, " ").trim() || "Request captured";
+    const summary = row.summary?.replace(/\s+/g, " ").trim() || "Enquiry captured";
     items.push({
       id: `ticket-${row.id}`,
       title: ticketCallerLabel(row),

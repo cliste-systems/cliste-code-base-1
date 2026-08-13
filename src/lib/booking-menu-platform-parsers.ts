@@ -44,25 +44,37 @@ function parseFreshaPrice(value: unknown): number | null {
   return Number.isFinite(price) && price > 0 ? price : null;
 }
 
-function parseFreshaServices(html: string): ParsedBookingMenuService[] | null {
+type FreshaPageProps = {
+  data?: { location?: { name?: unknown; services?: unknown } };
+  liteLocation?: {
+    name?: unknown;
+    offeredCategories?: unknown;
+  };
+};
+
+function parseFreshaNextData(html: string): FreshaPageProps | null {
   const match = html.match(
     /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/,
   );
   if (!match) return null;
 
-  let data: unknown;
   try {
-    data = JSON.parse(match[1]!);
+    const data = JSON.parse(match[1]!) as {
+      props?: { pageProps?: FreshaPageProps };
+    };
+    return data.props?.pageProps ?? null;
   } catch {
     return null;
   }
+}
 
-  const pageProps = (data as { props?: { pageProps?: { data?: { location?: { services?: unknown } } } } })
-    .props?.pageProps?.data?.location?.services;
-  if (!Array.isArray(pageProps)) return null;
+function parseFreshaBookingServices(
+  serviceGroups: unknown,
+): ParsedBookingMenuService[] {
+  if (!Array.isArray(serviceGroups)) return [];
 
   const out: ParsedBookingMenuService[] = [];
-  for (const group of pageProps) {
+  for (const group of serviceGroups) {
     if (typeof group !== "object" || group === null) continue;
     const rec = group as { name?: unknown; items?: unknown };
     const category = String(rec.name ?? "").trim().slice(0, 80);
@@ -74,7 +86,6 @@ function parseFreshaServices(html: string): ParsedBookingMenuService[] | null {
         name?: unknown;
         retailPrice?: unknown;
         caption?: unknown;
-        description?: unknown;
       };
       const name = String(service.name ?? "").trim().slice(0, 120);
       if (!name) continue;
@@ -90,7 +101,61 @@ function parseFreshaServices(html: string): ParsedBookingMenuService[] | null {
     }
   }
 
-  return out.length > 0 ? out : null;
+  return out;
+}
+
+function parseFreshaLiteServices(
+  liteLocation: FreshaPageProps["liteLocation"],
+): ParsedBookingMenuService[] {
+  if (typeof liteLocation !== "object" || liteLocation === null) return [];
+  if (!Array.isArray(liteLocation.offeredCategories)) return [];
+
+  const out: ParsedBookingMenuService[] = [];
+  for (const group of liteLocation.offeredCategories) {
+    if (typeof group !== "object" || group === null) continue;
+    const rec = group as { name?: unknown; treatments?: unknown };
+    const category = String(rec.name ?? "").trim().slice(0, 80);
+    if (!Array.isArray(rec.treatments)) continue;
+
+    for (const treatment of rec.treatments) {
+      const name = String(treatment ?? "").trim().slice(0, 120);
+      if (!name) continue;
+      out.push({
+        name,
+        category,
+        price: null,
+        durationMinutes: null,
+        notes: "",
+      });
+      if (out.length >= MAX_SERVICE_CATALOG_ITEMS) return out;
+    }
+  }
+
+  return out;
+}
+
+function parseFreshaServices(html: string): ParsedBookingMenuService[] | null {
+  const pageProps = parseFreshaNextData(html);
+  if (!pageProps) return null;
+
+  const fromBooking = parseFreshaBookingServices(
+    pageProps.data?.location?.services,
+  );
+  if (fromBooking.length > 0) return fromBooking;
+
+  const fromLite = parseFreshaLiteServices(pageProps.liteLocation);
+  return fromLite.length > 0 ? fromLite : null;
+}
+
+/** Business name embedded in Fresha __NEXT_DATA__, when present. */
+export function parseFreshaBusinessNameFromHtml(html: string): string | null {
+  const pageProps = parseFreshaNextData(html);
+  if (!pageProps) return null;
+
+  const name =
+    pageProps.liteLocation?.name ?? pageProps.data?.location?.name ?? null;
+  const trimmed = String(name ?? "").trim();
+  return trimmed.length > 0 ? trimmed.slice(0, 120) : null;
 }
 
 function parseBooksyServices(html: string): ParsedBookingMenuService[] | null {

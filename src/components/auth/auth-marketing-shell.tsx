@@ -4,6 +4,7 @@ import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import { HeroPhotoEnter } from "@/components/onboarding/onboarding-canvas-background";
 import {
@@ -211,7 +212,7 @@ function LegacyAuthCard({
           <div className="mb-16 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm">
             <Image
               src={PUBLIC_ASSETS.logo}
-              alt="Cliste"
+              alt={PRODUCT_NAME}
               width={30}
               height={30}
               className="h-7 w-7 object-contain"
@@ -219,7 +220,7 @@ function LegacyAuthCard({
             />
           </div>
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-zinc-300 backdrop-blur-md">
-            Cliste Systems
+            {PRODUCT_NAME}
           </div>
           <h2 className="mb-6 text-3xl leading-[1.12] font-light tracking-tight text-white lg:text-4xl">
             {marketingHeadline}
@@ -252,7 +253,7 @@ function LegacyAuthCard({
           <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
             <Image
               src={PUBLIC_ASSETS.logo}
-              alt="Cliste"
+              alt={PRODUCT_NAME}
               width={30}
               height={30}
               className="h-7 w-7 object-contain"

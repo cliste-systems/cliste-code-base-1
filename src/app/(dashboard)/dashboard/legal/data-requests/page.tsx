@@ -1,13 +1,13 @@
 import Link from "next/link";
 
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
-import { CLISTE_COMPANY } from "@/lib/company-details";
+import { CLISTE_COMPANY, PRODUCT_NAME } from "@/lib/company-details";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 import { PrivacyToolsClient } from "../../privacy/privacy-client";
 
 export const metadata = {
-  title: "Data requests — Legal — Cliste",
+  title: `Data requests — Legal — ${PRODUCT_NAME}`,
 };
 
 export default function LegalDataRequestsPage() {
@@ -44,10 +44,10 @@ export default function LegalDataRequestsPage() {
             <li>
               Customers can also email{" "}
               <a
-                href="mailto:privacy@clistesystems.ie"
+                href={`mailto:${CLISTE_COMPANY.privacyEmail}`}
                 className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
               >
-                privacy@clistesystems.ie
+                {CLISTE_COMPANY.privacyEmail}
               </a>
               . You remain the data controller; we act as processor.
             </li>
@@ -85,7 +85,7 @@ export default function LegalDataRequestsPage() {
             phone assistant provided by {CLISTE_COMPANY.legalName}. Calls may be recorded and
             transcribed to handle your request; audio is not kept after the call.
             We use {CLISTE_COMPANY.legalName} to process this data on our behalf. For privacy requests,
-            contact us directly or email privacy@clistesystems.ie.
+            contact us directly or email {CLISTE_COMPANY.privacyEmail}.
           </blockquote>
           <p className="text-[12px] text-slate-500">
             <Link

@@ -45,6 +45,8 @@ export type CaraTrainingItemRow = {
   applied_at: string | null;
   applied_by: string | null;
   dismissed_at: string | null;
+  occurrence_count: number;
+  last_seen_at: string;
   created_at: string;
   updated_at: string;
 };
@@ -73,6 +75,19 @@ export function targetSectionForPatch(
 
 export function normalizeTrainingTopic(topic: string): string {
   return topic.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * A routine booking/callback handoff is NOT a teachable knowledge gap — it is
+ * already handled by the Action Inbox, and any genuine gap inside it is caught
+ * by the smarter postprocess `knowledge_gaps` path. Keeping these out of Teach
+ * Cara stops routine bookings appearing as "I wasn't sure how to handle this".
+ */
+export function isRoutineHandoff(summary: string): boolean {
+  const s = String(summary ?? "").toLowerCase();
+  return /\b(book|booking|booked|appointment|appt|slot|reschedul|cancel|patch test|call ?back|callbacks?|ring (them|him|her|me) back)\b/.test(
+    s,
+  );
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { DEFAULT_APP_SITE_URL } from "@/lib/company-details";
 import {
   purchasePhoneNumbers,
   searchAvailableUsPhoneNumbers,
@@ -200,7 +200,7 @@ async function getAppOriginForRedirect(
     if (headerOrigin) return headerOrigin;
     return LOCAL_DEV_APP_ORIGIN;
   }
-  return "https://app.clistesystems.ie";
+  return DEFAULT_APP_SITE_URL;
 }
 
 export type CreateOrganizationResult =

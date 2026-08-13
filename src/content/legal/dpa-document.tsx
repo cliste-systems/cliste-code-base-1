@@ -14,17 +14,17 @@ export function DpaDocument() {
     <>
       <LegalPageHeader
         title="Data Processing Agreement (DPA)"
-        description={`GDPR Article 28 agreement between ${CLISTE_COMPANY.legalName} (processor) and your business (controller) for caller and contact data processed through the Cliste platform.`}
+        description={`GDPR Article 28 agreement between ${CLISTE_COMPANY.legalName} (processor) and your business (controller) for caller and contact data processed through the Hello Cara platform.`}
       />
 
       <p className="text-[15px] leading-relaxed text-slate-700">
         <strong>{CLISTE_COMPANY.legalName}</strong> (&ldquo;Processor&rdquo;) and the customer
         business (&ldquo;Controller&rdquo;) agree the following with respect to
         processing of personal data carried out by {CLISTE_COMPANY.legalName} on behalf of
-        the Controller under the Cliste platform{" "}
+        the Controller under the Hello Cara platform{" "}
         <LegalInlineLink href="/legal/terms">Terms of Service</LegalInlineLink>.
         This DPA forms part of the agreement between the parties and applies to
-        all processing of personal data carried out by Cliste under the
+        all processing of personal data carried out by Cliste Systems Limited under the
         agreement.
       </p>
 
@@ -45,7 +45,7 @@ export function DpaDocument() {
             Article 4 GDPR.
           </li>
           <li>
-            <strong>Sub-processor</strong> — any third party engaged by Cliste
+            <strong>Sub-processor</strong> — any third party engaged by {CLISTE_COMPANY.legalName}
             that processes Personal Data on the Controller&apos;s behalf.
           </li>
         </LegalList>
@@ -53,7 +53,7 @@ export function DpaDocument() {
 
       <LegalSection title="2. Subject matter and duration">
         <p>
-          Cliste processes Personal Data to provide the Cliste platform — AI voice
+          Cliste Systems Limited processes Personal Data to provide the Hello Cara platform — AI voice
           receptionist, Action Inbox, optional appointments, SMS / email
           notifications, and the operator dashboard — for the duration of the
           customer&apos;s subscription, plus the retention periods set out in our{" "}
@@ -97,7 +97,7 @@ export function DpaDocument() {
         <LegalList>
           <li>
             It has a lawful basis under Article 6 GDPR for every category of
-            Personal Data shared with Cliste — typically performance of a
+            Personal Data shared with {CLISTE_COMPANY.legalName} — typically performance of a
             contract (Art 6(1)(b)) for booking, and legitimate interests
             (Art 6(1)(f)) for repeat-customer recognition.
           </li>
@@ -114,7 +114,7 @@ export function DpaDocument() {
       </LegalSection>
 
       <LegalSection title="5. Processor obligations">
-        <p>Cliste will:</p>
+        <p>Cliste Systems Limited will:</p>
         <LegalList ordered>
           <li>
             <strong>Process only on documented instructions</strong> from the
@@ -167,14 +167,14 @@ export function DpaDocument() {
           Several sub-processors are located in or transfer data to the United
           States (see{" "}
           <LegalInlineLink href="/legal/sub-processors">Sub-processors</LegalInlineLink>
-          ). Cliste relies on the <strong>EU-U.S. Data Privacy Framework</strong>{" "}
+          ). Cliste Systems Limited relies on the <strong>EU-U.S. Data Privacy Framework</strong>{" "}
           where the sub-processor is certified, and the EU Commission&apos;s{" "}
           <strong>Standard Contractual Clauses</strong> (Module 3:
           processor-to-processor) elsewhere, supplemented by the technical and
           organisational measures in Annex II.
         </p>
         <p>
-          Cliste has completed a <strong>transfer impact assessment</strong> for
+          Cliste Systems Limited has completed a <strong>transfer impact assessment</strong> for
           US transfers under Schrems II, documenting supplementary measures
           including TLS in transit, no voice-audio retention at rest, transcript
           redaction, provider zero-data-retention options where available, and
@@ -188,12 +188,12 @@ export function DpaDocument() {
           <LegalInlineLink href="/legal/sub-processors">
             /legal/sub-processors
           </LegalInlineLink>
-          . The Controller provides general written authorisation for Cliste to
-          engage these and future sub-processors. Cliste will give at least{" "}
+          . The Controller provides general written authorisation for {CLISTE_COMPANY.legalName} to
+          engage these and future sub-processors. Cliste Systems Limited will give at least{" "}
           <strong>30 days&apos; notice</strong> of any new or replaced
           sub-processor by updating that page and notifying the Controller&apos;s
           primary admin user by email. The Controller may object on reasonable
-          grounds within that notice period; if Cliste cannot accommodate the
+          grounds within that notice period; if {CLISTE_COMPANY.legalName} cannot accommodate the
           objection, the Controller may terminate the agreement.
         </p>
       </LegalSection>
@@ -208,10 +208,10 @@ export function DpaDocument() {
           Articles 18, 20, 21 and 22 requests, or where data spans multiple
           controllers, the Controller may request assistance by emailing{" "}
           <a
-            href="mailto:support@clistesystems.ie"
+            href={`mailto:${CLISTE_COMPANY.supportEmail}`}
             className="font-medium text-emerald-800 underline-offset-2 hover:underline"
           >
-            support@clistesystems.ie
+            {CLISTE_COMPANY.supportEmail}
           </a>
           .
         </p>
@@ -219,7 +219,7 @@ export function DpaDocument() {
 
       <LegalSection title="9. Deletion / return">
         <p>
-          Within 30 days of the termination or expiry of the agreement, Cliste
+          Within 30 days of the termination or expiry of the agreement, {CLISTE_COMPANY.legalName}
           will, at the Controller&apos;s choice, delete or return all Personal Data
           processed on its behalf, except where retention is required by Union
           or Member State law. Backups are overwritten within the standard backup
@@ -242,16 +242,16 @@ export function DpaDocument() {
         <LegalTable
           headers={["Field", "Value"]}
           rows={[
-            ["Controller", "The customer business (account holder of the Cliste account)"],
+            ["Controller", "The customer business (account holder of the Hello Cara account)"],
             ["Processor", `${CLISTE_COMPANY.legalName}, Ireland`],
             [
               "Processor contact",
               <>
                 <a
-                  href="mailto:privacy@clistesystems.ie"
+                  href={`mailto:${CLISTE_COMPANY.privacyEmail}`}
                   className="font-medium text-emerald-800 underline-offset-2 hover:underline"
                 >
-                  privacy@clistesystems.ie
+                  {CLISTE_COMPANY.privacyEmail}
                 </a>
               </>,
             ],
@@ -320,10 +320,10 @@ export function DpaDocument() {
         <p className="text-[13px] text-slate-600">
           For a countersigned copy before your first paid subscription, email{" "}
           <a
-            href="mailto:privacy@clistesystems.ie"
+            href={`mailto:${CLISTE_COMPANY.privacyEmail}`}
             className="font-medium text-emerald-800 underline-offset-2 hover:underline"
           >
-            privacy@clistesystems.ie
+            {CLISTE_COMPANY.privacyEmail}
           </a>
           .
         </p>

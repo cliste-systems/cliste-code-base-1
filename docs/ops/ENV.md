@@ -34,11 +34,11 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 |----------|----------|-------|
 | `SENDGRID_API_KEY` | Production | Sends signup confirmation link (with `SENDGRID_FROM_EMAIL`) |
 | `SENDGRID_FROM_EMAIL` | Production | Platform sender for signup, invites, and system notices |
-| `SENDGRID_FROM_NAME` | Optional | From name (defaults to Cliste) |
+| `SENDGRID_FROM_NAME` | Optional | From name (defaults to Hello Cara) |
 | `SENDGRID_API_URL` | Optional | Use `https://api.eu.sendgrid.com` with an EU SendGrid subuser |
 
-Per-business owner notifications use `{org.slug}@clistesystems.ie` when SendGrid
-domain authentication is enabled for `clistesystems.ie`. Verify with:
+Per-business owner notifications use `{org.slug}@hellocara.ie` when SendGrid
+domain authentication is enabled for `hellocara.ie`. Verify with:
 
 ```bash
 npx tsx scripts/verify-twilio-ie1-messaging.ts
@@ -54,11 +54,11 @@ Caller-facing SMS during calls uses each org's assigned Irish DID via
 ```bash
 npx tsx scripts/verify-twilio-ie1-messaging.ts --fix
 ```
-| `NEXT_PUBLIC_APP_URL` | Production | `https://app.clistesystems.ie` — used in confirmation links |
+| `NEXT_PUBLIC_APP_URL` | Production | `https://app.hellocara.ie` — used in confirmation links |
 
 Production signups use `email_confirm: false` and email a confirmation link before onboarding.
 
-**Supabase Auth URLs:** production site URL `https://app.clistesystems.ie`, redirect `https://app.clistesystems.ie/auth/callback`. Agent/script patch (not dashboard):
+**Supabase Auth URLs:** production site URL `https://app.hellocara.ie`, redirect `https://app.hellocara.ie/auth/callback`. Agent/script patch (not dashboard):
 
 ```bash
 # After `supabase login` or with SUPABASE_ACCESS_TOKEN in .env.local

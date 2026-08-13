@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { OnboardingStepShell } from "@/components/onboarding/onboarding-step-shell";
 import {
   DEFAULT_CALL_ROUTING_MODE,
@@ -38,7 +39,7 @@ export default async function OnboardingNumberPage() {
   return (
     <OnboardingStepShell
       title="How should calls reach Cara?"
-      description="Use your new Cliste number, or keep your current number and forward calls to Cara."
+      description={`Use your new ${PRODUCT_NAME} number, or keep your current number and forward calls to Cara.`}
     >
       <OnboardingNumberView
         phoneNumber={phoneNumber}

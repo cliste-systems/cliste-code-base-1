@@ -2,6 +2,8 @@ import "server-only";
 
 import Stripe from "stripe";
 
+import { CLISTE_COMPANY, MARKETING_SITE_URL } from "@/lib/company-details";
+
 /**
  * Shared Stripe server client for Cliste platform billing (subscriptions,
  * Billing Portal). Salon customer Connect / booking PaymentIntents were removed in v1.
@@ -22,8 +24,8 @@ export function getStripeClient(): Stripe {
     apiVersion: "2026-03-25.dahlia",
     typescript: true,
     appInfo: {
-      name: "Cliste Systems Limited",
-      url: "https://clistesystems.ie",
+      name: CLISTE_COMPANY.legalName,
+      url: MARKETING_SITE_URL,
     },
   });
   return cachedClient;

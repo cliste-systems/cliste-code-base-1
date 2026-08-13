@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { cn } from "@/lib/utils";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -10,7 +11,7 @@ import { CloseSupportButton } from "./close-support-button";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Cliste Admin — Support tickets",
+  title: `${PRODUCT_NAME} Admin — Support tickets`,
 };
 
 type OrgJoin = { name: string; slug: string };

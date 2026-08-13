@@ -6,6 +6,7 @@ import {
   droppableSectionIdsForInput,
   MAX_PROMPT_CHARS,
 } from "./compile-cara-prompt";
+import { SERVICE_POLICY_INSTRUCTION } from "./service-policy-presets";
 import {
   KNOWLEDGE_PRECEDENCE_INSTRUCTION,
   shouldDefaultAnswerEnabledOff,
@@ -113,6 +114,123 @@ describe("compileCaraPrompt budget assembly", () => {
 
     assert.match(prompt, /do not quote prices on the phone/i);
     assert.doesNotMatch(prompt, /quote it with "from"/i);
+  });
+
+  it("includes service policy instruction when catalog has policyFlags", () => {
+    const withPolicies = compileCaraPromptWithMeta({
+      businessName: "Test Salon",
+      assistantDisplayName: "Cara",
+      businessType: "salon",
+      serviceCatalog: [
+        {
+          id: "1",
+          name: "Full colour",
+          price: 85,
+          durationMinutes: 120,
+          category: null,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [{ type: "patch_test", hours: 48 }],
+          source: "manual",
+        },
+      ],
+    }).prompt;
+
+    assert.match(withPolicies, /patch test is needed 48 hours/i);
+    assert.ok(withPolicies.includes(SERVICE_POLICY_INSTRUCTION));
+
+    const withoutPolicies = compileCaraPromptWithMeta({
+      businessName: "Test Salon",
+      assistantDisplayName: "Cara",
+      businessType: "salon",
+      serviceCatalog: [
+        {
+          id: "1",
+          name: "Cut",
+          price: 45,
+          durationMinutes: 30,
+          category: null,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [],
+          source: "manual",
+        },
+      ],
+    }).prompt;
+
+    assert.ok(!withoutPolicies.includes(SERVICE_POLICY_INSTRUCTION));
+  });
+
+  it("includes patch-test booking guidance when catalog has patch_test", () => {
+    const prompt = compileCaraPromptWithMeta({
+      businessName: "Test Salon",
+      assistantDisplayName: "Cara",
+      businessType: "salon",
+      serviceCatalog: [
+        {
+          id: "1",
+          name: "Root colour",
+          price: 85,
+          durationMinutes: 120,
+          category: null,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [{ type: "patch_test", hours: 48 }],
+          source: "manual",
+        },
+      ],
+    }).prompt;
+
+    assert.match(prompt, /Patch-test services \(Root colour\)/i);
+    assert.match(prompt, /both texting the online booking link and a team callback/i);
+  });
+
+  it("includes callback-only guidance when catalog has callback_only", () => {
+    const prompt = compileCaraPromptWithMeta({
+      businessName: "Test Salon",
+      assistantDisplayName: "Cara",
+      businessType: "salon",
+      serviceCatalog: [
+        {
+          id: "1",
+          name: "VIP colour",
+          price: 120,
+          durationMinutes: 120,
+          category: null,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [{ type: "callback_only" }],
+          source: "manual",
+        },
+      ],
+    }).prompt;
+
+    assert.match(prompt, /Callback-only services \(VIP colour\)/i);
+    assert.match(prompt, /Do not offer the online booking link/i);
+  });
+
+  it("omits patch-test and callback-only sections when flags absent", () => {
+    const prompt = compileCaraPromptWithMeta({
+      businessName: "Test Salon",
+      assistantDisplayName: "Cara",
+      businessType: "salon",
+      serviceCatalog: [
+        {
+          id: "1",
+          name: "Cut",
+          price: 45,
+          durationMinutes: 30,
+          category: null,
+          description: null,
+          aiVoiceNotes: null,
+          policyFlags: [],
+          source: "manual",
+        },
+      ],
+    }).prompt;
+
+    assert.doesNotMatch(prompt, /Patch-test services/i);
+    assert.doesNotMatch(prompt, /Callback-only services/i);
   });
 
   it("escapes quotes in FAQ answers", () => {

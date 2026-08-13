@@ -108,7 +108,7 @@ export function BlockedNumbersSection({ initial }: BlockedNumbersSectionProps) {
   return (
     <SettingsSection title="Blocked numbers" id="blocked-numbers">
       <div className="space-y-4">
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-4 py-3">
+        <div className="rounded-xl border border-[#d9e2dd] bg-[#fbfcfb] px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <Label htmlFor="block-anonymous" className="text-[13px] font-semibold text-[#0b1220]">
@@ -172,7 +172,7 @@ export function BlockedNumbersSection({ initial }: BlockedNumbersSectionProps) {
             className={cn(
               "text-[13px]",
               msg.includes("blocked") || msg.includes("turned off") || msg.includes("unblocked")
-                ? "text-emerald-600"
+                ? "text-slate-600"
                 : "text-red-600",
             )}
           >

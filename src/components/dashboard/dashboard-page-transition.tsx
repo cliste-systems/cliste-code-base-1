@@ -1,8 +1,8 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
-import { onboardingPageVariants } from "@/components/onboarding/onboarding-motion";
+import { onboardingPageTransition } from "@/components/onboarding/onboarding-motion";
 import { cn } from "@/lib/utils";
 
 type DashboardPageTransitionProps = {
@@ -11,6 +11,7 @@ type DashboardPageTransitionProps = {
   className?: string;
 };
 
+/** Soft enter when switching dashboard sections — no exit animation (avoids DOM teardown races). */
 export function DashboardPageTransition({
   children,
   animateKey,
@@ -23,17 +24,14 @@ export function DashboardPageTransition({
   }
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={animateKey}
-        variants={onboardingPageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className={cn("w-full min-w-0", className)}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <motion.div
+      key={animateKey}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={onboardingPageTransition}
+      className={cn("w-full min-w-0", className)}
+    >
+      {children}
+    </motion.div>
   );
 }

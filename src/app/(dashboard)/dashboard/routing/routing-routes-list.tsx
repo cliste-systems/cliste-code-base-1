@@ -11,7 +11,6 @@ import {
 } from "./routing-routes-categories";
 import {
   customRoutes,
-  reorderRoutes,
   routeActionType,
   routeDestinationLabel,
   routeKeywords,
@@ -50,9 +49,9 @@ export function RoutingRoutesList({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-slate-100 px-5 py-4">
-        <h2 className="text-[15px] font-semibold text-[#0b1220]">Your routes</h2>
-        <p className="mt-0.5 text-[12px] text-slate-500">
+      <div className="shrink-0 border-b border-[#dfe7e2] bg-[#fbfcfb] px-5 py-4">
+        <h2 className="text-[15px] font-semibold text-[#11181d]">Your routes</h2>
+        <p className="mt-0.5 text-[12px] text-[#6b7c75]">
           {custom.length === 0
             ? "Saved routes appear here by type."
             : `${custom.length} route${custom.length === 1 ? "" : "s"} · top wins when two match`}
@@ -63,7 +62,7 @@ export function RoutingRoutesList({
         <div className="flex flex-1 items-center justify-center px-5 py-8">
           <p
             role="status"
-            className="rounded-xl border border-slate-200/90 bg-slate-50 px-5 py-2.5 text-center text-[13px] font-medium text-slate-500"
+            className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] px-5 py-2.5 text-center text-[13px] font-medium text-[#6b7c75]"
           >
             No routes yet — create one on the left.
           </p>
@@ -118,7 +117,7 @@ function CategoryGroup({
 }) {
   return (
     <section>
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
         {group.label}
       </h3>
       <ul className="mt-2 space-y-1.5">
@@ -172,12 +171,12 @@ function RouteRow({
   return (
     <li
       className={cn(
-        "rounded-lg border transition-colors",
+        "rounded-lg border border-l-4 transition-colors",
         selected
-          ? "border-[#0b1220]/20 bg-slate-50"
-          : "border-slate-200 bg-white hover:border-slate-300",
+          ? "border-[#353D42] bg-white"
+          : "border-[#d9e2dd] border-l-[#cfd9d4] bg-white hover:border-[#9da9a4] hover:border-l-[#353D42]",
         isDragging && "opacity-50",
-        needs && "border-amber-200/90",
+        needs && "border-dashed",
       )}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -194,7 +193,7 @@ function RouteRow({
             onDragStart();
           }}
           onDragEnd={onDragEnd}
-          className="mt-0.5 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 active:cursor-grabbing"
+          className="mt-0.5 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-[#7a8d84] hover:bg-[#f3f6f4] active:cursor-grabbing"
           aria-label={`Drag ${route.name}`}
         >
           <GripVertical className="size-3.5" aria-hidden />
@@ -206,20 +205,20 @@ function RouteRow({
         >
           <div className="flex flex-wrap items-center gap-1.5">
             {typeof priority === "number" ? (
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600">
+              <span className="rounded border border-[#d9e2dd] bg-[#fbfcfb] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[#4d5f58]">
                 #{priority}
               </span>
             ) : null}
-            <span className="text-[13px] font-semibold text-[#0b1220]">
+            <span className="text-[13px] font-semibold text-[#11181d]">
               {route.name.trim() || "Untitled"}
             </span>
             {needs ? (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase text-amber-800">
+              <span className="rounded border border-[#cfd9d4] bg-[#fbfcfb] px-1.5 py-0.5 text-[9px] font-medium uppercase text-[#353D42]">
                 Setup
               </span>
             ) : null}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-0.5 text-[11px] text-[#6b7c75]">
             {verb} · {destination}
           </p>
           {routeKeywords(route) ? (
@@ -228,7 +227,7 @@ function RouteRow({
             </p>
           ) : null}
           {warnings[0] ? (
-            <p className="mt-1 text-[10px] text-amber-900">{warnings[0].message}</p>
+            <p className="mt-1 text-[10px] font-medium text-[#353D42]">{warnings[0].message}</p>
           ) : null}
         </button>
         <div className="flex shrink-0">
@@ -245,7 +244,7 @@ function RouteRow({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8 rounded-md text-red-600"
+            className="size-8 rounded-md text-[#6b7c75] hover:text-[#11181d]"
             onClick={onDelete}
           >
             <Trash2 className="size-3.5" aria-hidden />

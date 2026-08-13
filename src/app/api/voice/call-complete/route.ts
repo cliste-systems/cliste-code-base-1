@@ -308,17 +308,24 @@ export async function POST(request: Request) {
     );
   }
 
+  const knowledgeGaps = parseKnowledgeGaps(body);
+
   if (callSid) {
     const { data: existing } = await admin
       .from("call_logs")
-      .select("id")
+      .select("id, transcript_review, ai_summary")
       .eq("call_sid", callSid)
       .maybeSingle();
     if (existing?.id) {
-      return NextResponse.json({
-        ok: true,
-        call_log_id: existing.id,
-        idempotent: true,
+      return await respondIdempotentCallComplete({
+        admin,
+        orgId,
+        callLogId: String(existing.id),
+        outcome,
+        body,
+        existingReview: existing.transcript_review as string | null,
+        existingSummary: existing.ai_summary as string | null,
+        knowledgeGaps,
       });
     }
   }
@@ -380,14 +387,19 @@ export async function POST(request: Request) {
     if (callSid && callErr.code === "23505") {
       const { data: existing } = await admin
         .from("call_logs")
-        .select("id")
+        .select("id, transcript_review, ai_summary")
         .eq("call_sid", callSid)
         .maybeSingle();
       if (existing?.id) {
-        return NextResponse.json({
-          ok: true,
-          call_log_id: existing.id,
-          idempotent: true,
+        return await respondIdempotentCallComplete({
+          admin,
+          orgId,
+          callLogId: String(existing.id),
+          outcome,
+          body,
+          existingReview: existing.transcript_review as string | null,
+          existingSummary: existing.ai_summary as string | null,
+          knowledgeGaps,
         });
       }
     }
@@ -567,15 +579,6 @@ export async function POST(request: Request) {
     appointmentId = appt.id;
   }
 
-  const knowledgeGaps = Array.isArray(body.knowledge_gaps)
-    ? body.knowledge_gaps.filter(
-        (g): g is KnowledgeGapPayload =>
-          g != null &&
-          typeof g === "object" &&
-          String((g as KnowledgeGapPayload).topic ?? "").trim().length > 0,
-      )
-    : [];
-
   if (outcome === "spam_or_abuse") {
     const { error: abuseErr } = await admin.rpc("increment_caller_abuse_hit", {
       p_org_id: orgId,
@@ -630,10 +633,83 @@ export async function POST(request: Request) {
   });
 }
 
+function parseKnowledgeGaps(body: VoiceCallCompleteBody): KnowledgeGapPayload[] {
+  return Array.isArray(body.knowledge_gaps)
+    ? body.knowledge_gaps.filter(
+        (g): g is KnowledgeGapPayload =>
+          g != null &&
+          typeof g === "object" &&
+          String((g as KnowledgeGapPayload).topic ?? "").trim().length > 0,
+      )
+    : [];
+}
+
+async function respondIdempotentCallComplete(input: {
+  admin: ReturnType<typeof createAdminClient>;
+  orgId: string;
+  callLogId: string;
+  outcome: string;
+  body: VoiceCallCompleteBody;
+  existingReview: string | null;
+  existingSummary: string | null;
+  knowledgeGaps: KnowledgeGapPayload[];
+}) {
+  const reviewRedacted = redactCallText(input.body.transcript_review ?? null);
+  const summaryRedacted = redactCallText(input.body.ai_summary ?? null);
+  const patch: Record<string, string> = {};
+  if (!input.existingReview?.trim() && reviewRedacted.text) {
+    patch.transcript_review = reviewRedacted.text;
+  }
+  if (!input.existingSummary?.trim() && summaryRedacted.text) {
+    patch.ai_summary = summaryRedacted.text;
+  }
+  if (Object.keys(patch).length > 0) {
+    const { error: patchErr } = await input.admin
+      .from("call_logs")
+      .update(patch)
+      .eq("id", input.callLogId);
+    if (patchErr) {
+      console.warn("[voice/call-complete] idempotent enrichment patch", patchErr.message);
+    }
+  }
+
+  if (
+    shouldRunCallCompleteSideEffects(input.outcome) &&
+    input.knowledgeGaps.length > 0
+  ) {
+    after(async () => {
+      try {
+        await ingestCallKnowledgeGaps(
+          input.admin,
+          input.orgId,
+          input.callLogId,
+          input.knowledgeGaps,
+        );
+      } catch (e) {
+        await captureObservedError(e, {
+          route: "voice/call-complete",
+          sideEffect: "knowledge_gaps",
+          orgId: input.orgId,
+        });
+      }
+    });
+  }
+
+  revalidateAfterWrite();
+  return NextResponse.json({
+    ok: true,
+    call_log_id: input.callLogId,
+    idempotent: true,
+  });
+}
+
 function revalidateAfterWrite() {
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/activity");
   revalidatePath("/dashboard/calls");
   revalidatePath("/dashboard/call-history");
   revalidatePath("/dashboard/action-inbox");
+  revalidatePath("/dashboard/clients");
+  revalidatePath("/dashboard/contacts");
   revalidatePath("/dashboard/cara-training");
 }

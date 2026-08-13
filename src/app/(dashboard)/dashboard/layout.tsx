@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { HideStripeTestingAssistant } from "@/components/billing/hide-stripe-testing-assistant";
 import { DashboardGateShell } from "@/components/dashboard/dashboard-gate-shell";
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
@@ -59,6 +60,7 @@ const navItems: {
   { href: DASHBOARD_ROUTES.activity, label: "Activity", section: "core" },
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
   { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
+  { href: DASHBOARD_ROUTES.caraTraining, label: "Training", section: "core" },
   { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
   { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
@@ -155,7 +157,6 @@ export default async function DashboardLayout({
   const accountNav = resolvedNavItems
     .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const caraTrainingBadge = navBadges[DASHBOARD_ROUTES.caraTraining];
   const mobileNavItems: DashboardSidebarNavItem[] = resolvedNavItems
     .filter((i) => i.section === "core")
     .map((item) => toNavItem(item, navBadges));
@@ -178,9 +179,10 @@ export default async function DashboardLayout({
   return (
     <>
       <DashboardViewportLock />
+      <HideStripeTestingAssistant />
       <div
         className={cn(
-          "fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-white text-slate-900 lg:flex-row",
+          "fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-[#f3f6f4] text-[#11181d] lg:flex-row",
           DASHBOARD_INTERACTIVE_CURSOR,
         )}
       >
@@ -188,11 +190,6 @@ export default async function DashboardLayout({
           <DashboardSidebar
             coreNav={coreNav}
             accountNav={accountNav}
-            caraTrainingBadge={
-              typeof caraTrainingBadge === "number" && caraTrainingBadge > 0
-                ? caraTrainingBadge
-                : undefined
-            }
             needsPassword={needsPassword}
             account={accountSummary}
             locations={locations}
@@ -203,20 +200,15 @@ export default async function DashboardLayout({
           />
         ) : null}
 
-        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white lg:h-full">
+        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f3f6f4] lg:h-full">
           {!DASHBOARD_REBUILD_SHELL ? (
             <DashboardChromeBar versionDisplay={versionDisplay} />
           ) : null}
           {!DASHBOARD_REBUILD_SHELL ? (
-            <div className="shrink-0 border-b border-slate-200 bg-[#fcfcfd] px-4 py-3 lg:hidden">
+            <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] px-4 py-3 lg:hidden">
               <DashboardMobileNav
                 items={mobileNavItems}
                 accountNav={accountNav}
-                caraTrainingBadge={
-                  typeof caraTrainingBadge === "number" && caraTrainingBadge > 0
-                    ? caraTrainingBadge
-                    : undefined
-                }
               />
             </div>
           ) : null}
@@ -231,8 +223,8 @@ export default async function DashboardLayout({
               </Link>
             </div>
           ) : null}
-          <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-white">
-            <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-white px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-home]:!overflow-y-auto has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
+          <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-[#f3f6f4]">
+            <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-home]:!overflow-y-auto has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
               {DASHBOARD_REBUILD_SHELL ? null : (
                 <DashboardVerticalProvider
                   niche={orgRow?.niche}

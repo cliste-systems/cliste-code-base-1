@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
+  useRef,
   startTransition,
   useTransition,
 } from "react";
@@ -26,6 +27,15 @@ import {
 } from "@/components/onboarding/onboarding-ui";
 import { normalizeCaraTrainingVoice } from "@/lib/cara-starter-notes";
 import {
+  formatAgentKnowledgeList,
+  formatWeekScheduleForAgent,
+} from "@/lib/agent-knowledge-format";
+import {
+  weekScheduleHasOpenDay,
+  type BankHolidayConfig,
+  type WeekSchedule,
+} from "@/lib/business-hours";
+import {
   isOnboardingUiCopyFresh,
   type OnboardingUiCopy,
 } from "@/lib/onboarding-ui-copy-shared";
@@ -39,21 +49,18 @@ import {
   skipTrainCaraStep,
   ensureOnboardingUiCopy,
   saveTrainCaraProgress,
-  persistTrainCaraExclusionsStep,
   persistTrainCaraServicesStep,
   type TrainCaraPayload,
   type TrainCaraSaveResult,
 } from "./actions";
 import { CaraFaqsStep } from "./cara-faqs-step";
 import {
-  CaraDualTextareaStep,
   CaraTextareaStep,
 } from "./cara-training-step-shell";
 import {
   composeCaptureDetailsNote,
   type CaraCaptureField,
 } from "./train-cara-capture-fields";
-import { TrainCaraCaptureStep } from "./train-cara-capture-step";
 import { compileCaraPhoneNotes } from "./train-cara-compile-notes";
 import {
   CARA_HANDLE_OPTIONS,
@@ -64,12 +71,17 @@ import {
   type CaraHandleOptionId,
   type TrainCaraStepId,
 } from "./train-cara-constants";
-import { resolveServicesStepCopy, resolveExclusionsStepCopy } from "./train-cara-services-copy";
+import { resolveServicesStepCopy } from "./train-cara-services-copy";
 import { TrainCaraServicesStep } from "./train-cara-services-step";
-import { TrainCaraExclusionsStep } from "./train-cara-exclusions-step";
+import { TrainCaraHoursStep } from "./train-cara-hours-step";
+import { TrainCaraLocationStep } from "./train-cara-location-step";
 import { aboutTextForStep } from "./train-cara-about-text";
 import { trainCaraVerticalCopy } from "./train-cara-vertical-copy";
 import { TrainCaraIntro } from "./train-cara-intro";
+import {
+  buildTrainCaraFaqGuardContext,
+  sanitizeOnboardingFaqs,
+} from "./train-cara-faq-guardrails";
 
 const INITIAL: TrainCaraSaveResult = { ok: false, message: "" };
 
@@ -85,8 +97,17 @@ export type TrainCaraInitial = {
   servicesOfferedRaw: string;
   servicesNotOffered: string;
   servicesNotOfferedRaw: string;
-  openingHours: string;
-  serviceArea: string;
+  openingHoursSchedule: WeekSchedule;
+  open24_7: boolean;
+  bankHolidays: BankHolidayConfig;
+  hoursNeverConfigured: boolean;
+  locationAddress: string;
+  baseTown: string;
+  locationCounty: string;
+  locationEircode: string;
+  serviceAreaItems: string[];
+  hoursPrefilled: boolean;
+  locationPrefilled: boolean;
   captureFields: CaraCaptureField[];
   faqs: AgentFaq[];
   businessType: string;
@@ -169,10 +190,23 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
     initial.servicesNotOfferedRaw || initial.servicesNotOffered,
   );
   const [serviceCatalog, setServiceCatalog] = useState(initial.serviceCatalog);
-  const [openingHours, setOpeningHours] = useState(initial.openingHours);
-  const [serviceArea, setServiceArea] = useState(initial.serviceArea);
+  const [openingHoursSchedule, setOpeningHoursSchedule] = useState(
+    initial.openingHoursSchedule,
+  );
+  const [open24_7, setOpen24_7] = useState(initial.open24_7);
+  const [bankHolidays, setBankHolidays] = useState(initial.bankHolidays);
+  const [hoursNeverConfigured, setHoursNeverConfigured] = useState(
+    initial.hoursNeverConfigured,
+  );
+  const [locationAddress, setLocationAddress] = useState(initial.locationAddress);
+  const [baseTown, setBaseTown] = useState(initial.baseTown);
+  const [locationCounty, setLocationCounty] = useState(initial.locationCounty);
+  const [locationEircode, setLocationEircode] = useState(initial.locationEircode);
+  const [serviceAreaItems, setServiceAreaItems] = useState(initial.serviceAreaItems);
   const [captureFields, setCaptureFields] = useState(initial.captureFields);
   const [faqs, setFaqs] = useState<AgentFaq[]>(initial.faqs);
+  const [faqsStrippedNotice, setFaqsStrippedNotice] = useState<string | null>(null);
+  const faqsSanitizedOnEnter = useRef(false);
 
   const [handleOptions] = useState<CaraHandleOptionId[]>(() =>
     sanitizeHandleOptions(initial.handleOptions),
@@ -198,11 +232,71 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
   const skipServiceArea = verticalPackForNiche(initial.niche).capabilities
     .skipServiceArea;
 
+  const openingHours = useMemo(() => {
+    if (open24_7) return "Open 24 hours, 7 days a week";
+    if (!weekScheduleHasOpenDay(openingHoursSchedule)) return "";
+    return formatWeekScheduleForAgent(openingHoursSchedule);
+  }, [openingHoursSchedule, open24_7]);
+
+  const serviceArea = useMemo(
+    () => formatAgentKnowledgeList(serviceAreaItems),
+    [serviceAreaItems],
+  );
+
+  const faqGuardContext = useMemo(
+    () =>
+      buildTrainCaraFaqGuardContext({
+        openingHoursSchedule,
+        open24_7,
+        hoursNeverConfigured,
+        locationAddress,
+        baseTown,
+        locationCounty,
+        locationEircode,
+        serviceAreaItems,
+        servicesOffered,
+        serviceCatalogCount: serviceCatalog.length,
+      }),
+    [
+      openingHoursSchedule,
+      open24_7,
+      hoursNeverConfigured,
+      locationAddress,
+      baseTown,
+      locationCounty,
+      locationEircode,
+      serviceAreaItems,
+      servicesOffered,
+      serviceCatalog.length,
+    ],
+  );
+
+  useEffect(() => {
+    if (step.id !== "faqs") {
+      faqsSanitizedOnEnter.current = false;
+      return;
+    }
+    if (faqsSanitizedOnEnter.current) return;
+    faqsSanitizedOnEnter.current = true;
+
+    setFaqs((current) => {
+      const next = sanitizeOnboardingFaqs(current, faqGuardContext);
+      const removed = current.length - next.length;
+      if (removed > 0) {
+        setFaqsStrippedNotice(
+          removed === 1
+            ? "We removed 1 question that duplicated your hours, location, or services — Cara already knows that from earlier steps."
+            : `We removed ${removed} questions that duplicated your hours, location, or services — Cara already knows those from earlier steps.`,
+        );
+      }
+      return next;
+    });
+  }, [step.id, faqGuardContext]);
+
   const canFinishLater =
     step.id === "services" ||
-    step.id === "exclusions" ||
     step.id === "hours" ||
-    step.id === "capture" ||
+    step.id === "location" ||
     step.id === "faqs";
 
   useLayoutEffect(() => {
@@ -261,16 +355,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
         uiCopy: onboardingUiCopy,
       }),
     [initial.businessType, initial.niche, onboardingUiCopy],
-  );
-
-  const exclusionsCopy = useMemo(
-    () =>
-      resolveExclusionsStepCopy({
-        businessType: initial.businessType,
-        niche: initial.niche,
-        servicesCopy,
-      }),
-    [initial.businessType, initial.niche, servicesCopy],
   );
 
   useEffect(() => {
@@ -363,12 +447,26 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
       trainCaraStep: overrides.trainCaraStep ?? step.id,
       onboardingUiCopy: onboardingUiCopy ?? undefined,
       preserveFaqs: step.id !== "faqs",
+      businessHours: openingHoursSchedule,
+      open24_7,
+      bankHolidays,
+      locationAddress: locationAddress.trim(),
+      baseTown: baseTown.trim(),
+      locationCounty: locationCounty.trim(),
+      locationEircode: locationEircode.trim(),
     };
   }
 
   function validateStep(): string | null {
     if (step.id === "about" && about.trim().length < MIN_ABOUT_LENGTH) {
       return `Tell Cara a little more about the business (at least ${MIN_ABOUT_LENGTH} characters).`;
+    }
+    if (
+      step.id === "hours" &&
+      !open24_7 &&
+      !weekScheduleHasOpenDay(openingHoursSchedule)
+    ) {
+      return "Set opening hours for at least one day, or choose Open 24/7.";
     }
     return null;
   }
@@ -422,26 +520,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
       return;
     }
 
-    if (step.id === "exclusions") {
-      const nextIndex = Math.min(TRAIN_CARA_STEPS.length - 1, stepIndex + 1);
-      const nextStep = TRAIN_CARA_STEPS[nextIndex];
-      if (!nextStep) return;
-      startSaveProgress(async () => {
-        const result = await persistTrainCaraExclusionsStep(
-          payloadFromState({ trainCaraStep: nextStep.id }),
-        );
-        if (!result.ok) {
-          setLocalError(result.message);
-          return;
-        }
-        if (result.formatted != null) {
-          setServicesNotOffered(result.formatted);
-        }
-        setStepIndex(nextIndex);
-      });
-      return;
-    }
-
     if (isLast) {
       startTransition(() => formAction(payloadFromState()));
       return;
@@ -473,13 +551,6 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
         setLocalError(result.message);
       }
     });
-  }
-
-  function handleServicesNotOfferedRawChange(value: string) {
-    setServicesNotOfferedRaw(value);
-    if (!value.trim()) {
-      setServicesNotOffered("");
-    }
   }
 
   function handleSkipServices() {
@@ -556,46 +627,55 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
             disabled={busy}
           />
         );
-      case "exclusions":
-        return (
-          <TrainCaraExclusionsStep
-            title={step.title}
-            subtitle={exclusionsCopy.subtitle}
-            exclusionsCopy={exclusionsCopy}
-            servicesNotOfferedRaw={servicesNotOfferedRaw}
-            servicesNotOffered={servicesNotOffered}
-            onServicesNotOfferedRawChange={handleServicesNotOfferedRawChange}
-            disabled={busy}
-          />
-        );
       case "hours":
         return (
-          <CaraDualTextareaStep
+          <TrainCaraHoursStep
             title={verticalCopy.hours.title}
             subtitle={verticalCopy.hours.subtitle}
             helper={verticalCopy.hours.helper}
-            primaryLabel={verticalCopy.labels.openingHours}
-            primaryValue={openingHours}
-            primaryPlaceholder={verticalCopy.placeholders.openingHours}
-            secondaryLabel={verticalCopy.labels.serviceArea}
-            secondaryValue={serviceArea}
-            secondaryPlaceholder={verticalCopy.placeholders.serviceArea}
-            onPrimaryChange={setOpeningHours}
-            onSecondaryChange={setServiceArea}
+            openingHoursSchedule={openingHoursSchedule}
+            onOpeningHoursScheduleChange={(next) => {
+              setHoursNeverConfigured(false);
+              setOpeningHoursSchedule(next);
+            }}
+            open24_7={open24_7}
+            onOpen24_7Change={(next) => {
+              setHoursNeverConfigured(false);
+              setOpen24_7(next);
+            }}
+            bankHolidays={bankHolidays}
+            onBankHolidaysChange={setBankHolidays}
+            hoursNeverConfigured={hoursNeverConfigured}
+            prefilledNotice={
+              initial.hoursPrefilled
+                ? "We pulled your opening hours from your website — tweak anything that looks off."
+                : undefined
+            }
             disabled={busy}
           />
         );
-      case "capture":
+      case "location":
         return (
-          <TrainCaraCaptureStep
-            title={verticalCopy.capture.title}
-            subtitle={verticalCopy.capture.subtitle}
-            helper={verticalCopy.capture.helper}
-            captureFields={captureFields}
-            onCaptureFieldsChange={setCaptureFields}
-            businessType={initial.businessType}
-            niche={initial.niche}
-            caraGoal={initial.caraGoal}
+          <TrainCaraLocationStep
+            title={verticalCopy.location.title}
+            subtitle={verticalCopy.location.subtitle}
+            helper={verticalCopy.location.helper}
+            locationAddress={locationAddress}
+            onLocationAddressChange={setLocationAddress}
+            baseTown={baseTown}
+            onBaseTownChange={setBaseTown}
+            locationCounty={locationCounty}
+            onLocationCountyChange={setLocationCounty}
+            locationEircode={locationEircode}
+            onLocationEircodeChange={setLocationEircode}
+            prefilledNotice={
+              initial.locationPrefilled
+                ? "We pulled your address from your website — add town or county if needed."
+                : undefined
+            }
+            showServiceArea={!skipServiceArea}
+            serviceAreaItems={serviceAreaItems}
+            onServiceAreaItemsChange={setServiceAreaItems}
             disabled={busy}
           />
         );
@@ -609,16 +689,8 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
             niche={initial.niche}
             faqs={faqs}
             disabled={busy}
-            suggestContext={{
-              businessType: initial.businessType,
-              niche: initial.niche,
-              about,
-              servicesOffered,
-              serviceArea,
-              openingHours,
-              servicesNotOffered,
-            }}
-            uiCopy={onboardingUiCopy}
+            guardContext={faqGuardContext}
+            strippedNotice={faqsStrippedNotice}
             onChange={setFaqs}
           />
         );
@@ -629,29 +701,31 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
 
   if (phase === "intro") {
     return (
-      <div className={TRAIN_CARA_CONTENT_WIDTH}>
-        <OnboardingStepPanel stepKey="intro" className="flex w-full flex-col items-center">
-          <OnboardingEnterProvider>
-            <OnboardingEnter className="mb-3 flex w-full justify-center">
-              <ClisteLogoMark
-                size={ONBOARDING_LOGO_SIZE}
-                priority
-                className="mx-auto"
-              />
-            </OnboardingEnter>
-          </OnboardingEnterProvider>
-          <TrainCaraIntro
-            niche={initial.niche}
-            onStart={handleStartTraining}
-            onBack={handleIntroBack}
-            disabled={busy}
-          />
-          {(localError || formError) ? (
-            <p className="mt-4 text-center text-[13px] text-red-600" role="alert">
-              {localError ?? formError}
-            </p>
-          ) : null}
-        </OnboardingStepPanel>
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-hidden">
+        <div className={TRAIN_CARA_CONTENT_WIDTH}>
+          <OnboardingStepPanel stepKey="intro" className="flex w-full flex-col items-center">
+            <OnboardingEnterProvider>
+              <OnboardingEnter className="mb-3 flex w-full justify-center">
+                <ClisteLogoMark
+                  size={ONBOARDING_LOGO_SIZE}
+                  priority
+                  className="mx-auto"
+                />
+              </OnboardingEnter>
+            </OnboardingEnterProvider>
+            <TrainCaraIntro
+              niche={initial.niche}
+              onStart={handleStartTraining}
+              onBack={handleIntroBack}
+              disabled={busy}
+            />
+            {(localError || formError) ? (
+              <p className="mt-4 text-center text-[13px] text-red-600" role="alert">
+                {localError ?? formError}
+              </p>
+            ) : null}
+          </OnboardingStepPanel>
+        </div>
       </div>
     );
   }
@@ -659,33 +733,35 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
   const continueLabel = isLast ? "Continue" : "Save and continue";
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center">
-      <OnboardingStepPanel
-        stepKey={step.id}
-        className="flex min-h-0 w-full flex-1 flex-col items-center gap-4"
+    <div className="w-full">
+      <div
+        className={cn(
+          TRAIN_CARA_CONTENT_WIDTH,
+          "mx-auto flex w-full flex-col items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4",
+        )}
       >
-        <OnboardingEnterProvider>
-          <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4">
-            <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4 overflow-y-auto overscroll-y-contain">
-              <OnboardingEnter className="flex w-full shrink-0 justify-center">
+        <OnboardingStepPanel
+          stepKey={step.id}
+          className="flex w-full flex-col items-center gap-3 sm:gap-4"
+        >
+          <OnboardingEnterProvider>
+            <div className="flex w-full flex-col items-center gap-3 sm:gap-4">
+              <OnboardingEnter className="flex w-full justify-center">
                 <ClisteLogoMark
                   size={ONBOARDING_LOGO_SIZE}
                   priority
                   className="mx-auto"
                 />
               </OnboardingEnter>
-              <OnboardingEnter className="w-full shrink-0">
-                {renderStep()}
-              </OnboardingEnter>
+              <OnboardingEnter className="w-full">{renderStep()}</OnboardingEnter>
 
               {formError ? (
-                <p className="w-full shrink-0 text-center text-[13px] text-red-600" role="alert">
+                <p className="w-full text-center text-[13px] text-red-600" role="alert">
                   {formError}
                 </p>
               ) : null}
-            </div>
 
-            <OnboardingEnter className="flex w-full shrink-0 flex-col items-center justify-center gap-2.5 border-t border-slate-200/60 pt-3">
+              <OnboardingEnter className="flex w-full flex-col items-center gap-2.5 border-t border-slate-200/60 pt-3">
               {canFinishLater ? (
                 <button
                   type="button"
@@ -704,7 +780,10 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
                   type="button"
                   onClick={handleBack}
                   disabled={busy}
-                  className={ONBOARDING_SECONDARY_BUTTON}
+                  className={cn(
+                    ONBOARDING_SECONDARY_BUTTON,
+                    "shadow-none hover:shadow-none",
+                  )}
                 >
                   <ChevronLeft className="size-4" aria-hidden />
                   Back
@@ -713,7 +792,7 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
                   type="button"
                   pending={busy}
                   onClick={handleContinue}
-                  className="min-w-[12rem]"
+                  className="min-w-[12rem] shadow-none hover:shadow-none"
                 >
                   {busy ? (
                     <>
@@ -729,9 +808,10 @@ export function TrainCaraFlow({ initial }: { initial: TrainCaraInitial }) {
                 </OnboardingPrimaryButton>
               </div>
             </OnboardingEnter>
-          </div>
-        </OnboardingEnterProvider>
-      </OnboardingStepPanel>
+            </div>
+          </OnboardingEnterProvider>
+        </OnboardingStepPanel>
+      </div>
     </div>
   );
 }

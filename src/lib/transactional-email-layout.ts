@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "@/lib/company-details";
+
 /** Logo PNG (`public/m8x4p2n7.png`) — preserve aspect in email clients. */
 export const TRANSACTIONAL_EMAIL_LOGO_WIDTH = 40;
 export const TRANSACTIONAL_EMAIL_LOGO_HEIGHT = 48; // 478×576 source
@@ -36,7 +38,7 @@ export function buildTransactionalEmailHtml(
               <td align="center" style="padding-bottom:20px;">
                 <img
                   src="${input.logoUrl}"
-                  alt="Cliste"
+                  alt="${PRODUCT_NAME}"
                   width="${TRANSACTIONAL_EMAIL_LOGO_WIDTH}"
                   height="${TRANSACTIONAL_EMAIL_LOGO_HEIGHT}"
                   style="display:block;width:${TRANSACTIONAL_EMAIL_LOGO_WIDTH}px;height:${TRANSACTIONAL_EMAIL_LOGO_HEIGHT}px;max-width:${TRANSACTIONAL_EMAIL_LOGO_WIDTH}px;margin:0 auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"

@@ -29,14 +29,14 @@ export const onboardingSpring: Transition = {
 };
 
 export const onboardingPageVariants: Variants = {
-  initial: { opacity: 0, y: 10 },
+  initial: { opacity: 1, y: 8 },
   animate: {
     opacity: 1,
     y: 0,
     transition: onboardingPageTransition,
   },
   exit: {
-    opacity: 0,
+    opacity: 1,
     y: -6,
     transition: { duration: 0.28, ease: ONBOARDING_EASE },
   },

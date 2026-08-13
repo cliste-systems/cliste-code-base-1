@@ -9,14 +9,11 @@ export type CaraNavChild = {
 
 export const CARA_SIDEBAR_CHILDREN: CaraNavChild[] = [
   { href: DASHBOARD_ROUTES.caraGreeting, label: "Greeting" },
-  { href: DASHBOARD_ROUTES.caraTraining, label: "Training" },
 ];
 
 export function isCaraNavPath(pathname: string): boolean {
   return (
-    pathname.startsWith(CARA_NAV_PREFIX) ||
-    pathname === DASHBOARD_ROUTES.caraTraining ||
-    pathname.startsWith(`${DASHBOARD_ROUTES.caraTraining}/`)
+    pathname === CARA_NAV_PREFIX || pathname.startsWith(`${CARA_NAV_PREFIX}/`)
   );
 }
 

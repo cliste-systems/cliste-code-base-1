@@ -42,11 +42,12 @@ import {
 } from "@/lib/call-routing";
 
 import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
+import { parseStoredLocation } from "@/lib/location-fields";
 import { listServicesForOrg } from "@/lib/service-catalog";
 import { parseStoredServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
 
 const PROMPT_ORG_COLUMNS =
-  "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche";
+  "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, agent_location_county, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche";
 
 export type PromptCompileWarnings = CaraCompileMeta & {
   trimmedAt: string;
@@ -132,6 +133,7 @@ function hoursFieldsFromOrg(org: PromptOrgRow | null | undefined): Pick<
   | "hoursNeverConfigured"
   | "open24_7"
   | "hoursNote"
+  | "bankHolidays"
 > {
   const legacyHours = String(org?.agent_opening_hours ?? "").trim();
   const hoursUnset = isBusinessHoursUnset(org?.business_hours);
@@ -157,6 +159,7 @@ function hoursFieldsFromOrg(org: PromptOrgRow | null | undefined): Pick<
     hoursNeverConfigured: false,
     open24_7: meta.open24_7 === true,
     hoursNote: hoursNote || undefined,
+    bankHolidays: meta.bankHolidays,
     openingHoursSchedule: schedule,
     openingHours:
       String(org?.agent_opening_hours ?? "").trim() ||
@@ -184,11 +187,20 @@ export function buildCaraSetupPromptInputFromOrg(
       ),
     greeting: String(org?.greeting ?? "").trim() || undefined,
     businessType: String(org?.agent_business_type ?? "").trim(),
-    locationAddress:
-      String(org?.agent_location_address ?? "").trim() || undefined,
+    ...(() => {
+      const loc = parseStoredLocation({
+        address: String(org?.agent_location_address ?? ""),
+        baseTown: String(org?.agent_base_town ?? ""),
+        county: String(org?.agent_location_county ?? ""),
+      });
+      return {
+        locationAddress: loc.street || undefined,
+        baseTown: loc.town || undefined,
+        locationCounty: loc.county || undefined,
+      };
+    })(),
     locationEircode:
       String(org?.agent_location_eircode ?? "").trim() || undefined,
-    baseTown: String(org?.agent_base_town ?? "").trim() || undefined,
     ...hoursFieldsFromOrg(org),
     serviceArea: pack.capabilities.skipServiceArea
       ? undefined

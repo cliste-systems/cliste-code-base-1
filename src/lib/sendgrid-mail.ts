@@ -13,6 +13,8 @@
  *   `https://api.eu.sendgrid.com` only with an EU-designated SendGrid subuser.
  */
 
+import { PRODUCT_NAME } from "@/lib/company-details";
+
 export function isSendGridConfigured(): boolean {
   return Boolean(
     process.env.SENDGRID_API_KEY?.trim() &&
@@ -30,7 +32,7 @@ export type SendTransactionalEmailInput = {
   subject: string;
   text: string;
   html?: string;
-  /** Override platform From (e.g. per-business `{slug}@clistesystems.ie`). */
+  /** Override platform From (e.g. per-business `{slug}@hellocara.ie`). */
   from?: EmailAddress;
   replyTo?: EmailAddress;
 };
@@ -44,7 +46,7 @@ export async function sendTransactionalEmail(
 ): Promise<SendTransactionalEmailResult> {
   const apiKey = process.env.SENDGRID_API_KEY?.trim();
   const platformFromEmail = process.env.SENDGRID_FROM_EMAIL?.trim();
-  const platformFromName = process.env.SENDGRID_FROM_NAME?.trim() || "Cliste";
+  const platformFromName = process.env.SENDGRID_FROM_NAME?.trim() || PRODUCT_NAME;
   const fromEmail = input.from?.email.trim() || platformFromEmail;
   const fromName = input.from?.name?.trim() || platformFromName;
 
@@ -101,7 +103,7 @@ export async function sendTransactionalEmail(
       subject,
       content: body,
       // Click tracking rewrites links through a SendGrid tracking domain
-      // (url####.clistesystems.ie) which we don't have DNS for, breaking
+      // (url####.hellocara.ie) which we don't have DNS for, breaking
       // auth links. These are transactional emails — no tracking needed.
       tracking_settings: {
         click_tracking: { enable: false, enable_text: false },

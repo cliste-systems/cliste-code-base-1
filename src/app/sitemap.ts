@@ -7,7 +7,7 @@ import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
  * Authenticated surfaces and legacy salon slug routes are excluded.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const appOrigin = resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+  const appOrigin = resolveAppSiteOrigin().origin;
   const lastModified = new Date();
 
   return [

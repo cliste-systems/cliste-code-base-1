@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/company-details";
 import Link from "next/link";
 
 import { Building2 } from "lucide-react";
@@ -39,7 +40,7 @@ export default async function AdminShellLayout({
               </div>
               <div className="flex min-w-0 flex-col">
                 <span className="text-sm leading-tight font-medium text-gray-900">
-                  Cliste Admin
+                  {PRODUCT_NAME} Admin
                 </span>
                 <span className="mt-0.5 text-xs text-gray-500">
                   Internal console

@@ -32,8 +32,9 @@ export type PlatformCheckoutResult =
   | { ok: false; message: string };
 
 export async function resolveCheckoutReturnOrigin(): Promise<string> {
-  const configured = resolveAppSiteOrigin();
-  if (configured) return configured.origin;
+  if (process.env.NEXT_PUBLIC_APP_URL?.trim()) {
+    return resolveAppSiteOrigin().origin;
+  }
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "NEXT_PUBLIC_APP_URL must be set for billing return URLs.",

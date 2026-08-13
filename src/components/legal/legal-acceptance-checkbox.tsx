@@ -30,7 +30,7 @@ export function LegalAcceptanceCheckbox({
       className={cn(
         "flex cursor-pointer items-start gap-2.5 text-left text-slate-600 shadow-sm",
         compact
-          ? "rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-[11px] leading-snug"
+          ? "rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-3 text-[12px] leading-[1.45]"
           : "rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 text-[13px] leading-relaxed",
         className,
       )}
@@ -47,8 +47,7 @@ export function LegalAcceptanceCheckbox({
             : undefined
         }
         className={cn(
-          "mt-0.5 shrink-0 rounded border-slate-300 text-[#0b1220] focus:ring-[#0b1220]/20",
-          compact ? "size-3.5" : "size-4",
+          "mt-0.5 shrink-0 rounded border-slate-300 text-[#0b1220] focus:ring-[#0b1220]/20 size-4",
         )}
       />
       <span>{children}</span>

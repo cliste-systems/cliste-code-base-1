@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { Shield, Users } from "lucide-react";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { isAdminEmailAllowlisted } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -13,7 +14,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Cliste Admin — Identity & access",
+  title: `${PRODUCT_NAME} Admin — Identity & access`,
 };
 
 function formatLastLogin(iso: string | null | undefined): string {

@@ -12,7 +12,7 @@ import { createClient } from "@/utils/supabase/server";
  * Bump organisations.onboarding_step when a step completes.
  *
  * Payment is deferred to the end. The wizard runs:
- * profile -> voice -> knowledge -> number -> test call ->
+ * profile -> voice -> knowledge -> number ->
  * go live (plan + pay) -> dashboard.
  */
 export const ONBOARDING_STEPS = {
@@ -20,9 +20,8 @@ export const ONBOARDING_STEPS = {
   voice: 2,
   knowledge: 3,
   number: 4,
-  testCall: 5,
-  goLive: 6,
-  done: 7,
+  goLive: 5,
+  done: 6,
 } as const;
 
 export type OnboardingStepKey = keyof typeof ONBOARDING_STEPS;
@@ -120,12 +119,11 @@ export async function requireOnboardingSession(): Promise<OnboardingSession> {
 
 export function resolveCurrentStepPath(session: OnboardingSession): string {
   // Payment deferred: profile -> voice -> knowledge -> number ->
-  // test call -> go live (plan) -> dashboard.
+  // go live (plan) -> dashboard.
   if (session.onboardingStep <= ONBOARDING_STEPS.profile) return "/onboarding/profile";
   if (session.onboardingStep <= ONBOARDING_STEPS.voice) return "/onboarding/voice";
   if (session.onboardingStep <= ONBOARDING_STEPS.knowledge) return "/onboarding/knowledge";
   if (session.onboardingStep <= ONBOARDING_STEPS.number) return "/onboarding/number";
-  if (session.onboardingStep <= ONBOARDING_STEPS.testCall) return "/onboarding/test-call";
   if (session.onboardingStep < ONBOARDING_STEPS.done) return "/onboarding/plan";
   return "/dashboard";
 }

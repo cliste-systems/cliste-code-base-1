@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { PRODUCT_NAME } from "@/lib/company-details";
 import { LoginForm } from "@/app/login/login-form";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { describeAuthCallbackError } from "@/lib/auth-error-message";
@@ -11,8 +12,8 @@ import { AuthenticateSignUpLink } from "./authenticate-sign-up-link";
 import { AuthParamForwarder } from "./auth-param-forwarder";
 
 export const metadata: Metadata = {
-  title: "Sign in — Cliste Systems",
-  description: "Sign in to your Cliste account and manage Cara, your AI phone agent.",
+  title: `Sign in — ${PRODUCT_NAME}`,
+  description: `Sign in to your ${PRODUCT_NAME} account and manage Cara, your AI phone agent.`,
 };
 
 type AuthenticatePageProps = {

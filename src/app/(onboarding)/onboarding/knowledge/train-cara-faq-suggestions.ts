@@ -2,13 +2,7 @@ import type { OnboardingUiCopy } from "@/lib/onboarding-ui-copy-shared";
 
 import { verticalIdForNiche } from "@/lib/verticals";
 
-import {
-  deterministicFaqSuggestions,
-  type FaqSuggestionContext,
-} from "./train-cara-prefill-heuristics";
-
-const SALON_FAQ_UI_HINT =
-  /\b(walk.?in|balayage|blow.?dry|colour|color|highlight|beard trim|nail|salon)\b/i;
+import type { FaqSuggestionContext } from "./train-cara-prefill-heuristics";
 
 function barberFaqSuggestions(): string[] {
   return [
@@ -53,62 +47,13 @@ export function packFaqSuggestionsForBusiness(
   return hairSalonFaqSuggestions();
 }
 
-function shouldUseFaqUiCopy(
-  niche: string,
-  suggestions: string[] | undefined,
-): suggestions is string[] {
-  if (!suggestions?.length) return false;
-  if (verticalIdForNiche(niche) === "salon_beauty") {
-    const blob = suggestions.join(" ");
-    return !SALON_FAQ_UI_HINT.test(blob);
-  }
-  return true;
-}
-
-function uniqueSuggestions(lists: string[][], max = 3): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-
-  for (const list of lists) {
-    for (const question of list) {
-      const trimmed = question.trim();
-      if (!trimmed) continue;
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(trimmed);
-      if (out.length >= max) break;
-    }
-    if (out.length >= max) break;
-  }
-
-  return out;
-}
-
 export function resolveFaqSuggestions(input: {
   businessType: string;
   niche: string;
-  context: FaqSuggestionContext;
+  context?: FaqSuggestionContext;
   uiCopy?: OnboardingUiCopy | null;
 }): string[] {
-  const packBase = packFaqSuggestionsForBusiness(
-    input.businessType,
-    input.niche,
-  );
-  const contextual = deterministicFaqSuggestions(input.context);
-  const uiSuggestions = shouldUseFaqUiCopy(
-    input.niche,
-    input.uiCopy?.faqSuggestions,
-  )
-    ? input.uiCopy.faqSuggestions
-    : [];
-
-  const isSalon = verticalIdForNiche(input.niche) === "salon_beauty";
-  const lists = isSalon
-    ? [packBase, uiSuggestions, contextual]
-    : [uiSuggestions, packBase, contextual];
-
-  return uniqueSuggestions(lists, isSalon ? 4 : 3);
+  return packFaqSuggestionsForBusiness(input.businessType, input.niche);
 }
 
 export function resolveFaqPlaceholders(input: {
@@ -123,9 +68,7 @@ export function resolveFaqPlaceholders(input: {
   const isSalon = verticalIdForNiche(input.niche) === "salon_beauty";
 
   const questionFallback = isSalon
-    ? isBarber
-      ? "e.g. Do you take walk-ins?"
-      : "e.g. Do you take walk-ins?"
+    ? "e.g. Do you take walk-ins?"
     : "e.g. How much does it cost?";
 
   const answerFallback = isSalon

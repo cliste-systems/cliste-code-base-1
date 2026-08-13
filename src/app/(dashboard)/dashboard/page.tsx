@@ -257,7 +257,8 @@ export default async function DashboardHomePage({
       supabase
         .from("action_tickets")
         .select("id", { count: "exact", head: true })
-        .eq("status", "open"),
+        .eq("status", "open")
+        .gte("created_at", metricRangeStartIso),
       scopedOrgIds,
     ),
     callsForMetricRollupsQuery,
@@ -268,6 +269,7 @@ export default async function DashboardHomePage({
         .from("action_tickets")
         .select("id, summary, created_at, status, caller_name, caller_number")
         .eq("status", "open")
+        .gte("created_at", metricRangeStartIso)
         .order("created_at", { ascending: false })
         .limit(DASHBOARD_HOME_ATTENTION_ROW_LIMIT),
       scopedOrgIds,
@@ -473,12 +475,12 @@ export default async function DashboardHomePage({
                 href: DASHBOARD_ROUTES.calls,
               },
               {
-                label: "Requests captured",
+                label: "Enquiries captured",
                 value: String(actionsCreated),
                 href: DASHBOARD_ROUTES.actionInbox,
               },
               {
-                label: "Routed",
+                label: "Info sent",
                 value: String(routedCount),
                 href: DASHBOARD_ROUTES.routing,
               },
@@ -488,7 +490,7 @@ export default async function DashboardHomePage({
                 href: DASHBOARD_ROUTES.actionInbox,
               },
               {
-                label: "Minutes used",
+                label: "Minutes this period",
                 value: formatMinutes(minutesUsedDisplay),
                 href: DASHBOARD_ROUTES.usage,
               },

@@ -9,9 +9,10 @@ import { dashboardBreadcrumbs } from "@/lib/dashboard-breadcrumbs";
 import { cn } from "@/lib/utils";
 
 import { DashboardChromeFeedback } from "./dashboard-chrome-feedback";
+import { DashboardChromeSystemHealth } from "./dashboard-chrome-system-health";
 
 const CHROME_UTILITY_PILL =
-  "inline-flex h-7 max-w-full shrink-0 items-center rounded-full border border-[#e5eaf2] bg-white/80 px-2.5 text-[11px] font-medium shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+  "inline-flex h-7 max-w-full shrink-0 items-center rounded-md border border-[#d9e2dd] bg-[#fbfcfb]/90 px-2.5 text-[11px] font-medium shadow-[0_1px_0_rgba(17,24,29,0.04)]";
 
 type DashboardChromeBarProps = {
   versionDisplay: DashboardVersionDisplay;
@@ -22,7 +23,7 @@ export function DashboardChromeBar({ versionDisplay }: DashboardChromeBarProps) 
   const crumbs = dashboardBreadcrumbs(pathname);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:px-5">
+    <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-[#d9e2dd] bg-[#f3f6f4] px-4 sm:px-5">
       <div className="flex min-w-0 items-center gap-2.5">
         <nav
           aria-label="Breadcrumb"
@@ -81,6 +82,7 @@ export function DashboardChromeBar({ versionDisplay }: DashboardChromeBarProps) 
           </span>
           <span>{versionDisplay.caraLine}</span>
         </p>
+        <DashboardChromeSystemHealth />
       </div>
     </header>
   );

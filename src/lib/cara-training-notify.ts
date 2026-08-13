@@ -39,7 +39,7 @@ export async function notifyCaraTrainingOwner(
 
   const biz = String(org.name ?? "").trim() || "Your business";
   const topic = input.gapSummary.trim().slice(0, 300) || "something on a recent call";
-  const origin = resolveAppSiteOrigin()?.origin ?? "https://app.clistesystems.ie";
+  const origin = resolveAppSiteOrigin().origin;
   const trainingUrl = `${origin}/dashboard/cara-training?item=${encodeURIComponent(input.itemId)}`;
 
   if (email && isSendGridConfigured()) {

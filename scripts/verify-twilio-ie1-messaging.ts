@@ -5,7 +5,7 @@
  *   npx tsx scripts/verify-twilio-ie1-messaging.ts
  *   npx tsx scripts/verify-twilio-ie1-messaging.ts --fix
  *
- * Also reports SendGrid domain authentication for clistesystems.ie.
+ * Also reports SendGrid domain authentication for hellocara.ie.
  */
 
 import { config } from "dotenv";

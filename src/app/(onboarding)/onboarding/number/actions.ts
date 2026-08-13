@@ -51,7 +51,7 @@ export async function saveOnboardingNumber(
   const update: Record<string, unknown> = {
     call_routing_mode: input.mode,
     fallback_number: transfer || null,
-    onboarding_step: ONBOARDING_STEPS.testCall,
+    onboarding_step: ONBOARDING_STEPS.goLive,
     updated_at: new Date().toISOString(),
   };
   if (transfer) update.notification_phone = transfer;
@@ -69,5 +69,5 @@ export async function saveOnboardingNumber(
   revalidatePath("/onboarding", "layout");
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/routing");
-  redirect("/onboarding/test-call");
+  redirect("/onboarding/plan");
 }

@@ -7,7 +7,7 @@ import { redactCallText } from "@/lib/transcript-redaction";
 
 import { actionInboxTrainingQuestion } from "./cara-training-draft";
 import { createTrainingItem } from "./cara-training";
-import type { KnowledgeGapPayload } from "./cara-training-types";
+import { isRoutineHandoff, type KnowledgeGapPayload } from "./cara-training-types";
 
 function defaultQuestionForGap(gap: KnowledgeGapPayload): string {
   const q = gap.cara_question?.trim();
@@ -47,7 +47,8 @@ export async function ingestCallKnowledgeGaps(
 }
 
 /**
- * Create a training item from unclear / follow-up Action Inbox tickets.
+ * Create a training item from a genuine unanswered Action Inbox question
+ * (e.g. "asked if we offer X"). Routine booking/callback handoffs are skipped.
  */
 export async function ingestActionInboxTraining(
   admin: SupabaseClient,
@@ -57,6 +58,9 @@ export async function ingestActionInboxTraining(
 ): Promise<void> {
   const category = classifyActionCategory(summary);
   if (category !== "unclear" && category !== "follow_up") {
+    return;
+  }
+  if (isRoutineHandoff(summary)) {
     return;
   }
 

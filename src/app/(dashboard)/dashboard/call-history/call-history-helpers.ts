@@ -1,15 +1,12 @@
 import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
 import { resolveCallerDisplayName } from "@/lib/caller-identity";
+import type { CallFollowUpLink } from "@/lib/call-history-follow-up";
 import {
   normalizeCallOutcome,
   type CallOutcome,
 } from "@/lib/call-history-types";
 import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
-export type CallFollowUp = {
-  id: string;
-  summary: string;
-  status: "open" | "resolved";
-};
+export type CallFollowUp = CallFollowUpLink;
 
 export type CallHistoryListItem = {
   id: string;
@@ -73,6 +70,27 @@ export function callSummaryForDisplay(
   return null;
 }
 
+/** Primary transcript for call detail — prefer full verbatim STT. */
+export function primaryTranscriptForDisplay(
+  item: CallHistoryListItem,
+): string | null {
+  const verbatim = fullTranscriptForDisplay(item);
+  if (verbatim) return verbatim;
+  const review = item.transcriptReview?.trim();
+  if (review) return review;
+  if (item.aiSummary?.trim()) return item.aiSummary.trim();
+  return null;
+}
+
+/** Cleaned LLM-reviewed transcript when available. */
+export function cleanedTranscriptForDisplay(
+  item: CallHistoryListItem,
+): string | null {
+  const review = item.transcriptReview?.trim();
+  if (review) return review;
+  return null;
+}
+
 /** Staff-facing transcript — prefers review/summary over raw verbatim STT. */
 export function reviewTranscriptForDisplay(
   item: CallHistoryListItem,
@@ -109,7 +127,7 @@ export function whatHappenedNextLabel(
     case "answered":
       return "Handled";
     case "link_sent":
-      return "Routed";
+      return "Info sent";
     case "action_created":
       return "Follow-up created";
     case "callback_requested":
@@ -127,22 +145,25 @@ export function whatHappenedNextLabel(
   }
 }
 
-/** Quiet colour for an outcome chip — colour conveys meaning only. */
+/**
+ * Outcome chip colour. Consistent with the Action Inbox: colour means
+ * needs-attention, not category. Amber only for problems, grey for no-speech,
+ * Cliste charcoal (`brand`) for everything routine — no green/blue rainbow.
+ */
 export function outcomeBadgeVariant(outcome: CallOutcome): StatusVariant {
   switch (outcome) {
-    case "answered":
-      return "success";
-    case "link_sent":
-    case "callback_requested":
-    case "action_created":
-      return "info";
     case "failed":
     case "spam_or_abuse":
     case "blocked":
       return "attention";
     case "voicemail_or_no_speech":
-    default:
       return "neutral";
+    case "answered":
+    case "link_sent":
+    case "callback_requested":
+    case "action_created":
+    default:
+      return "brand";
   }
 }
 
@@ -168,8 +189,8 @@ export type OutcomeFilterValue =
 export const OUTCOME_FILTER_OPTIONS: { value: OutcomeFilterValue; label: string }[] = [
   { value: "all", label: "All outcomes" },
   { value: "answered", label: "Answered" },
-  { value: "link_sent", label: "Routed" },
-  { value: "action_created", label: "Request captured" },
+  { value: "link_sent", label: "Info sent" },
+  { value: "action_created", label: "Enquiry captured" },
   { value: "callback_requested", label: "Callback requested" },
   { value: "failed", label: "Failed" },
   { value: "voicemail_or_no_speech", label: "No speech" },
