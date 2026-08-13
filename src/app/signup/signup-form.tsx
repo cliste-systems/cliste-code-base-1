@@ -98,11 +98,11 @@ export function SignupForm({
   const turnstilePending = Boolean(turnstileSiteKey && !turnstileToken);
 
   useEffect(() => {
-    if (!state.ok && state.message?.includes("Security check")) {
+    if (errorMessage?.includes("Security check")) {
       setTurnstileToken(null);
       turnstileRef.current?.reset();
     }
-  }, [state.ok, state.message]);
+  }, [errorMessage]);
 
   function clearFieldError(field: keyof SignupFieldErrors) {
     setFieldErrors((current) => {
