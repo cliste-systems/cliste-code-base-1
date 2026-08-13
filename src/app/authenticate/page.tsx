@@ -38,7 +38,6 @@ export default async function AuthenticatePage({
       <AuthParamForwarder />
       <AuthMarketingShell
         title="Sign in"
-        subtitle="Welcome back — pick up where you left off with Cara."
         pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
         urlError={urlError}
       >
