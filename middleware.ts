@@ -150,49 +150,54 @@ async function legalAcceptRedirect(
     return null;
   }
 
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", userId)
-    .maybeSingle();
+  try {
+    const admin = createAdminClient();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", userId)
+      .maybeSingle();
 
-  const organizationId = profile?.organization_id;
-  if (!organizationId) return null;
+    const organizationId = profile?.organization_id;
+    if (!organizationId) return null;
 
-  const onboardingNeeds = await onboardingPathNeedsLegalAcceptance({
-    pathname,
-    userId,
-    organizationId,
-  });
-  if (onboardingNeeds) {
-    const redirectRes = NextResponse.redirect(
-      new URL("/onboarding/legal", request.url),
-    );
-    copySessionCookies(response, redirectRes);
-    return redirectRes;
+    const onboardingNeeds = await onboardingPathNeedsLegalAcceptance({
+      pathname,
+      userId,
+      organizationId,
+    });
+    if (onboardingNeeds) {
+      const redirectRes = NextResponse.redirect(
+        new URL("/onboarding/legal", request.url),
+      );
+      copySessionCookies(response, redirectRes);
+      return redirectRes;
+    }
+
+    const dashboardNeeds = await dashboardPathNeedsLegalAcceptance({
+      pathname,
+      userId,
+      organizationId,
+    });
+    if (dashboardNeeds) {
+      const redirectRes = NextResponse.redirect(
+        new URL(DASHBOARD_LEGAL_ACCEPT_PATH, request.url),
+      );
+      copySessionCookies(response, redirectRes);
+      return redirectRes;
+    }
+
+    response.cookies.set(LEGAL_OK_COOKIE, LEGAL_OK_VERSION, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60,
+      path: "/",
+    });
+  } catch (err) {
+    // Missing service-role key or a Supabase timeout must not 500 sign-in.
+    console.error("[middleware] legal acceptance check failed", err);
   }
-
-  const dashboardNeeds = await dashboardPathNeedsLegalAcceptance({
-    pathname,
-    userId,
-    organizationId,
-  });
-  if (dashboardNeeds) {
-    const redirectRes = NextResponse.redirect(
-      new URL(DASHBOARD_LEGAL_ACCEPT_PATH, request.url),
-    );
-    copySessionCookies(response, redirectRes);
-    return redirectRes;
-  }
-
-  response.cookies.set(LEGAL_OK_COOKIE, LEGAL_OK_VERSION, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60,
-    path: "/",
-  });
 
   return null;
 }

@@ -1,5 +1,7 @@
-import "server-only";
-
+/**
+ * Used from Edge middleware as well as server pages — do not add
+ * `import "server-only"` here (it crashes the middleware bundle).
+ */
 import {
   LEGAL_DOCUMENT_VERSIONS,
   type LegalDocumentType,

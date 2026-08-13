@@ -7,7 +7,7 @@ import {
   parseMarketingPlanIntent,
   planIntentLabel,
 } from "@/lib/signup-plan-intent";
-import { createClient } from "@/utils/supabase/server";
+import { getAuthUserOrNull } from "@/utils/supabase/server";
 
 import { SignupForm } from "./signup-form";
 import { SignupSignInLink } from "./signup-sign-in-link";
@@ -23,11 +23,10 @@ type SearchParams = Promise<{
   interval?: string | string[];
 }>;
 
+export const dynamic = "force-dynamic";
+
 export default async function SignupPage(props: { searchParams?: SearchParams }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUserOrNull();
   if (user) {
     redirect("/auth/post-login");
   }
