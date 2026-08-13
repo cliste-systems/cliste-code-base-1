@@ -91,17 +91,17 @@ export default async function AdminSupportPage() {
           </p>
         </div>
         <h1 className="mb-4 text-3xl font-medium tracking-tight text-gray-900">
-          Salon support tickets
+          Client support tickets
         </h1>
         <p className="max-w-3xl text-base leading-relaxed font-normal text-gray-500">
-          Requests submitted from each salon&apos;s{" "}
+          Requests submitted from each client&apos;s{" "}
           <Link
             href="/dashboard/support"
             className="font-medium text-gray-700 underline-offset-2 hover:underline"
           >
             Support
           </Link>{" "}
-          page. Mark closed when you&apos;re done — salons still see their
+          page. Mark closed when you&apos;re done — clients still see their
           history.
         </p>
       </header>
@@ -133,7 +133,7 @@ export default async function AdminSupportPage() {
               <thead>
                 <tr className="border-b border-gray-100 bg-white">
                   <th className="w-[15%] px-6 py-4 text-sm font-medium text-gray-900">
-                    Salon
+                    Client
                   </th>
                   <th className="w-[20%] px-6 py-4 text-sm font-medium text-gray-900">
                     Subject

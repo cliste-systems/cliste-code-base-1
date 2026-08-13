@@ -5,8 +5,9 @@ import { PRODUCT_NAME } from "@/lib/company-details";
 import { LoginForm } from "@/app/login/login-form";
 import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { describeAuthCallbackError } from "@/lib/auth-error-message";
+import { isPublicSignupEnabled } from "@/lib/public-signup";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
-import { createClient } from "@/utils/supabase/server";
+import { getAuthUserOrNull } from "@/utils/supabase/server";
 
 import { AuthenticateSignUpLink } from "./authenticate-sign-up-link";
 import { AuthParamForwarder } from "./auth-param-forwarder";
@@ -20,13 +21,12 @@ type AuthenticatePageProps = {
   searchParams: Promise<{ error?: string; message?: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AuthenticatePage({
   searchParams,
 }: AuthenticatePageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUserOrNull();
   if (user) {
     redirect("/auth/post-login");
   }
@@ -39,12 +39,11 @@ export default async function AuthenticatePage({
       <AuthParamForwarder />
       <AuthMarketingShell
         title="Sign in"
-        subtitle="Welcome back — pick up where you left off with Cara."
         pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
         urlError={urlError}
       >
         <LoginForm />
-        <AuthenticateSignUpLink />
+        {isPublicSignupEnabled() ? <AuthenticateSignUpLink /> : null}
       </AuthMarketingShell>
     </>
   );

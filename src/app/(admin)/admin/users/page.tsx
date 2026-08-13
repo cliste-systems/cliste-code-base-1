@@ -95,7 +95,7 @@ export default async function AdminIdentityAccessPage() {
       if (o.id) {
         orgNameById.set(
           o.id,
-          o.name?.trim() ? o.name.trim() : "Unnamed salon",
+          o.name?.trim() ? o.name.trim() : "Unnamed client",
         );
       }
     }
@@ -117,8 +117,8 @@ export default async function AdminIdentityAccessPage() {
 
     rows = sorted.map((user) => {
       const orgId = profileOrgByUserId.get(user.id) ?? null;
-      const salonName = orgId
-        ? (orgNameById.get(orgId) ?? "Unknown salon")
+      const organizationName = orgId
+        ? (orgNameById.get(orgId) ?? "Unknown client")
         : "—";
 
       const meta = user.user_metadata as Record<string, unknown> | undefined;
@@ -135,7 +135,7 @@ export default async function AdminIdentityAccessPage() {
         userId: user.id,
         email: user.email?.trim() ?? "",
         organizationId: orgId,
-        salonName,
+        organizationName,
         status: resolveStatus(user),
         passwordStatus: needsPassword ? "must_set" : "set",
         lastLoginLabel: formatLastLogin(user.last_sign_in_at),

@@ -34,7 +34,7 @@ type PageBackground = {
 
 type Props = {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   marketingHeadline?: ReactNode;
   marketingBody?: string;
   marketingBullets?: string[];
@@ -112,7 +112,7 @@ function SignupGlassShell({
   contentExiting = false,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   urlError?: string | null;
   children: ReactNode;
   assets: PageBackground;
@@ -163,14 +163,16 @@ function SignupGlassShell({
               >
                 {title}
               </h1>
-              <p
-                className={cn(
-                  ONBOARDING_SUBHEADLINE,
-                  compact ? "mt-1 text-[12px] leading-snug" : "mt-2",
-                )}
-              >
-                {subtitle}
-              </p>
+              {subtitle ? (
+                <p
+                  className={cn(
+                    ONBOARDING_SUBHEADLINE,
+                    compact ? "mt-1 text-[12px] leading-snug" : "mt-2",
+                  )}
+                >
+                  {subtitle}
+                </p>
+              ) : null}
             </OnboardingEnter>
           </div>
 
@@ -263,14 +265,18 @@ function LegacyAuthCard({
           <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
             {title}
           </h1>
-          <p className="text-sm font-light text-slate-500">{subtitle}</p>
+          {subtitle ? (
+            <p className="text-sm font-light text-slate-500">{subtitle}</p>
+          ) : null}
         </div>
 
         <div className="mb-10 hidden lg:block">
           <h1 className="mb-1.5 text-2xl font-light tracking-tight text-slate-900">
             {title}
           </h1>
-          <p className="text-sm font-light text-slate-500">{subtitle}</p>
+          {subtitle ? (
+            <p className="text-sm font-light text-slate-500">{subtitle}</p>
+          ) : null}
         </div>
 
         {urlError ? (

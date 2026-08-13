@@ -6,7 +6,7 @@ import { LogOut } from "lucide-react";
 
 import { createClient } from "@/utils/supabase/client";
 
-import { clearAdminSessionCookies } from "../admin-unlock/actions";
+import { clearAdminSessionCookies } from "../admin/login/actions";
 
 export function AdminSignOutButton() {
   const router = useRouter();

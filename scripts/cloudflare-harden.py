@@ -225,7 +225,7 @@ def push_rate_limit_rules() -> None:
             "enabled": True,
             "expression": (
                 '(http.request.method eq "POST") and ('
-                'http.request.uri.path in {"/admin-unlock" "/dashboard-unlock" "/signup"} '
+                'http.request.uri.path in {"/admin/login" "/dashboard-unlock" "/signup"} '
                 'or starts_with(http.request.uri.path, "/authenticate") '
                 'or http.request.uri.path eq "/api/onboarding/voice-preview"'
                 ')'

@@ -18,6 +18,7 @@ import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
+import { ADMIN_LOGIN_PATH } from "@/lib/staff-route-paths";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
 
@@ -31,65 +32,65 @@ export async function clearAdminSessionCookies(): Promise<void> {
   jar.delete(DASHBOARD_GATE_COOKIE);
 }
 
-export async function unlockAdminGate(formData: FormData): Promise<void> {
+export async function submitAdminLogin(formData: FormData): Promise<void> {
   const h = await headers();
   const securityCtx = buildSecurityEventContext(h);
-  const fingerprint = rateLimitFingerprint(h, "admin-unlock");
-  const before = await getRateLimitStatus("admin_unlock", fingerprint);
+  const fingerprint = rateLimitFingerprint(h, "admin-login");
+  const before = await getRateLimitStatus("admin_login", fingerprint);
   if (!before.allowed) {
-    console.warn("[security] admin_unlock_rate_limited", {
+    console.warn("[security] admin_login_rate_limited", {
       retryAfterSeconds: before.retryAfterSeconds,
     });
     await logSecurityEvent(securityCtx, {
-      eventType: "admin_unlock",
+      eventType: "admin_login",
       outcome: "rate_limited",
       attemptCount: before.failuresInWindow,
       metadata: { retryAfterSeconds: before.retryAfterSeconds },
     });
-    redirect("/admin-unlock?error=rate");
+    redirect(`${ADMIN_LOGIN_PATH}?error=rate`);
   }
 
   const password = formData.get("password");
   if (typeof password !== "string") {
-    await recordRateLimitFailure("admin_unlock", fingerprint);
-    console.warn("[security] admin_unlock_bad_payload");
+    await recordRateLimitFailure("admin_login", fingerprint);
+    console.warn("[security] admin_login_bad_payload");
     await logSecurityEvent(securityCtx, {
-      eventType: "admin_unlock",
+      eventType: "admin_login",
       outcome: "failure",
       metadata: { reason: "bad_payload" },
     });
-    redirect("/admin-unlock?error=1");
+    redirect(`${ADMIN_LOGIN_PATH}?error=1`);
   }
 
   const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
   if (!secret) {
-    await recordRateLimitFailure("admin_unlock", fingerprint);
-    console.warn("[security] admin_unlock_config_missing");
+    await recordRateLimitFailure("admin_login", fingerprint);
+    console.warn("[security] admin_login_config_missing");
     await logSecurityEvent(securityCtx, {
-      eventType: "admin_unlock",
+      eventType: "admin_login",
       outcome: "config_error",
       metadata: { reason: "missing_secret" },
     });
-    redirect("/admin-unlock?error=config");
+    redirect(`${ADMIN_LOGIN_PATH}?error=config`);
   }
   if (!(await timingSafeEqualUtf8(password, secret))) {
-    const afterFailure = await recordRateLimitFailure("admin_unlock", fingerprint);
-    console.warn("[security] admin_unlock_wrong_password", {
+    const afterFailure = await recordRateLimitFailure("admin_login", fingerprint);
+    console.warn("[security] admin_login_wrong_password", {
       retryAfterSeconds: afterFailure.retryAfterSeconds,
     });
     await logSecurityEvent(securityCtx, {
-      eventType: "admin_unlock",
+      eventType: "admin_login",
       outcome: afterFailure.allowed ? "failure" : "rate_limited",
       attemptCount: afterFailure.failuresInWindow,
       metadata: { retryAfterSeconds: afterFailure.retryAfterSeconds },
     });
     if (!afterFailure.allowed) {
-      redirect("/admin-unlock?error=rate");
+      redirect(`${ADMIN_LOGIN_PATH}?error=rate`);
     }
-    redirect("/admin-unlock?error=1");
+    redirect(`${ADMIN_LOGIN_PATH}?error=1`);
   }
 
-  await clearRateLimit("admin_unlock", fingerprint);
+  await clearRateLimit("admin_login", fingerprint);
   const cookieValue = await createGateCookieValue(
     ADMIN_GATE_COOKIE_PREFIX,
     secret,
@@ -103,9 +104,9 @@ export async function unlockAdminGate(formData: FormData): Promise<void> {
     secure: process.env.NODE_ENV === "production",
   });
 
-  console.info("[security] admin_unlock_success");
+  console.info("[security] admin_login_success");
   await logSecurityEvent(securityCtx, {
-    eventType: "admin_unlock",
+    eventType: "admin_login",
     outcome: "success",
   });
   redirect("/admin");

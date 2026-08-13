@@ -18,7 +18,7 @@ export function describeAuthCallbackError(
   }
   if (error === "profile") {
     return (
-      "You are signed in, but this account is not linked to a salon yet. " +
+      "You are signed in, but this account is not linked to a business yet. " +
       "Finish the invite link from your email, or ask your administrator to add you to the organization."
     );
   }

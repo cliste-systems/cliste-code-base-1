@@ -44,8 +44,9 @@ export function LiveKitPhoneCard({
       <CardHeader>
         <CardTitle className="text-lg">LiveKit phone (US)</CardTitle>
         <CardDescription>
-          Buy a US number from LiveKit Cloud inventory and store it on this salon
-          as <code className="text-xs">organizations.phone_number</code> so your
+          Buy a US number from LiveKit Cloud inventory and store it on this
+          organization as{" "}
+          <code className="text-xs">organizations.phone_number</code> so your
           voice agent can route inbound calls (E.164). Requires server env:{" "}
           <code className="text-xs">LIVEKIT_URL</code>,{" "}
           <code className="text-xs">LIVEKIT_API_KEY</code>,{" "}

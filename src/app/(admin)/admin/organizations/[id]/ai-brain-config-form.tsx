@@ -71,7 +71,7 @@ export function AIBrainConfigForm({
               id="greeting"
               name="greeting"
               type="text"
-              placeholder="Hi, thanks for calling Bella Salon..."
+              placeholder="Hi, thanks for calling SuperValu Donegal Town..."
               value={greetingValue}
               onChange={(e) => setGreetingValue(e.target.value)}
               readOnly={isPending}

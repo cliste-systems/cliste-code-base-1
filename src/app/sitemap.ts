@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
 
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
+import { isPublicSignupEnabled } from "@/lib/public-signup";
 
 /**
  * Search-engine sitemap. Lists public marketing / legal pages only.
- * Authenticated surfaces and legacy salon slug routes are excluded.
+ * Authenticated surfaces are excluded.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const appOrigin = resolveAppSiteOrigin().origin;
@@ -12,7 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     "",
-    "/signup",
+    ...(isPublicSignupEnabled() ? ["/signup"] : []),
     "/login",
     "/legal/privacy",
     "/legal/terms",

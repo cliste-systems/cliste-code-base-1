@@ -25,7 +25,7 @@ export type IdentityAccessRow = {
   userId: string;
   email: string;
   organizationId: string | null;
-  salonName: string;
+  organizationName: string;
   status: "active" | "pending" | "suspended";
   passwordStatus: "set" | "must_set";
   lastLoginLabel: string;
@@ -47,7 +47,7 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
               User email
             </th>
             <th className="w-[20%] px-5 py-3.5 text-xs font-medium text-gray-500">
-              Linked salon
+              Linked client
             </th>
             <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
               Status
@@ -91,10 +91,10 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
                       href={`/admin/organizations/${row.organizationId}`}
                       className="text-gray-900 underline-offset-2 hover:underline"
                     >
-                      {row.salonName}
+                      {row.organizationName}
                     </Link>
                   ) : (
-                    row.salonName
+                    row.organizationName
                   )}
                 </td>
                 <td className="whitespace-nowrap px-5 py-4">
