@@ -78,18 +78,28 @@ function isMissingAvatarUrlColumn(error: { code?: string; message?: string } | n
 }
 
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireUuid(id: string, label: string): string {
+  if (!UUID_RE.test(id)) {
+    throw new Error(`Invalid ${label}.`);
+  }
+  return id;
+}
+
 async function selectPreviewProfileForOrg(
   admin: ReturnType<typeof createAdminClient>,
   organizationId: string,
 ) {
+  const orgId = requireUuid(organizationId, "organization id");
+  const orgOrFilter = `organization_id.eq.${orgId},active_organization_id.eq.${orgId}`;
   const baseQuery = () =>
     admin
       .from("profiles")
       .select(PROFILE_FIELDS_BASE)
       .not("account_id", "is", null)
-      .or(
-        `organization_id.eq.${organizationId},active_organization_id.eq.${organizationId}`,
-      )
+      .or(orgOrFilter)
       .order("created_at", { ascending: true })
       .limit(1);
 
@@ -98,9 +108,7 @@ async function selectPreviewProfileForOrg(
       .from("profiles")
       .select(PROFILE_FIELDS_WITH_AVATAR)
       .not("account_id", "is", null)
-      .or(
-        `organization_id.eq.${organizationId},active_organization_id.eq.${organizationId}`,
-      )
+      .or(orgOrFilter)
       .order("created_at", { ascending: true })
       .limit(1);
 
