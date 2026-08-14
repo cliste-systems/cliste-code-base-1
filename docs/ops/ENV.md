@@ -44,8 +44,11 @@ domain authentication is enabled for `hellocara.ie`. Verify with:
 npx tsx scripts/verify-twilio-ie1-messaging.ts
 ```
 
+| Variable | Required | Notes |
+|----------|----------|-------|
 | `TWILIO_SMS_FROM` | Production | Platform sender for owner alert SMS |
 | `TWILIO_IE_SMS_URL` | Optional | Inbound SMS webhook on IE DIDs (not yet implemented) |
+| `NEXT_PUBLIC_APP_URL` | Production | `https://app.hellocara.ie` — used in confirmation links |
 
 Caller-facing SMS during calls uses each org's assigned Irish DID via
 `POST /api/voice/send-sms`. Pool numbers should have Twilio messaging region
@@ -54,7 +57,6 @@ Caller-facing SMS during calls uses each org's assigned Irish DID via
 ```bash
 npx tsx scripts/verify-twilio-ie1-messaging.ts --fix
 ```
-| `NEXT_PUBLIC_APP_URL` | Production | `https://app.hellocara.ie` — used in confirmation links |
 
 Production signups use `email_confirm: false` and email a confirmation link before onboarding.
 
@@ -104,7 +106,16 @@ Then **Reload Window** in Cursor and toggle **supabase** under Settings → Tool
 | `STRIPE_WEBHOOK_SECRET` | Production | Signature verification |
 | `CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS` | Dev only | Ignored when `NODE_ENV=production` |
 
-## Rate limiting
+## Rate limiting and launch secrets
 
 Cloudflare edge rules: re-run `python3 scripts/cloudflare-harden.py` after deploy.
-Slow brute-force uses `security_auth_events` (no extra env).
+Slow brute-force uses Postgres `auth_rate_limit_counters` (via `AUTH_RATE_LIMIT_SALT`). Audit rows stay in `security_auth_events` (service-role only).
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `AUTH_RATE_LIMIT_SALT` | Production | Salt for hashed auth fingerprints; unique per environment |
+| `CLISTE_EDGE_SHARED_SECRET` | Production | Shared secret injected by Cloudflare as `x-cliste-edge`; middleware rejects direct origin without it (PR #4) |
+| `CLISTE_SUPPORT_DASHBOARD_SECRET` | Production | Signs support impersonation cookie shown in tenant dashboard banner (PR #4) |
+| `PUBLIC_SIGNUP_ENABLED` | Off for pilot | Set `true` only to re-open self-serve `/signup`. Default is off. |
+
+Apply edge + Vercel secrets via `npm run provision:launch-secrets` when that script is on the deployed branch and `CLOUDFLARE_API_TOKEN` / `VERCEL_TOKEN` are in `.env.local`.

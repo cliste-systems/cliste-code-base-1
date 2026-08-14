@@ -10,6 +10,8 @@
     "test": "tsx --test src/lib/**/*.test.ts",
     "knip": "knip",
     "supabase:mcp-reconnect": "tsx scripts/supabase-mcp-reconnect.ts",
+    "reconnect:supabase": "tsx scripts/reconnect-supabase.ts",
+    "bootstrap:env": "tsx scripts/bootstrap-env-local.ts",
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
     "onboarding:background": "bash scripts/export-onboarding-background.sh"
   },
