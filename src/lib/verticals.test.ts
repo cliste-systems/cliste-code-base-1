@@ -17,6 +17,8 @@ describe("retail live pack", () => {
     assert.equal(pack.productNoun, "Store");
     assert.equal(pack.customerNoun.plural, "customers");
     assert.equal(pack.nav?.labelOverrides?.["/dashboard"], "Knowledge Gaps");
+    assert.equal(pack.capabilities.usesStoreDepartments, true);
+    assert.equal(pack.capabilities.neverQuoteLiveStockOrPrice, true);
   });
 
   it("keeps salon machinery without offering it as a choice", () => {

@@ -28,6 +28,11 @@ import type { AgentSetupInitial } from "../agent-setup/agent-setup-helpers";
 import type { BusinessFileListItem } from "@/lib/business-files";
 
 import type { CaraSetupPromptInput } from "@/lib/compile-cara-prompt";
+import { listStoreDepartments } from "@/lib/store-departments-server";
+import {
+  draftFromDepartment,
+  draftsFromChipNames,
+} from "@/lib/store-departments";
 
 export type CaraSetupPageData = {
   initial: AgentSetupInitial;
@@ -97,6 +102,17 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const useSalonCatalog =
     verticalPackForNiche(niche).capabilities.usesServiceCatalog ||
     serviceCatalog.length > 0;
+  const storeDepartmentRows = verticalPackForNiche(niche).capabilities
+    .usesStoreDepartments
+    ? await listStoreDepartments(supabase, organizationId)
+    : [];
+  const servicesItems = useSalonCatalog
+    ? serviceCatalog.map((s) => s.name)
+    : parseAgentKnowledgeList(servicesOffered);
+  const storeDepartments =
+    storeDepartmentRows.length > 0
+      ? storeDepartmentRows.map(draftFromDepartment)
+      : draftsFromChipNames(servicesItems);
   return {
     businessFiles,
     promptExtras: {
@@ -127,9 +143,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
         parseAgentKnowledgeList(serviceArea),
       ),
       serviceAreaExclusionItems: parseAgentKnowledgeList(serviceAreaExclusions),
-      servicesItems: useSalonCatalog
-        ? serviceCatalog.map((s) => s.name)
-        : parseAgentKnowledgeList(servicesOffered),
+      servicesItems,
       servicesNotOfferedItems: parseAgentKnowledgeList(servicesNotOffered),
       serviceCatalog: useSalonCatalog ? serviceCatalog : [],
       serviceCatalogSupplement: serviceCatalogSupplement ?? undefined,
@@ -161,6 +175,7 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
         (org?.storefront_eircode as string | null)?.trim() ||
         "",
       quotePricesOnCalls: org?.quote_prices_on_calls === true,
+      storeDepartments,
     },
   };
 }

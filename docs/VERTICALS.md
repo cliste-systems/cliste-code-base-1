@@ -12,7 +12,7 @@ Primary nav is three items for every store session:
 |-----|-------|------|
 | **Knowledge Gaps** | `/dashboard` | Default landing. Badge = open `cara_training_items`. |
 | **Calls** | `/dashboard/calls` | Hear what Cara said/did; follow-ups stay on the call (Action Inbox is folded here). |
-| **Setup** | `/dashboard/setup` | Opening hours, department chips, FAQs. |
+| **Setup** | `/dashboard/setup` | Opening hours, departments (`store_departments`), FAQs. |
 
 Settings, Support, and Legal live in the footer — not primary nav. Files stay reachable at `/dashboard/business/files` for Cliste impersonation; they are not in store nav.
 
@@ -52,4 +52,4 @@ Niche-specific routing examples for generic-vertical orgs merge from `ROUTING_OV
 
 - **New pages** for a vertical still require real page work.
 - **Declarative per-service field controls** (e.g. a patch-test toggle) are a separate follow-up — not part of the pack layer.
-- **Phase 3 departments table** (hours, transfer, off-licence) — Setup currently reuses existing department chips, not a new table.
+- **Phase 3 departments table** is live — Setup edits `store_departments` (hours, transfer, Off-licence, An Post).

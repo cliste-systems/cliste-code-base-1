@@ -45,6 +45,7 @@ import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 import { parseStoredLocation } from "@/lib/location-fields";
 import { listServicesForOrg } from "@/lib/service-catalog";
 import { parseStoredServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
+import { listStoreDepartments } from "@/lib/store-departments-server";
 
 const PROMPT_ORG_COLUMNS =
   "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, agent_location_county, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche";
@@ -257,12 +258,27 @@ export async function regenerateCaraCustomPrompt(
   const serviceCatalogSupplement = parseStoredServiceCatalogSupplement(
     (org as PromptOrgRow | null)?.agent_service_catalog_supplement,
   );
+  const pack = verticalPackForNiche(niche);
+  const storeDepartments = pack.capabilities.usesStoreDepartments
+    ? await listStoreDepartments(supabase, organizationId)
+    : [];
 
   const { prompt, compileMeta } = compileCaraPromptWithMeta({
     ...buildCaraSetupPromptInputFromOrg(org as PromptOrgRow | null),
     businessFiles,
     serviceCatalog: serviceCatalog.length > 0 ? serviceCatalog : undefined,
     serviceCatalogSupplement: serviceCatalogSupplement ?? undefined,
+    storeDepartments:
+      storeDepartments.length > 0
+        ? storeDepartments.map((d) => ({
+            name: d.name,
+            usesStoreHours: d.usesStoreHours,
+            hours: d.hours,
+            transferNumber: d.transferNumber,
+            isOffLicence: d.isOffLicence,
+            isAnPost: d.isAnPost,
+          }))
+        : undefined,
   });
 
   const promptCompileWarnings: PromptCompileWarnings | null = compileMeta.wasTrimmed

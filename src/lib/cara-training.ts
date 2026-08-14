@@ -42,15 +42,18 @@ import {
 } from "@/lib/dashboard-routes";
 import {
   normalizeTrainingTopic,
+  parseCaraTrainingGapKind,
   parseCaraTrainingPatch,
   parseOwnerMessages,
   targetSectionForPatch,
+  type CaraTrainingGapKind,
   type CaraTrainingItemRow,
   type CaraTrainingOwnerMessage,
   type CaraTrainingPatch,
   type CaraTrainingSource,
   type CaraTrainingStatus,
 } from "./cara-training-types";
+import { classifyGapKind } from "./gap-kind";
 
 export const CARA_TRAINING_OPEN_STATUSES: CaraTrainingStatus[] = [
   "awaiting_answer",
@@ -98,6 +101,7 @@ function rowToItem(row: Record<string, unknown>): CaraTrainingItemRow {
       : String(row.created_at ?? new Date().toISOString()),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+    gap_kind: parseCaraTrainingGapKind(row.gap_kind),
   };
 }
 
@@ -306,6 +310,7 @@ export type CreateTrainingItemInput = {
   callLogId?: string | null;
   actionTicketId?: string | null;
   notify?: boolean;
+  gapKind?: CaraTrainingGapKind;
 };
 
 export async function createTrainingItem(
@@ -331,6 +336,12 @@ export async function createTrainingItem(
     }
   }
 
+  const gapKind = input.gapKind
+    ? parseCaraTrainingGapKind(input.gapKind)
+    : classifyGapKind(gapSummary, caraQuestion, input.callerContext);
+  const isLiveInfo = gapKind === "live_info";
+  const now = new Date().toISOString();
+
   const normalizedTopic = normalizeTrainingTopic(gapSummary);
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: recentOpen } = await admin
@@ -342,7 +353,6 @@ export async function createTrainingItem(
 
   for (const row of recentOpen ?? []) {
     if (normalizeTrainingTopic(String(row.gap_summary ?? "")) === normalizedTopic) {
-      const now = new Date().toISOString();
       const priorCount =
         typeof row.occurrence_count === "number" && row.occurrence_count > 0
           ? row.occurrence_count
@@ -373,13 +383,15 @@ export async function createTrainingItem(
     .from("cara_training_items")
     .insert({
       organization_id: input.organizationId,
-      status: "awaiting_answer",
+      status: isLiveInfo ? "dismissed" : "awaiting_answer",
       source: input.source,
       gap_summary: gapSummary,
       caller_context: input.callerContext?.trim() || null,
       cara_question: caraQuestion,
       call_log_id: input.callLogId ?? null,
       action_ticket_id: input.actionTicketId ?? null,
+      gap_kind: gapKind,
+      ...(isLiveInfo ? { dismissed_at: now } : {}),
     })
     .select("id")
     .single();
@@ -391,7 +403,7 @@ export async function createTrainingItem(
 
   const itemId = String(inserted.id);
 
-  if (input.notify !== false) {
+  if (!isLiveInfo && input.notify !== false) {
     try {
       await notifyCaraTrainingOwner(admin, input.organizationId, {
         itemId,

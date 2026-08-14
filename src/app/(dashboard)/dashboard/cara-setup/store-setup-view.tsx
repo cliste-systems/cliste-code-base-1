@@ -5,19 +5,17 @@ import { Clock, Store } from "lucide-react";
 import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
 import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form-scroll-region";
-import { Field } from "@/components/dashboard/field";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { OpeningHoursEditor } from "@/components/agent-knowledge/opening-hours-editor";
 import {
   DASHBOARD_PRIMARY_BUTTON_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { Button } from "@/components/ui/button";
-import { dedupeServiceChips } from "@/lib/services-boundary";
 import { cn } from "@/lib/utils";
 
 import { CaraSetupTabAnswers } from "./cara-setup-tab-answers";
 import { CaraSetupUnsavedGuard } from "./cara-setup-unsaved-guard";
-import { ServicesBoundaryChipEditor } from "./services-boundary-chip-editor";
+import { StoreDepartmentsEditor } from "./store-departments-editor";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 
 export function StoreSetupView() {
@@ -86,24 +84,12 @@ export function StoreSetupView() {
               <SectionCard
                 flat
                 title="Departments"
-                description="Counters and desks callers ask for — Deli, Butcher, Bakery, Customer Service."
+                description="Counters and desks callers ask for — hours, transfer, Off-licence, and An Post."
               >
-                <Field
-                  label="Add a department"
-                  htmlFor="store-departments"
-                  hint="Type a name, then comma — or press Enter or Add."
-                >
-                  <ServicesBoundaryChipEditor
-                    kind="offered"
-                    inputId="store-departments"
-                    value={form.servicesItems}
-                    onChange={(next) =>
-                      form.setServicesItems(dedupeServiceChips(next))
-                    }
-                    otherList={form.servicesNotOfferedItems}
-                    placeholder="e.g. Deli"
-                  />
-                </Field>
+                <StoreDepartmentsEditor
+                  value={form.storeDepartments}
+                  onChange={form.setStoreDepartments}
+                />
               </SectionCard>
 
               <CaraSetupTabAnswers />

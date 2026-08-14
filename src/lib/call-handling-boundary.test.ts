@@ -183,6 +183,28 @@ describe("compileCaraPrompt call handling", () => {
     assert.match(prompt, /Text them a link/);
   });
 
+  it("locks retail stores out of quoting live stock or shelf prices", () => {
+    const prompt = compileCaraPrompt({
+      businessName: "SuperValu Example",
+      assistantDisplayName: "Cara",
+      businessType: "supermarket",
+      niche: "retail",
+      storeDepartments: [
+        {
+          name: "Deli",
+          usesStoreHours: true,
+          hours: null,
+          transferNumber: "",
+          isOffLicence: false,
+          isAnPost: false,
+        },
+      ],
+    });
+    assert.match(prompt, /never quote live stock/i);
+    assert.match(prompt, /Deli/);
+    assert.doesNotMatch(prompt, /quote it with "from"/);
+  });
+
   it("includes conversational collection guidance", () => {
     const prompt = compileCaraPrompt({
       businessName: "Example Co",

@@ -1,4 +1,10 @@
 /** Structured update Cara drafts from an owner answer. */
+
+import { type CaraTrainingGapKind } from "./gap-kind";
+
+export type { CaraTrainingGapKind } from "./gap-kind";
+export { parseCaraTrainingGapKind } from "./gap-kind";
+
 export type CaraTrainingPatch =
   | { kind: "faq"; question: string; answer: string }
   | { kind: "service_offered"; label: string }
@@ -49,6 +55,7 @@ export type CaraTrainingItemRow = {
   last_seen_at: string;
   created_at: string;
   updated_at: string;
+  gap_kind: CaraTrainingGapKind;
 };
 
 export type KnowledgeGapPayload = {

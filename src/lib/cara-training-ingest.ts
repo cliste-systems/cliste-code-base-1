@@ -7,6 +7,7 @@ import { redactCallText } from "@/lib/transcript-redaction";
 
 import { actionInboxTrainingQuestion } from "./cara-training-draft";
 import { createTrainingItem } from "./cara-training";
+import { classifyGapKind } from "./gap-kind";
 import { isRoutineHandoff, type KnowledgeGapPayload } from "./cara-training-types";
 
 function defaultQuestionForGap(gap: KnowledgeGapPayload): string {
@@ -34,21 +35,24 @@ export async function ingestCallKnowledgeGaps(
       ? redactCallText(callerContextRaw).text
       : null;
 
+    const caraQuestion = defaultQuestionForGap(gap);
     await createTrainingItem(admin, {
       organizationId,
       source: "call_gap",
       gapSummary: topic,
-      caraQuestion: defaultQuestionForGap(gap),
+      caraQuestion,
       callerContext,
       callLogId,
       notify: true,
+      gapKind: classifyGapKind(topic, caraQuestion, callerContext),
     });
   }
 }
 
 /**
- * Create a training item from a genuine unanswered Action Inbox question
- * (e.g. "asked if we offer X"). Routine booking/callback handoffs are skipped.
+ * Opt-in: create a training item from an Action Inbox ticket.
+ * Not called by the voice action-ticket route (Phase 3) — Action Inbox
+ * follow-ups stay on Calls; Knowledge Gaps come from post-call `knowledge_gaps`.
  */
 export async function ingestActionInboxTraining(
   admin: SupabaseClient,
@@ -66,13 +70,15 @@ export async function ingestActionInboxTraining(
 
   const { gapSummary, caraQuestion } = actionInboxTrainingQuestion(summary);
 
+  const callerContext = summary.trim().slice(0, 500) || null;
   await createTrainingItem(admin, {
     organizationId,
     source: "action_inbox",
     gapSummary,
     caraQuestion,
-    callerContext: summary.trim().slice(0, 500) || null,
+    callerContext,
     actionTicketId,
     notify: true,
+    gapKind: classifyGapKind(gapSummary, caraQuestion, callerContext),
   });
 }

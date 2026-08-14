@@ -6,6 +6,7 @@ import type { ServiceCatalogSupplement } from "@/lib/service-catalog-supplement"
 import type { VerticalId } from "@/lib/verticals";
 import type { CaraCaptureField } from "@/app/(onboarding)/onboarding/knowledge/train-cara-capture-fields";
 import type { CaraConduct } from "@/lib/agent-cara-conduct";
+import type { StoreDepartmentDraft } from "@/lib/store-departments";
 import { assistantNameLabel, businessNameLabel } from "@/lib/voice-greeting";
 
 export type AgentSetupInitial = {
@@ -40,6 +41,7 @@ export type AgentSetupInitial = {
   baseTown: string;
   locationCounty: string;
   quotePricesOnCalls: boolean;
+  storeDepartments: StoreDepartmentDraft[];
 };
 
 export { assistantNameLabel, businessNameLabel };

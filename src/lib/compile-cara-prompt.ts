@@ -92,6 +92,10 @@ import {
 } from "@/lib/agent-cara-conduct";
 import { resolveBusinessRuleForPrompt } from "@/lib/business-rule-presets";
 import { verticalPackForNiche } from "@/lib/verticals";
+import {
+  RETAIL_LIVE_STOCK_PRICE_INSTRUCTION,
+  storeDepartmentsPromptSection,
+} from "@/lib/store-departments";
 
 /** Structured Cara Setup fields used to compile the live call prompt. */
 export type CaraSetupPromptInput = {
@@ -134,6 +138,15 @@ export type CaraSetupPromptInput = {
   fallbackNote?: string;
   transferNumber?: string;
   businessFiles?: BusinessFileListItem[];
+  /** Structured store departments (retail). Takes precedence over servicesOffered chips. */
+  storeDepartments?: Array<{
+    name: string;
+    usesStoreHours: boolean;
+    hours?: WeekSchedule | null;
+    transferNumber: string;
+    isOffLicence: boolean;
+    isAnPost: boolean;
+  }>;
 };
 
 export type CaraCompileMeta = {
@@ -413,8 +426,12 @@ function serviceCatalogSupplementSection(
   return parts.join("\n");
 }
 
-function nonNegotiablesSection(assistant: string): string {
-  return [
+function nonNegotiablesSection(
+  assistant: string,
+  input: CaraSetupPromptInput,
+): string {
+  const pack = verticalPackForNiche(input.niche ?? "");
+  const lines = [
     "A few things never change — even if one of your rules says otherwise:",
     `• Every call I say I'm AI and that the call may be recorded and transcribed: "${voiceLegalDisclosure(assistant)}" — I never skip that.`,
     "• On live calls I ask one question per turn — I never stack multiple questions in the same reply.",
@@ -424,8 +441,12 @@ function nonNegotiablesSection(assistant: string): string {
     `• ${VOLUNTEERED_SENSITIVE_INSTRUCTION}`,
     "• I don't give legal, medical, or financial advice on the call — I take a message for the team instead.",
     `• ${PHOTO_HANDLING_INSTRUCTION}`,
-    PRECEDENCE_CONFLICT_INSTRUCTION,
-  ].join("\n");
+  ];
+  if (pack.capabilities.neverQuoteLiveStockOrPrice) {
+    lines.push(`• ${RETAIL_LIVE_STOCK_PRICE_INSTRUCTION}`);
+  }
+  lines.push(PRECEDENCE_CONFLICT_INSTRUCTION);
+  return lines.join("\n");
 }
 
 function sendableFileActions(files: BusinessFileListItem[]): string[] {
@@ -614,7 +635,7 @@ function buildProtectedParts(
     `I'm ${assistant}, the AI phone assistant for ${businessName}${input.businessType.trim() ? ` — a ${input.businessType.trim()}` : ""}. I'm warm, concise, and professional. I only share details I've been given — I never invent anything.`,
   );
 
-  parts.push(nonNegotiablesSection(assistant));
+  parts.push(nonNegotiablesSection(assistant, input));
   parts.push(availableActionsSection(input));
 
   const collectItems = listItems(input.detailsToCollect);
@@ -758,6 +779,22 @@ function buildDroppableSections(
   const notOffered = listItems(input.servicesNotOffered);
   const businessRules = input.businessRules ?? [];
   const catalogParts: string[] = [];
+  const departments = (input.storeDepartments ?? []).filter((d) =>
+    d.name.trim(),
+  );
+  const departmentSection =
+    departments.length > 0
+      ? storeDepartmentsPromptSection(
+          departments.map((d) => ({
+            name: d.name,
+            usesStoreHours: d.usesStoreHours,
+            hours: d.hours ?? null,
+            transferNumber: d.transferNumber,
+            isOffLicence: d.isOffLicence,
+            isAnPost: d.isAnPost,
+          })),
+        )
+      : "";
 
   if (catalog.length > 0) {
     catalogParts.push(
@@ -773,6 +810,11 @@ function buildDroppableSections(
     catalogParts.push(CATEGORY_MATCHING_INSTRUCTION);
     catalogParts.push(SPECIFIC_BEATS_BROAD_INSTRUCTION);
     catalogParts.push(MIXED_REQUEST_INSTRUCTION);
+  } else if (departmentSection) {
+    catalogParts.push(departmentSection);
+    if (notOffered.length > 0) {
+      catalogParts.push(`We don't offer:\n${bulletBlock(notOffered)}`);
+    }
   } else if (offered.length > 0 || notOffered.length > 0) {
     catalogParts.push(servicesSection(offered, notOffered));
   } else {

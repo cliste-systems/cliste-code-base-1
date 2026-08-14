@@ -25,6 +25,10 @@ import { compileCaraOwnerPreview } from "@/lib/compile-cara-owner-preview";
 import type { CaraOwnerPreview } from "@/lib/compile-cara-owner-preview";
 import { weekScheduleHasOpenDay } from "@/lib/business-hours";
 import { dedupeServiceChips } from "@/lib/services-boundary";
+import {
+  departmentNames,
+  type StoreDepartmentDraft,
+} from "@/lib/store-departments";
 import { syncCaptureFieldsFromDetailLabels } from "@/lib/sync-capture-fields";
 import {
   composeCaptureDetailsNote,
@@ -38,6 +42,7 @@ import {
 } from "@/lib/voice-greeting";
 
 import { saveAgentSetup } from "../agent-setup/actions";
+import { saveStoreDepartments } from "./store-departments-actions";
 import type { AgentFaq } from "../agent-setup/agent-faqs";
 import type { AgentSetupInitial } from "../agent-setup/agent-setup-helpers";
 import type { BusinessFileListItem } from "@/lib/business-files";
@@ -75,6 +80,7 @@ type FormSnapshot = {
   locationEircode: string;
   baseTown: string;
   locationCounty: string;
+  storeDepartments: StoreDepartmentDraft[];
 };
 
 type CaraSetupFormContextValue = {
@@ -136,6 +142,8 @@ type CaraSetupFormContextValue = {
   setRawBusinessDescription: (v: string) => void;
   faqs: AgentFaq[];
   setFaqs: (v: AgentFaq[]) => void;
+  storeDepartments: StoreDepartmentDraft[];
+  setStoreDepartments: (v: StoreDepartmentDraft[]) => void;
   isDirty: boolean;
   pending: boolean;
   status: { kind: "ok" | "error"; message: string } | null;
@@ -214,6 +222,9 @@ export function CaraSetupFormProvider({
     initial.serviceAreaExclusionItems,
   );
   const [servicesItems, setServicesItems] = useState(initial.servicesItems);
+  const [storeDepartments, setStoreDepartments] = useState(
+    initial.storeDepartments ?? [],
+  );
   const [servicesNotOfferedItems, setServicesNotOfferedItems] = useState(
     initial.servicesNotOfferedItems,
   );
@@ -263,6 +274,7 @@ export function CaraSetupFormProvider({
         serviceAreaItems: initial.serviceAreaItems,
         serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
         servicesItems: initial.servicesItems,
+        storeDepartments: initial.storeDepartments ?? [],
         servicesNotOfferedItems: initial.servicesNotOfferedItems,
         detailsToCollectItems: initial.detailsToCollectItems,
         detailsCollectMode: initial.detailsCollectMode,
@@ -301,6 +313,7 @@ export function CaraSetupFormProvider({
         serviceAreaItems: initial.serviceAreaItems,
         serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
         servicesItems: initial.servicesItems,
+        storeDepartments: initial.storeDepartments ?? [],
         servicesNotOfferedItems: initial.servicesNotOfferedItems,
         detailsToCollectItems: initial.detailsToCollectItems,
         detailsCollectMode: initial.detailsCollectMode,
@@ -335,6 +348,7 @@ export function CaraSetupFormProvider({
         serviceAreaItems,
         serviceAreaExclusionItems,
         servicesItems,
+        storeDepartments,
         servicesNotOfferedItems,
         detailsToCollectItems,
         detailsCollectMode,
@@ -404,6 +418,7 @@ export function CaraSetupFormProvider({
         serviceAreaItems: initial.serviceAreaItems,
         serviceAreaExclusionItems: initial.serviceAreaExclusionItems,
         servicesItems: initial.servicesItems,
+        storeDepartments: initial.storeDepartments ?? [],
         servicesNotOfferedItems: initial.servicesNotOfferedItems,
         detailsToCollectItems: initial.detailsToCollectItems,
         detailsCollectMode: initial.detailsCollectMode,
@@ -438,6 +453,7 @@ export function CaraSetupFormProvider({
       serviceAreaItems,
       serviceAreaExclusionItems,
       servicesItems,
+      storeDepartments,
       servicesNotOfferedItems,
       detailsToCollectItems,
       detailsCollectMode,
@@ -478,6 +494,7 @@ export function CaraSetupFormProvider({
     setServiceAreaItems(base.serviceAreaItems);
     setServiceAreaExclusionItems(base.serviceAreaExclusionItems);
     setServicesItems(base.servicesItems);
+    setStoreDepartments(base.storeDepartments ?? []);
     setServicesNotOfferedItems(base.servicesNotOfferedItems);
     setDetailsToCollectItems(base.detailsToCollectItems ?? []);
     setCaptureFields(base.captureFields ?? initial.captureFields);
@@ -517,7 +534,9 @@ export function CaraSetupFormProvider({
       serviceArea: "",
       serviceAreaExclusions: "",
       servicesDepartments: formatAgentKnowledgeList(
-        dedupeServiceChips(servicesItems),
+        departmentNames(storeDepartments).length > 0
+          ? departmentNames(storeDepartments)
+          : dedupeServiceChips(servicesItems),
       ),
       servicesNotOffered: formatAgentKnowledgeList(
         dedupeServiceChips(servicesNotOfferedItems),
@@ -544,6 +563,7 @@ export function CaraSetupFormProvider({
     serviceAreaItems,
     serviceAreaExclusionItems,
     servicesItems,
+    storeDepartments,
     servicesNotOfferedItems,
     captureFields,
     detailsCollectMode,
@@ -558,6 +578,11 @@ export function CaraSetupFormProvider({
 
   const saveAsync = useCallback(async (): Promise<boolean> => {
     setStatus(null);
+    const deptRes = await saveStoreDepartments(storeDepartments);
+    if (!deptRes.ok) {
+      setStatus({ kind: "error", message: deptRes.message });
+      return false;
+    }
     const res = await saveAgentSetup(buildSavePayload());
     if (res.ok) {
       baselineRef.current = currentSnapshot;
@@ -567,10 +592,7 @@ export function CaraSetupFormProvider({
     }
     setStatus({ kind: "error", message: res.message });
     return false;
-  }, [
-    buildSavePayload,
-    currentSnapshot,
-  ]);
+  }, [buildSavePayload, currentSnapshot, storeDepartments]);
 
   const save = useCallback(() => {
     startTransition(async () => {
@@ -607,6 +629,7 @@ export function CaraSetupFormProvider({
       serviceArea: undefined,
       serviceAreaExclusions: undefined,
       servicesOffered: formatAgentKnowledgeList(servicesItems) || undefined,
+      storeDepartments,
       servicesNotOffered:
         formatAgentKnowledgeList(servicesNotOfferedItems) || undefined,
       detailsToCollect:
@@ -641,6 +664,7 @@ export function CaraSetupFormProvider({
     serviceAreaItems,
     serviceAreaExclusionItems,
     servicesItems,
+    storeDepartments,
     servicesNotOfferedItems,
     detailsToCollectItems,
     detailsCollectMode,
@@ -687,6 +711,8 @@ export function CaraSetupFormProvider({
     setServiceAreaExclusionItems,
     servicesItems,
     setServicesItems,
+    storeDepartments,
+    setStoreDepartments,
     servicesNotOfferedItems,
     setServicesNotOfferedItems,
     serviceCatalog,

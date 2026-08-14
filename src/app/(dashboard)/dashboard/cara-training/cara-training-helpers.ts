@@ -1,5 +1,6 @@
 import { formatCallDateTimeLabel } from "@/lib/call-history-types";
 import {
+  parseCaraTrainingGapKind,
   parseCaraTrainingPatch,
   parseOwnerMessages,
   type CaraTrainingItemRow,
@@ -56,6 +57,7 @@ export function rowToTrainingItem(row: Record<string, unknown>): CaraTrainingLis
       : String(row.created_at ?? new Date().toISOString()),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+    gap_kind: parseCaraTrainingGapKind(row.gap_kind),
   };
 }
 

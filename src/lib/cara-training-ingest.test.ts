@@ -26,3 +26,20 @@ describe("isRoutineHandoff", () => {
     );
   });
 });
+
+describe("action-ticket default ingest", () => {
+  it("is not wired from the voice action-ticket route", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+    const path = await import("node:path");
+    const repoRoot = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../..",
+    );
+    const src = await readFile(
+      path.join(repoRoot, "src/app/api/voice/action-ticket/route.ts"),
+      "utf8",
+    );
+    assert.doesNotMatch(src, /ingestActionInboxTraining/);
+  });
+});
