@@ -32,7 +32,7 @@ export type SendTransactionalEmailInput = {
   subject: string;
   text: string;
   html?: string;
-  /** Override platform From (e.g. per-business `{slug}@clistesystems.ie`). */
+  /** Override platform From (e.g. per-business `{slug}@hellocara.ie`). */
   from?: EmailAddress;
   replyTo?: EmailAddress;
 };

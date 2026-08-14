@@ -29,7 +29,7 @@ describe("resolveOrgSenderEmail", () => {
       notificationEmail: "owner@acme.ie",
     });
     assert.deepEqual(sender, {
-      email: "acme-hair@clistesystems.ie",
+      email: "acme-hair@hellocara.ie",
       name: "Acme Hair Studio",
       replyTo: "owner@acme.ie",
     });

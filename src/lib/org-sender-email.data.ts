@@ -46,7 +46,7 @@ export function sanitizeOrgEmailLocalPart(slug: string): string | null {
 }
 
 /**
- * Per-business From address: `{slug}@clistesystems.ie` with display name from
+ * Per-business From address: `{slug}@hellocara.ie` with display name from
  * org name. Reply-To routes to the business notification inbox when set.
  */
 export function resolveOrgSenderEmail(

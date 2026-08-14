@@ -2,15 +2,12 @@
 
 export const PRODUCT_NAME = "Hello Cara";
 
-/** Brand target domains — switch these when DNS, mail, and Vercel cutover are ready. */
-export const TARGET_MARKETING_SITE_URL = "https://hellocara.ie";
-export const TARGET_APP_SITE_URL = "https://app.hellocara.ie";
-export const TARGET_OUTBOUND_EMAIL_DOMAIN = "hellocara.ie";
+export const MARKETING_SITE_URL = "https://hellocara.ie";
 
-/** Active production domains until cutover (do not redirect or link to hellocara yet). */
-export const MARKETING_SITE_URL = "https://clistesystems.ie";
-export const DEFAULT_APP_SITE_URL = "https://app.clistesystems.ie";
-export const OUTBOUND_EMAIL_DOMAIN = "clistesystems.ie";
+/** Production app host when `NEXT_PUBLIC_APP_URL` is unset (local scripts, fallbacks). */
+export const DEFAULT_APP_SITE_URL = "https://app.hellocara.ie";
+
+export const OUTBOUND_EMAIL_DOMAIN = "hellocara.ie";
 
 export const CLISTE_COMPANY = {
   legalName: "Cliste Systems Limited",
@@ -24,10 +21,10 @@ export const CLISTE_COMPANY = {
   /** Set CLISTE_REGISTERED_OFFICE in production env for public display. */
   registeredOffice:
     process.env.CLISTE_REGISTERED_OFFICE?.trim() || "Dublin, Ireland",
-  privacyEmail: "privacy@clistesystems.ie",
-  supportEmail: "support@clistesystems.ie",
-  helloEmail: "hello@clistesystems.ie",
-  securityEmail: "security@clistesystems.ie",
+  privacyEmail: "privacy@hellocara.ie",
+  supportEmail: "support@hellocara.ie",
+  helloEmail: "hello@hellocara.ie",
+  securityEmail: "security@hellocara.ie",
 } as const;
 
 export function companyRegistrationLine(): string {

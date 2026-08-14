@@ -61,7 +61,7 @@ async function main() {
 
   const stripe = new Stripe(stripeKey, {
     apiVersion: "2026-03-25.dahlia",
-    appInfo: { name: "Cliste Bootstrap", url: "https://clistesystems.ie" },
+    appInfo: { name: "Cliste Bootstrap", url: "https://hellocara.ie" },
   });
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false },

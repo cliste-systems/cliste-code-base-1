@@ -5,8 +5,8 @@ import { buildInviteEmailBodies } from "./invite-email-bodies";
 
 
 const actionLink =
-  "https://app.clistesystems.ie/auth/callback?token_hash=abc&type=invite";
-const logoUrl = "https://app.clistesystems.ie/m8x4p2n7.png";
+  "https://app.hellocara.ie/auth/callback?token_hash=abc&type=invite";
+const logoUrl = "https://app.hellocara.ie/m8x4p2n7.png";
 
 test("invite subject includes name without leading comma", () => {
   const bodies = buildInviteEmailBodies({
