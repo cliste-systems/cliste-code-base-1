@@ -139,6 +139,10 @@ to Vercel:
 Next.js middleware rejects production requests without a matching header,
 except `/api/cron/*`, `/api/voice/*`, and `/monitoring` (Sentry tunnel).
 
-Generate a long random secret per environment; never commit it. After
-deploy, verify direct Vercel origin returns **403** while the public
-Cloudflare URL loads normally.
+Run after setting `CLOUDFLARE_API_TOKEN`, zone IDs, and `VERCEL_TOKEN`:
+
+```bash
+npm run provision:launch-secrets
+# or extend cloudflare-harden.py (uses CLISTE_EDGE_SHARED_SECRET + CF_ZONE_ID):
+python3 scripts/cloudflare-harden.py
+```

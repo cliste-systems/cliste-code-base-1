@@ -11,6 +11,7 @@
     "knip": "knip",
     "supabase:mcp-reconnect": "tsx scripts/supabase-mcp-reconnect.ts",
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
+    "provision:launch-secrets": "tsx scripts/provision-launch-secrets.ts",
     "onboarding:background": "bash scripts/export-onboarding-background.sh"
   },
   "dependencies": {

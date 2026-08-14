@@ -114,3 +114,5 @@ Slow brute-force uses Postgres `auth_rate_limit_counters` (via `AUTH_RATE_LIMIT_
 | `AUTH_RATE_LIMIT_SALT` | Production | Salt for hashed auth fingerprints; unique per environment |
 | `CLISTE_EDGE_SHARED_SECRET` | Production | Shared secret injected by Cloudflare as `x-cliste-edge`; middleware rejects direct origin without it |
 | `CLISTE_SUPPORT_DASHBOARD_SECRET` | Production | Signs support impersonation cookie shown in tenant dashboard banner |
+
+Apply all three via `npm run provision:launch-secrets` when `CLOUDFLARE_API_TOKEN`, zone IDs, and `VERCEL_TOKEN` are in `.env.local`.
