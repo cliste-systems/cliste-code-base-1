@@ -39,6 +39,10 @@ import {
   type ServiceCatalogSupplement,
 } from "@/lib/service-catalog-supplement";
 import {
+  sanitizePromptFreeText,
+  wrapUntrustedTenantContent,
+} from "@/lib/prompt-tenant-boundary";
+import {
   NEVER_PROMISE_INSTRUCTION,
   NEVER_QUOTE_PRICE_PATTERN,
   PHOTO_HANDLING_INSTRUCTION,
@@ -201,10 +205,7 @@ function locationPhrase(
   );
 }
 
-/** Sanitize owner free text embedded in quoted prompt lines. */
-export function sanitizePromptFreeText(text: string): string {
-  return text.replace(/"/g, "'");
-}
+export { sanitizePromptFreeText } from "@/lib/prompt-tenant-boundary";
 
 /** @deprecated use sanitizePromptFreeText */
 export function escapeFaqTextForPrompt(text: string): string {
@@ -468,14 +469,22 @@ function businessFilesSection(files: BusinessFileListItem[]): string {
 
     if (slice.wasTruncated) {
       hasLargeFile = true;
-      return buildLargeFilePromptIndex(raw, file.fileName.trim(), label, undefined, {
-        title: file.title,
-        caraDescription: file.caraDescription,
-        whenToUse: file.whenToUse,
-      });
+      const indexBlock = buildLargeFilePromptIndex(
+        raw,
+        file.fileName.trim(),
+        label,
+        undefined,
+        {
+          title: file.title,
+          caraDescription: file.caraDescription,
+          whenToUse: file.whenToUse,
+        },
+      );
+      return wrapUntrustedTenantContent(`FILE_${displayName}`, indexBlock);
     }
 
-    const body = [metadata, slice.text].filter(Boolean).join("\n\n");
+    const wrappedText = wrapUntrustedTenantContent(`FILE_${displayName}`, slice.text);
+    const body = [metadata, wrappedText].filter(Boolean).join("\n\n");
     return `${label} (${displayName}):\n${body}`;
   });
 

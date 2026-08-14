@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { HideStripeTestingAssistant } from "@/components/billing/hide-stripe-testing-assistant";
 import { DashboardGateShell } from "@/components/dashboard/dashboard-gate-shell";
 import { DashboardStoreFooter } from "@/components/dashboard/dashboard-store-footer";
+import { SupportImpersonationBanner } from "@/components/dashboard/support-impersonation-banner";
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
 import { DashboardVerticalProvider } from "./dashboard-vertical-context";
@@ -160,6 +161,7 @@ export default async function DashboardLayout({
   return (
     <>
       <DashboardViewportLock />
+      <SupportImpersonationBanner />
       <HideStripeTestingAssistant />
       <div
         className={cn(

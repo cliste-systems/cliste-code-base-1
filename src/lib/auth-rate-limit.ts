@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 
+import { getTrustedClientIp } from "@/lib/trusted-client-ip";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 type Scope = "authenticate" | "admin_login" | "dashboard_unlock";
@@ -46,7 +47,14 @@ const CONFIG: Record<Scope, ScopeConfig> = {
 };
 
 function getSalt(): string {
-  return process.env.AUTH_RATE_LIMIT_SALT?.trim() || DEFAULT_SALT;
+  const configured = process.env.AUTH_RATE_LIMIT_SALT?.trim();
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "AUTH_RATE_LIMIT_SALT must be set in production for pseudonymous IP hashing.",
+    );
+  }
+  return DEFAULT_SALT;
 }
 
 export function hashRateLimitIdentifier(raw: string): string {
@@ -55,60 +63,93 @@ export function hashRateLimitIdentifier(raw: string): string {
     .digest("hex");
 }
 
-function getClientIp(headersList: Headers): string {
-  const fromCf = headersList.get("cf-connecting-ip")?.trim();
-  if (fromCf) return fromCf;
-  const fromRealIp = headersList.get("x-real-ip")?.trim();
-  if (fromRealIp) return fromRealIp;
-  const xff = headersList.get("x-forwarded-for");
-  if (xff) {
-    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
-    const rightmost = parts[parts.length - 1];
-    if (rightmost) return rightmost;
-  }
-  return "0.0.0.0";
-}
-
+/** IP-only fingerprint for per-IP throttling. */
 export function rateLimitFingerprint(
   headersList: Headers,
   hint?: string | null,
 ): string {
-  const ip = getClientIp(headersList);
-  const ua = headersList.get("user-agent")?.trim() || "unknown-ua";
+  const ip = getTrustedClientIp(headersList);
   const extra = hint?.trim() ? `:${hint.trim().toLowerCase()}` : "";
-  return hashRateLimitIdentifier(`${ip}:${ua}${extra}`);
+  return hashRateLimitIdentifier(`${ip}${extra}`);
 }
 
-async function countFailures(
+/** Identifier-only fingerprint (email, etc.) — no IP or user-agent. */
+export function rateLimitIdentifierFingerprint(identifier: string): string {
+  return hashRateLimitIdentifier(identifier.trim().toLowerCase());
+}
+
+function scopeSeconds(cfg: ScopeConfig) {
+  return {
+    windowSeconds: Math.ceil(cfg.windowMs / 1000),
+    lockSeconds: Math.ceil(cfg.lockMs / 1000),
+  };
+}
+
+function toStatus(row: {
+  failure_count: number;
+  locked_until: string | null;
+  retry_after_seconds: number;
+  requires_captcha: boolean;
+}): RateLimitStatus {
+  const locked =
+    row.retry_after_seconds > 0 ||
+    (row.locked_until != null && new Date(row.locked_until).getTime() > Date.now());
+  return {
+    allowed: !locked,
+    requiresCaptcha: row.requires_captcha,
+    retryAfterSeconds: row.retry_after_seconds ?? 0,
+    failuresInWindow: row.failure_count ?? 0,
+  };
+}
+
+async function rpcStatus(
   scope: Scope,
   fingerprint: string,
-): Promise<{ count: number; lastFailureMs: number | null }> {
+): Promise<RateLimitStatus> {
   const cfg = CONFIG[scope];
-  const windowStart = new Date(Date.now() - cfg.windowMs).toISOString();
+  const { windowSeconds, lockSeconds } = scopeSeconds(cfg);
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("security_auth_events")
-      .select("created_at")
-      .in("event_type", cfg.eventTypes)
-      .in("outcome", ["failure", "rate_limited"])
-      .gte("created_at", windowStart)
-      .contains("metadata", { rate_limit_fingerprint: fingerprint })
-      .order("created_at", { ascending: false })
-      .limit(cfg.maxFailures + 1);
+    const { data, error } = await admin.rpc("auth_rate_limit_get_status", {
+      p_scope: scope,
+      p_fingerprint: fingerprint,
+      p_window_seconds: windowSeconds,
+      p_max_failures: cfg.maxFailures,
+      p_lock_seconds: lockSeconds,
+      p_captcha_after: cfg.captchaAfterFailures,
+    });
     if (error) {
-      console.warn("[auth-rate-limit] count query failed", error.message);
-      return { count: 0, lastFailureMs: null };
+      console.warn("[auth-rate-limit] status rpc failed", error.message);
+      return {
+        allowed: true,
+        requiresCaptcha: false,
+        retryAfterSeconds: 0,
+        failuresInWindow: 0,
+      };
     }
-    const rows = data ?? [];
-    const last = rows[0]?.created_at;
-    return {
-      count: rows.length,
-      lastFailureMs: last ? new Date(last).getTime() : null,
-    };
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
+      return {
+        allowed: true,
+        requiresCaptcha: false,
+        retryAfterSeconds: 0,
+        failuresInWindow: 0,
+      };
+    }
+    return toStatus(row as {
+      failure_count: number;
+      locked_until: string | null;
+      retry_after_seconds: number;
+      requires_captcha: boolean;
+    });
   } catch (e) {
-    console.warn("[auth-rate-limit] count failed", e);
-    return { count: 0, lastFailureMs: null };
+    console.warn("[auth-rate-limit] status failed", e);
+    return {
+      allowed: true,
+      requiresCaptcha: false,
+      retryAfterSeconds: 0,
+      failuresInWindow: 0,
+    };
   }
 }
 
@@ -116,21 +157,7 @@ export async function getRateLimitStatus(
   scope: Scope,
   fingerprint: string,
 ): Promise<RateLimitStatus> {
-  const cfg = CONFIG[scope];
-  const { count, lastFailureMs } = await countFailures(scope, fingerprint);
-  const locked =
-    count >= cfg.maxFailures &&
-    lastFailureMs != null &&
-    Date.now() < lastFailureMs + cfg.lockMs;
-  const retryAfterSeconds = locked
-    ? Math.max(1, Math.ceil((lastFailureMs! + cfg.lockMs - Date.now()) / 1000))
-    : 0;
-  return {
-    allowed: !locked,
-    requiresCaptcha: count >= cfg.captchaAfterFailures,
-    retryAfterSeconds,
-    failuresInWindow: count,
-  };
+  return rpcStatus(scope, fingerprint);
 }
 
 export async function recordRateLimitFailure(
@@ -138,34 +165,45 @@ export async function recordRateLimitFailure(
   fingerprint: string,
 ): Promise<RateLimitStatus> {
   const cfg = CONFIG[scope];
+  const { windowSeconds, lockSeconds } = scopeSeconds(cfg);
   try {
     const admin = createAdminClient();
-    await admin.from("security_auth_events").insert({
-      event_type: cfg.eventTypes[0],
-      outcome: "failure",
-      metadata: { rate_limit_fingerprint: fingerprint, rate_limit_only: true },
+    const { data, error } = await admin.rpc("auth_rate_limit_record_failure", {
+      p_scope: scope,
+      p_fingerprint: fingerprint,
+      p_window_seconds: windowSeconds,
+      p_max_failures: cfg.maxFailures,
+      p_lock_seconds: lockSeconds,
+      p_captcha_after: cfg.captchaAfterFailures,
+    });
+    if (error) {
+      console.warn("[auth-rate-limit] record rpc failed", error.message);
+      return rpcStatus(scope, fingerprint);
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return rpcStatus(scope, fingerprint);
+    return toStatus(row as {
+      failure_count: number;
+      locked_until: string | null;
+      retry_after_seconds: number;
+      requires_captcha: boolean;
     });
   } catch (e) {
-    console.warn("[auth-rate-limit] record failure failed", e);
+    console.warn("[auth-rate-limit] record failed", e);
+    return rpcStatus(scope, fingerprint);
   }
-  return getRateLimitStatus(scope, fingerprint);
 }
 
 export async function clearRateLimit(
   scope: Scope,
   fingerprint: string,
 ): Promise<void> {
-  const cfg = CONFIG[scope];
   try {
     const admin = createAdminClient();
-    await admin
-      .from("security_auth_events")
-      .delete()
-      .in("event_type", cfg.eventTypes)
-      .contains("metadata", {
-        rate_limit_fingerprint: fingerprint,
-        rate_limit_only: true,
-      });
+    await admin.rpc("auth_rate_limit_clear", {
+      p_scope: scope,
+      p_fingerprint: fingerprint,
+    });
   } catch (e) {
     console.warn("[auth-rate-limit] clear failed", e);
   }

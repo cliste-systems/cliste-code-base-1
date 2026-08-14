@@ -13,7 +13,7 @@ import {
   SENSITIVE_DATA_BLOCK_MESSAGE,
 } from "@/lib/call-handling-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
-import { findNearDuplicateChip } from "@/lib/cara-setup-chips";
+import { findExactChipInList, findNearDuplicateChip } from "@/lib/cara-setup-chips";
 import {
   businessFileKindLabel,
   type BusinessFileListItem,
@@ -191,6 +191,9 @@ export function findNearDuplicateFaqQuestion(
     if (i === skipIndex) continue;
     const existing = faqs[i]?.question.trim();
     if (!existing) continue;
+    if (findExactChipInList(normalized, [existing])) {
+      return { index: i, faq: faqs[i]! };
+    }
     if (findNearDuplicateChip(normalized, [existing])) {
       return { index: i, faq: faqs[i]! };
     }

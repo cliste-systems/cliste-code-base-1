@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { resolveSafeAuthNextPath } from "@/lib/auth-callback-next";
 import { createSupabaseCallbackClient } from "@/utils/supabase/callback-client";
 
 const EMAIL_OTP_TYPES = new Set([
@@ -91,6 +92,17 @@ export default function AuthCallbackPage() {
 
         const href = window.location.href;
         const params = mergeAuthParamsFromUrl(href);
+        const nextPath =
+          resolveSafeAuthNextPath(params.next) ??
+          resolveSafeAuthNextPath(
+            new URL(href).searchParams.get("next") ?? undefined,
+          );
+
+        const finishSuccess = () => {
+          finishAuthCallback(claimKey, true);
+          router.replace(nextPath ?? "/auth/post-login");
+          router.refresh();
+        };
 
         if (params.error || params.error_description) {
           const msg =
@@ -107,7 +119,7 @@ export default function AuthCallbackPage() {
         claimKey = getCallbackClaimKey(params);
         const gate = tryBeginAuthCallback(claimKey);
         if (gate === "skip_done") {
-          router.replace("/auth/post-login");
+          router.replace(nextPath ?? "/auth/post-login");
           router.refresh();
           return;
         }
@@ -142,9 +154,7 @@ export default function AuthCallbackPage() {
             );
             return;
           }
-          finishAuthCallback(claimKey, true);
-          router.replace("/auth/post-login");
-          router.refresh();
+          finishSuccess();
           return;
         }
 
@@ -160,9 +170,7 @@ export default function AuthCallbackPage() {
             );
             return;
           }
-          finishAuthCallback(claimKey, true);
-          router.replace("/auth/post-login");
-          router.refresh();
+          finishSuccess();
           return;
         }
 
@@ -181,14 +189,12 @@ export default function AuthCallbackPage() {
             );
             return;
           }
-          finishAuthCallback(claimKey, true);
           window.history.replaceState(
             window.history.state,
             "",
             `${window.location.pathname}${window.location.search}`
           );
-          router.replace("/auth/post-login");
-          router.refresh();
+          finishSuccess();
           return;
         }
 
@@ -196,7 +202,7 @@ export default function AuthCallbackPage() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
-          router.replace("/auth/post-login");
+          router.replace(nextPath ?? "/auth/post-login");
           router.refresh();
           return;
         }

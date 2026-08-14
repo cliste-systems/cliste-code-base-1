@@ -15,6 +15,10 @@ import {
   resolveAccountIdFromBillingMetadata,
 } from "@/lib/account-billing";
 import { captureObservedError } from "@/lib/observability";
+import {
+  claimStripeWebhookEvent,
+  markStripeWebhookEventProcessed,
+} from "@/lib/stripe-webhook-replay";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -66,22 +70,18 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { data: dedupeRow, error: dedupeErr } = await admin
-    .from("stripe_webhook_events")
-    .insert({ event_id: event.id, event_type: event.type })
-    .select("event_id")
-    .maybeSingle();
-  if (dedupeErr) {
-    if (dedupeErr.code === "23505") {
-      return NextResponse.json({ received: true, duplicate: true });
-    }
+  let claim: Awaited<ReturnType<typeof claimStripeWebhookEvent>>;
+  try {
+    claim = await claimStripeWebhookEvent(admin, event.id, event.type);
+  } catch (dedupeErr) {
     await captureObservedError(dedupeErr, {
       route: "stripe/webhook",
       eventId: event.id,
     });
     return new NextResponse("dedupe error", { status: 500 });
   }
-  if (!dedupeRow) {
+
+  if (claim === "duplicate") {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
@@ -121,6 +121,17 @@ export async function POST(req: NextRequest) {
       eventId: event.id,
     });
     return new NextResponse("handler error", { status: 500 });
+  }
+
+  try {
+    await markStripeWebhookEventProcessed(admin, event.id);
+  } catch (markErr) {
+    await captureObservedError(markErr, {
+      route: "stripe/webhook",
+      eventId: event.id,
+      sideEffect: "mark_processed",
+    });
+    return new NextResponse("mark processed error", { status: 500 });
   }
 
   return NextResponse.json({ received: true });

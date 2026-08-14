@@ -251,6 +251,62 @@ def push_rate_limit_rules() -> None:
     must("push rate-limit rules", r)
 
 
+# ------------------------------------------------------------------ transform
+def ensure_edge_header_transform(edge_secret: str) -> None:
+    """Inject x-cliste-edge on app hostnames for Vercel origin auth."""
+    if not edge_secret:
+        print("SKIP edge header transform — CLISTE_EDGE_SHARED_SECRET unset")
+        return
+
+    entry = req("GET", f"/zones/{ZONE}/rulesets/phases/http_request_late_transform/entrypoint")
+    ruleset_id = None
+    existing_rules = []
+    if entry.get("success") and entry.get("result"):
+        ruleset_id = entry["result"].get("id")
+        existing_rules = entry["result"].get("rules") or []
+
+    if not ruleset_id:
+        created = req("POST", f"/zones/{ZONE}/rulesets", {
+            "name": "Cliste launch hardening",
+            "kind": "zone",
+            "phase": "http_request_late_transform",
+            "rules": [],
+        })
+        if not created.get("success"):
+            print(f"FAIL create transform ruleset: {created.get('errors') or created}")
+            return
+        ruleset_id = created["result"]["id"]
+
+    kept = [
+        rule for rule in existing_rules
+        if rule.get("description") != "Cliste inject x-cliste-edge header"
+    ]
+    kept.append({
+        "description": "Cliste inject x-cliste-edge header",
+        "enabled": True,
+        "expression": (
+            '(http.host eq "app.hellocara.ie" or http.host eq "app.clistesystems.ie")'
+        ),
+        "action": "rewrite",
+        "action_parameters": {
+            "headers": {
+                "x-cliste-edge": {
+                    "operation": "set",
+                    "value": edge_secret,
+                }
+            }
+        },
+    })
+
+    must(
+        "push x-cliste-edge transform rule",
+        req("PUT", f"/zones/{ZONE}/rulesets/{ruleset_id}", {
+            "description": "Cliste launch hardening request header transforms",
+            "rules": kept,
+        }),
+    )
+
+
 # ------------------------------------------------------------------ main
 def main():
     print("== 1. ensure Stripe webhook IP list ==")
@@ -261,6 +317,9 @@ def main():
 
     print("\n== 3. push rate-limit rules ==")
     push_rate_limit_rules()
+
+    print("\n== 4. inject x-cliste-edge transform ==")
+    ensure_edge_header_transform(os.environ.get("CLISTE_EDGE_SHARED_SECRET", "").strip())
 
 
 if __name__ == "__main__":

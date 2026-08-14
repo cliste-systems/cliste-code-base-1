@@ -8,6 +8,7 @@ import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { sendInviteEmail } from "@/lib/invite-email";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
+import { lookupAuthUserIdByEmail } from "@/lib/auth-user-lookup";
 import {
   parseOrganizationNiche,
   PRODUCT_NAME_BY_NICHE,
@@ -62,18 +63,24 @@ export async function inviteTeamMember(
   const niche = parseOrganizationNiche(orgRow?.niche);
   const productName = PRODUCT_NAME_BY_NICHE[niche];
 
-  const { data: existingAuthUsers } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
-  const existingAuthUser = existingAuthUsers?.users?.find(
-    (user) => user.email?.trim().toLowerCase() === email,
-  );
-  if (existingAuthUser?.id) {
+  let existingAuthUserId: string | null = null;
+  try {
+    existingAuthUserId = await lookupAuthUserIdByEmail(admin, email);
+  } catch (lookupError) {
+    return {
+      ok: false,
+      message:
+        lookupError instanceof Error
+          ? lookupError.message
+          : "Could not verify whether this email is already registered.",
+    };
+  }
+
+  if (existingAuthUserId) {
     const { data: existingProfile } = await admin
       .from("profiles")
       .select("account_id")
-      .eq("id", existingAuthUser.id)
+      .eq("id", existingAuthUserId)
       .maybeSingle();
 
     if (

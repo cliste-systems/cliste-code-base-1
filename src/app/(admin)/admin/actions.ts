@@ -586,9 +586,17 @@ export type SupportDashboardLinkResult =
 /** Generates a sign-in link so support can open the client dashboard as a member. */
 export async function createSupportDashboardLink(
   organizationId: string,
-  clientOrigin?: string | null
+  clientOrigin?: string | null,
+  reason?: string | null,
 ): Promise<SupportDashboardLinkResult> {
-  await assertAdminOperator();
+  const operator = await assertAdminOperator();
+  const supportReason = reason?.trim();
+  if (!supportReason || supportReason.length < 8) {
+    return {
+      ok: false,
+      message: "Enter a short reason (at least 8 characters) for opening this account.",
+    };
+  }
   const id = organizationId.trim();
   if (!UUID_RE.test(id)) {
     return { ok: false, message: "Invalid organization id." };
@@ -663,13 +671,25 @@ export async function createSupportDashboardLink(
   }
 
   const supportCookieValue = await createSupportDashboardCookieValue();
-  if (supportCookieValue) {
-    (await cookies()).set(
-      SUPPORT_DASHBOARD_COOKIE,
-      supportCookieValue,
-      supportDashboardCookieOptions()
-    );
-  }
+  (await cookies()).set(
+    SUPPORT_DASHBOARD_COOKIE,
+    supportCookieValue,
+    supportDashboardCookieOptions(),
+  );
+
+  const h = await headers();
+  await logSecurityEvent(buildSecurityEventContext(h), {
+    eventType: "support_impersonation_started",
+    outcome: "success",
+    actorUserId: operator.id,
+    actorEmail: operator.email ?? null,
+    targetUserId: target.id,
+    targetEmail: email,
+    metadata: {
+      organizationId: id,
+      reason: supportReason,
+    },
+  });
 
   return { ok: true, url: linkData.properties.action_link };
 }
