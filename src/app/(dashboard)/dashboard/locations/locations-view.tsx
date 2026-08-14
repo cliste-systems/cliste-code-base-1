@@ -28,6 +28,7 @@ import type { AccountLocationRow } from "@/lib/account-locations";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
+import { parseOrganizationNiche } from "@/lib/organization-niche";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -55,13 +56,13 @@ export function LocationsView({
   upgradeMessage,
   activeOrganizationId,
 }: LocationsViewProps) {
-  const { copy } = useDashboardVertical();
+  const { copy, niche } = useDashboardVertical();
   const [state, formAction, pending] = useActionState(
     addAccountLocation,
     initialState,
   );
   // Retail pilot: plans are managed by Cliste, not self-serve.
-  const isRetail = useDashboardVertical().vertical.id === "retail";
+  const isRetail = parseOrganizationNiche(niche) === "retail";
 
   const locationLabelLower = locationLabel.toLowerCase();
   const locationLabelPlural = `${locationLabelLower}s`;

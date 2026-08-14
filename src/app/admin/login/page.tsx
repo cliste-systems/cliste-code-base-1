@@ -2,7 +2,7 @@ import { PRODUCT_NAME } from "@/lib/company-details";
 import Link from "next/link";
 import Image from "next/image";
 
-import { unlockAdminGate } from "./actions";
+import { submitAdminLogin } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +93,7 @@ export default async function AdminUnlockPage({
             </p>
           ) : null}
 
-          <form action={unlockAdminGate} className="space-y-5">
+          <form action={submitAdminLogin} className="space-y-5">
             <div className="space-y-2">
               <label
                 htmlFor="admin-gate-pw"

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
-import { verticalIdForNiche } from "@/lib/verticals";
+import { parseOrganizationNiche } from "@/lib/organization-niche";
 import { PLANS, type PlanTier } from "@/lib/cliste-plans";
 
 import { finaliseBillingCheckout } from "./actions";
@@ -55,7 +55,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     .select("niche")
     .eq("id", organizationId)
     .maybeSingle();
-  if (verticalIdForNiche(orgNicheRow?.niche) === "retail") {
+  if (parseOrganizationNiche(orgNicheRow?.niche) === "retail") {
     if (!suspendedQuery) {
       redirect("/dashboard");
     }

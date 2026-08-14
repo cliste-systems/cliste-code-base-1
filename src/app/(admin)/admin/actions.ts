@@ -36,6 +36,7 @@ import {
   logSecurityEvent,
 } from "@/lib/security-events";
 import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { requireAdminSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const UUID_RE =
