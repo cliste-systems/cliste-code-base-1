@@ -1,14 +1,12 @@
-/** Set when admin uses "Open dashboard"; sidebar shows "dev" instead of the salon user's name. */
+import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
+
+/** Set when admin uses "Open dashboard"; shows an impersonation banner in the tenant shell. */
 export const SUPPORT_DASHBOARD_COOKIE = "cliste_support_dashboard";
-const SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS = 60 * 60 * 8;
+const SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS = 60 * 60;
 const SUPPORT_DASHBOARD_COOKIE_PREFIX = "support-dashboard";
 
 function getSupportDashboardSigningSecret(): string | null {
-  return (
-    process.env.CLISTE_SUPPORT_DASHBOARD_SECRET?.trim() ||
-    process.env.CLISTE_DASHBOARD_GATE_SECRET?.trim() ||
-    null
-  );
+  return process.env.CLISTE_SUPPORT_DASHBOARD_SECRET?.trim() || null;
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -33,13 +31,31 @@ async function signSupportPayload(
   return bytesToHex(new Uint8Array(sig));
 }
 
-export async function createSupportDashboardCookieValue(): Promise<string | null> {
+export async function createSupportDashboardCookieValue(): Promise<string> {
   const secret = getSupportDashboardSigningSecret();
-  if (!secret) return null;
+  if (!secret) {
+    throw new Error(
+      "CLISTE_SUPPORT_DASHBOARD_SECRET is not configured — refusing to mint support impersonation links.",
+    );
+  }
   const expiresAt = Math.floor(Date.now() / 1000) + SUPPORT_DASHBOARD_COOKIE_TTL_SECONDS;
   const payload = `${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${expiresAt}`;
   const sig = await signSupportPayload(payload, secret);
   return `${expiresAt}.${sig}`;
+}
+
+export async function isValidSupportDashboardCookie(
+  cookieValue: string | null | undefined,
+): Promise<boolean> {
+  const secret = getSupportDashboardSigningSecret();
+  if (!secret || !cookieValue?.trim()) return false;
+  const [expiresRaw, sig] = cookieValue.trim().split(".", 2);
+  const expiresAt = Number(expiresRaw);
+  if (!Number.isFinite(expiresAt) || !sig) return false;
+  if (expiresAt <= Math.floor(Date.now() / 1000)) return false;
+  const payload = `${SUPPORT_DASHBOARD_COOKIE_PREFIX}:${expiresAt}`;
+  const expected = await signSupportPayload(payload, secret);
+  return timingSafeEqualUtf8(sig, expected);
 }
 
 export function supportDashboardCookieOptions(): {

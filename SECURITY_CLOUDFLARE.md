@@ -91,7 +91,9 @@ Everything else is already applied.
 - **Authenticated Origin Pulls (mTLS) to Vercel** — Vercel doesn't support
   client-cert auth on Hobby/Team. The practical equivalent is a shared
   secret header in a Cloudflare Transform Rule checked by the Next.js
-  middleware. Also available on request.
+  middleware (`CLISTE_EDGE_SHARED_SECRET` → `x-cliste-edge`). **Required
+  for production launch** — without it, direct-origin traffic to Vercel is
+  rejected with 403.
 - **DMARC/SPF/DKIM** — needs coordination with whichever provider sends
   your outbound mail (SendGrid, Twilio, Google Workspace). A one-line
   `v=DMARC1; p=reject; rua=mailto:dmarc@hellocara.ie` is the goal, but
@@ -123,3 +125,20 @@ python3 scripts/cloudflare-harden.py
 ```
 
 Do this quarterly, or after any Stripe IP update.
+
+## Origin shared secret (launch hardening)
+
+Add a **Transform Rule** on the app zone (`app.hellocara.ie` / legacy
+`app.clistesystems.ie`) that sets a request header on all traffic proxied
+to Vercel:
+
+| Header | Value |
+|--------|--------|
+| `x-cliste-edge` | Same value as Vercel env `CLISTE_EDGE_SHARED_SECRET` |
+
+Next.js middleware rejects production requests without a matching header,
+except `/api/cron/*`, `/api/voice/*`, and `/monitoring` (Sentry tunnel).
+
+Generate a long random secret per environment; never commit it. After
+deploy, verify direct Vercel origin returns **403** while the public
+Cloudflare URL loads normally.

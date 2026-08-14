@@ -107,4 +107,10 @@ Then **Reload Window** in Cursor and toggle **supabase** under Settings → Tool
 ## Rate limiting
 
 Cloudflare edge rules: re-run `python3 scripts/cloudflare-harden.py` after deploy.
-Slow brute-force uses `security_auth_events` (no extra env).
+Slow brute-force uses Postgres `auth_rate_limit_counters` (via `AUTH_RATE_LIMIT_SALT`).
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `AUTH_RATE_LIMIT_SALT` | Production | Salt for hashed auth fingerprints; unique per environment |
+| `CLISTE_EDGE_SHARED_SECRET` | Production | Shared secret injected by Cloudflare as `x-cliste-edge`; middleware rejects direct origin without it |
+| `CLISTE_SUPPORT_DASHBOARD_SECRET` | Production | Signs support impersonation cookie shown in tenant dashboard banner |
