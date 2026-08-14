@@ -36,7 +36,6 @@ import {
   type BusinessFileListItem,
 } from "@/lib/business-files";
 import {
-  extractedContentLooksLikePii,
   sliceFileTextForPrompt,
 } from "@/lib/business-file-prompt";
 import {
@@ -53,8 +52,12 @@ import {
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 type UploadResult =
-  | { ok: true; file?: BusinessFileListItem; overlapSendOnlyDefault?: boolean }
-  | { ok: false; message: string };
+  | {
+      ok: true;
+      file?: BusinessFileListItem;
+      overlapSendOnlyDefault?: boolean;
+    }
+  | { ok: false; message: string; requiresPiiAck?: boolean };
 
 type ActionResult =
   | { ok: true; file?: BusinessFileListItem }
@@ -124,9 +127,13 @@ export function BusinessFilesSection({
     file: File;
     existing: BusinessFileListItem;
   } | null>(null);
+  const [piiAckPrompt, setPiiAckPrompt] = useState<{
+    file: File;
+    message: string;
+    skipReplaceCheck?: boolean;
+  } | null>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [documentKind, setDocumentKind] = useState<BusinessFileKind | "">("");
-  const [piiDismissed, setPiiDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const onboarding = variant === "onboarding";
 
@@ -134,7 +141,10 @@ export function BusinessFilesSection({
     setFiles(initialFiles);
   }, [initialFiles]);
 
-  function runUpload(file: File, options?: { skipReplaceCheck?: boolean }) {
+  function runUpload(
+    file: File,
+    options?: { skipReplaceCheck?: boolean; piiAcknowledged?: boolean },
+  ) {
     setMessage(null);
 
     if (!documentKind) {
@@ -151,6 +161,9 @@ export function BusinessFilesSection({
     const formData = new FormData();
     formData.set("file", file);
     formData.set("documentKind", documentKind);
+    if (options?.piiAcknowledged) {
+      formData.set("piiAcknowledged", "true");
+    }
     startTransition(async () => {
       const res = await onUpload(formData);
       if (res.ok && res.file) {
@@ -160,22 +173,17 @@ export function BusinessFilesSection({
           onFilesChange?.(next);
           return next;
         });
-
-        const hasText = Boolean(uploaded.extractedText?.trim());
-        if (
-          hasText &&
-          !piiDismissed &&
-          extractedContentLooksLikePii(uploaded.extractedText ?? "")
-        ) {
-          setMessage(
-            "This file may contain personal contact details — only upload what Cara genuinely needs on calls.",
-          );
-        } else {
-          setMessage(null);
-        }
-
+        setMessage(null);
         setSetupContext({ file: uploaded, isNewUpload: true });
       } else if (!res.ok) {
+        if (res.requiresPiiAck) {
+          setPiiAckPrompt({
+            file,
+            message: res.message,
+            skipReplaceCheck: options?.skipReplaceCheck,
+          });
+          return;
+        }
         setMessage(res.message);
       }
     });
@@ -515,6 +523,23 @@ export function BusinessFilesSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={piiAckPrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) setPiiAckPrompt(null);
+        }}
+        title="Personal details detected"
+        description={piiAckPrompt?.message}
+        confirmLabel="Upload anyway"
+        onConfirm={() => {
+          if (!piiAckPrompt) return;
+          const { file, skipReplaceCheck } = piiAckPrompt;
+          setPiiAckPrompt(null);
+          runUpload(file, { skipReplaceCheck, piiAcknowledged: true });
+        }}
+        pending={pending}
+      />
 
       <ConfirmDialog
         open={removeId !== null}

@@ -7,15 +7,41 @@ import {
 } from "./src/lib/gate-cookie";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
 import { dashboardStripRedirect } from "./src/lib/dashboard-routes";
-import { DASHBOARD_LEGAL_ACCEPT_PATH, LEGAL_DOCUMENT_VERSIONS } from "./src/lib/legal-documents";
-import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
-import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
 import { isPublicSignupEnabled } from "./src/lib/public-signup";
 import { pathIsAdminLogin, pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
-import { createAdminClient } from "./src/utils/supabase/admin";
+import { timingSafeEqualUtf8 } from "./src/lib/timing-safe-equal";
 import { updateSession } from "./src/utils/supabase/middleware";
 
 const ADMIN_GATE_COOKIE = "cliste_admin_gate";
+const EDGE_HEADER = "x-cliste-edge";
+
+function pathBypassesEdgeAuth(pathname: string): boolean {
+  if (pathname.startsWith("/api/cron/")) return true;
+  if (pathname.startsWith("/api/voice/")) return true;
+  if (pathname.startsWith("/monitoring")) return true;
+  return false;
+}
+
+async function rejectDirectOriginWithoutEdgeSecret(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  if (process.env.NODE_ENV !== "production") return null;
+  const path = request.nextUrl.pathname;
+  if (pathBypassesEdgeAuth(path)) return null;
+
+  const secret = process.env.CLISTE_EDGE_SHARED_SECRET?.trim();
+  if (!secret) {
+    console.error("[middleware] CLISTE_EDGE_SHARED_SECRET missing in production");
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  const provided = request.headers.get(EDGE_HEADER) ?? "";
+  const ok = await timingSafeEqualUtf8(provided, secret);
+  if (!ok) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+  return null;
+}
 
 const LEGACY_APP_HOSTS = new Set(["app.clistesystems.ie"]);
 
@@ -175,76 +201,10 @@ function buildForwardRequestHeaders(request: NextRequest): Headers {
   return headers;
 }
 
-const LEGAL_OK_COOKIE = "cliste_legal_ok";
-const LEGAL_OK_VERSION = Object.values(LEGAL_DOCUMENT_VERSIONS).join("|");
-
-async function legalAcceptRedirect(
-  request: NextRequest,
-  response: NextResponse,
-  userId: string | undefined,
-): Promise<NextResponse | null> {
-  if (!userId) return null;
-
-  const pathname = request.nextUrl.pathname;
-  if (pathname.startsWith("/api/")) return null;
-
-  if (request.cookies.get(LEGAL_OK_COOKIE)?.value === LEGAL_OK_VERSION) {
-    return null;
-  }
-
-  try {
-    const admin = createAdminClient();
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    const organizationId = profile?.organization_id;
-    if (!organizationId) return null;
-
-    const onboardingNeeds = await onboardingPathNeedsLegalAcceptance({
-      pathname,
-      userId,
-      organizationId,
-    });
-    if (onboardingNeeds) {
-      const redirectRes = NextResponse.redirect(
-        new URL("/onboarding/legal", request.url),
-      );
-      copySessionCookies(response, redirectRes);
-      return redirectRes;
-    }
-
-    const dashboardNeeds = await dashboardPathNeedsLegalAcceptance({
-      pathname,
-      userId,
-      organizationId,
-    });
-    if (dashboardNeeds) {
-      const redirectRes = NextResponse.redirect(
-        new URL(DASHBOARD_LEGAL_ACCEPT_PATH, request.url),
-      );
-      copySessionCookies(response, redirectRes);
-      return redirectRes;
-    }
-
-    response.cookies.set(LEGAL_OK_COOKIE, LEGAL_OK_VERSION, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60,
-      path: "/",
-    });
-  } catch (err) {
-    // Missing service-role key or a Supabase timeout must not 500 sign-in.
-    console.error("[middleware] legal acceptance check failed", err);
-  }
-
-  return null;
-}
-
 export async function middleware(request: NextRequest) {
+  const edgeReject = await rejectDirectOriginWithoutEdgeSecret(request);
+  if (edgeReject) return edgeReject;
+
   const legacyHostRedirect = legacyAppHostRedirect(request);
   if (legacyHostRedirect) return legacyHostRedirect;
 
@@ -253,9 +213,6 @@ export async function middleware(request: NextRequest) {
 
   const gatedSignup = signupGateRedirect(request, response, user?.id);
   if (gatedSignup) return gatedSignup;
-
-  const legalRedirect = await legalAcceptRedirect(request, response, user?.id);
-  if (legalRedirect) return legalRedirect;
 
   const maybeRootRedirect = rootToLoginRedirect(request, response);
   if (maybeRootRedirect !== response) return maybeRootRedirect;

@@ -22,7 +22,9 @@ import { listServicesForOrg } from "@/lib/service-catalog";
 
 import { parseAgentFaqs } from "./agent-faqs";
 
-type ActionResult = { ok: true } | { ok: false; message: string };
+type ActionResult =
+  | { ok: true }
+  | { ok: false; message: string; requiresPiiAck?: boolean };
 
 function revalidateBusinessFilesPaths() {
   for (const path of AGENT_CONFIG_REVALIDATE_PATHS) {
@@ -45,12 +47,17 @@ export async function listSendableBusinessFiles(): Promise<BusinessFileListItem[
 export async function uploadBusinessFile(
   formData: FormData,
 ): Promise<
-  ActionResult & { file?: BusinessFileListItem; overlapSendOnlyDefault?: boolean }
+  ActionResult & {
+    file?: BusinessFileListItem;
+    overlapSendOnlyDefault?: boolean;
+    requiresPiiAck?: boolean;
+  }
 > {
   const { organizationId, supabase } = await requireDashboardSession();
   const file = formData.get("file");
   const rawKind = String(formData.get("documentKind") ?? "").trim();
   const documentKind = isBusinessFileKind(rawKind) ? rawKind : null;
+  const piiAcknowledged = formData.get("piiAcknowledged") === "true";
 
   if (!(file instanceof File)) {
     return { ok: false, message: "Choose a file to upload." };
@@ -80,6 +87,7 @@ export async function uploadBusinessFile(
     documentKind,
     hasServiceCatalog,
     hasFaqs,
+    piiAcknowledged,
   });
 
   if (result.ok) {

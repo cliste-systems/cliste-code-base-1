@@ -1,9 +1,13 @@
 import * as Sentry from "@sentry/nextjs";
 
+import { validateProductionEnv } from "./lib/env";
+
 /**
  * Next.js instrumentation hook — loads Sentry when SENTRY_DSN is set.
  */
 export async function register() {
+  validateProductionEnv();
+
   const dsn = process.env.SENTRY_DSN?.trim();
   if (!dsn) return;
 

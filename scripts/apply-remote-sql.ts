@@ -1,16 +1,14 @@
-/**
- * Run SQL against the linked Supabase project (DDL / one-off fixes).
- *
- * Requires SUPABASE_ACCESS_TOKEN or `supabase login`.
- *
- *   npx tsx scripts/apply-remote-sql.ts supabase/migrations/066_profile_avatars.sql
- */
-
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { config } from "dotenv";
+
+import {
+  isProductionSupabaseRef,
+  requireDestructiveScriptConfirmation,
+  resolveSupabaseProjectRef,
+} from "./destructive-script-guard";
 
 config({ path: ".env.local" });
 
@@ -56,6 +54,12 @@ async function runSql(token: string, query: string): Promise<void> {
   console.log(text || "OK");
 }
 
+function sqlLooksDestructive(query: string): boolean {
+  return /\b(drop\s+table|truncate\s+|delete\s+from\s+(?!public\.security_auth_events\b))/i.test(
+    query,
+  );
+}
+
 async function main() {
   const sqlPath = process.argv[2];
   if (!sqlPath) {
@@ -64,6 +68,20 @@ async function main() {
   }
 
   const query = await readFile(sqlPath, "utf8");
+  const ref = resolveSupabaseProjectRef();
+  const isVersionedMigration = sqlPath.replace(/\\/g, "/").includes("supabase/migrations/");
+  if (
+    !isVersionedMigration &&
+    sqlLooksDestructive(query) &&
+    ref &&
+    isProductionSupabaseRef(ref) &&
+    process.env.CLISTE_ALLOW_DESTRUCTIVE_ON_PROD !== "1"
+  ) {
+    await requireDestructiveScriptConfirmation({
+      actionLabel: `RUN DESTRUCTIVE SQL from ${sqlPath}`,
+    });
+  }
+
   const token = await readAccessToken();
   await runSql(token, query);
   console.log(`Applied ${sqlPath}`);

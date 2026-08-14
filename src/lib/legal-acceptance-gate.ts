@@ -55,8 +55,7 @@ export async function enforceDashboardLegalAcceptance(
 
   const pathname = await dashboardPathnameFromHeaders();
 
-  // Middleware enforces the gate on /dashboard/*; skip here to avoid redirect loops
-  // when the pathname header is unavailable in this render.
+  // Avoid redirect loops when the pathname header is unavailable in this render.
   if (!pathname) {
     return;
   }

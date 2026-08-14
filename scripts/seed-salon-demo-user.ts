@@ -8,6 +8,7 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
+import { requireDestructiveScriptConfirmation } from "./destructive-script-guard";
 import { randomBytes } from "node:crypto";
 
 import { PLANS } from "../src/lib/cliste-plans.data";
@@ -89,6 +90,11 @@ async function assignPoolPhone(
 }
 
 async function main() {
+  await requireDestructiveScriptConfirmation({
+    actionLabel: "seed a demo salon tenant",
+    requireYesFlag: false,
+  });
+
   const suffix = randomBytes(3).toString("hex");
   const email = `bloom-beauty-${suffix}@cliste.test`;
   const password = `BloomSalon${suffix.slice(0, 4)}!`;
