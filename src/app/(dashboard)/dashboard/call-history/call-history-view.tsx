@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { Ban, Check, Copy, Inbox, Phone, PhoneCall, Search, ShieldOff, User } from "lucide-react";
+import { Ban, Check, Copy, Phone, PhoneCall, Search, ShieldOff } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 
@@ -184,8 +184,6 @@ export function CallHistoryView({
     }
   }, [selected, businessName, blockedSet]);
 
-  const contactHref = DASHBOARD_ROUTES.contacts;
-
   return (
     <section
       className={cn(
@@ -280,7 +278,6 @@ export function CallHistoryView({
             copied={copied}
             detailLoading={detailLoading}
             onCopySummary={copySummary}
-            contactHref={contactHref}
             blockedSet={blockedSet}
             businessName={businessName}
             onRefresh={() => router.refresh()}
@@ -415,7 +412,6 @@ function CallDetailPanel({
   copied,
   detailLoading,
   onCopySummary,
-  contactHref,
   blockedSet,
   businessName,
   onRefresh,
@@ -424,7 +420,6 @@ function CallDetailPanel({
   copied: boolean;
   detailLoading: boolean;
   onCopySummary: () => void;
-  contactHref: string;
   blockedSet: Set<string>;
   businessName: string;
   onRefresh: () => void;
@@ -451,7 +446,6 @@ function CallDetailPanel({
       copied={copied}
       detailLoading={detailLoading}
       onCopySummary={onCopySummary}
-      contactHref={contactHref}
       blockedSet={blockedSet}
       businessName={businessName}
       onRefresh={onRefresh}
@@ -464,7 +458,6 @@ function CallDetailPanelContent({
   copied,
   detailLoading,
   onCopySummary,
-  contactHref,
   blockedSet,
   businessName,
   onRefresh,
@@ -473,7 +466,6 @@ function CallDetailPanelContent({
   copied: boolean;
   detailLoading: boolean;
   onCopySummary: () => void;
-  contactHref: string;
   blockedSet: Set<string>;
   businessName: string;
   onRefresh: () => void;
@@ -570,6 +562,19 @@ function CallDetailPanelContent({
           </p>
         </DetailSection>
 
+        {call.followUp ? (
+          <DetailSection title="Follow-up">
+            <p className="text-[14px] leading-relaxed text-slate-700">
+              {call.followUp.summary}
+            </p>
+            <p className="mt-1 text-[12px] text-slate-500">
+              {call.followUp.status === "open"
+                ? "Cara took this as a message or handoff — it stays on this call."
+                : "This follow-up is marked resolved."}
+            </p>
+          </DetailSection>
+        ) : null}
+
         <DetailSection title="Transcript">
           {detailLoading ? (
             <p className="text-[13px] text-slate-500">Loading transcript…</p>
@@ -651,16 +656,6 @@ function CallDetailPanelContent({
           )}
           {copied ? "Copied" : "Copy summary"}
         </DetailActionButton>
-        <DetailActionButton href={contactHref}>
-          <User className="size-3.5" aria-hidden />
-          Open contact
-        </DetailActionButton>
-        {call.followUp ? (
-          <DetailActionButton href="/dashboard/action-inbox">
-            <Inbox className="size-3.5" aria-hidden />
-            View follow-up
-          </DetailActionButton>
-        ) : null}
       </DetailPanelFooter>
 
       {blockMsg ? (

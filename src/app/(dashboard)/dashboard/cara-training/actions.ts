@@ -121,6 +121,7 @@ export async function startOwnerInitiatedTraining(
     return created;
   }
 
+  revalidatePath("/dashboard");
   revalidatePath("/dashboard/cara-training");
   return { ok: true, itemId: created.itemId };
 }

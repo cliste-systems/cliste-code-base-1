@@ -3,7 +3,6 @@ import { Suspense, type ReactNode } from "react";
 import {
   AlertTriangle,
   Building2,
-  Euro,
   ExternalLink,
   Eye,
   LifeBuoy,
@@ -17,7 +16,6 @@ import {
   getAdminGlobalMetricRange,
   parseAdminGlobalMetricPeriod,
 } from "@/lib/admin-metric-range";
-import { formatBookingValueEur, sumAppointmentBookingValueEur } from "@/lib/booking-value";
 import {
   ORGANIZATION_NICHE_ADMIN_LABELS,
   parseOrganizationNiche,
@@ -207,7 +205,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   let openTickets = 0;
   let urgentEngineeringOpen = 0;
   let openSupportTickets = 0;
-  let bookingValueEur = 0;
   let estimatedVoiceCostUsd = 0;
   let voiceCostCallsWithEstimate = 0;
   let voiceCostBreakdown: Record<string, number> = {
@@ -252,7 +249,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
       urgentListRes,
       supportRes,
       listRes,
-      bookingValueSum,
     ] = await Promise.all([
       admin.from("organizations").select("id", { count: "exact", head: true }),
       admin
@@ -286,10 +282,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
         .from("organizations")
         .select("id, name, slug, tier, niche, created_at")
         .order("created_at", { ascending: false }),
-      sumAppointmentBookingValueEur(admin, {
-        rangeStartIso,
-        rangeEndExclusiveIso,
-      }),
     ]);
 
     if (orgsRes.error) throw new Error(orgsRes.error.message);
@@ -304,7 +296,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     openTickets = ticketsRes.count ?? 0;
     urgentEngineeringOpen = urgentCountRes.count ?? 0;
     urgentEngineeringTickets = (urgentListRes.data ?? []) as UrgentEngineeringRow[];
-    bookingValueEur = bookingValueSum;
     openSupportTickets = supportRes.error
       ? 0
       : (supportRes.count ?? 0);
@@ -344,14 +335,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
             Overview
           </h1>
         </div>
-        {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
-          <NewClientDialog />
-        ) : (
-          <div className="flex flex-col items-end gap-1 text-right text-xs text-gray-500">
-            <span>Self-serve signup is live at <code className="rounded bg-gray-100 px-1 py-0.5">/signup</code>.</span>
-            <span>Set <code className="rounded bg-gray-100 px-1 py-0.5">ADMIN_ALLOW_MANUAL_CREATE=1</code> to expose the manual form.</span>
-          </div>
-        )}
+        <NewClientDialog />
       </header>
 
       {loadError ? (
@@ -481,7 +465,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 sm:items-stretch lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 sm:items-stretch lg:grid-cols-3 xl:grid-cols-5">
           <AdminMetricCard
             title="Organizations"
             icon={<Building2 strokeWidth={1.5} aria-hidden />}
@@ -493,13 +477,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
             icon={<Phone strokeWidth={1.5} aria-hidden />}
             subtitle={periodShort}
             value={formatInt(callsInRange)}
-          />
-
-          <AdminMetricCard
-            title="Booking value"
-            icon={<Euro strokeWidth={1.5} aria-hidden />}
-            subtitle={periodShort}
-            value={formatBookingValueEur(bookingValueEur)}
           />
 
           <AdminMetricCard

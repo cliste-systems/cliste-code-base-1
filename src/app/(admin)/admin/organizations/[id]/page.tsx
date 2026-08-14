@@ -118,10 +118,12 @@ export default async function AdminOrganizationDetailPage({ params }: PageProps)
         customPrompt={org.custom_prompt}
       />
 
-      <LiveKitPhoneCard
-        organizationId={org.id}
-        phoneNumber={org.phone_number}
-      />
+      {process.env.ADMIN_SHOW_LIVEKIT_US_PHONE === "1" ? (
+        <LiveKitPhoneCard
+          organizationId={org.id}
+          phoneNumber={org.phone_number}
+        />
+      ) : null}
     </div>
   );
 }

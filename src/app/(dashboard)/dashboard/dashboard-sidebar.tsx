@@ -2,29 +2,18 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
-  Bot,
-  Building2,
-  Gauge,
   GraduationCap,
-  Inbox,
   LayoutDashboard,
-  LifeBuoy,
   Phone,
   Settings,
-  Share2,
-  Shield,
-  Users,
-  Activity,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { LocationSwitcher } from "@/components/dashboard/location-switcher";
-import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
-import { CaraSidebarNav } from "@/components/dashboard/cara-sidebar-nav";
-import { BusinessSidebarNav } from "@/components/dashboard/business-sidebar-nav";
 import { DashboardProfileMenu } from "@/components/dashboard/dashboard-profile-menu";
+import { DashboardStoreFooter } from "@/components/dashboard/dashboard-store-footer";
 import type { AccountLocationRow } from "@/lib/account-locations";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import { dashboardSidebarRowClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
@@ -35,27 +24,9 @@ import type { DashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { DashboardSignOutButton } from "./dashboard-sign-out-button";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
-  "/dashboard": LayoutDashboard,
-  "/dashboard/activity": Activity,
+  "/dashboard": GraduationCap,
   "/dashboard/calls": Phone,
-  "/dashboard/call-history": Phone,
-  "/dashboard/action-inbox": Inbox,
-  "/dashboard/contacts": Users,
-  "/dashboard/clients": Users,
-  "/dashboard/routing": Share2,
-  "/dashboard/cara": Bot,
-  "/dashboard/cara-setup": Bot,
-  "/dashboard/business": Building2,
-  "/dashboard/agent-setup": Bot,
-  "/dashboard/cara-training": GraduationCap,
-  "/dashboard/usage": Gauge,
-  "/dashboard/billing": Gauge,
-  "/dashboard/support": LifeBuoy,
-  "/dashboard/legal/data-requests": Shield,
-  "/dashboard/privacy": Shield,
-  "/dashboard/locations": Building2,
-  "/dashboard/team": Users,
-  "/dashboard/settings": Settings,
+  "/dashboard/setup": Settings,
 };
 
 export type DashboardSidebarNavItem = {
@@ -79,7 +50,6 @@ type DashboardSidebarProps = {
 };
 
 function sidebarLabel(item: DashboardSidebarNavItem): string {
-  if (item.href === "/dashboard") return "Overview";
   return item.label;
 }
 
@@ -166,7 +136,7 @@ function NavSection({
 
 export function DashboardSidebar({
   coreNav,
-  accountNav,
+  accountNav: _accountNav,
   needsPassword,
   account,
   locations,
@@ -199,32 +169,6 @@ export function DashboardSidebar({
 
         <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-0.5">
           <NavSection label="Workspace" items={coreNav} />
-          <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-          <section className="space-y-1.5">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
-              Cara
-            </p>
-            <CaraSidebarNav />
-          </section>
-          <section className="space-y-1.5">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
-              Business
-            </p>
-            <BusinessSidebarNav />
-          </section>
-          <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-          <section className="space-y-1.5">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
-              Account
-            </p>
-            <AccountSidebarNav
-              items={accountNav.map((item) => ({
-                href: item.href,
-                label: item.label,
-                badge: item.badge,
-              }))}
-            />
-          </section>
           {needsPassword ? (
             <>
               <Link
@@ -242,14 +186,17 @@ export function DashboardSidebar({
         </nav>
 
         <div className="mt-auto shrink-0 space-y-2 border-t border-[#e8ecf0] pt-4">
-          <LocationSwitcher
-            locations={locations}
-            activeOrganizationId={activeOrganizationId}
-            viewAllLocations={viewAllLocations}
-            locationLabel={locationLabel}
-            accountName={accountName}
-          />
+          {locations.length >= 2 ? (
+            <LocationSwitcher
+              locations={locations}
+              activeOrganizationId={activeOrganizationId}
+              viewAllLocations={viewAllLocations}
+              locationLabel={locationLabel}
+              accountName={accountName}
+            />
+          ) : null}
           <DashboardProfileMenu account={account} />
+          <DashboardStoreFooter className="px-1" />
           <DashboardSignOutButton />
         </div>
       </div>

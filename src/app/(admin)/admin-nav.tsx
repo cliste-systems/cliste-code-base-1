@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
-  Inbox,
   LayoutGrid,
   LifeBuoy,
   Phone,
@@ -18,12 +17,6 @@ import { AdminSignOutButton } from "./admin-sign-out-button";
 
 const nav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
-  {
-    href: "/admin/onboarding",
-    label: "Onboarding queue",
-    icon: Inbox,
-    exact: false,
-  },
   {
     href: "/admin/phone-pool",
     label: "Phone pool",

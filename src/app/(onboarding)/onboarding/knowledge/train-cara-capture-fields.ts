@@ -59,6 +59,7 @@ const BOOKING_CAPTURE_IDS = new Set([
 
 const CAPTURE_OPTIONS_BY_VERTICAL: Record<VerticalId, CaptureFieldOption[]> = {
   salon_beauty: SALON_CAPTURE_OPTIONS,
+  retail: DEFAULT_CAPTURE_OPTIONS,
   generic: DEFAULT_CAPTURE_OPTIONS,
 };
 
@@ -69,6 +70,11 @@ const DEFAULT_CAPTURE_FIELD_IDS_BY_VERTICAL: Record<
   salon_beauty: [
     { id: "preferred_service", label: "Preferred service" },
     { id: "preferred_day", label: "Preferred day" },
+  ],
+  retail: [
+    { id: "what_they_need", label: "What they need" },
+    { id: "location", label: "Location" },
+    { id: "urgency", label: "Urgency" },
   ],
   generic: [
     { id: "what_they_need", label: "What they need" },

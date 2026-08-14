@@ -51,7 +51,7 @@ export async function notifyActionInboxOwner(
   const summary =
     input.summary.trim().slice(0, 500) || "A caller needs follow-up.";
   const origin = resolveAppSiteOrigin().origin;
-  const inboxUrl = `${origin}/dashboard/action-inbox`;
+  const inboxUrl = `${origin}/dashboard/calls`;
 
   if (email && isSendGridConfigured()) {
     const orgSender = resolveOrgSenderEmail({
@@ -61,7 +61,7 @@ export async function notifyActionInboxOwner(
     });
     const res = await sendTransactionalEmail({
       to: email,
-      subject: `${biz} — new Action Inbox item`,
+      subject: `${biz} — new follow-up from a call`,
       text: [
         `A caller needs your attention at ${biz}.`,
         "",
@@ -69,7 +69,7 @@ export async function notifyActionInboxOwner(
         "",
         summary,
         "",
-        `Open Action Inbox: ${inboxUrl}`,
+        `Open Calls: ${inboxUrl}`,
       ].join("\n"),
       ...(orgSender
         ? {
@@ -86,7 +86,7 @@ export async function notifyActionInboxOwner(
   }
 
   if (phone) {
-    const sms = `${biz}: new Action Inbox item from ${caller}. Open ${PRODUCT_NAME} to review.`;
+    const sms = `${biz}: new follow-up from ${caller}. Open ${PRODUCT_NAME} Calls to review.`;
     const res = await sendTwilioBookingSms(phone, sms, {
       organizationId,
       purpose: "action_inbox_notify",

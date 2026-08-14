@@ -564,6 +564,43 @@ const GENERIC_COPY: VerticalCopyBase = {
 
 const VERTICAL_COPY: Record<VerticalId, VerticalCopyBase> = {
   salon_beauty: SALON_COPY,
+  retail: {
+    ...GENERIC_COPY,
+    customerNoun: { singular: "customer", plural: "customers" },
+    nav: {
+      contactsLabel: "Customers",
+    },
+    home: {
+      heroSubheading: "Here's how the store's looking today.",
+      greetingSubline: "What Cara handled on the shop phone today.",
+      goLiveChecklistSuffix: "can handle real customer calls confidently.",
+    },
+    calls: {
+      emptyDescription:
+        "When Cara answers your store line, calls appear here with summaries and what she did.",
+    },
+    training: {
+      description:
+        "Fill the gaps customers hit on calls — parking, gift cards, departments — then Cara knows next time.",
+    },
+    settings: {
+      businessIdentityTitle: "Store details",
+    },
+    caraSetupBase: {
+      ...GENERIC_COPY.caraSetupBase,
+      generalBasicsTitle: "Store basics",
+      greetingHint:
+        "Introduce your store — the AI and recording notice is added automatically.",
+      locationHint:
+        "The town your store is in — Cara uses this for directions.",
+      commonQuestionsTitle: "What customers always ask",
+      servicesEmptyWarning:
+        "Add departments and what you offer so Cara can put callers through instead of guessing.",
+    },
+    setupSteps: {
+      addServicesLabel: "Add departments",
+    },
+  },
   generic: GENERIC_COPY,
 };
 

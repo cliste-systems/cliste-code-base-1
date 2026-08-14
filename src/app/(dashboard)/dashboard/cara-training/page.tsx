@@ -62,7 +62,7 @@ export default async function CaraTrainingPage({
           <ClistePageHeader
             tone="training"
             icon={GraduationCap}
-            title="Training"
+            title="Knowledge Gaps"
             description={description}
             summary={[
               { value: String(openCount), label: "needs input" },

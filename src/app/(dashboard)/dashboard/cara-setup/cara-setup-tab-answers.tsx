@@ -13,7 +13,6 @@ import { lintFaqVsFilePriceConflicts } from "@/lib/answers-boundary";
 import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
 import { cleanBusinessRules } from "@/lib/agent-business-rules";
 import { weekScheduleHasOpenDay } from "@/lib/business-hours";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 import { MAX_FAQS } from "../agent-setup/agent-faqs";
 import { AddQuestionDialog } from "./add-question-dialog";
@@ -86,7 +85,6 @@ export function CaraSetupTabAnswers() {
   }
 
   const atFaqCap = form.faqs.length >= MAX_FAQS;
-  const hasServiceCatalog = form.serviceCatalog.length > 0;
 
   return (
     <DashboardAnimatedStack embedded>
@@ -138,9 +136,7 @@ export function CaraSetupTabAnswers() {
             className="h-9 rounded-lg border-slate-300 bg-white text-[12px] text-slate-700"
             title={
               atFaqCap
-                ? hasServiceCatalog
-                  ? "Question limit reached — add more services in your Services menu."
-                  : "Question limit reached — for bigger knowledge (price lists, menus), use Files instead."
+                ? "Question limit reached. Contact Cliste if Cara needs more answers."
                 : undefined
             }
           >
@@ -153,29 +149,8 @@ export function CaraSetupTabAnswers() {
         <div className="space-y-4 px-5 py-5">
         {atFaqCap ? (
           <p className="mb-3 text-[12.5px] text-[#35443f]">
-            {hasServiceCatalog ? (
-              <>
-                Question limit reached — add more services or prices in your{" "}
-                <Link
-                  href={DASHBOARD_ROUTES.businessServices}
-                  className="font-medium underline underline-offset-2"
-                >
-                  Services menu
-                </Link>
-                .
-              </>
-            ) : (
-              <>
-                Question limit reached — for bigger knowledge (price lists, menus),{" "}
-                <Link
-                  href={DASHBOARD_ROUTES.businessFiles}
-                  className="font-medium underline underline-offset-2"
-                >
-                  upload a file on Files
-                </Link>{" "}
-                instead.
-              </>
-            )}
+            Question limit reached. Contact Cliste if Cara needs more answers
+            loaded for this store.
           </p>
         ) : null}
 
@@ -195,8 +170,8 @@ export function CaraSetupTabAnswers() {
               No questions yet
             </p>
             <p className="mt-1 text-[12.5px] leading-relaxed text-slate-500">
-              Add the questions callers ask most often. Cara already covers
-              services, hours, and location from your other setup tabs.
+              Add the questions callers ask most often. Hours and departments
+              are set above.
             </p>
             <Button
               type="button"

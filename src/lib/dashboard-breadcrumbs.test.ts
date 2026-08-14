@@ -5,10 +5,10 @@ import { dashboardBreadcrumbs } from "./dashboard-breadcrumbs";
 import { DASHBOARD_ROUTES } from "./dashboard-routes";
 
 describe("dashboardBreadcrumbs", () => {
-  it("uses Workspace > Overview for home", () => {
+  it("uses Workspace > Knowledge Gaps for home", () => {
     assert.deepEqual(dashboardBreadcrumbs("/dashboard"), [
       { label: "Workspace", href: DASHBOARD_ROUTES.home },
-      { label: "Overview" },
+      { label: "Knowledge Gaps" },
     ]);
   });
 
@@ -26,10 +26,17 @@ describe("dashboardBreadcrumbs", () => {
     ]);
   });
 
-  it("uses Workspace > Training for training", () => {
+  it("uses Workspace > Knowledge Gaps for the training path", () => {
     assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.caraTraining), [
       { label: "Workspace", href: DASHBOARD_ROUTES.home },
-      { label: "Training" },
+      { label: "Knowledge Gaps" },
+    ]);
+  });
+
+  it("uses Workspace > Setup for setup", () => {
+    assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.setup), [
+      { label: "Workspace", href: DASHBOARD_ROUTES.home },
+      { label: "Setup" },
     ]);
   });
 

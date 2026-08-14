@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { HideStripeTestingAssistant } from "@/components/billing/hide-stripe-testing-assistant";
 import { DashboardGateShell } from "@/components/dashboard/dashboard-gate-shell";
+import { DashboardStoreFooter } from "@/components/dashboard/dashboard-store-footer";
 import { DashboardLiveRefresh } from "@/components/dashboard-live-refresh";
 
 import { DashboardVerticalProvider } from "./dashboard-vertical-context";
@@ -18,7 +19,6 @@ import {
 import { loadAccountBilling, loadAccountLocations } from "@/lib/account-session";
 import { buildDashboardAccountSummary } from "@/lib/dashboard-account-summary";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
-import { navItemsForVertical } from "@/lib/dashboard-nav-items";
 import { resolveOrganizationDisplayName } from "@/lib/organization-display-name";
 import { verticalPackForNiche } from "@/lib/verticals";
 import {
@@ -43,7 +43,10 @@ import {
   DashboardSidebar,
   type DashboardSidebarNavItem,
 } from "./dashboard-sidebar";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import {
+  DASHBOARD_ROUTES,
+  dashboardStripRedirect,
+} from "@/lib/dashboard-routes";
 import { dashboardVersionDisplay } from "@/lib/dashboard-versions";
 
 import { DASHBOARD_INTERACTIVE_CURSOR, DASHBOARD_REBUILD_SHELL } from "@/components/dashboard/dashboard-surface";
@@ -54,21 +57,11 @@ import { DashboardViewportLock } from "./dashboard-viewport-lock";
 const navItems: {
   href: string;
   label: string;
-  section: "core" | "account";
+  section: "core";
 }[] = [
-  { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
-  { href: DASHBOARD_ROUTES.activity, label: "Activity", section: "core" },
+  { href: DASHBOARD_ROUTES.home, label: "Knowledge Gaps", section: "core" },
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
-  { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
-  { href: DASHBOARD_ROUTES.caraTraining, label: "Training", section: "core" },
-  { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
-  { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
-  { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
-  { href: DASHBOARD_ROUTES.support, label: "Support", section: "account" },
-  { href: DASHBOARD_ROUTES.legalDataRequests, label: "Legal", section: "account" },
-  { href: DASHBOARD_ROUTES.locations, label: "Locations", section: "account" },
-  { href: DASHBOARD_ROUTES.team, label: "Team", section: "account" },
-  { href: DASHBOARD_ROUTES.settings, label: "Settings", section: "account" },
+  { href: DASHBOARD_ROUTES.setup, label: "Setup", section: "core" },
 ];
 
 function toNavItem(
@@ -90,6 +83,10 @@ export default async function DashboardLayout({
 }>) {
   const session = await requireDashboardSession();
   const pathname = await dashboardPathnameFromHeaders();
+  const stripped = pathname ? dashboardStripRedirect(pathname) : null;
+  if (stripped) {
+    redirect(stripped);
+  }
 
   if (await dashboardShouldUseGateShell(session, pathname)) {
     return <DashboardGateShell>{children}</DashboardGateShell>;
@@ -119,10 +116,6 @@ export default async function DashboardLayout({
     ),
   };
 
-  // Gate the dashboard on SaaS lifecycle status. Newly-signed-up salons
-  // still in the wizard (or suspended ones) should not see live bookings.
-  // Legacy rows created before migration 027 default to status='active' so
-  // existing dashboards are unaffected.
   const lifecycleStatus =
     (accountBilling?.status as string | undefined) ??
     (orgRow?.status as string | undefined) ??
@@ -134,32 +127,20 @@ export default async function DashboardLayout({
   ) {
     redirect("/onboarding");
   }
-  if (lifecycleStatus === "suspended") {
-    redirect("/dashboard/usage?suspended=1");
-  }
 
-  const navBadges: DashboardNavBadgeMap = await fetchDashboardNavBadges(
-    supabase,
-    organizationId,
-    navSeenAt,
-  );
+  const suspended = lifecycleStatus === "suspended";
+
+  const navBadges: DashboardNavBadgeMap = suspended
+    ? {}
+    : await fetchDashboardNavBadges(supabase, organizationId, navSeenAt);
 
   const userMeta = user.user_metadata as Record<string, unknown> | undefined;
   const needsPassword =
     userMeta?.needs_password === true || userMeta?.needs_password === "true";
 
   const vertical = verticalPackForNiche(orgRow?.niche);
-  const resolvedNavItems = navItemsForVertical(navItems, vertical);
-
-  const coreNav = resolvedNavItems
-    .filter((i) => i.section === "core")
-    .map((item) => toNavItem(item, navBadges));
-  const accountNav = resolvedNavItems
-    .filter((i) => i.section === "account")
-    .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = resolvedNavItems
-    .filter((i) => i.section === "core")
-    .map((item) => toNavItem(item, navBadges));
+  const coreNav = navItems.map((item) => toNavItem(item, navBadges));
+  const accountNav: DashboardSidebarNavItem[] = [];
 
   const accountSummary = buildDashboardAccountSummary(profile, user, {
     name: accountBilling?.name ?? orgRow?.name ?? null,
@@ -170,7 +151,7 @@ export default async function DashboardLayout({
     resolveOrganizationDisplayName(
       accountBilling?.name ?? orgRow?.name,
       orgRow?.slug,
-    ) || "Your business";
+    ) || "Your store";
   const versionDisplay = dashboardVersionDisplay({
     experienceLabel: vertical.selection.label,
     packVersion: vertical.packVersion,
@@ -207,7 +188,7 @@ export default async function DashboardLayout({
           {!DASHBOARD_REBUILD_SHELL ? (
             <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] px-4 py-3 lg:hidden">
               <DashboardMobileNav
-                items={mobileNavItems}
+                items={coreNav}
                 accountNav={accountNav}
               />
             </div>
@@ -230,11 +211,31 @@ export default async function DashboardLayout({
                   niche={orgRow?.niche}
                   businessType={orgRow?.agent_business_type}
                 >
-                  {children}
+                  {suspended ? (
+                    <div className="mx-auto w-full max-w-xl py-16">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-6">
+                        <h1 className="text-lg font-semibold tracking-tight text-amber-950">
+                          This account is suspended
+                        </h1>
+                        <p className="mt-2 text-sm leading-relaxed text-amber-950/90">
+                          Cara has stopped answering calls for this store. Contact
+                          Cliste to reactivate the account — billing for pilot
+                          stores is handled directly, not through this dashboard.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    children
+                  )}
                 </DashboardVerticalProvider>
               )}
             </div>
           </main>
+          {!DASHBOARD_REBUILD_SHELL ? (
+            <div className="shrink-0 border-t border-[#d9e2dd] bg-[#fafbfc] px-4 py-3 lg:hidden">
+              <DashboardStoreFooter />
+            </div>
+          ) : null}
         </div>
       </div>
       <DashboardNavSeenSync />
