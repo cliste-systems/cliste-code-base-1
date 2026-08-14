@@ -84,7 +84,7 @@ const STRIPPED_DASHBOARD_PREFIX_REDIRECTS: ReadonlyArray<{
   { prefix: "/dashboard/activity", to: DASHBOARD_ROUTES.home },
   { prefix: "/dashboard/cara-setup", to: DASHBOARD_ROUTES.setup },
   { prefix: "/dashboard/agent-setup", to: DASHBOARD_ROUTES.setup },
-  { prefix: "/dashboard/cara/", to: DASHBOARD_ROUTES.setup },
+  { prefix: "/dashboard/cara", to: DASHBOARD_ROUTES.setup },
   { prefix: "/dashboard/business/profile", to: DASHBOARD_ROUTES.setup },
   { prefix: "/dashboard/business/services", to: DASHBOARD_ROUTES.setup },
   { prefix: "/dashboard/business/faqs", to: DASHBOARD_ROUTES.setup },
