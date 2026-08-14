@@ -5,8 +5,10 @@ import {
   Building2,
   ExternalLink,
   Eye,
+  GraduationCap,
   LifeBuoy,
   Phone,
+  PhoneForwarded,
   Ticket,
   Wallet,
 } from "lucide-react";
@@ -201,6 +203,9 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   const periodShort = adminGlobalMetricPeriodShortLabel(metricPeriod);
 
   let orgCount = 0;
+  let storesWithDid = 0;
+  let openLearnableGaps = 0;
+  let warmTransferGo = 0;
   let callsInRange = 0;
   let openTickets = 0;
   let urgentEngineeringOpen = 0;
@@ -300,6 +305,25 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
       ? 0
       : (supportRes.count ?? 0);
     organizations = listRes.data ?? [];
+
+    const [didRes, gapsRes, goRes] = await Promise.all([
+      admin
+        .from("organizations")
+        .select("id", { count: "exact", head: true })
+        .not("phone_number", "is", null),
+      admin
+        .from("cara_training_items")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["awaiting_answer", "draft_ready"])
+        .neq("gap_kind", "live_info"),
+      admin
+        .from("organizations")
+        .select("id", { count: "exact", head: true })
+        .eq("warm_transfer_hardware_status", "go"),
+    ]);
+    if (!didRes.error) storesWithDid = didRes.count ?? 0;
+    if (!gapsRes.error) openLearnableGaps = gapsRes.count ?? 0;
+    if (!goRes.error) warmTransferGo = goRes.count ?? 0;
 
     const callCostsRes = await admin
       .from("call_logs")
@@ -529,6 +553,30 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
               </Link>
             }
             value={formatInt(openSupportTickets)}
+          />
+        </div>
+
+        <h3 className="mt-8 mb-4 px-1 text-sm font-medium text-gray-900">
+          Retail pilot
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 sm:items-stretch lg:grid-cols-3">
+          <AdminMetricCard
+            title="Stores with a DID"
+            icon={<Phone strokeWidth={1.5} aria-hidden />}
+            subtitle="Irish number assigned"
+            value={formatInt(storesWithDid)}
+          />
+          <AdminMetricCard
+            title="Open knowledge gaps"
+            icon={<GraduationCap strokeWidth={1.5} aria-hidden />}
+            subtitle="Learnable · needs input"
+            value={formatInt(openLearnableGaps)}
+          />
+          <AdminMetricCard
+            title="Warm-transfer Go"
+            icon={<PhoneForwarded strokeWidth={1.5} aria-hidden />}
+            subtitle="Hardware marked ready"
+            value={formatInt(warmTransferGo)}
           />
         </div>
       </section>

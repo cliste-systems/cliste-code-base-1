@@ -235,7 +235,10 @@ export function PrivacyToolsClient() {
           <p className="text-[13px] text-slate-600">
             Last export: {portabilityState.data.appointments.length} appointments,{" "}
             {portabilityState.data.call_logs.length} call logs,{" "}
-            {portabilityState.data.action_tickets.length} action tickets.
+            {portabilityState.data.action_tickets.length} action tickets
+            {portabilityState.data.truncated
+              ? " (capped at 5,000 rows per type — contact Cliste if you need a full dump)."
+              : "."}
           </p>
         ) : null}
       </SectionCard>

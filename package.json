@@ -2,6 +2,10 @@
   "name": "cliste-dashboard",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "packageManager": "npm@10.9.7",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3001",
     "build": "next build",
@@ -9,6 +13,8 @@
     "lint": "eslint",
     "test": "tsx --test --experimental-test-module-mocks \"src/**/*.test.ts\"",
     "knip": "knip",
+    "reconnect:supabase": "tsx scripts/reconnect-supabase.ts",
+    "bootstrap:env": "tsx scripts/bootstrap-env-local.ts",
     "supabase:mcp-reconnect": "tsx scripts/supabase-mcp-reconnect.ts",
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
     "provision:launch-secrets": "tsx scripts/provision-launch-secrets.ts",

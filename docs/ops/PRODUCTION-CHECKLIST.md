@@ -3,8 +3,8 @@
 ## Before deploy
 
 - [ ] **Billing alerts** configured — see [INFRASTRUCTURE-COSTS.md](./INFRASTRUCTURE-COSTS.md) (Vercel spend cap, Supabase usage, Railway limit)
-- [ ] Migrations `060`–`064` applied to production Supabase (064 revokes legacy anon storefront access)
-- [ ] Launch-hardening migrations applied: `20260814130000` (auth rate-limit counters), `20260814130100` (Stripe webhook replay), `20260814130200` (auth user lookup RPC)
+- [ ] Migrations applied through the latest timestamped file in `supabase/migrations/` (currently through `20260814160000_call_cost_daily_with_estimate.sql`, plus numeric `001`–`082`). New files must be `YYYYMMDDHHMMSS_name.sql` — do not reuse `20260814130000` or add another numeric `083`.
+- [ ] Launch-hardening migrations: `20260814130000`–`20260814130200`, JWT revoke `20260814140000`, retail departments/gap_kind `20260814150000`
 - [ ] `SENTRY_DSN` set; alert rules configured
 - [ ] `CRON_SECRET`, Stripe, **SendGrid** (signup confirmation email), **Turnstile** keys set on Vercel
 - [ ] `STRIPE_WEBHOOK_SECRET` set; `CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS` unset in production

@@ -8,6 +8,13 @@ import { requireDashboardAdmin } from "@/lib/dashboard-admin";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { syncAccountLocationAddonQuantity } from "@/lib/location-billing-sync";
 import { provisionOrganizationPhoneNumber } from "@/lib/phone-pool";
+import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
+import {
+  departmentInsertsFromTemplate,
+  organizationInsertFromStoreTemplate,
+  STORE_TEMPLATE_ORG_COLUMNS,
+  type StoreTemplatePrimary,
+} from "@/lib/store-from-template";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type LocationActionResult =
@@ -69,9 +76,7 @@ export async function addAccountLocation(
   const admin = createAdminClient();
   const { data: primary } = await admin
     .from("organizations")
-    .select(
-      "niche, agent_business_type, plan_tier, billing_interval, tier, call_routing_mode, agent_voice_id, greeting",
-    )
+    .select(STORE_TEMPLATE_ORG_COLUMNS.join(", "))
     .eq("account_id", session.accountId)
     .eq("is_primary_location", true)
     .maybeSingle();
@@ -79,28 +84,17 @@ export async function addAccountLocation(
   const slug = await uniqueLocationSlug(admin, slugifyLocationName(locationName));
   const { data: orgRow, error: orgErr } = await admin
     .from("organizations")
-    .insert({
-      account_id: session.accountId,
-      is_primary_location: false,
-      name: locationName,
-      slug,
-      address: address || null,
-      agent_location_address: address || null,
-      agent_location_eircode: eircode || null,
-      storefront_eircode: eircode || null,
-      tier: (primary?.tier as string | null) ?? "native",
-      niche: (primary?.niche as string | null) ?? "other",
-      agent_business_type: (primary?.agent_business_type as string | null) ?? null,
-      plan_tier: (primary?.plan_tier as string | null) ?? planTier,
-      billing_interval: (primary?.billing_interval as string | null) ?? "month",
-      call_routing_mode: (primary?.call_routing_mode as string | null) ?? "cara",
-      agent_voice_id: (primary?.agent_voice_id as string | null) ?? null,
-      greeting: (primary?.greeting as string | null) ?? null,
-      status: "active",
-      is_active: true,
-      onboarding_step: 8,
-      launch_status: "completed",
-    })
+    .insert(
+      organizationInsertFromStoreTemplate({
+        accountId: session.accountId,
+        locationName,
+        slug,
+        address,
+        eircode,
+        planTier,
+        primary: (primary as StoreTemplatePrimary | null) ?? null,
+      }),
+    )
     .select("id")
     .single();
 
@@ -109,6 +103,34 @@ export async function addAccountLocation(
   }
 
   const organizationId = orgRow.id as string;
+
+  const primaryId = (primary as StoreTemplatePrimary | null)?.id;
+  if (primaryId) {
+    const { data: deptRows, error: deptErr } = await admin
+      .from("store_departments")
+      .select(
+        "name, uses_store_hours, hours, transfer_number, is_off_licence, is_an_post, sort_order",
+      )
+      .eq("organization_id", primaryId)
+      .order("sort_order", { ascending: true });
+    if (deptErr) {
+      console.warn("[locations] department template copy skipped", deptErr.message);
+    } else {
+      const inserts = departmentInsertsFromTemplate(
+        (deptRows ?? []) as Record<string, unknown>[],
+        organizationId,
+      );
+      if (inserts.length > 0) {
+        const { error: copyErr } = await admin
+          .from("store_departments")
+          .insert(inserts);
+        if (copyErr) {
+          console.warn("[locations] department template insert", copyErr.message);
+        }
+      }
+    }
+  }
+
   const phoneResult = await provisionOrganizationPhoneNumber(organizationId);
   if (!phoneResult.ok) {
     await admin.from("organizations").delete().eq("id", organizationId);
@@ -121,6 +143,11 @@ export async function addAccountLocation(
   const addonSync = await syncAccountLocationAddonQuantity(session.accountId);
   if (!addonSync.ok) {
     console.warn("[locations] addon sync failed", addonSync.message);
+  }
+
+  const prompt = await regenerateCaraCustomPrompt(admin, organizationId);
+  if (!prompt.ok) {
+    console.warn("[locations] prompt compile failed", prompt.message);
   }
 
   revalidatePath(DASHBOARD_ROUTES.locations);
