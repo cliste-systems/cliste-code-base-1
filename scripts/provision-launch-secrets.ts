@@ -141,34 +141,23 @@ async function ensureEdgeHeaderTransformRule(
   zoneLabel: string,
   edgeSecret: string,
 ): Promise<void> {
-  const entrypoint = await cfRequest<{ id: string; rules?: unknown[] }>(
-    token,
-    "GET",
-    `/zones/${zoneId}/rulesets/phases/http_request_late_transform/entrypoint`,
-  );
-
-  let rulesetId = entrypoint?.id;
-  if (!rulesetId) {
-    const created = await cfRequest<{ id: string }>(
-      token,
-      "POST",
-      `/zones/${zoneId}/rulesets`,
-      {
-        name: "Cliste launch hardening",
-        kind: "zone",
-        phase: "http_request_late_transform",
-        rules: [],
-      },
-    );
-    rulesetId = created.id;
-  }
-
-  const existingRules = (entrypoint?.rules ?? []) as Array<{
+  let existingRules: Array<{
     description?: string;
     action?: string;
     expression?: string;
     action_parameters?: unknown;
-  }>;
+  }> = [];
+
+  try {
+    const entrypoint = await cfRequest<{ id: string; rules?: unknown[] }>(
+      token,
+      "GET",
+      `/zones/${zoneId}/rulesets/phases/http_request_late_transform/entrypoint`,
+    );
+    existingRules = (entrypoint?.rules ?? []) as typeof existingRules;
+  } catch {
+    // No entrypoint ruleset yet — create below via PUT.
+  }
 
   const otherRules = existingRules.filter(
     (rule) => rule.description !== "Cliste inject x-cliste-edge header",
@@ -193,7 +182,7 @@ async function ensureEdgeHeaderTransformRule(
   await cfRequest(
     token,
     "PUT",
-    `/zones/${zoneId}/rulesets/${rulesetId}`,
+    `/zones/${zoneId}/rulesets/phases/http_request_late_transform/entrypoint`,
     {
       description: "Cliste launch hardening request header transforms",
       rules: [...otherRules, edgeRule],
