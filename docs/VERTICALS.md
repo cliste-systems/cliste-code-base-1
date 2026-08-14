@@ -1,8 +1,20 @@
 # Vertical packs
 
-A **vertical** is the product-tailoring layer above organization **niches**. Today there are two verticals — `salon_beauty` (tailored) and `generic` (neutral fallback). Each vertical is defined by a single **pack object** in [`src/lib/verticals.ts`](../src/lib/verticals.ts).
+A **vertical** is the product-tailoring layer above organization **niches**. Packs live in [`src/lib/verticals.ts`](../src/lib/verticals.ts). **Retail is the only live pack** (`VERTICAL_CHOICES`). `salon_beauty` and `generic` stay in the machinery (frozen onboarding copy, classifier fallbacks) but are not offered as choices.
 
-Adding a new vertical should require **one pack object + config rows**, not new pages or components.
+Adding a new vertical should require **one pack object + config rows**, not new pages or components. Do not collapse `VerticalId` to a single enum.
+
+## Live store dashboard (Phase 1)
+
+Primary nav is three items for every store session:
+
+| Nav | Route | Role |
+|-----|-------|------|
+| **Knowledge Gaps** | `/dashboard` | Default landing. Badge = open `cara_training_items`. |
+| **Calls** | `/dashboard/calls` | Hear what Cara said/did; follow-ups stay on the call (Action Inbox is folded here). |
+| **Setup** | `/dashboard/setup` | Opening hours, department chips, FAQs. |
+
+Settings, Support, and Legal live in the footer — not primary nav. Files stay reachable at `/dashboard/business/files` for Cliste impersonation; they are not in store nav.
 
 ## How to add a vertical
 
@@ -20,7 +32,7 @@ Follow these steps in order:
 
 6. **Nav diffs** (optional) — use `pack.nav.labelOverrides`, `hiddenHrefs`, or `extraItems`. New hrefs need a destination page and an entry in `NAV_ICONS` in [`dashboard-sidebar.tsx`](../src/app/(dashboard)/dashboard/dashboard-sidebar.tsx) (fallback icon is `LayoutDashboard`).
 
-7. **Add to `VERTICAL_CHOICES`** only when copy is real — no placeholder picker entries.
+7. **Add to `VERTICAL_CHOICES`** only when the pack is live — no placeholder picker entries. Salon is intentionally omitted.
 
 8. **Run verification** — `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`. The guardrail test in [`src/lib/vertical-fork-guardrail.test.ts`](../src/lib/vertical-fork-guardrail.test.ts) must pass.
 
@@ -40,3 +52,4 @@ Niche-specific routing examples for generic-vertical orgs merge from `ROUTING_OV
 
 - **New pages** for a vertical still require real page work.
 - **Declarative per-service field controls** (e.g. a patch-test toggle) are a separate follow-up — not part of the pack layer.
+- **Phase 3 departments table** (hours, transfer, off-licence) — Setup currently reuses existing department chips, not a new table.

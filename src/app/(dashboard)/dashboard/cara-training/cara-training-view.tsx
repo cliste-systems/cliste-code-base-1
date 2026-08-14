@@ -284,7 +284,7 @@ export function CaraTrainingView({
         <div
           className="inline-flex w-full max-w-md rounded-lg border border-[#d9e2dd] bg-[#f6faf7] p-0.5"
           role="tablist"
-          aria-label="Training queue"
+          aria-label="Knowledge gaps"
         >
           {(
             [
@@ -352,7 +352,7 @@ export function CaraTrainingView({
             >
               <div className="shrink-0 border-b border-inherit px-4 py-3 sm:px-5">
                 <p className="text-[13px] font-semibold text-[#11181d]">
-                  {isOpenQueue ? "Training queue" : "Learned"}
+                  {isOpenQueue ? "Needs input" : "Learned"}
                 </p>
               </div>
 
@@ -369,7 +369,7 @@ export function CaraTrainingView({
                     description={
                       isOpenQueue
                         ? "When Cara hits a gap on a call, she'll ask you here."
-                        : "Confirmed training will appear here with where it came from."
+                        : "Confirmed answers will appear here with where they came from."
                     }
                     className="w-full py-10"
                   />

@@ -3,47 +3,26 @@
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
-  Bot,
-  Briefcase,
   GraduationCap,
-  Gauge,
   Menu,
-  Inbox,
   LayoutDashboard,
   Phone,
   Settings,
-  Share2,
-  Users,
   X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { DashboardStoreFooter } from "@/components/dashboard/dashboard-store-footer";
 import { cn } from "@/lib/utils";
 
-import { CaraSidebarNav } from "@/components/dashboard/cara-sidebar-nav";
-import { BusinessSidebarNav } from "@/components/dashboard/business-sidebar-nav";
-import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
 import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
-  "/dashboard": LayoutDashboard,
+  "/dashboard": GraduationCap,
   "/dashboard/calls": Phone,
-  "/dashboard/call-history": Phone,
-  "/dashboard/action-inbox": Inbox,
-  "/dashboard/contacts": Users,
-  "/dashboard/clients": Users,
-  "/dashboard/routing": Share2,
-  "/dashboard/cara": Bot,
-  "/dashboard/cara-setup": Bot,
-  "/dashboard/agent-setup": Bot,
-  "/dashboard/business": Briefcase,
-  "/dashboard/cara-training": GraduationCap,
-  "/dashboard/usage": Gauge,
-  "/dashboard/billing": Gauge,
-  "/dashboard/settings": Settings,
+  "/dashboard/setup": Settings,
 };
 
 type DashboardMobileNavProps = {
@@ -53,7 +32,7 @@ type DashboardMobileNavProps = {
 
 export function DashboardMobileNav({
   items,
-  accountNav,
+  accountNav: _accountNav,
 }: DashboardMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -80,29 +59,20 @@ export function DashboardMobileNav({
           </span>
         </Link>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/dashboard/action-inbox"
-            className="relative inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-            aria-label="Open notifications"
-          >
-            <Bell className="size-4" aria-hidden />
-          </Link>
-          <button
-            type="button"
-            onClick={() => setOpen((current) => !current)}
-            className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-            aria-expanded={open}
-            aria-controls="dashboard-mobile-menu"
-            aria-label="Toggle dashboard menu"
-          >
-            {open ? (
-              <X className="size-4" aria-hidden />
-            ) : (
-              <Menu className="size-4" aria-hidden />
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+          aria-expanded={open}
+          aria-controls="dashboard-mobile-menu"
+          aria-label="Toggle dashboard menu"
+        >
+          {open ? (
+            <X className="size-4" aria-hidden />
+          ) : (
+            <Menu className="size-4" aria-hidden />
+          )}
+        </button>
       </div>
 
       {open ? (
@@ -114,12 +84,10 @@ export function DashboardMobileNav({
           {items.map((item) => {
             const Icon = NAV_ICONS[item.href] ?? LayoutDashboard;
             const active =
-              item.activePrefix
-                ? pathname.startsWith(item.activePrefix)
-                : item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -138,16 +106,8 @@ export function DashboardMobileNav({
               </Link>
             );
           })}
-          <div className="col-span-2 space-y-2 border-t border-slate-100 pt-2">
-            <CaraSidebarNav />
-            <BusinessSidebarNav />
-            <AccountSidebarNav
-              items={accountNav.map((item) => ({
-                href: item.href,
-                label: item.label,
-                badge: item.badge,
-              }))}
-            />
+          <div className="col-span-2 border-t border-slate-100 pt-2">
+            <DashboardStoreFooter />
           </div>
         </nav>
       ) : null}

@@ -16,8 +16,11 @@ import {
  *
  * `generic` is the deliberate fallback: anything we haven't tailored yet uses
  * neutral, business-agnostic copy.
+ *
+ * `retail` is the only live pack (SuperValu / supermarket pilot). Salon remains
+ * in the machinery for frozen onboarding copy; it is not offered as a choice.
  */
-export type VerticalId = "salon_beauty" | "generic";
+export type VerticalId = "salon_beauty" | "retail" | "generic";
 
 export type VerticalSelectionChoice = {
   id: VerticalId;
@@ -136,6 +139,57 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   },
 };
 
+/** Niches that roll up into the Retail vertical. */
+const RETAIL_NICHES = ["retail"] as const;
+
+const RETAIL_PACK: VerticalPack = {
+  id: "retail",
+  defaultNiche: "retail",
+  niches: RETAIL_NICHES,
+  selection: {
+    label: "Retail & Grocery",
+    tagline: "Stores & supermarkets",
+    description:
+      "Supermarkets and shops — Cara answers hours and department questions, takes messages, and puts callers through.",
+  },
+  productNoun: "Store",
+  packVersion: "2.0",
+  customerNoun: { singular: "customer", plural: "customers" },
+  locationNoun: "Store",
+  nav: {
+    hiddenHrefs: [
+      DASHBOARD_ROUTES.contacts,
+      DASHBOARD_ROUTES.actionInbox,
+      DASHBOARD_ROUTES.routing,
+      DASHBOARD_ROUTES.usage,
+      DASHBOARD_ROUTES.team,
+      DASHBOARD_ROUTES.locations,
+      DASHBOARD_ROUTES.activity,
+      DASHBOARD_ROUTES.businessServices,
+      DASHBOARD_ROUTES.businessProfile,
+      DASHBOARD_ROUTES.businessFaqs,
+      DASHBOARD_ROUTES.caraSetup,
+      DASHBOARD_ROUTES.caraGreeting,
+      DASHBOARD_ROUTES.caraTraining,
+    ],
+    labelOverrides: {
+      [DASHBOARD_ROUTES.home]: "Knowledge Gaps",
+      [DASHBOARD_ROUTES.calls]: "Calls",
+      [DASHBOARD_ROUTES.setup]: "Setup",
+    },
+  },
+  capabilities: {
+    ...GENERIC_CAPABILITIES,
+    skipServiceArea: true,
+  },
+  onboarding: {
+    profileHeaderTitle: "Tell us about your store",
+    profileHeaderSubtitle:
+      "A few details so Cara can answer the way your shop floor would.",
+    pickerIcon: "building",
+  },
+};
+
 const GENERIC_PACK: VerticalPack = {
   id: "generic",
   defaultNiche: "other",
@@ -161,22 +215,26 @@ const GENERIC_PACK: VerticalPack = {
 
 export const VERTICAL_PACKS: Record<VerticalId, VerticalPack> = {
   salon_beauty: SALON_BEAUTY_PACK,
+  retail: RETAIL_PACK,
   generic: GENERIC_PACK,
 };
 
 /**
- * Choices shown on the onboarding niche picker, in display order. Today this is
- * intentionally short: the tailored vertical plus the generic fallback. Add a
- * new pack here (e.g. trades) when its copy is ready.
+ * Choices shown on the onboarding niche picker. Retail is the only live pack;
+ * salon and generic stay in VERTICAL_PACKS for frozen wizard copy.
  */
 export const VERTICAL_CHOICES: VerticalSelectionChoice[] = [
-  { id: SALON_BEAUTY_PACK.id, ...SALON_BEAUTY_PACK.selection },
-  { id: GENERIC_PACK.id, ...GENERIC_PACK.selection },
+  { id: RETAIL_PACK.id, ...RETAIL_PACK.selection },
 ];
 
-const NICHE_TO_VERTICAL: ReadonlyMap<OrganizationNiche, VerticalId> = new Map(
-  SALON_BEAUTY_NICHES.map((niche) => [niche, "salon_beauty" as VerticalId]),
-);
+const NICHE_TO_VERTICAL: ReadonlyMap<OrganizationNiche, VerticalId> = new Map([
+  ...SALON_BEAUTY_NICHES.map(
+    (niche) => [niche, "salon_beauty"] as [OrganizationNiche, VerticalId],
+  ),
+  ...RETAIL_NICHES.map(
+    (niche) => [niche, "retail"] as [OrganizationNiche, VerticalId],
+  ),
+]);
 
 /** Which vertical a stored niche belongs to. */
 export function verticalIdForNiche(
@@ -228,10 +286,10 @@ export function resolveNicheForVerticalChoice(
   choice: VerticalId | null,
   classifiedNiche: OrganizationNiche,
 ): OrganizationNiche {
-  if (choice === "salon_beauty") {
-    return verticalIdForNiche(classifiedNiche) === "salon_beauty"
+  if (choice && choice !== "generic") {
+    return verticalIdForNiche(classifiedNiche) === choice
       ? classifiedNiche
-      : SALON_BEAUTY_PACK.defaultNiche;
+      : VERTICAL_PACKS[choice].defaultNiche;
   }
   return classifiedNiche;
 }

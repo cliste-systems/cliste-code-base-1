@@ -17,7 +17,7 @@ describe('parseTrainCaraStepIndex', () => {
 
   it('does not include exclusions in current steps', () => {
     assert.equal(
-      TRAIN_CARA_STEPS.some((step) => step.id === 'exclusions'),
+      TRAIN_CARA_STEPS.some((step) => String(step.id) === "exclusions"),
       false,
     );
   });

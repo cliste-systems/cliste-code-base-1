@@ -15,12 +15,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import {
-  ORGANIZATION_NICHES,
-  ORGANIZATION_NICHE_ADMIN_LABELS,
-  type OrganizationNiche,
-} from "@/lib/organization-niche";
-
 import { createOrganization } from "./actions";
 
 function slugify(name: string): string {
@@ -36,8 +30,6 @@ function slugify(name: string): string {
 export function NewClientDialog() {
   const nameId = useId();
   const slugId = useId();
-  const tierId = useId();
-  const nicheId = useId();
   const ownerEmailId = useId();
   const ownerNameId = useId();
   const addressId = useId();
@@ -46,8 +38,6 @@ export function NewClientDialog() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [tier, setTier] = useState<"connect" | "native">("native");
-  const [niche, setNiche] = useState<OrganizationNiche>("retail");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [address, setAddress] = useState("");
@@ -66,8 +56,6 @@ export function NewClientDialog() {
     setName("");
     setSlug("");
     setSlugTouched(false);
-    setTier("native");
-    setNiche("retail");
     setOwnerEmail("");
     setOwnerName("");
     setAddress("");
@@ -85,8 +73,8 @@ export function NewClientDialog() {
       const result = await createOrganization({
         name,
         slug: slug || slugify(name),
-        tier,
-        niche,
+        tier: "native",
+        niche: "retail",
         ownerEmail,
         ownerName,
         address: address.trim() || null,
@@ -101,7 +89,7 @@ export function NewClientDialog() {
       setOpen(false);
       reset();
     });
-  }, [name, slug, tier, niche, ownerEmail, ownerName, address, storefrontEircode, reset]);
+  }, [name, slug, ownerEmail, ownerName, address, storefrontEircode, reset]);
 
   return (
     <Dialog
@@ -157,20 +145,6 @@ export function NewClientDialog() {
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor={tierId}>Tier</Label>
-            <select
-              id={tierId}
-              value={tier}
-              onChange={(e) =>
-                setTier(e.target.value as "connect" | "native")
-              }
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            >
-              <option value="native">Native</option>
-              <option value="connect">Connect</option>
-            </select>
-          </div>
-          <div className="space-y-2">
             <Label htmlFor={addressId}>Address (optional)</Label>
             <Input
               id={addressId}
@@ -196,27 +170,6 @@ export function NewClientDialog() {
             <p className="text-muted-foreground text-xs">
               Resolved with Google Maps Geocoding to pin the store&apos;s
               location.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={nicheId}>Niche</Label>
-            <select
-              id={nicheId}
-              value={niche}
-              onChange={(e) =>
-                setNiche(e.target.value as OrganizationNiche)
-              }
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            >
-              {ORGANIZATION_NICHES.map((key) => (
-                <option key={key} value={key}>
-                  {ORGANIZATION_NICHE_ADMIN_LABELS[key]}
-                </option>
-              ))}
-            </select>
-            <p className="text-muted-foreground text-xs">
-              Retail is the pilot default — it tailors the client dashboard for
-              stores.
             </p>
           </div>
           <div className="space-y-2">

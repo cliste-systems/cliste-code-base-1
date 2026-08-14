@@ -10,10 +10,12 @@ import {
 
 function pathnameToSeenKey(pathname: string | null): DashboardNavSeenKey | null {
   if (!pathname) return null;
+  if (pathname === "/dashboard" || pathname === "/dashboard/") {
+    return "cara-training";
+  }
   const routes: { prefix: string; key: DashboardNavSeenKey }[] = [
     { prefix: "/dashboard/call-history", key: "call-history" },
     { prefix: "/dashboard/calls", key: "call-history" },
-    { prefix: "/dashboard/action-inbox", key: "action-inbox" },
     { prefix: "/dashboard/cara-training", key: "cara-training" },
   ];
   for (const { prefix, key } of routes) {
@@ -25,7 +27,7 @@ function pathnameToSeenKey(pathname: string | null): DashboardNavSeenKey | null 
 }
 
 /**
- * When the user opens Calls or Action Inbox, persist “seen” via a Server Action
+ * When the user opens Knowledge Gaps or Calls, persist “seen” via a Server Action
  * so the next layout render reads the cookie.
  */
 export function DashboardNavSeenSync() {

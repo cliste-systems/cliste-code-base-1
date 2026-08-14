@@ -24,15 +24,16 @@ const ACCOUNT_SECTION = "Account";
 
 /** Workspace nav pages — longest prefix wins when matching. */
 const WORKSPACE_PAGES: { prefix: string; label: string }[] = [
+  { prefix: DASHBOARD_ROUTES.setup, label: "Setup" },
   { prefix: DASHBOARD_ROUTES.activity, label: "Activity" },
-  { prefix: DASHBOARD_ROUTES.caraTraining, label: "Training" },
-  { prefix: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox" },
-  { prefix: DASHBOARD_ROUTES.contacts, label: "Contacts" },
-  { prefix: "/dashboard/clients", label: "Contacts" },
-  { prefix: DASHBOARD_ROUTES.routing, label: "Call flow" },
+  { prefix: DASHBOARD_ROUTES.caraTraining, label: "Knowledge Gaps" },
+  { prefix: DASHBOARD_ROUTES.actionInbox, label: "Calls" },
+  { prefix: DASHBOARD_ROUTES.contacts, label: "Calls" },
+  { prefix: "/dashboard/clients", label: "Calls" },
+  { prefix: DASHBOARD_ROUTES.routing, label: "Setup" },
   { prefix: DASHBOARD_ROUTES.calls, label: "Calls" },
   { prefix: "/dashboard/call-history", label: "Calls" },
-  { prefix: DASHBOARD_ROUTES.home, label: "Overview" },
+  { prefix: DASHBOARD_ROUTES.home, label: "Knowledge Gaps" },
 ].sort((a, b) => b.prefix.length - a.prefix.length);
 
 function normalizePathname(pathname: string): string {
@@ -110,5 +111,5 @@ export function dashboardBreadcrumbs(pathname: string): DashboardBreadcrumb[] {
     return sectionPage(CARA_SECTION, DASHBOARD_ROUTES.caraGreeting, "Setup");
   }
 
-  return sectionPage(WORKSPACE_SECTION, DASHBOARD_ROUTES.home, "Overview");
+  return sectionPage(WORKSPACE_SECTION, DASHBOARD_ROUTES.home, "Knowledge Gaps");
 }

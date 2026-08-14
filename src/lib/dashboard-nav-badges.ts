@@ -49,17 +49,9 @@ export async function fetchDashboardNavBadges(
   seen: DashboardNavSeenAt | null | undefined,
 ): Promise<DashboardNavBadgeMap> {
   const s = seen ?? EMPTY_SEEN_AT;
-  const actionInboxSince = sinceOrFallback(s.actionInbox);
   const callHistorySince = sinceOrFallback(s.callHistory);
-  const caraTrainingSince = sinceOrFallback(s.caraTraining);
 
-  const [openRes, callHistoryRes, trainingRes] = await Promise.all([
-    supabase
-      .from("action_tickets")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("status", "open")
-      .gt("created_at", actionInboxSince),
+  const [callHistoryRes, openGapsRes] = await Promise.all([
     supabase
       .from("call_logs")
       .select("id", { count: "exact", head: true })
@@ -69,18 +61,14 @@ export async function fetchDashboardNavBadges(
       .from("cara_training_items")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .in("status", ["awaiting_answer", "draft_ready"])
-      .gt("updated_at", caraTrainingSince),
+      .in("status", ["awaiting_answer", "draft_ready"]),
   ]);
 
   const callBadge = countHead(callHistoryRes);
-  const inboxBadge = countHead(openRes);
-  const trainingBadge = countHead(trainingRes);
+  const gapsBadge = countHead(openGapsRes);
   return {
-    "/dashboard/action-inbox": inboxBadge,
-    "/dashboard/calls": callBadge,
-    "/dashboard/call-history": callBadge,
-    [DASHBOARD_ROUTES.caraTraining]: trainingBadge,
+    [DASHBOARD_ROUTES.home]: gapsBadge,
+    [DASHBOARD_ROUTES.calls]: callBadge,
   };
 }
 

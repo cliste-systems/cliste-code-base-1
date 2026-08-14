@@ -6,7 +6,7 @@ import {
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
-import { LEGACY_DASHBOARD_REDIRECTS } from "./src/lib/dashboard-routes";
+import { dashboardStripRedirect } from "./src/lib/dashboard-routes";
 import { DASHBOARD_LEGAL_ACCEPT_PATH, LEGAL_DOCUMENT_VERSIONS } from "./src/lib/legal-documents";
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
 import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
@@ -60,13 +60,13 @@ function legacyAuthPathRedirect(
   return redirectRes;
 }
 
-/** Canonical dashboard URLs (Calls, Contacts, Usage, Cara Setup). */
+/** Phase 1 strip: dashboard URLs that are no longer store destinations. */
 function legacyDashboardPathRedirect(
   request: NextRequest,
   response: NextResponse,
 ): NextResponse {
   const path = request.nextUrl.pathname;
-  const target = LEGACY_DASHBOARD_REDIRECTS[path];
+  const target = dashboardStripRedirect(path);
   if (!target) return response;
   const url = new URL(target, request.url);
   url.search = request.nextUrl.search;

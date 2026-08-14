@@ -40,7 +40,7 @@ export async function notifyCaraTrainingOwner(
   const biz = String(org.name ?? "").trim() || "Your business";
   const topic = input.gapSummary.trim().slice(0, 300) || "something on a recent call";
   const origin = resolveAppSiteOrigin().origin;
-  const trainingUrl = `${origin}/dashboard/cara-training?item=${encodeURIComponent(input.itemId)}`;
+  const trainingUrl = `${origin}/dashboard?item=${encodeURIComponent(input.itemId)}`;
 
   if (email && isSendGridConfigured()) {
     const orgSender = resolveOrgSenderEmail({
@@ -50,13 +50,13 @@ export async function notifyCaraTrainingOwner(
     });
     const res = await sendTransactionalEmail({
       to: email,
-      subject: `${biz} — Cara needs training input`,
+      subject: `${biz} — Cara needs a Knowledge Gaps answer`,
       text: [
         `Cara learned something on a call at ${biz} and needs your help.`,
         "",
         topic,
         "",
-        `Open Cara Training: ${trainingUrl}`,
+        `Open Knowledge Gaps: ${trainingUrl}`,
       ].join("\n"),
       ...(orgSender
         ? {

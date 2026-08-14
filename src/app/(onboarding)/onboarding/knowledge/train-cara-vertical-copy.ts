@@ -145,6 +145,11 @@ const TRAIN_CARA_INTRO_COPY: Record<VerticalId, TrainCaraIntroCopy> = {
     subheadline:
       "The more Cara knows about the salon — your treatments, your regulars, your policies — the better she'll handle real calls.",
   },
+  retail: {
+    headlineLines: ["Train Cara like someone new on the shop phone."],
+    subheadline:
+      "The more Cara knows about the store — hours, departments, and what you never guess — the better she'll handle real calls.",
+  },
   generic: {
     headlineLines: [
       "Train Cara like someone you're putting",
@@ -160,6 +165,7 @@ const TRAIN_CARA_VERTICAL_COPY: Record<
   (caraGoal?: CaraGoal) => TrainCaraVerticalCopy
 > = {
   salon_beauty: salonCopy,
+  retail: genericCopy,
   generic: genericCopy,
 };
 
