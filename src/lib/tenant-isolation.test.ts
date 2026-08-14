@@ -38,7 +38,7 @@ describe("tenant isolation guardrails", () => {
   it("lookupAuthUserIdByEmail returns null for empty email without RPC", async () => {
     const admin = {
       rpc: async () => ({ data: null, error: null }),
-    } as Parameters<typeof lookupAuthUserIdByEmail>[0];
+    } as unknown as Parameters<typeof lookupAuthUserIdByEmail>[0];
 
     assert.equal(await lookupAuthUserIdByEmail(admin, "   "), null);
   });
