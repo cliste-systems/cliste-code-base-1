@@ -36,6 +36,10 @@ export type VerticalPackCapabilities = {
   usesServiceCatalog: boolean;
   /** Omit service area from prompt compilation and DB persistence. */
   skipServiceArea: boolean;
+  /** Compile store department rows (hours, transfer, off-licence / An Post). */
+  usesStoreDepartments: boolean;
+  /** Never quote live stock or shelf prices — take a message or transfer. */
+  neverQuoteLiveStockOrPrice: boolean;
   bookingMenuImport: boolean;
   catalogSatisfiesServicesGate: boolean;
   autoEnsureBookingRoute: boolean;
@@ -87,6 +91,8 @@ export type VerticalPack = {
 const SALON_CAPABILITIES: VerticalPackCapabilities = {
   usesServiceCatalog: true,
   skipServiceArea: true,
+  usesStoreDepartments: false,
+  neverQuoteLiveStockOrPrice: false,
   bookingMenuImport: true,
   catalogSatisfiesServicesGate: true,
   autoEnsureBookingRoute: true,
@@ -99,6 +105,8 @@ const SALON_CAPABILITIES: VerticalPackCapabilities = {
 const GENERIC_CAPABILITIES: VerticalPackCapabilities = {
   usesServiceCatalog: false,
   skipServiceArea: false,
+  usesStoreDepartments: false,
+  neverQuoteLiveStockOrPrice: false,
   bookingMenuImport: false,
   catalogSatisfiesServicesGate: false,
   autoEnsureBookingRoute: false,
@@ -181,6 +189,8 @@ const RETAIL_PACK: VerticalPack = {
   capabilities: {
     ...GENERIC_CAPABILITIES,
     skipServiceArea: true,
+    usesStoreDepartments: true,
+    neverQuoteLiveStockOrPrice: true,
   },
   onboarding: {
     profileHeaderTitle: "Tell us about your store",

@@ -2,7 +2,6 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
-import { ingestActionInboxTraining } from "@/lib/cara-training-ingest";
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
@@ -167,17 +166,6 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     console.error("[voice/action-ticket] notify failed", e);
-  }
-
-  try {
-    await ingestActionInboxTraining(
-      admin,
-      orgId,
-      inserted.id as string,
-      summaryRedacted.text ?? summaryRaw,
-    );
-  } catch (e) {
-    console.error("[voice/action-ticket] training ingest failed", e);
   }
 
   revalidatePath("/dashboard");

@@ -42,6 +42,7 @@ export function NewClientDialog() {
   const [ownerName, setOwnerName] = useState("");
   const [address, setAddress] = useState("");
   const [storefrontEircode, setStorefrontEircode] = useState("");
+  const [assignIrishDid, setAssignIrishDid] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -60,6 +61,7 @@ export function NewClientDialog() {
     setOwnerName("");
     setAddress("");
     setStorefrontEircode("");
+    setAssignIrishDid(true);
     setError(null);
   }, []);
 
@@ -79,6 +81,7 @@ export function NewClientDialog() {
         ownerName,
         address: address.trim() || null,
         storefrontEircode: storefrontEircode.trim() || null,
+        assignIrishDid,
         clientOrigin:
           typeof window !== "undefined" ? window.location.origin : null,
       });
@@ -89,7 +92,7 @@ export function NewClientDialog() {
       setOpen(false);
       reset();
     });
-  }, [name, slug, ownerEmail, ownerName, address, storefrontEircode, reset]);
+  }, [name, slug, ownerEmail, ownerName, address, storefrontEircode, assignIrishDid, reset]);
 
   return (
     <Dialog
@@ -113,9 +116,8 @@ export function NewClientDialog() {
         <DialogHeader>
           <DialogTitle>New retail client</DialogTitle>
           <DialogDescription>
-            Creates the tenant and emails the owner an invite. Assign the phone
-            number, call routing, and Cara config from the organization page
-            after this step.
+            Creates the tenant and emails the owner an invite. Call routing and
+            Cara config stay on the organization page after this step.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
@@ -200,6 +202,15 @@ export function NewClientDialog() {
               Must not already be registered in this project.
             </p>
           </div>
+          <label className="flex items-start gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 rounded border-slate-300"
+              checked={assignIrishDid}
+              onChange={(e) => setAssignIrishDid(e.target.checked)}
+            />
+            Assign an Irish number from the pool now
+          </label>
           {error ? (
             <p className="text-destructive text-sm" role="alert">
               {error}

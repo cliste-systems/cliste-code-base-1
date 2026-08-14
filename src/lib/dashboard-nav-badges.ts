@@ -61,7 +61,8 @@ export async function fetchDashboardNavBadges(
       .from("cara_training_items")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .in("status", ["awaiting_answer", "draft_ready"]),
+      .in("status", ["awaiting_answer", "draft_ready"])
+      .neq("gap_kind", "live_info"),
   ]);
 
   const callBadge = countHead(callHistoryRes);

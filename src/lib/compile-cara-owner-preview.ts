@@ -167,8 +167,13 @@ export function compileCaraOwnerPreview(
   }
 
   const offered = listItems(input.servicesOffered);
+  const departmentNames = (input.storeDepartments ?? [])
+    .map((d) => d.name.trim())
+    .filter(Boolean);
   const notOffered = listItems(input.servicesNotOffered);
-  if (offered.length > 0) {
+  if (departmentNames.length > 0) {
+    parts.push(`Departments: ${formatListPhrase(departmentNames)}.`);
+  } else if (offered.length > 0) {
     parts.push(`What we offer: ${formatListPhrase(offered)}.`);
   } else {
     parts.push(

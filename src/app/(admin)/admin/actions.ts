@@ -37,6 +37,9 @@ import {
 } from "@/lib/security-events";
 import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { requireAdminSessionUser } from "@/lib/admin-session";
+import {
+  parseWarmTransferHardwareStatus,
+} from "@/lib/admin-store-health";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const UUID_RE =
@@ -213,7 +216,13 @@ async function getAppOriginForRedirect(
 }
 
 export type CreateOrganizationResult =
-  | { ok: true }
+  | {
+      ok: true;
+      organizationId: string;
+      phoneAssigned: boolean;
+      phoneE164?: string;
+      phoneMessage?: string;
+    }
   | { ok: false; message: string };
 
 function formatAuthError(message: string): string {
@@ -253,6 +262,8 @@ export async function createOrganization(payload: {
   storefrontEircode?: string | null;
   /** From `window.location.origin` so invite redirect matches this app */
   clientOrigin?: string | null;
+  /** Assign an Irish DID from the pool in the same provision step. */
+  assignIrishDid?: boolean;
 }): Promise<CreateOrganizationResult> {
   const operator = await assertAdminOperator();
   const name = payload.name.trim();
@@ -356,6 +367,7 @@ export async function createOrganization(payload: {
     }
 
     organizationId = orgRow.id;
+    const createdOrgId = orgRow.id as string;
 
     const appOrigin = await getAppOriginForRedirect(payload.clientOrigin);
     const inviteRedirectTo = `${appOrigin}/auth/callback`;
@@ -407,6 +419,19 @@ export async function createOrganization(payload: {
       role: "admin",
     });
 
+    let phoneAssigned = false;
+    let phoneE164: string | undefined;
+    let phoneMessage: string | undefined;
+    if (payload.assignIrishDid !== false) {
+      const phoneResult = await provisionOrganizationPhoneNumber(createdOrgId);
+      if (phoneResult.ok) {
+        phoneAssigned = true;
+        phoneE164 = phoneResult.e164;
+      } else {
+        phoneMessage = phoneResult.message;
+      }
+    }
+
     revalidatePath("/admin");
     await recordAdminEvent(operator, {
       eventType: "admin_organization_created",
@@ -414,13 +439,21 @@ export async function createOrganization(payload: {
       targetUserId: userId,
       targetEmail: ownerEmail,
       metadata: {
-        organization_id: organizationId,
+        organization_id: createdOrgId,
         slug,
         tier,
         niche,
+        phone_assigned: phoneAssigned,
+        phone_e164: phoneE164 ?? null,
       },
     });
-    return { ok: true };
+    return {
+      ok: true,
+      organizationId: createdOrgId,
+      phoneAssigned,
+      phoneE164,
+      phoneMessage,
+    };
   } catch (e) {
     if (userId) {
       try {
@@ -1359,5 +1392,88 @@ export async function testSendGridConnection(): Promise<TestSendGridResult> {
   if (!result.ok) {
     return { ok: false, message: result.message };
   }
+  return { ok: true };
+}
+
+export type UpdateOrganizationNotesResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+const MAX_ADMIN_NOTES = 8000;
+
+/** Internal Cliste notes — not shown to the store. */
+export async function updateOrganizationAdminNotes(
+  organizationId: string,
+  notes: string,
+): Promise<UpdateOrganizationNotesResult> {
+  await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+  const adminNotes = notes.trim().slice(0, MAX_ADMIN_NOTES);
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      admin_notes: adminNotes || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/admin/organizations/${id}`);
+  return { ok: true };
+}
+
+export type UpdateWarmTransferHardwareResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+/** Record whether the store handset/PBX can warm-transfer. */
+export async function updateWarmTransferHardware(
+  organizationId: string,
+  payload: { status: string; notes: string },
+): Promise<UpdateWarmTransferHardwareResult> {
+  await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  const status = parseWarmTransferHardwareStatus(payload.status);
+  const notes = String(payload.notes ?? "").trim().slice(0, 2000);
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      warm_transfer_hardware_status: status,
+      warm_transfer_hardware_notes: notes || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/admin/organizations/${id}`);
   return { ok: true };
 }

@@ -18,7 +18,7 @@ Primary nav is **three items**:
 |-----|-------|------|
 | **Knowledge Gaps** | `/dashboard` | Default landing. Existing Cara training UI; badge = open `cara_training_items`. |
 | **Calls** | `/dashboard/calls` | Hear what Cara said/did. Action Inbox is folded here (ticket/outcome on the call). |
-| **Setup** | `/dashboard/setup` | Opening hours, department chips (`agent_services_departments` / `_raw`), FAQs. Not the Phase 3 departments table. |
+| **Setup** | `/dashboard/setup` | Opening hours, departments (`store_departments`: hours, transfer, Off-licence, An Post), FAQs. |
 
 Footer (not primary nav): Settings (notification email + phone only), Support, Legal.
 
@@ -33,7 +33,7 @@ Five nav items: Overview · Phone pool · Identity & access · Security · Suppo
 - “New retail client” always shown; `tier: "native"`; niche picker hidden (server still defaults `retail`).
 - LiveKit US phone card hidden unless `ADMIN_SHOW_LIVEKIT_US_PHONE=1`. Irish DID card stays.
 
-Do **not** rename Overview/Users to Stores yet (Phase 3.5). No store-health panel yet.
+Do **not** rename Overview/Users to Stores yet (Phase 3.5). Store-health, client notes, and warm-transfer go/no-go live on the organization page (Phase 3).
 
 ## Decisions (locked)
 
@@ -41,7 +41,7 @@ Do **not** rename Overview/Users to Stores yet (Phase 3.5). No store-health pane
 |-------|--------|
 | Billing | Manual invoicing. Suspended stores see “contact Cliste”, not a checkout. |
 | Signup | Keep `/signup` + `/onboarding`, including salon parts. Gate with `PUBLIC_SIGNUP_ENABLED` (default off). |
-| What stores can edit | Hours, departments (chips), FAQs, notification email/phone. Routing, blocklist, plan, and files stay admin/Cliste-managed. |
+| What stores can edit | Hours, departments (table), FAQs, notification email/phone. Routing, blocklist, plan, and files stay admin/Cliste-managed. |
 | Vertical | Admin create hardcodes native + `organizations.niche = retail`. Retail is the only live pack. |
 
 ## Architecture
@@ -60,10 +60,10 @@ Do **not** rename Overview/Users to Stores yet (Phase 3.5). No store-health pane
 
 Admin-created accounts insert `accounts.status = 'active'` and skip the dashboard layout redirect to `/onboarding` (`pending_verification` / `onboarding` only).
 
-## Later phases (do not start from this PR)
+## Later phases
 
-2. Launch blockers — adapt `cursor/launch-hardening-1f34` onto this stripped tree. Do not reuse timestamp `20260814130000` for a call-cost view leak migration.
-3. Build retail — `gap_kind`, departments table, hardware warm-transfer go/no-go, admin store health.
+2. Launch blockers — adapted onto the stripped tree in Phase 2.
+3. Build retail (this PR) — `gap_kind`, departments table, hardware warm-transfer go/no-go, admin store health.
 4. P1 hardening leftover after Phase 2.
 5. Scale / backlog.
 
