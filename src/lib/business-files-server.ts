@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 
 import { extractBusinessFileText } from "@/lib/business-file-extract";
+import { extractedContentLooksLikePii } from "@/lib/business-file-prompt";
 import {
   BUSINESS_FILES_BUCKET,
   BUSINESS_FILE_MIME_TYPES,
@@ -130,8 +131,10 @@ export async function uploadBusinessFileForOrg(input: {
   documentKind?: BusinessFileKind | null;
   hasServiceCatalog?: boolean;
   hasFaqs?: boolean;
+  piiAcknowledged?: boolean;
 }): Promise<
-  { ok: true; file: BusinessFileListItem; overlapSendOnlyDefault?: boolean } | { ok: false; message: string }
+  | { ok: true; file: BusinessFileListItem; overlapSendOnlyDefault?: boolean }
+  | { ok: false; message: string; requiresPiiAck?: boolean }
 > {
   const { organizationId, file } = input;
   const documentKind =
@@ -171,6 +174,19 @@ export async function uploadBusinessFileForOrg(input: {
     file.name,
     mimeType,
   );
+
+  const piiDetected =
+    processingStatus === "ready" &&
+    Boolean(extractedText?.trim()) &&
+    extractedContentLooksLikePii(extractedText ?? "");
+  if (piiDetected && input.piiAcknowledged !== true) {
+    return {
+      ok: false,
+      message:
+        "This file may contain personal contact details — only upload what Cara genuinely needs on calls.",
+      requiresPiiAck: true,
+    };
+  }
 
   const couldAnswer =
     processingStatus === "ready" && Boolean(extractedText?.trim());

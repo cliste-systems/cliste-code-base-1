@@ -5,6 +5,7 @@ import { OnboardingProgressProvider } from "@/components/onboarding/onboarding-p
 import { OnboardingStepDots } from "@/components/onboarding/onboarding-step-dots";
 import { OnboardingViewportLock } from "@/components/onboarding/onboarding-viewport-lock";
 import { isOnboardingFreeNavEnabled } from "@/lib/onboarding-dev";
+import { enforceOnboardingLegalAcceptance } from "@/lib/onboarding-legal-gate";
 import { requireOnboardingSession } from "@/lib/onboarding-session";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ export default async function OnboardingLayout({
   children: React.ReactNode;
 }) {
   const session = await requireOnboardingSession();
+  await enforceOnboardingLegalAcceptance(session);
   const freeNav = isOnboardingFreeNavEnabled();
 
   return (

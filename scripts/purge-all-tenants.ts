@@ -2,8 +2,8 @@
  * Dev QA: remove every tenant (auth users, accounts, orgs) and return pool
  * numbers to available. Preserves phone_numbers inventory.
  *
- *   npx tsx scripts/purge-all-tenants.ts
- *   npx tsx scripts/purge-all-tenants.ts --keep-email brendan@clistesystems.ie
+ *   npx tsx scripts/purge-all-tenants.ts --yes-i-am-sure
+ *   npx tsx scripts/purge-all-tenants.ts --yes-i-am-sure --keep-email brendan@clistesystems.ie
  */
 
 import "./mock-server-only.ts";
@@ -11,6 +11,7 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
+import { requireDestructiveScriptConfirmation } from "./destructive-script-guard";
 import { createAdminClient } from "../src/utils/supabase/admin";
 
 function parseArgs() {
@@ -37,6 +38,10 @@ async function listAllUsers(admin: ReturnType<typeof createAdminClient>) {
 }
 
 async function main() {
+  await requireDestructiveScriptConfirmation({
+    actionLabel: "DELETE ALL TENANTS",
+  });
+
   const { keepEmails } = parseArgs();
   const admin = createAdminClient();
   const now = new Date().toISOString();

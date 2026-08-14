@@ -1,4 +1,5 @@
 import { hashRateLimitIdentifier } from "@/lib/auth-rate-limit";
+import { getTrustedClientIp, maskIpForLog } from "@/lib/trusted-client-ip";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type SecurityEventContext = {
@@ -20,34 +21,11 @@ export type SecurityEventPayload = {
   metadata?: Record<string, unknown>;
 };
 
-function readClientIp(headersList: Headers): string {
-  const xff = headersList.get("x-forwarded-for");
-  const fromXff = xff?.split(",")[0]?.trim();
-  const fromRealIp = headersList.get("x-real-ip")?.trim();
-  const fromCf = headersList.get("cf-connecting-ip")?.trim();
-  return fromXff || fromRealIp || fromCf || "";
-}
-
-function maskIp(ip: string): string | null {
-  const raw = ip.trim();
-  if (!raw) return null;
-  if (raw.includes(".")) {
-    const p = raw.split(".");
-    if (p.length === 4) return `${p[0]}.${p[1]}.x.x`;
-    return null;
-  }
-  if (raw.includes(":")) {
-    const p = raw.split(":");
-    if (p.length >= 2) return `${p[0]}:${p[1]}:****`;
-  }
-  return null;
-}
-
 export function buildSecurityEventContext(headersList: Headers): SecurityEventContext {
-  const ip = readClientIp(headersList);
+  const ip = getTrustedClientIp(headersList);
   return {
-    ipHash: ip ? hashRateLimitIdentifier(`security-ip:${ip}`) : null,
-    ipMasked: maskIp(ip),
+    ipHash: ip && ip !== "0.0.0.0" ? hashRateLimitIdentifier(`security-ip:${ip}`) : null,
+    ipMasked: maskIpForLog(ip),
     ipCountry: headersList.get("cf-ipcountry")?.trim() || null,
     userAgent: headersList.get("user-agent")?.trim() || null,
   };

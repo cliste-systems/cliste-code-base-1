@@ -151,6 +151,12 @@ const nextConfig: NextConfig = {
   // removes a fingerprinting datapoint that helps attackers pick exploits.
   poweredByHeader: false,
   serverExternalPackages: ["unpdf"],
+  experimental: {
+    // 12mb — headroom above MAX_BUSINESS_FILE_BYTES (10mb) for multipart overhead.
+    serverActions: {
+      bodySizeLimit: "12mb",
+    },
+  },
   images: {
     remotePatterns: [
       {
@@ -227,4 +233,5 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   silent: true,
   disableLogger: true,
+  tunnelRoute: "/monitoring",
 });

@@ -6,6 +6,7 @@ import {
   clearRateLimit,
   getRateLimitStatus,
   rateLimitFingerprint,
+  rateLimitIdentifierFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
@@ -74,7 +75,7 @@ export async function passwordSignIn(payload: {
   const securityCtx = buildSecurityEventContext(h);
   const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
   const ipFingerprint = rateLimitFingerprint(h, "auth-ip");
-  const emailFingerprint = rateLimitFingerprint(h, `auth-email:${email}`);
+  const emailFingerprint = rateLimitIdentifierFingerprint(`auth-email:${email}`);
   const ipStatus = await getRateLimitStatus("authenticate", ipFingerprint);
   const emailStatus = await getRateLimitStatus("authenticate", emailFingerprint);
   const preRequiresCaptcha =
@@ -86,7 +87,7 @@ export async function passwordSignIn(payload: {
       emailStatus.retryAfterSeconds
     );
     console.warn("[security] auth_rate_limited", {
-      email,
+      email: maskEmailForLog(email),
       retryAfterSeconds,
     });
     await logSecurityEvent(securityCtx, {
