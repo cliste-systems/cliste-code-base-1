@@ -6,6 +6,10 @@ import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import type { GdprPortabilityPayload } from "@/lib/gdpr-portability";
 import {
+  GDPR_EXPORT_ROW_CAP,
+  gdprExportWasTruncated,
+} from "@/lib/gdpr-export-cap";
+import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
@@ -66,21 +70,21 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
         "id, customer_name, customer_phone, customer_email, service_id, start_time, end_time, status, source, payment_status, amount_cents, currency, booking_reference, created_at",
       )
       .eq("organization_id", session.organizationId)
-      .limit(5000),
+      .limit(GDPR_EXPORT_ROW_CAP),
     sb
       .from("call_logs")
       .select(
         "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at",
       )
       .eq("organization_id", session.organizationId)
-      .limit(5000),
+      .limit(GDPR_EXPORT_ROW_CAP),
     sb
       .from("action_tickets")
       .select(
         "id, status, summary, caller_number, caller_name, engineering_priority, created_at",
       )
       .eq("organization_id", session.organizationId)
-      .limit(5000),
+      .limit(GDPR_EXPORT_ROW_CAP),
   ]);
 
   if (appts.error || calls.error || tickets.error) {
@@ -117,6 +121,11 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
       format: "cliste-gdpr-portability-v1",
       generated_at: new Date().toISOString(),
       organization_id: session.organizationId,
+      truncated: gdprExportWasTruncated(
+        appts.data?.length ?? 0,
+        calls.data?.length ?? 0,
+        tickets.data?.length ?? 0,
+      ),
       appointments: appts.data ?? [],
       call_logs: calls.data ?? [],
       action_tickets: tickets.data ?? [],

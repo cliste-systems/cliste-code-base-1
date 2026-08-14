@@ -2,6 +2,7 @@ export type GdprPortabilityPayload = {
   format: "cliste-gdpr-portability-v1";
   generated_at: string;
   organization_id: string;
+  truncated: boolean;
   appointments: Record<string, unknown>[];
   call_logs: Record<string, unknown>[];
   action_tickets: Record<string, unknown>[];
@@ -39,6 +40,13 @@ export function portabilityPayloadToCsv(data: GdprPortabilityPayload): string {
   appendSection("appointments", data.appointments);
   appendSection("call_logs", data.call_logs);
   appendSection("action_tickets", data.action_tickets);
+  if (data.truncated) {
+    sections.push("# truncated");
+    sections.push(
+      "Export hit the 5000-row cap on at least one table. Contact Cliste for a full dump.",
+    );
+    sections.push("");
+  }
 
   return sections.join("\n");
 }
