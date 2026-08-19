@@ -12,7 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
   return [
-    "",
+    "/authenticate",
     ...(isPublicSignupEnabled() ? ["/signup"] : []),
     "/login",
     "/legal/privacy",

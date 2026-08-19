@@ -145,10 +145,6 @@ export default async function AdminUnlockPage({
               <Link href="/authenticate" className="underline-offset-4 hover:underline">
                 Sign-in page
               </Link>
-              {" · "}
-              <Link href="/" className="underline-offset-4 hover:underline">
-                Home
-              </Link>
             </div>
           </form>
         </section>

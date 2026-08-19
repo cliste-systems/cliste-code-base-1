@@ -1,3 +1,4 @@
+import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
@@ -150,6 +151,11 @@ const nextConfig: NextConfig = {
   // Don't advertise we're a Next.js app to every visitor. Trivial change but
   // removes a fingerprinting datapoint that helps attackers pick exploits.
   poweredByHeader: false,
+  // Pin the app root. Without this, Turbopack 16.3 infers `/src/app` and
+  // skips compiling root `middleware.ts` (and shows a persistent "1 Issue").
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   serverExternalPackages: ["unpdf"],
   images: {
     remotePatterns: [
