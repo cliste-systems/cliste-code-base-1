@@ -4,7 +4,7 @@ import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { isPublicSignupEnabled } from "@/lib/public-signup";
 
 /**
- * Search-engine sitemap. Lists public marketing / legal pages only.
+ * Search-engine sitemap. Lists public sign-in and legal pages only.
  * Authenticated surfaces are excluded.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -12,7 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
   return [
-    "",
+    "/authenticate",
     ...(isPublicSignupEnabled() ? ["/signup"] : []),
     "/login",
     "/legal/privacy",

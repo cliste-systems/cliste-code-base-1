@@ -16,9 +16,7 @@ describe('parseTrainCaraStepIndex', () => {
   });
 
   it('does not include exclusions in current steps', () => {
-    assert.equal(
-      TRAIN_CARA_STEPS.some((step) => step.id === 'exclusions'),
-      false,
-    );
+    const ids: string[] = TRAIN_CARA_STEPS.map((step) => step.id);
+    assert.equal(ids.includes('exclusions'), false);
   });
 });

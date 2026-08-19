@@ -3,7 +3,13 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
-import { isLocalDashboardPreviewEnabled } from "@/lib/dashboard-dev";
+import { isLocalDashboardPreviewEnabled, supabaseServiceRoleLooksConfigured } from "@/lib/dashboard-dev";
+import {
+  createOfflinePreviewSupabase,
+  OFFLINE_PREVIEW_ACCOUNT_ID,
+  OFFLINE_PREVIEW_ORG_ID,
+  OFFLINE_PREVIEW_PROFILE_ID,
+} from "@/lib/dashboard-offline-preview";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -254,8 +260,28 @@ async function loadPreviewProfileForOrg(
   return previewSessionFromProfile(admin, profile);
 }
 
+function offlinePreviewSession(): DashboardSession {
+  return {
+    supabase: createOfflinePreviewSupabase(),
+    user: createLocalPreviewUser({
+      id: OFFLINE_PREVIEW_PROFILE_ID,
+      name: "Local tester",
+      role: "owner",
+    }),
+    accountId: OFFLINE_PREVIEW_ACCOUNT_ID,
+    organizationId: OFFLINE_PREVIEW_ORG_ID,
+    profile: {
+      name: "Local tester",
+      role: "owner",
+      avatarUrl: null,
+    },
+    isLocalPreview: true,
+  };
+}
+
 async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | null> {
   if (!isLocalDashboardPreviewEnabled()) return null;
+  if (!supabaseServiceRoleLooksConfigured()) return offlinePreviewSession();
 
   try {
     const admin = createAdminClient();
@@ -315,15 +341,21 @@ async function resolveLocalPreviewDashboardAuth(): Promise<DashboardSession | nu
     }
 
     const profile = resolvedProfiles?.[0];
-    if (resolvedError || !profile?.account_id) return null;
-    return previewSessionFromProfile(admin, profile);
+    if (!resolvedError && profile?.account_id) {
+      const session = previewSessionFromProfile(admin, profile);
+      if (session) return session;
+    }
   } catch (error) {
     console.warn("[dashboard] local preview session unavailable", error);
-    return null;
   }
+
+  return offlinePreviewSession();
 }
 
 async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
+  const previewSession = await resolveLocalPreviewDashboardAuth();
+  if (previewSession) return { tag: "ok", session: previewSession };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -331,8 +363,6 @@ async function resolveDashboardAuth(): Promise<ResolveDashboardAuth> {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    const previewSession = await resolveLocalPreviewDashboardAuth();
-    if (previewSession) return { tag: "ok", session: previewSession };
     return { tag: "no_session" };
   }
   redirectIfEmailUnconfirmed(user);
