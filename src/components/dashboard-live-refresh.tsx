@@ -241,6 +241,26 @@ export function DashboardLiveRefresh({
         },
         scheduleRealtimeRefresh,
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "usage_records",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "usage_records",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
       .subscribe((status) => {
         const healthy = isRealtimeHealthyStatus(status);
         realtimeHealthyRef.current = healthy;
