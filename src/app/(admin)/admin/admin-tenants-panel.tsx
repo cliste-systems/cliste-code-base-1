@@ -30,21 +30,28 @@ type AdminTenantsPanelProps = {
 export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
   return (
     <aside
-      className="flex max-h-[min(720px,calc(100vh-2rem))] flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm lg:max-h-none lg:min-h-0 lg:flex-1"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm"
       aria-labelledby="tenants-heading"
     >
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
         <h2 id="tenants-heading" className="text-sm font-semibold text-[#0b1220]">
           Tenants
         </h2>
         <span className="text-xs text-slate-500">{organizations.length}</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {organizations.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-slate-500">
-            No tenants yet.
-          </p>
+          <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
+            <p className="text-sm font-medium text-slate-600">No tenants yet</p>
+            <p className="mt-1 max-w-[200px] text-xs leading-relaxed text-slate-500">
+              New signups from{" "}
+              <Link href="/signup" className="font-medium text-[#0b1220] underline-offset-2 hover:underline">
+                /signup
+              </Link>{" "}
+              will appear here.
+            </p>
+          </div>
         ) : (
           <ul className="divide-y divide-slate-100">
             {organizations.map((org) => (

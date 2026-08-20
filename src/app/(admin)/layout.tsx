@@ -41,7 +41,7 @@ export default async function AdminShellLayout({
           when ready.
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex h-full min-h-0 flex-1 overflow-hidden">
         <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white md:flex">
           <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="shrink-0 border-b border-slate-100 px-4 py-5">
@@ -71,7 +71,7 @@ export default async function AdminShellLayout({
           </div>
         </aside>
 
-        <main className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-slate-100/80">
+        <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-slate-100/80 lg:h-full lg:overflow-hidden">
           {children}
         </main>
       </div>

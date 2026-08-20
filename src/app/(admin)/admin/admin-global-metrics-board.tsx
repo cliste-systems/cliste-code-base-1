@@ -94,10 +94,12 @@ function Panel({
   title,
   children,
   className,
+  empty = false,
 }: {
   title: string;
   children: ReactNode;
   className?: string;
+  empty?: boolean;
 }) {
   return (
     <div
@@ -106,10 +108,17 @@ function Panel({
         className,
       )}
     >
-      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+      <h3 className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
         {title}
       </h3>
-      <div className="mt-4 min-h-0 flex-1">{children}</div>
+      <div
+        className={cn(
+          "mt-4 min-h-0 flex-1",
+          empty && "flex items-center justify-center",
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -238,10 +247,10 @@ export function AdminGlobalMetricsBoard({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 bg-slate-50/80 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
-        <Panel title="Call outcomes">
+      <div className="grid min-h-0 flex-1 auto-rows-fr gap-4 overflow-hidden bg-slate-50/80 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
+        <Panel title="Call outcomes" empty={!callOutcomes.some((s) => s.value > 0)}>
           {callOutcomes.some((s) => s.value > 0) ? (
-            <ul className="space-y-3">
+            <ul className="space-y-3 overflow-y-auto">
               {callOutcomes.map((segment) => (
                 <li key={segment.id}>
                   <BreakdownBar segment={segment} />
@@ -253,9 +262,9 @@ export function AdminGlobalMetricsBoard({
           )}
         </Panel>
 
-        <Panel title="Top tenants by calls">
+        <Panel title="Top tenants by calls" empty={topTenants.length === 0}>
           {topTenants.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="space-y-3 overflow-y-auto">
               {topTenants.map((tenant) => (
                 <li key={tenant.orgId}>
                   <Link
@@ -287,9 +296,13 @@ export function AdminGlobalMetricsBoard({
           )}
         </Panel>
 
-        <Panel title="Recent calls" className="sm:col-span-2 lg:col-span-1">
+        <Panel
+          title="Recent calls"
+          className="sm:col-span-2 lg:col-span-1"
+          empty={recentCalls.length === 0}
+        >
           {recentCalls.length > 0 ? (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100 overflow-y-auto">
               {recentCalls.map((call) => (
                 <li
                   key={call.id}
