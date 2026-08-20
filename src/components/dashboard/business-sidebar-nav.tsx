@@ -7,6 +7,7 @@ import { Briefcase, ChevronDown } from "lucide-react";
 
 import {
   BUSINESS_SIDEBAR_CHILDREN,
+  businessSidebarChildrenForVertical,
   isBusinessNavPath,
   type BusinessNavChild,
 } from "@/lib/dashboard-business-nav";
@@ -20,6 +21,8 @@ import {
   dashboardSidebarSubRowClassName,
 } from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { cn } from "@/lib/utils";
+
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
 
 function NavSubRow({
   href,
@@ -42,10 +45,13 @@ function NavSubRow({
 }
 
 export function BusinessSidebarNav({
-  children: items = BUSINESS_SIDEBAR_CHILDREN,
+  children: itemsProp,
 }: {
   children?: BusinessNavChild[];
 }) {
+  const { vertical } = useDashboardVertical();
+  const items =
+    itemsProp ?? businessSidebarChildrenForVertical(vertical);
   const pathname = usePathname();
   const onBusinessRoute = isBusinessNavPath(pathname);
   const [manuallyExpanded, setManuallyExpanded] = useState(false);

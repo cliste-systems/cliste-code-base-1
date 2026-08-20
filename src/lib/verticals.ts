@@ -50,6 +50,8 @@ export type VerticalPackNav = {
     afterHref?: string;
   }[];
   hiddenHrefs?: string[];
+  /** Business submenu hrefs to omit (Profile, Services, FAQs, Files). */
+  hiddenBusinessHrefs?: string[];
   /** href → label */
   labelOverrides?: Record<string, string>;
 };
@@ -171,6 +173,10 @@ const RETAIL_PACK: VerticalPack = {
       DASHBOARD_ROUTES.routing,
       DASHBOARD_ROUTES.caraTraining,
       DASHBOARD_ROUTES.locations,
+    ],
+    hiddenBusinessHrefs: [
+      DASHBOARD_ROUTES.businessServices,
+      DASHBOARD_ROUTES.businessFiles,
     ],
   },
   capabilities: RETAIL_CAPABILITIES,
