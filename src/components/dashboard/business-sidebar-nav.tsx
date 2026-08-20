@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { Briefcase, ChevronDown } from "lucide-react";
 
 import {
-  BUSINESS_SIDEBAR_CHILDREN,
   businessSidebarChildrenForVertical,
   isBusinessNavPath,
   type BusinessNavChild,

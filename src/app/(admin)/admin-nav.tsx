@@ -53,7 +53,13 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-2">
+      <nav
+        className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4"
+        aria-label="Admin"
+      >
+        <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          Platform
+        </p>
         {nav.map(({ href, label, icon: Icon, exact }) => {
           const active = isActive(pathname, href, exact);
           return (
@@ -61,16 +67,16 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40",
                 active
-                  ? "border border-gray-200 bg-white font-medium text-gray-900 shadow-sm"
-                  : "border border-transparent font-normal text-gray-600 hover:bg-gray-100/80 hover:text-gray-900",
+                  ? "bg-[#0b1220] font-medium text-white shadow-sm"
+                  : "font-normal text-slate-600 hover:bg-slate-100 hover:text-[#0b1220]",
               )}
             >
               <Icon
                 className={cn(
                   "size-4 shrink-0",
-                  active ? "text-gray-500" : "text-gray-400",
+                  active ? "text-white/90" : "text-slate-400",
                 )}
                 strokeWidth={1.5}
                 aria-hidden
@@ -81,14 +87,17 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-gray-200/60 p-4">
-        <div className="mb-3 flex items-center gap-2 px-1">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white shadow-sm">
+      <div className="shrink-0 border-t border-slate-100 p-4">
+        <div className="mb-3 flex items-center gap-2.5 px-1">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0b1220] text-xs font-semibold text-white">
             {initial}
           </span>
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-[0.08em]">
-            Admin session
-          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[#0b1220]">
+              {loggedInAs}
+            </p>
+            <p className="text-[11px] text-slate-500">Staff session</p>
+          </div>
         </div>
         <AdminSignOutButton />
       </div>

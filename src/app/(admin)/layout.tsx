@@ -25,7 +25,7 @@ export default async function AdminShellLayout({
   const supabaseOffline = allowAdminDevWithoutSupabase();
 
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-hidden bg-[#fafafa] antialiased text-gray-900">
+    <div className="flex min-h-screen w-full flex-col overflow-hidden bg-[#f4f6f8] antialiased text-[#0b1220]">
       {supabaseOffline ? (
         <div
           className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950"
@@ -42,46 +42,38 @@ export default async function AdminShellLayout({
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-      <aside className="relative z-20 hidden h-full w-[260px] shrink-0 flex-col border-r border-gray-200/60 bg-[#fafafa] md:flex">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-          <div className="shrink-0 p-4 pt-6">
-            <Link
-              href="/admin"
-              className="-mx-2 flex cursor-pointer items-start gap-3 rounded-lg p-2 transition-colors hover:bg-gray-100/50"
-            >
-              <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm">
-                <Building2
-                  className="size-4 text-gray-600"
-                  strokeWidth={1.5}
-                  aria-hidden
-                />
-              </div>
-              <div className="flex min-w-0 flex-col">
-                <span className="text-sm leading-tight font-medium text-gray-900">
-                  {PRODUCT_NAME} Admin
-                </span>
-                <span className="mt-0.5 text-xs text-gray-500">
-                  Internal console
-                </span>
-              </div>
-            </Link>
-            <div className="mt-3 rounded-lg border border-gray-200/80 bg-white px-3 py-2 shadow-sm">
-              <p className="text-[11px] font-medium tracking-[0.08em] text-gray-400 uppercase">
-                Logged in as
-              </p>
-              <p className="mt-1 truncate text-sm font-medium text-gray-800">
-                {loggedInAs}
-              </p>
+        <aside className="relative z-20 hidden h-full w-[248px] shrink-0 flex-col border-r border-slate-200/80 bg-white md:flex">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <div className="shrink-0 border-b border-slate-100 px-4 py-5">
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 rounded-lg outline-none transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:ring-slate-400/40"
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+                  <Building2
+                    className="size-4 text-slate-600"
+                    strokeWidth={1.5}
+                    aria-hidden
+                  />
+                </div>
+                <div className="min-w-0 flex-col">
+                  <span className="block text-sm font-semibold leading-tight text-[#0b1220]">
+                    {PRODUCT_NAME}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    Admin console
+                  </span>
+                </div>
+              </Link>
             </div>
+
+            <AdminNav loggedInAs={loggedInAs} />
           </div>
+        </aside>
 
-          <AdminNav loggedInAs={loggedInAs} />
-        </div>
-      </aside>
-
-      <main className="relative z-10 h-full min-w-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {children}
-      </main>
+        <main className="relative z-10 h-full min-w-0 flex-1 overflow-y-auto bg-[#f4f6f8]">
+          {children}
+        </main>
       </div>
     </div>
   );
