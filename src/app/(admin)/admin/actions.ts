@@ -11,6 +11,7 @@ import {
   type CallRoutingMode,
 } from "@/lib/call-routing";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
+import { buildRetailRoutePack } from "@/lib/retail-route-pack";
 import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
 import {
   purchasePhoneNumbers,
@@ -35,7 +36,6 @@ import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
-import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -282,8 +282,8 @@ export async function createOrganization(payload: {
       ? payload.niche
       : "retail";
 
-  const addressTrim = (payload.address ?? "").trim();
-  const eircodeTrim = (payload.storefrontEircode ?? "").trim();
+    const addressTrim = (payload.address ?? "").trim();
+    const eircodeTrim = (payload.storefrontEircode ?? "").trim();
   let mapLat: number | null = null;
   let mapLng: number | null = null;
   const geoQuery = [addressTrim, eircodeTrim].filter(Boolean).join(", ");
@@ -343,6 +343,10 @@ export async function createOrganization(payload: {
         storefront_eircode: eircodeTrim || null,
         storefront_map_lat: mapLat,
         storefront_map_lng: mapLng,
+        agent_location_address: addressTrim || null,
+        agent_location_eircode: eircodeTrim || null,
+        retail_banner: niche === "retail" ? "supervalu" : null,
+        ...(niche === "retail" ? { routing_links: buildRetailRoutePack({}) } : {}),
       })
       .select("id")
       .single();
@@ -1093,12 +1097,18 @@ export async function assignLivekitUsPhoneToOrganization(
 
   const { data: org, error: orgErr } = await admin
     .from("organizations")
-    .select("id, phone_number")
+    .select("id, phone_number, niche")
     .eq("id", id)
     .maybeSingle();
 
   if (orgErr || !org) {
     return { ok: false, message: orgErr?.message ?? "Organization not found." };
+  }
+  if (parseOrganizationNiche(org.niche) === "retail") {
+    return {
+      ok: false,
+      message: "Retail stores use the Irish Twilio pool — not LiveKit US numbers.",
+    };
   }
   if (org.phone_number?.trim()) {
     return {
@@ -1316,28 +1326,3 @@ export async function updateAccountPlanTier(
   return { ok: true };
 }
 
-export type TestSendGridResult = { ok: true } | { ok: false; message: string };
-
-/**
- * Sends one transactional test email to the signed-in admin (SendGrid v3).
- * Requires SENDGRID_API_KEY and SENDGRID_FROM_EMAIL.
- */
-export async function testSendGridConnection(): Promise<TestSendGridResult> {
-  const user = await assertAdminOperator();
-  const email = user.email?.trim();
-  if (!email) {
-    return { ok: false, message: "Your account has no email address." };
-  }
-
-  const result = await sendTransactionalEmail({
-    to: email,
-    subject: "Cliste: SendGrid test",
-    text: "If you received this, SendGrid is connected to the Cliste app.",
-    html: "<p>If you received this, SendGrid is connected to the Cliste app.</p>",
-  });
-
-  if (!result.ok) {
-    return { ok: false, message: result.message };
-  }
-  return { ok: true };
-}

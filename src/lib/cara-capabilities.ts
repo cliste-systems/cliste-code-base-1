@@ -22,7 +22,14 @@ export function deriveCaraCapabilities(
     .join(" ");
 
   return {
-    transfer: Boolean(transferNumber?.trim()),
+    transfer:
+      Boolean(transferNumber?.trim()) ||
+      (routes ?? []).some((r) => {
+        const action = r.action.toLowerCase();
+        return (
+          action.includes("put them through") || action.includes("transfer")
+        );
+      }),
     book: false,
     sendLink:
       actionBlob.includes("text them the saved link") ||

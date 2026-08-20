@@ -11,13 +11,18 @@ const OPTIONS: { value: AdminGlobalMetricPeriod; label: string }[] = [
   { value: "month", label: "Month" },
 ];
 
-export function AdminMetricRangeToggle() {
+export function AdminMetricRangeToggle({
+  variant = "light",
+}: {
+  variant?: "light" | "dark";
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const raw = searchParams.get("period");
   const current: AdminGlobalMetricPeriod =
     raw === "week" || raw === "month" ? raw : "day";
+  const isDark = variant === "dark";
 
   function setPeriod(next: AdminGlobalMetricPeriod) {
     const q = new URLSearchParams(searchParams.toString());
@@ -32,7 +37,12 @@ export function AdminMetricRangeToggle() {
 
   return (
     <div
-      className="inline-flex flex-wrap items-center gap-1 rounded-full border border-gray-200/80 bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full p-1",
+        isDark
+          ? "border border-white/15 bg-white/10"
+          : "border border-slate-200/80 bg-white shadow-sm",
+      )}
       role="group"
       aria-label="Global metrics time range"
     >
@@ -44,10 +54,14 @@ export function AdminMetricRangeToggle() {
             type="button"
             onClick={() => setPeriod(value)}
             className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              active
-                ? "bg-gray-900 text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+              "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+              isDark
+                ? active
+                  ? "bg-white text-[#0b1220] shadow-sm"
+                  : "text-white/75 hover:bg-white/10 hover:text-white"
+                : active
+                  ? "bg-[#0b1220] text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-[#0b1220]",
             )}
           >
             {label}

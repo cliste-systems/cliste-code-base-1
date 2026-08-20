@@ -210,6 +210,32 @@ dashboard reads for every metric (defined in `src/lib/call-history-types.ts`):
 | `voicemail_or_no_speech` | No usable speech (voicemail, silence, no answer). |
 | `spam_or_abuse`          | Robocall / spam / abusive caller. |
 | `blocked`                | Rejected by owner blocklist before Cara started (preflight gate). |
+| `transferred`            | Caller was connected to a human (department line or fallback number). |
+
+## Transfer (`targetType: phone`)
+
+When a matched route has `targetType: "phone"`:
+
+1. Announce where the caller is going (`transferLabel` when set, otherwise a sensible name from the route trigger).
+2. Dial `url` (E.164 department or store line). If `url` is empty, use `organizations.fallback_number`.
+3. Respect `transferDuringHoursOnly`: when `true` and the destination is outside its hours, do **not** dial — take a message and report `action_created`.
+4. Respect `call_routing_mode`: human transfer is only allowed when mode is `cliste_number` (see `callRoutingAllowsHumanTransfer`).
+5. On no-answer, busy, or failed connect: take a message, create an Action Inbox ticket, report `action_created`. **Never drop the caller.**
+6. On successful connect: report `outcome: "transferred"`.
+
+Retail org metadata (`store_code`, `retail_banner`) may be attached to Action Inbox tickets for support — never spoken to callers.
+
+## Retail hard rules (prompt-enforced)
+
+For `niche: retail` orgs, Cara must **never**:
+
+- Confirm whether an item is in stock (offer to take a message for the department).
+- Quote a price unless `quote_prices_on_calls` is enabled.
+- Take payment or card details over the phone.
+- Discuss a prescription or a named customer's order with a third party.
+- Promise a delivery slot.
+
+Off-licence hours follow department hours, not general store hours.
 
 ## Normalization
 
@@ -412,8 +438,10 @@ destination per row and never ambiguity about which link a caller wants.
 | `presetId` | string (optional) | Template id (`booking-inquiry`, `location`, `brochure`, …) |
 | `intent` | string | The route's trigger (lowercased) — what callers ask about |
 | `label` | string | The route's trigger (display case); equals `intent` |
-| `targetType` | string | `link`, `form`, `email`, `callback`, `whatsapp` (`phone`/`note` are legacy — treat as `callback`) |
-| `url` | string | Link URL, email, WhatsApp, or message-capture instructions |
+| `targetType` | string | `link`, `form`, `email`, `callback`, `whatsapp`, **`phone`** (transfer). `note` is legacy — treat as `callback`. |
+| `url` | string | Link URL, email, WhatsApp, E.164 transfer destination, or message-capture instructions |
+| `transferLabel` | string (optional) | Spoken name for transfer target, e.g. "the deli counter" — use when announcing a transfer |
+| `transferDuringHoursOnly` | boolean (optional) | When `true` and the destination is closed, do **not** transfer — take a message and report `action_created` |
 | `businessFileId` | uuid (optional) | When `targetType` is `form` — **send file** action |
 | `active` | boolean | Inactive routes are ignored |
 

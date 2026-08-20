@@ -70,12 +70,8 @@ export function DashboardChromeBar({ versionDisplay }: DashboardChromeBarProps) 
             CHROME_UTILITY_PILL,
             "min-w-0 truncate tracking-wide text-slate-400 tabular-nums",
           )}
-          aria-label={`${versionDisplay.platformLine}. ${versionDisplay.experienceLine}. ${versionDisplay.caraLine}`}
+          aria-label={`${versionDisplay.experienceLine}. ${versionDisplay.caraLine}`}
         >
-          <span>{versionDisplay.platformLine}</span>
-          <span className="mx-1 text-slate-300" aria-hidden>
-            ·
-          </span>
           <span>{versionDisplay.experienceLine}</span>
           <span className="mx-1 text-slate-300" aria-hidden>
             ·

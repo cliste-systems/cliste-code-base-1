@@ -10,13 +10,13 @@ export function SettingsSection({
   children: ReactNode;
 }) {
   return (
-    <section id={id}>
-      <div className="px-5 py-2.5">
-        <h2 className="text-[15px] font-semibold tracking-tight text-[#0b1220]">
+    <section id={id} className="bg-[#fbfcfb]">
+      <div className="border-b border-[#e8eeea] px-5 py-3">
+        <h2 className="text-[14px] font-semibold tracking-tight text-[#0b1220]">
           {title}
         </h2>
       </div>
-      <div className="space-y-3 px-5 pb-4">{children}</div>
+      <div className="space-y-3 px-5 py-4">{children}</div>
     </section>
   );
 }

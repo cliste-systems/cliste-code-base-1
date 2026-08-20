@@ -13,6 +13,8 @@ import { IrishPhoneCard } from "./irish-phone-card";
 import { LiveKitPhoneCard } from "./livekit-phone-card";
 import { OpenDashboardButton } from "./open-dashboard-button";
 import { OrganizationNicheForm } from "./organization-niche-form";
+import { loadAdminStoreSetup } from "./store-setup/load-store-setup";
+import { StoreSetupView } from "./store-setup/store-setup-view";
 
 export const dynamic = "force-dynamic";
 
@@ -36,17 +38,52 @@ export default async function AdminOrganizationDetailPage({ params }: PageProps)
     );
   }
 
-  const { data: org, error } = await admin
+  const storeSetup = await loadAdminStoreSetup(id);
+  if (!storeSetup) {
+    notFound();
+  }
+
+  const niche = parseOrganizationNiche(storeSetup.niche);
+  const isRetail = niche === "retail";
+
+  if (isRetail) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+        <div>
+          <Link
+            href="/admin"
+            className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm font-medium"
+          >
+            <ChevronLeft className="size-4" aria-hidden />
+            All organizations
+          </Link>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-foreground text-2xl font-semibold tracking-tight">
+                {storeSetup.name}
+              </h1>
+              <p className="text-muted-foreground mt-1 font-mono text-sm">
+                {storeSetup.slug}
+                {storeSetup.storeCode ? ` · store ${storeSetup.storeCode}` : ""}
+              </p>
+            </div>
+            <OpenDashboardButton organizationId={storeSetup.organizationId} />
+          </div>
+        </div>
+        <StoreSetupView data={storeSetup} />
+      </div>
+    );
+  }
+
+  const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, niche, greeting, custom_prompt, updated_at, phone_number, account_id, call_routing_mode, fallback_number",
+      "id, name, slug, niche, greeting, custom_prompt, phone_number, account_id, call_routing_mode, fallback_number",
     )
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !org) {
-    notFound();
-  }
+  if (!org) notFound();
 
   const accountId = (org as { account_id?: string | null }).account_id ?? null;
   let planTier = "pro";
@@ -99,18 +136,7 @@ export default async function AdminOrganizationDetailPage({ params }: PageProps)
         <AccountPlanForm accountId={accountId} initialPlanTier={planTier} />
       ) : null}
 
-      <OrganizationNicheForm
-        organizationId={org.id}
-        initialNiche={parseOrganizationNiche(
-          (org as { niche?: string | null }).niche,
-        )}
-      />
-
-      <p className="text-muted-foreground text-sm leading-relaxed">
-        Opening hours, FAQs, and store details are edited in the client
-        dashboard (use &quot;Open dashboard as tenant&quot; above to change
-        them on the client&apos;s behalf).
-      </p>
+      <OrganizationNicheForm organizationId={org.id} initialNiche={niche} />
 
       <AIBrainConfigForm
         organizationId={org.id}
@@ -118,10 +144,7 @@ export default async function AdminOrganizationDetailPage({ params }: PageProps)
         customPrompt={org.custom_prompt}
       />
 
-      <LiveKitPhoneCard
-        organizationId={org.id}
-        phoneNumber={org.phone_number}
-      />
+      <LiveKitPhoneCard organizationId={org.id} phoneNumber={org.phone_number} />
     </div>
   );
 }

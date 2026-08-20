@@ -7,6 +7,7 @@ import {
   packServicesStepCopy,
   type ServicesStepCopy,
 } from "@/app/(onboarding)/onboarding/knowledge/train-cara-services-copy";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
   parseOrganizationNiche,
   type OrganizationNiche,
@@ -35,6 +36,12 @@ export type DashboardVerticalCopy = {
     heroSubheading: string;
     greetingSubline: string;
     goLiveChecklistSuffix: string;
+    /** Third hero tile — defaults to “Info sent” (routed call outcomes). */
+    heroThirdStat?: {
+      label: string;
+      href: string;
+      kind: "routed" | "callbacks";
+    };
   };
   calls: {
     emptyDescription: string;
@@ -562,8 +569,119 @@ const GENERIC_COPY: VerticalCopyBase = {
   },
 };
 
+const RETAIL_COPY: VerticalCopyBase = {
+  customerNoun: { singular: "customer", plural: "customers" },
+  nav: {
+    contactsLabel: "Customers",
+  },
+  home: {
+    heroSubheading: "Here's how the shop's looking today.",
+    greetingSubline: "What Cara handled at the shop today.",
+    goLiveChecklistSuffix: "can handle real customer calls confidently.",
+    heroThirdStat: {
+      label: "Callbacks",
+      href: DASHBOARD_ROUTES.actionInbox,
+      kind: "callbacks",
+    },
+  },
+  calls: {
+    emptyDescription:
+      "When Cara answers your shop line, calls appear here with summaries and outcomes.",
+  },
+  contacts: {
+    pageDescription:
+      "People who have called or are saved on your customer list — with call history and open follow-ups.",
+    emptyDescription:
+      "When Cara answers calls, customers appear here. Saved contacts show up too.",
+    selectDescription:
+      "Choose a customer to see how to reach them, their calls, and open follow-ups.",
+    savedContactLabel: "Saved customer",
+    savedContactNoCalls: "Saved customer · no calls yet",
+    savedContactNoCallsRecorded: "Saved customer · no calls recorded yet",
+  },
+  actionInbox: {
+    categoryLabels: ACTION_CATEGORY_LABELS,
+  },
+  routing: {
+    bookPresetLabel: "Product enquiry",
+    bookPresetName: "Product or stock enquiry",
+    directionsPresetLabel: "Get directions",
+    directionsPresetName: "Where are you based",
+    speakPresetLabel: "Speak to someone",
+    speakPresetName: "Speak to someone",
+    starterBookLabel: "Product enquiry",
+    starterBookDescription:
+      "Text a product or store link when callers ask about stock or visiting.",
+    starterEnquiryLabel: "Website or enquiry link",
+    starterEnquiryDescription:
+      "Cara can text this when callers want more information — she won't guess stock levels.",
+    starterEnquiryPlaceholder: "yoursite.com/products or your online store",
+    goLiveBookingLinkLabel: "Enquiry link",
+    goLiveEnquiryLinkLabel: "Enquiry link",
+    keywordPlaceholder: "e.g. in stock",
+    namePlaceholder: "e.g. Product enquiries",
+    descriptionPlaceholder:
+      "e.g. When they ask about products or visiting — not complaints",
+    rulesPlaceholder:
+      "e.g. Text the product or store link — don't guess stock levels",
+    exampleBlock: DEFAULT_ROUTING_EXAMPLE,
+    fieldHintExample: "stock check vs complaint",
+    flowTestPhrases: [
+      "Have ye got that in stock?",
+      "What time do ye close on Saturday?",
+      "Can I speak to someone?",
+    ],
+    flowTestPlaceholder: 'e.g. "Have ye got that in stock?"',
+    routeNameExamples: [
+      "have ye got that in stock",
+      "what time do ye close",
+      "where are you based",
+    ],
+    routeNamePlaceholder: 'e.g. "Have ye got that in stock?"',
+    saveConfirmLinkNoun: "links",
+    traceSamplePhrases: ["Have ye got that in stock?"],
+  },
+  caraSetupBase: {
+    servicesEmptyWarning:
+      "Cara can't confirm your departments until you add them — until then she'll take a message for every request.",
+    callHandlingRulesPlaceholder:
+      "e.g. Never quote live stock levels, Always take a message if no one's free",
+    detailsToCollectPlaceholder:
+      "e.g. Their name, what department they need, and the best time to reach them",
+    generalBasicsTitle: "Store basics",
+    greetingHint:
+      "Introduce your shop — the AI and recording notice is added automatically.",
+    locationHint:
+      "The town your shop is in — Cara uses this for directions and opening-hours answers.",
+    commonQuestionsTitle: "What customers always ask",
+  },
+  training: {
+    description:
+      "Questions Cara couldn't answer on calls — reply in plain English and confirm what she learns.",
+  },
+  team: {
+    accessDescription: "Share access to calls, messages, and customers.",
+  },
+  locations: {
+    subline: "Each store gets its own number and Cara setup.",
+  },
+  settings: {
+    businessIdentityTitle: "Store identity",
+  },
+  privacy: {
+    exportNoun: "record",
+    exportListIntro:
+      "every call log and message for that phone number in your account.",
+    eraseCountNoun: "records",
+  },
+  setupSteps: {
+    addServicesLabel: "Add departments",
+  },
+};
+
 const VERTICAL_COPY: Record<VerticalId, VerticalCopyBase> = {
   salon_beauty: SALON_COPY,
+  retail: RETAIL_COPY,
   generic: GENERIC_COPY,
 };
 

@@ -1,6 +1,8 @@
 # Vertical packs
 
-A **vertical** is the product-tailoring layer above organization **niches**. Today there are two verticals — `salon_beauty` (tailored) and `generic` (neutral fallback). Each vertical is defined by a single **pack object** in [`src/lib/verticals.ts`](../src/lib/verticals.ts).
+A **vertical** is the product-tailoring layer above organization **niches**. Today there are three verticals — `salon_beauty` (tailored), `retail` (stores & supermarkets), and `generic` (neutral fallback). Each vertical is defined by a single **pack object** in [`src/lib/verticals.ts`](../src/lib/verticals.ts).
+
+Retail stores use [`RETAILSTORESETUP.md`](./RETAILSTORESETUP.md) for admin provisioning and dashboard scope.
 
 Adding a new vertical should require **one pack object + config rows**, not new pages or components.
 

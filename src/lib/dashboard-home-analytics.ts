@@ -91,6 +91,7 @@ export function buildHomeCallOutcomeSegments(
   outcomes: (string | null | undefined)[],
 ): AnalyticsSegment[] {
   let answeredByCara = 0;
+  let transferred = 0;
   let informationProvided = 0;
   let followUpCreated = 0;
   let other = 0;
@@ -99,6 +100,9 @@ export function buildHomeCallOutcomeSegments(
     switch (normalizeCallOutcome(String(raw ?? ""))) {
       case "answered":
         answeredByCara += 1;
+        break;
+      case "transferred":
+        transferred += 1;
         break;
       case "link_sent":
         informationProvided += 1;
@@ -116,6 +120,7 @@ export function buildHomeCallOutcomeSegments(
   return withPercents(
     [
       { id: "answered", label: "Answered by Cara", value: answeredByCara },
+      { id: "transferred", label: "Transferred", value: transferred },
       {
         id: "information",
         label: "Information provided",

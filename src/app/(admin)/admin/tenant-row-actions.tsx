@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogIn, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LogIn, MoreHorizontal, Settings2, Trash2 } from "lucide-react";
 
 import {
   createSupportDashboardLink,
@@ -27,6 +35,7 @@ export function TenantRowActions({
   organizationId,
   organizationName,
 }: TenantRowActionsProps) {
+  const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -38,7 +47,7 @@ export function TenantRowActions({
     startLoginTransition(async () => {
       const result = await createSupportDashboardLink(
         organizationId,
-        typeof window !== "undefined" ? window.location.origin : null
+        typeof window !== "undefined" ? window.location.origin : null,
       );
       if (!result.ok) {
         setRowError(result.message);
@@ -65,36 +74,43 @@ export function TenantRowActions({
 
   return (
     <>
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            disabled={loginPending}
-            onClick={openSupportDashboard}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 focus:outline-none disabled:opacity-60"
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0b1220]"
+          aria-label={`Actions for ${organizationName}`}
+        >
+          <MoreHorizontal className="size-4" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={() => router.push(`/admin/organizations/${organizationId}`)}
           >
-            <LogIn className="size-3.5 text-gray-400" aria-hidden />
+            <Settings2 className="size-4" aria-hidden />
+            Manage tenant
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={loginPending} onClick={openSupportDashboard}>
+            <LogIn className="size-4" aria-hidden />
             {loginPending ? "Opening…" : "Open dashboard"}
-          </button>
-          <button
-            type="button"
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
             disabled={deletePending}
             onClick={() => {
               setDeleteError(null);
               setDeleteOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-50 focus:ring-2 focus:ring-red-200 focus:outline-none disabled:opacity-60"
           >
-            <Trash2 className="size-3.5 text-red-500" aria-hidden />
+            <Trash2 className="size-4" aria-hidden />
             Delete tenant
-          </button>
-        </div>
-        {rowError ? (
-          <p className="max-w-[14rem] text-right text-xs leading-snug text-red-600">
-            {rowError}
-          </p>
-        ) : null}
-      </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {rowError ? (
+        <p className="mt-1 text-right text-xs leading-snug text-red-600">
+          {rowError}
+        </p>
+      ) : null}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent showCloseButton className="sm:max-w-md">

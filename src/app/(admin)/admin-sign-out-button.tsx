@@ -27,7 +27,7 @@ export function AdminSignOutButton() {
       type="button"
       disabled={pending}
       onClick={() => void handleSignOut()}
-      className="group inline-flex w-full items-center gap-3 rounded-lg border border-gray-200/80 bg-white px-3 py-2 text-left text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-100/80 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-70"
+      className="group inline-flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0b1220] disabled:cursor-not-allowed disabled:opacity-70"
     >
       <LogOut
         className="size-4 shrink-0 text-gray-500 transition-colors group-hover:text-gray-900"

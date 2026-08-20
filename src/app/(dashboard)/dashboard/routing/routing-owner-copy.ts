@@ -1,10 +1,17 @@
 import type { RoutingLink, RoutingTargetType } from "./routing-links";
 
+const TRANSFER_PRESET_IDS = new Set(["transfer", "speak-to-person"]);
+
+function isTransferPreset(presetId: string | null | undefined): boolean {
+  return Boolean(presetId && TRANSFER_PRESET_IDS.has(presetId));
+}
+
 /** Plain-English actions shown in the UI (maps to existing targetType values). */
 type OwnerRouteAction =
   | "text_link"
   | "send_file"
   | "take_message"
+  | "transfer"
   | "email_request"
   | "send_whatsapp"
   | "just_log";
@@ -14,7 +21,7 @@ function targetTypeToOwnerAction(type: RoutingTargetType): OwnerRouteAction {
     case "form":
       return "send_file";
     case "phone":
-      return "take_message";
+      return "transfer";
     case "callback":
       return "take_message";
     case "email":
@@ -39,11 +46,9 @@ export function normalizeRoutingLink(link: RoutingLink): RoutingLink {
   const intent = link.intent.trim();
   const label = intent ? formatRouteListTitle(intent) : link.label.trim();
   const targetType: RoutingTargetType =
-    link.presetId === "transfer"
+    isTransferPreset(link.presetId) || link.targetType === "phone"
       ? "phone"
-      : link.targetType === "phone"
-        ? "callback"
-        : link.targetType;
+      : link.targetType;
   const action = targetTypeToOwnerAction(targetType);
   const businessFileId =
     action === "send_file" ? link.businessFileId?.trim() || null : null;

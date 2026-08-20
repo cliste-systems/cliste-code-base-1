@@ -4,6 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
 import { createClient } from "@/utils/supabase/client";
+import {
+  dispatchDashboardActivityEvent,
+} from "@/lib/dashboard-live-events";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -15,10 +19,17 @@ const IS_DEV = process.env.NODE_ENV === "development";
 const POLL_INTERVAL_MS = IS_DEV ? 12_000 : 30_000;
 
 /** Coalesce Realtime bursts (insert + enrichment update) into one RSC refresh. */
-const REALTIME_DEBOUNCE_MS = 250;
+const REALTIME_DEBOUNCE_MS = 400;
 
 /** Coalesce interval + focus refreshes so RSC fetches don’t overlap. */
 const MIN_MS_BETWEEN_POLL_REFRESH = 4_000;
+
+/** On home, layout refresh is throttled — content updates via client snapshot fetch. */
+const MIN_MS_BETWEEN_HOME_LAYOUT_REFRESH = 10_000;
+
+function isDashboardHomePath(pathname: string | null): boolean {
+  return pathname === DASHBOARD_ROUTES.home;
+}
 
 /**
  * Realtime is event-driven (no cost unless data actually changes) and the
@@ -113,7 +124,21 @@ export function DashboardLiveRefresh({
     if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     realtimeDebounceRef.current = setTimeout(() => {
       realtimeDebounceRef.current = null;
-      lastPollRefreshAt.current = Date.now();
+      if (pathnameRef.current === "/dashboard/settings") return;
+
+      const now = Date.now();
+      const onHome = isDashboardHomePath(pathnameRef.current);
+
+      if (onHome) {
+        dispatchDashboardActivityEvent();
+        if (now - lastPollRefreshAt.current < MIN_MS_BETWEEN_HOME_LAYOUT_REFRESH) {
+          return;
+        }
+      } else if (now - lastPollRefreshAt.current < MIN_MS_BETWEEN_POLL_REFRESH) {
+        return;
+      }
+
+      lastPollRefreshAt.current = now;
       router.refresh();
     }, REALTIME_DEBOUNCE_MS);
   }, [router]);
@@ -241,12 +266,31 @@ export function DashboardLiveRefresh({
         },
         scheduleRealtimeRefresh,
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "usage_records",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "usage_records",
+          filter,
+        },
+        scheduleRealtimeRefresh,
+      )
       .subscribe((status) => {
         const healthy = isRealtimeHealthyStatus(status);
         realtimeHealthyRef.current = healthy;
         if (healthy) {
           stopPolling();
-          scheduleRealtimeRefresh();
         } else if (shouldPoll(pathnameRef.current)) {
           startPolling();
         }

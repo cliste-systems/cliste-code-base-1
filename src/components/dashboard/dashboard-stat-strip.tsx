@@ -6,6 +6,7 @@ import {
   Clock3,
   Inbox,
   Phone,
+  PhoneForwarded,
   Timer,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const DEFAULT_STAT_ICONS: Record<string, LucideIcon> = {
   "Calls answered": Phone,
   "Enquiries captured": Inbox,
   "Info sent": ArrowUpRight,
+  Callbacks: PhoneForwarded,
   "Follow-ups due": Clock3,
   "Needs attention": AlertCircle,
   "Minutes this period": Timer,

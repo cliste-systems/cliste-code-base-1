@@ -11,7 +11,9 @@
     "knip": "knip",
     "supabase:mcp-reconnect": "tsx scripts/supabase-mcp-reconnect.ts",
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
-    "onboarding:background": "bash scripts/export-onboarding-background.sh"
+    "onboarding:background": "bash scripts/export-onboarding-background.sh",
+    "seed:retail-activity": "tsx scripts/seed-retail-dashboard-activity.ts",
+    "simulate:retail-calls": "tsx scripts/simulate-retail-live-calls.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

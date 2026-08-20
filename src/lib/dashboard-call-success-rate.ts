@@ -11,6 +11,7 @@ const SUCCESS: readonly CallOutcome[] = [
   "link_sent",
   "callback_requested",
   "action_created",
+  "transferred",
 ];
 
 export type CallSuccessRate = {
