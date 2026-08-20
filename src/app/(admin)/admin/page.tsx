@@ -18,14 +18,12 @@ import {
   getAdminGlobalMetricRange,
   parseAdminGlobalMetricPeriod,
 } from "@/lib/admin-metric-range";
-import { formatBookingValueEur, sumAppointmentBookingValueEur } from "@/lib/booking-value";
 import {
   ORGANIZATION_NICHE_ADMIN_LABELS,
   parseOrganizationNiche,
 } from "@/lib/organization-niche";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-import { AdminDiagnosticsPanel } from "./admin-diagnostics-panel";
 import { AdminMetricRangeToggle } from "./admin-metric-range-toggle";
 import { NewClientDialog } from "./new-client-dialog";
 import { TenantRowActions } from "./tenant-row-actions";
@@ -34,55 +32,6 @@ export const dynamic = "force-dynamic";
 
 function formatInt(n: number): string {
   return new Intl.NumberFormat("en-IE").format(n);
-}
-
-function voiceCostUsdToEurRate(): number {
-  const v = process.env.VOICE_COST_USD_TO_EUR?.trim();
-  if (!v) return 0.93;
-  const n = Number.parseFloat(v);
-  return Number.isFinite(n) && n > 0 ? n : 0.93;
-}
-
-function formatApproxEurFromUsd(usd: number): string {
-  const eur = usd * voiceCostUsdToEurRate();
-  return new Intl.NumberFormat("en-IE", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(eur);
-}
-
-type CostEstimateJson = {
-  totalUsd?: unknown;
-  breakdown?: Record<string, unknown>;
-};
-
-function isMissingCostEstimateColumnError(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("cost_estimate") ||
-    (m.includes("column") && m.includes("does not exist") && m.includes("call_logs"))
-  );
-}
-
-function aggregateCallCostEstimates(
-  rows: { cost_estimate: CostEstimateJson | null }[] | null,
-): {
-  totalUsd: number;
-  callsWithEstimate: number;
-} {
-  let totalUsd = 0;
-  let callsWithEstimate = 0;
-  for (const row of rows ?? []) {
-    const ce = row.cost_estimate;
-    if (!ce || typeof ce !== "object") continue;
-    const t = ce.totalUsd;
-    if (typeof t !== "number" || !Number.isFinite(t)) continue;
-    totalUsd += t;
-    callsWithEstimate += 1;
-  }
-  return { totalUsd, callsWithEstimate };
 }
 
 function formatDateShort(iso: string): string {
@@ -127,10 +76,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   let openTickets = 0;
   let urgentEngineeringOpen = 0;
   let openSupportTickets = 0;
-  let bookingValueEur = 0;
-  let estimatedVoiceCostUsd = 0;
-  let voiceCostCallsWithEstimate = 0;
-  let voiceCostSchemaMissing = false;
   let organizations: {
     id: string;
     name: string;
@@ -161,7 +106,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
       urgentListRes,
       supportRes,
       listRes,
-      bookingValueSum,
     ] = await Promise.all([
       admin.from("organizations").select("id", { count: "exact", head: true }),
       admin
@@ -195,10 +139,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
         .from("organizations")
         .select("id, name, slug, tier, niche, created_at")
         .order("created_at", { ascending: false }),
-      sumAppointmentBookingValueEur(admin, {
-        rangeStartIso,
-        rangeEndExclusiveIso,
-      }),
     ]);
 
     if (orgsRes.error) throw new Error(orgsRes.error.message);
@@ -213,27 +153,8 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     openTickets = ticketsRes.count ?? 0;
     urgentEngineeringOpen = urgentCountRes.count ?? 0;
     urgentEngineeringTickets = (urgentListRes.data ?? []) as UrgentEngineeringRow[];
-    bookingValueEur = bookingValueSum;
     openSupportTickets = supportRes.error ? 0 : (supportRes.count ?? 0);
     organizations = listRes.data ?? [];
-
-    const callCostsRes = await admin
-      .from("call_logs")
-      .select("cost_estimate")
-      .gte("created_at", rangeStartIso)
-      .lt("created_at", rangeEndExclusiveIso);
-
-    if (callCostsRes.error) {
-      if (isMissingCostEstimateColumnError(callCostsRes.error.message)) {
-        voiceCostSchemaMissing = true;
-      }
-    } else {
-      const agg = aggregateCallCostEstimates(
-        (callCostsRes.data ?? []) as { cost_estimate: CostEstimateJson | null }[],
-      );
-      estimatedVoiceCostUsd = agg.totalUsd;
-      voiceCostCallsWithEstimate = agg.callsWithEstimate;
-    }
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load admin data.";
   }
@@ -266,13 +187,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
       icon: LifeBuoy,
     },
   ];
-
-  const infraCostLabel =
-    voiceCostSchemaMissing
-      ? null
-      : voiceCostCallsWithEstimate > 0
-        ? formatApproxEurFromUsd(estimatedVoiceCostUsd)
-        : null;
 
   return (
     <div className="mx-auto max-w-[1080px] px-4 py-6 sm:px-6 sm:py-8">
@@ -439,13 +353,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           )}
         </div>
       </section>
-
-      <AdminDiagnosticsPanel
-        bookingValue={formatBookingValueEur(bookingValueEur)}
-        infraCost={infraCostLabel}
-        periodLabel={periodShort}
-        voiceCostSchemaMissing={voiceCostSchemaMissing}
-      />
     </div>
   );
 }

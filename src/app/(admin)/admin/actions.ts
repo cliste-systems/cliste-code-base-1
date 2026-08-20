@@ -35,7 +35,6 @@ import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
-import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -1316,28 +1315,3 @@ export async function updateAccountPlanTier(
   return { ok: true };
 }
 
-export type TestSendGridResult = { ok: true } | { ok: false; message: string };
-
-/**
- * Sends one transactional test email to the signed-in admin (SendGrid v3).
- * Requires SENDGRID_API_KEY and SENDGRID_FROM_EMAIL.
- */
-export async function testSendGridConnection(): Promise<TestSendGridResult> {
-  const user = await assertAdminOperator();
-  const email = user.email?.trim();
-  if (!email) {
-    return { ok: false, message: "Your account has no email address." };
-  }
-
-  const result = await sendTransactionalEmail({
-    to: email,
-    subject: "Cliste: SendGrid test",
-    text: "If you received this, SendGrid is connected to the Cliste app.",
-    html: "<p>If you received this, SendGrid is connected to the Cliste app.</p>",
-  });
-
-  if (!result.ok) {
-    return { ok: false, message: result.message };
-  }
-  return { ok: true };
-}
