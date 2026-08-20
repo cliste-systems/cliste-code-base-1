@@ -46,7 +46,9 @@ export function TeamView({
   currentUserId: string;
   canManage: boolean;
 }) {
-  const { copy } = useDashboardVertical();
+  const { copy, vertical } = useDashboardVertical();
+  const isRetail = vertical.id === "retail";
+  const canInvite = canManage && !isRetail;
   const [state, formAction, pending] = useActionState(inviteTeamMember, INITIAL);
 
   const ownerCount = useMemo(
@@ -107,7 +109,7 @@ export function TeamView({
                   <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
                     {dashboardRoleLabel(member.role)}
                   </span>
-                  {canManage && member.id !== currentUserId ? (
+                  {canInvite && member.id !== currentUserId ? (
                     <form action={removeTeamMemberAction}>
                       <input type="hidden" name="userId" value={member.id} />
                       <Button type="submit" variant="ghost" size="sm">
@@ -121,7 +123,7 @@ export function TeamView({
           </ul>
         </section>
 
-        {canManage ? (
+        {canInvite ? (
           <SectionCard
             icon={UserPlus}
             title="Invite team member"
@@ -191,7 +193,9 @@ export function TeamView({
           </SectionCard>
         ) : (
           <p className="shrink-0 text-[13px] text-slate-500">
-            Only owners can invite or remove team members.
+            {isRetail
+              ? "Team members are invited by Cliste during store setup."
+              : "Only owners can invite or remove team members."}
           </p>
         )}
         </DashboardPageScrollBody>

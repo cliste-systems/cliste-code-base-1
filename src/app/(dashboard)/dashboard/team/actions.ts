@@ -16,6 +16,7 @@ import {
   buildSecurityEventContext,
   logSecurityEvent,
 } from "@/lib/security-events";
+import { verticalPackForNiche } from "@/lib/verticals";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type TeamActionResult = { ok: true } | { ok: false; message: string };
@@ -29,6 +30,19 @@ export async function inviteTeamMember(
   formData: FormData,
 ): Promise<TeamActionResult> {
   const session = await requireDashboardAdmin();
+
+  const { data: org } = await session.supabase
+    .from("organizations")
+    .select("niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+  if (verticalPackForNiche(String(org?.niche ?? "")).id === "retail") {
+    return {
+      ok: false,
+      message: "Retail stores manage team access via Cliste admin.",
+    };
+  }
+
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const name = String(formData.get("name") ?? "").trim();
   const role = String(formData.get("role") ?? "member");
@@ -173,6 +187,19 @@ export async function removeTeamMember(
   const session = await requireDashboardAdmin();
   const trimmed = userId.trim();
   if (!trimmed) return { ok: false, message: "Invalid member." };
+
+  const { data: org } = await session.supabase
+    .from("organizations")
+    .select("niche")
+    .eq("id", session.organizationId)
+    .maybeSingle();
+  if (verticalPackForNiche(String(org?.niche ?? "")).id === "retail") {
+    return {
+      ok: false,
+      message: "Retail stores manage team access via Cliste admin.",
+    };
+  }
+
   if (trimmed === session.user.id) {
     return { ok: false, message: "You cannot remove yourself." };
   }

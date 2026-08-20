@@ -96,12 +96,12 @@ const SALON_CAPABILITIES: VerticalPackCapabilities = {
 };
 
 const RETAIL_CAPABILITIES: VerticalPackCapabilities = {
-  usesServiceCatalog: true,
+  usesServiceCatalog: false,
   skipServiceArea: true,
   bookingMenuImport: false,
-  catalogSatisfiesServicesGate: true,
+  catalogSatisfiesServicesGate: false,
   autoEnsureBookingRoute: false,
-  alwaysIncludeLinkChecklist: true,
+  alwaysIncludeLinkChecklist: false,
   linkChecklistUsesBookingInquiryRoute: false,
   preferPackLabelInSettings: true,
   defaultRouteTemplate: "form-application",
@@ -173,6 +173,7 @@ const RETAIL_PACK: VerticalPack = {
       DASHBOARD_ROUTES.contacts,
       DASHBOARD_ROUTES.routing,
       DASHBOARD_ROUTES.locations,
+      DASHBOARD_ROUTES.usage,
     ],
     hiddenBusinessHrefs: [
       DASHBOARD_ROUTES.businessServices,

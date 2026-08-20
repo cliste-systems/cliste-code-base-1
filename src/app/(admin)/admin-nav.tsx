@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import {
   Inbox,
@@ -12,17 +13,19 @@ import {
   Users,
 } from "lucide-react";
 
+import { isPublicSignupEnabled } from "@/lib/public-signup";
 import { cn } from "@/lib/utils";
 
 import { AdminSignOutButton } from "./admin-sign-out-button";
 
-const nav = [
+const baseNav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
   {
     href: "/admin/onboarding",
     label: "Onboarding queue",
     icon: Inbox,
     exact: false,
+    requiresPublicSignup: true,
   },
   {
     href: "/admin/phone-pool",
@@ -49,6 +52,15 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
 
 export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
   const pathname = usePathname() ?? "";
+  const [publicSignup, setPublicSignup] = useState(false);
+
+  useEffect(() => {
+    setPublicSignup(isPublicSignupEnabled());
+  }, []);
+
+  const nav = baseNav.filter(
+    (item) => !("requiresPublicSignup" in item && item.requiresPublicSignup) || publicSignup,
+  );
   const initial = loggedInAs.trim().charAt(0).toUpperCase() || "A";
 
   return (

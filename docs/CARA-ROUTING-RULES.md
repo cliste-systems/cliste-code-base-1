@@ -64,6 +64,7 @@ read raw URLs out of the prompt — always execute from `routing_links`.
 | Send a link | `link` | Confirm the caller's mobile number, SMS the route's `url`, confirm it has been sent. |
 | Send a file | `form` + `businessFileId` | Only if the `business_files` row has `send_enabled = true`. Deliver a short-lived **signed URL** from the private `business-files` bucket; send `file_name` + `mime_type`. Never expose `storage_path`. |
 | Take a message | `callback` | Capture the details in the route's `url` note (defaults to name, number, what they need). Create an Action Inbox ticket (`POST /api/voice/action-ticket`) and report `outcome: action_created`. |
+| **Transfer** | `phone` | Announce the transfer (`transferLabel` when set). Dial `url` (E.164). On connect, report `outcome: transferred`. On no-answer, busy, closed hours (`transferDuringHoursOnly`), or failed connect — take a message and report `action_created`. Never drop the caller. |
 | Email the team | `email` | Collect the caller's details, send to the address in `url`. |
 | WhatsApp | `whatsapp` | Follow up via the number/link in `url`. |
 
@@ -115,7 +116,7 @@ Preferred day: Saturday (UNCONFIRMED)
 
 | Situation | Cara's behaviour |
 |-----------|------------------|
-| Caller asks for a person | Transfer to `organizations.fallback_number` if set and the caller reached the Cliste line directly. Otherwise take a message. |
+| Caller asks for a person / department | Match the department transfer route when configured (`targetType: phone`). Announce and dial. On failure, take a message. Report `transferred` on connect. |
 | Caller asks for several things | Handle the primary request, then offer the others ("I can also text you the booking link — would that help?"). |
 | Matched route's destination is missing/invalid | Do not invent one. Fall back to taking a message and flag it. |
 | Caller asks about something the business does NOT offer (`agent_services_not_offered`) | Politely say it is not offered; offer to take a message. |
@@ -128,6 +129,6 @@ Preferred day: Saturday (UNCONFIRMED)
 ## Outcomes to report
 
 Use the canonical `outcome` values from `VOICE-WORKER-CONTRACT.md`
-(`answered`, `link_sent`, `callback_requested`, `action_created`, `failed`,
-`voicemail_or_no_speech`, `spam_or_abuse`). `outcome` drives every dashboard
+(`answered`, `link_sent`, `callback_requested`, `action_created`, `transferred`,
+`failed`, `voicemail_or_no_speech`, `spam_or_abuse`, `blocked`). `outcome` drives every dashboard
 metric — send a canonical string.

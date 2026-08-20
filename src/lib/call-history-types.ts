@@ -7,6 +7,7 @@ export type CallOutcome =
   | "link_sent"
   | "callback_requested"
   | "action_created"
+  | "transferred"
   | "failed"
   | "voicemail_or_no_speech"
   | "spam_or_abuse"
@@ -32,6 +33,7 @@ export const OUTCOME_LABELS: Record<CallOutcome, string> = {
   link_sent: "Info sent",
   callback_requested: "Callback requested",
   action_created: "Enquiry captured",
+  transferred: "Transferred",
   failed: "Failed",
   voicemail_or_no_speech: "No speech",
   spam_or_abuse: "Spam or abuse",
@@ -44,6 +46,7 @@ export const INTENT_FALLBACK_BY_OUTCOME: Record<CallOutcome, string> = {
   link_sent: "Information request",
   callback_requested: "Callback request",
   action_created: "Follow-up",
+  transferred: "Transfer request",
   failed: "Unknown",
   voicemail_or_no_speech: "Unknown",
   spam_or_abuse: "Unknown",
@@ -82,6 +85,7 @@ export function inferCallIntent(
   if (outcome === "link_sent") return "Information request";
   if (outcome === "callback_requested") return "Callback request";
   if (outcome === "action_created") return "Follow-up";
+  if (outcome === "transferred") return "Transfer request";
   return INTENT_FALLBACK_BY_OUTCOME[outcome];
 }
 
@@ -94,7 +98,7 @@ export function normalizeCallOutcome(raw: string): CallOutcome {
   if (s === "link_sent" || s === "linksent") return "link_sent";
   if (s === "callback_requested") return "callback_requested";
   if (s === "action_created") return "action_created";
-  if (s === "transferred" || s === "transfer") return "answered";
+  if (s === "transferred" || s === "transfer") return "transferred";
   if (s === "failed") return "failed";
   if (s === "voicemail_or_no_speech") return "voicemail_or_no_speech";
   if (s === "spam_or_abuse") return "spam_or_abuse";
@@ -117,7 +121,7 @@ export function normalizeCallOutcome(raw: string): CallOutcome {
   ) {
     return "voicemail_or_no_speech";
   }
-  if (hay.includes("transfer") || hay.includes("forwarded")) return "answered";
+  if (hay.includes("transfer") || hay.includes("forwarded")) return "transferred";
   if (hay.includes("link") && hay.includes("sent")) return "link_sent";
   if (hay.includes("callback") || (hay.includes("call") && hay.includes("back"))) {
     return "callback_requested";

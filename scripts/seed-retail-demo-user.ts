@@ -194,6 +194,9 @@ async function main() {
     slug,
     tier: "native",
     niche: "retail",
+    retail_banner: "supervalu",
+    store_code: "DEMO-001",
+    store_public_number: "+353641234567",
     agent_business_type: "Retail & Grocery — local supermarket",
     is_active: true,
     onboarding_step: 7,
@@ -201,6 +204,9 @@ async function main() {
     storefront_eircode: EIRCODE,
     agent_location_address: ADDRESS,
     agent_location_eircode: EIRCODE,
+    agent_location_county: "Kerry",
+    retail_facilities: ["parking", "atm", "pharmacy"],
+    retail_loyalty_program: "Real Rewards",
     notification_email: email,
     notification_phone: OWNER_PHONE,
     raw_business_description: businessDescription,
@@ -230,6 +236,22 @@ async function main() {
   }
 
   const organizationId = orgRow.id as string;
+
+  await admin.from("store_departments").insert([
+    { organization_id: organizationId, name: "Customer service", sort_order: 0, transfer_enabled: true, active: true },
+    { organization_id: organizationId, name: "Deli / hot food", sort_order: 1, transfer_enabled: true, active: true },
+    { organization_id: organizationId, name: "Butcher", sort_order: 2, transfer_enabled: true, active: true },
+  ]);
+
+  await admin.from("store_contacts").insert({
+    organization_id: organizationId,
+    name: OWNER_NAME,
+    role: "store_manager",
+    phone_e164: OWNER_PHONE,
+    email,
+    is_notification_target: true,
+    active: true,
+  });
 
   const { error: profileErr } = await admin.from("profiles").insert({
     id: userId,

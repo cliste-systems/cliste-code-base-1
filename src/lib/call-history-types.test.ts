@@ -10,3 +10,11 @@ describe("normalizeCallOutcome blocked", () => {
     assert.equal(normalizeCallOutcome("Rejected by blocklist"), "blocked");
   });
 });
+
+describe("normalizeCallOutcome transferred", () => {
+  it("maps transfer canonical values", () => {
+    assert.equal(normalizeCallOutcome("transferred"), "transferred");
+    assert.equal(normalizeCallOutcome("transfer"), "transferred");
+    assert.equal(normalizeCallOutcome("Caller was forwarded to deli"), "transferred");
+  });
+});
