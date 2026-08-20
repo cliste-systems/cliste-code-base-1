@@ -170,6 +170,7 @@ const RETAIL_PACK: VerticalPack = {
       DASHBOARD_ROUTES.contacts,
       DASHBOARD_ROUTES.routing,
       DASHBOARD_ROUTES.caraTraining,
+      DASHBOARD_ROUTES.locations,
     ],
   },
   capabilities: RETAIL_CAPABILITIES,
