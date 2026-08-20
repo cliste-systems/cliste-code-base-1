@@ -180,63 +180,61 @@ export default async function DashboardLayout({
     <>
       <DashboardViewportLock />
       <HideStripeTestingAssistant />
-      <div
-        className={cn(
-          "fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-[#f3f6f4] text-[#11181d] lg:flex-row",
-          DASHBOARD_INTERACTIVE_CURSOR,
-        )}
+      <DashboardVerticalProvider
+        niche={orgRow?.niche}
+        businessType={orgRow?.agent_business_type}
       >
-        {!DASHBOARD_REBUILD_SHELL ? (
-          <DashboardSidebar
-            coreNav={coreNav}
-            accountNav={accountNav}
-            needsPassword={needsPassword}
-            account={accountSummary}
-            locations={locations}
-            activeOrganizationId={organizationId}
-            viewAllLocations={viewAllLocations}
-            locationLabel={locationLabel}
-            accountName={accountName}
-          />
-        ) : null}
+        <div
+          className={cn(
+            "fixed inset-0 z-10 flex w-full max-w-[100vw] flex-col overflow-hidden bg-[#f3f6f4] text-[#11181d] lg:flex-row",
+            DASHBOARD_INTERACTIVE_CURSOR,
+          )}
+        >
+          {!DASHBOARD_REBUILD_SHELL ? (
+            <DashboardSidebar
+              coreNav={coreNav}
+              accountNav={accountNav}
+              needsPassword={needsPassword}
+              account={accountSummary}
+              locations={locations}
+              activeOrganizationId={organizationId}
+              viewAllLocations={viewAllLocations}
+              locationLabel={locationLabel}
+              accountName={accountName}
+            />
+          ) : null}
 
-        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f3f6f4] lg:h-full">
-          {!DASHBOARD_REBUILD_SHELL ? (
-            <DashboardChromeBar versionDisplay={versionDisplay} />
-          ) : null}
-          {!DASHBOARD_REBUILD_SHELL ? (
-            <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] px-4 py-3 lg:hidden">
-              <DashboardMobileNav
-                items={mobileNavItems}
-                accountNav={accountNav}
-              />
-            </div>
-          ) : null}
-          {!DASHBOARD_REBUILD_SHELL && needsPassword ? (
-            <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/90 px-4 py-3 text-xs leading-snug text-amber-950 lg:hidden">
-              Finish setup: choose a password for this account.{" "}
-              <Link
-                href="/dashboard/set-password"
-                className="font-semibold underline-offset-2 hover:underline"
-              >
-                Set password
-              </Link>
-            </div>
-          ) : null}
-          <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-[#f3f6f4]">
-            <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-home]:!overflow-y-auto has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
-              {DASHBOARD_REBUILD_SHELL ? null : (
-                <DashboardVerticalProvider
-                  niche={orgRow?.niche}
-                  businessType={orgRow?.agent_business_type}
+          <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f3f6f4] lg:h-full">
+            {!DASHBOARD_REBUILD_SHELL ? (
+              <DashboardChromeBar versionDisplay={versionDisplay} />
+            ) : null}
+            {!DASHBOARD_REBUILD_SHELL ? (
+              <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] px-4 py-3 lg:hidden">
+                <DashboardMobileNav
+                  items={mobileNavItems}
+                  accountNav={accountNav}
+                />
+              </div>
+            ) : null}
+            {!DASHBOARD_REBUILD_SHELL && needsPassword ? (
+              <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/90 px-4 py-3 text-xs leading-snug text-amber-950 lg:hidden">
+                Finish setup: choose a password for this account.{" "}
+                <Link
+                  href="/dashboard/set-password"
+                  className="font-semibold underline-offset-2 hover:underline"
                 >
-                  {children}
-                </DashboardVerticalProvider>
-              )}
-            </div>
-          </main>
+                  Set password
+                </Link>
+              </div>
+            ) : null}
+            <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-[#f3f6f4]">
+              <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-home]:!overflow-y-auto has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
+      </DashboardVerticalProvider>
       <DashboardNavSeenSync />
       <DashboardLiveRefresh organizationId={organizationId} />
     </>
