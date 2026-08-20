@@ -45,7 +45,6 @@ export default async function DashboardHomePage({
     >
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
         <DashboardHomeLive
-          organizationId={session.organizationId}
           metricRange={metricRange}
           initialSnapshot={snapshot}
           enterClassName="min-h-0 flex-1 lg:h-full"
