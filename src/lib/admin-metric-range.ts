@@ -72,3 +72,35 @@ export function adminGlobalMetricPeriodShortLabel(
       return "Day";
   }
 }
+
+/** Human-readable Dublin calendar range for the selected metrics window. */
+export function adminGlobalMetricPeriodRangeLabel(
+  period: AdminGlobalMetricPeriod,
+  now: Date = new Date(),
+): string {
+  const { startIso, endExclusiveIso } = getAdminGlobalMetricRange(period, now);
+  const start = toZonedTime(new Date(startIso), DUBLIN);
+  const endInclusive = toZonedTime(
+    new Date(new Date(endExclusiveIso).getTime() - 1),
+    DUBLIN,
+  );
+  const sameDay =
+    start.getFullYear() === endInclusive.getFullYear() &&
+    start.getMonth() === endInclusive.getMonth() &&
+    start.getDate() === endInclusive.getDate();
+  const dateFmt: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "short",
+    timeZone: DUBLIN,
+  };
+  const fullFmt: Intl.DateTimeFormatOptions = {
+    ...dateFmt,
+    year: "numeric",
+  };
+  if (sameDay) {
+    return new Intl.DateTimeFormat("en-IE", fullFmt).format(start);
+  }
+  const startLabel = new Intl.DateTimeFormat("en-IE", dateFmt).format(start);
+  const endLabel = new Intl.DateTimeFormat("en-IE", fullFmt).format(endInclusive);
+  return `${startLabel} – ${endLabel}`;
+}

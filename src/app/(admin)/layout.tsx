@@ -71,7 +71,7 @@ export default async function AdminShellLayout({
           </div>
         </aside>
 
-        <main className="relative z-10 h-full min-w-0 flex-1 overflow-y-auto bg-[#f4f6f8]">
+        <main className="relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-slate-100/80">
           {children}
         </main>
       </div>
