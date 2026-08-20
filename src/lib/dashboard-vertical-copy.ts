@@ -7,6 +7,7 @@ import {
   packServicesStepCopy,
   type ServicesStepCopy,
 } from "@/app/(onboarding)/onboarding/knowledge/train-cara-services-copy";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
   parseOrganizationNiche,
   type OrganizationNiche,
@@ -35,6 +36,12 @@ export type DashboardVerticalCopy = {
     heroSubheading: string;
     greetingSubline: string;
     goLiveChecklistSuffix: string;
+    /** Third hero tile — defaults to “Info sent” (routed call outcomes). */
+    heroThirdStat?: {
+      label: string;
+      href: string;
+      kind: "routed" | "callbacks";
+    };
   };
   calls: {
     emptyDescription: string;
@@ -571,6 +578,11 @@ const RETAIL_COPY: VerticalCopyBase = {
     heroSubheading: "Here's how the shop's looking today.",
     greetingSubline: "What Cara handled at the shop today.",
     goLiveChecklistSuffix: "can handle real customer calls confidently.",
+    heroThirdStat: {
+      label: "Callbacks",
+      href: DASHBOARD_ROUTES.actionInbox,
+      kind: "callbacks",
+    },
   },
   calls: {
     emptyDescription:

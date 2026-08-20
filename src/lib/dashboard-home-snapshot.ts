@@ -45,6 +45,7 @@ import {
   getDashboardMetricRangeUpperExclusiveIso,
   type DashboardMetricRangeKey,
 } from "@/lib/dashboard-metric-range";
+import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { isRoutedCallOutcome } from "@/lib/dashboard-routed-outcomes";
 import { resolveDashboardOrganizationScope } from "@/lib/dashboard-scope";
 import type { DashboardSession } from "@/lib/dashboard-session";
@@ -307,6 +308,9 @@ export async function loadDashboardHomeSnapshot(input: {
   const routedCountLive = callsForMetricRollups.filter((row) =>
     isRoutedCallOutcome(row.outcome),
   ).length;
+  const callbackCountLive = callsForMetricRollups.filter(
+    (row) => normalizeCallOutcome(String(row.outcome ?? "")) === "callback_requested",
+  ).length;
   const minutesUsedLive = sumBillableMinutesFromDurations(
     callsForMetricRollups.map((row) => row.duration_seconds),
   );
@@ -435,6 +439,9 @@ export async function loadDashboardHomeSnapshot(input: {
     ? DASHBOARD_HOME_MOCK.hero.requestsCaptured
     : actionsCreatedLive;
   const routedCount = useHomeMock ? DASHBOARD_HOME_MOCK.hero.routed : routedCountLive;
+  const callbackCount = useHomeMock
+    ? DASHBOARD_HOME_MOCK.hero.callbacks
+    : callbackCountLive;
   const minutesUsedDisplay = useHomeMock
     ? DASHBOARD_HOME_MOCK.hero.minutesUsed
     : usageSnapshotLive.minutesUsed;
@@ -442,6 +449,13 @@ export async function loadDashboardHomeSnapshot(input: {
   const firstName = getFirstName(profile?.name);
   const greeting = dashboardTimeGreeting(firstName);
   const homeCopy = dashboardVerticalCopy(niche, agentBusinessType);
+  const thirdStat = homeCopy.home.heroThirdStat ?? {
+    label: "Info sent",
+    href: DASHBOARD_ROUTES.routing,
+    kind: "routed" as const,
+  };
+  const thirdStatValue =
+    thirdStat.kind === "callbacks" ? callbackCount : routedCount;
 
   return {
     greeting,
@@ -458,9 +472,9 @@ export async function loadDashboardHomeSnapshot(input: {
         href: DASHBOARD_ROUTES.actionInbox,
       },
       {
-        label: "Info sent",
-        value: String(routedCount),
-        href: DASHBOARD_ROUTES.routing,
+        label: thirdStat.label,
+        value: String(thirdStatValue),
+        href: thirdStat.href,
       },
       {
         label: "Needs attention",

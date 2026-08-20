@@ -14,6 +14,7 @@ export const DASHBOARD_HOME_MOCK = {
     callsAnswered: 47,
     requestsCaptured: 14,
     routed: 8,
+    callbacks: 3,
     needsAttention: 3,
     minutesUsed: 86,
   },
