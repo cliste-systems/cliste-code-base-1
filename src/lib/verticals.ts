@@ -172,7 +172,6 @@ const RETAIL_PACK: VerticalPack = {
       DASHBOARD_ROUTES.activity,
       DASHBOARD_ROUTES.contacts,
       DASHBOARD_ROUTES.routing,
-      DASHBOARD_ROUTES.caraTraining,
       DASHBOARD_ROUTES.locations,
     ],
     hiddenBusinessHrefs: [
