@@ -434,6 +434,10 @@ function ActionDetailPanelContent({
   blockedCallerE164s: string[];
   onRefresh: () => void;
 }) {
+  const { vertical } = useDashboardVertical();
+  const showOpenContact = !(vertical.nav?.hiddenHrefs ?? []).includes(
+    DASHBOARD_ROUTES.contacts,
+  );
   const Icon = CATEGORY_ICONS[item.category] ?? Inbox;
   const hasPhone = item.callerNumber.trim().length > 0;
   const tel = hasPhone ? `tel:${item.callerNumber.replace(/[^\d+]/g, "")}` : null;
@@ -633,9 +637,11 @@ function ActionDetailPanelContent({
                 Email
               </DetailActionButton>
             ) : null}
-            <DetailActionButton href={DASHBOARD_ROUTES.contacts}>
-              Open contact
-            </DetailActionButton>
+            {showOpenContact ? (
+              <DetailActionButton href={DASHBOARD_ROUTES.contacts}>
+                Open contact
+              </DetailActionButton>
+            ) : null}
           </div>
           {blockMsg ? (
             <p className="mt-2 text-[12px] text-red-600">{blockMsg}</p>
