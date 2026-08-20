@@ -27,6 +27,7 @@ import {
   type CallRoutingMode,
 } from "@/lib/call-routing";
 import { cn } from "@/lib/utils";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 import { AccountSecuritySection } from "./account-security-section";
 import { saveOrganizationSettings } from "./actions";
@@ -60,7 +61,10 @@ export function SettingsView({
   isLocalPreview = false,
   className,
 }: SettingsViewProps) {
-  const { copy } = useDashboardVertical();
+  const { copy, vertical } = useDashboardVertical();
+  const showCallRoutingSettings = !(vertical.nav?.hiddenHrefs ?? []).includes(
+    DASHBOARD_ROUTES.routing,
+  );
   const [businessName, setBusinessName] = useState(initial.businessName);
   const [notificationEmail, setNotificationEmail] = useState(
     initial.notificationEmail,
@@ -231,16 +235,18 @@ export function SettingsView({
           </div>
         </SettingsSection>
 
-        <SettingsSection title="Your number & forwarding">
-          <CallRoutingControls
-            mode={callRoutingMode}
-            onModeChange={setCallRoutingMode}
-            transferNumber={transferNumber}
-            onTransferChange={setTransferNumber}
-            clisteNumber={initial.phoneNumber}
-            fieldClass={fieldClass}
-          />
-        </SettingsSection>
+        {showCallRoutingSettings ? (
+          <SettingsSection title="Your number & forwarding">
+            <CallRoutingControls
+              mode={callRoutingMode}
+              onModeChange={setCallRoutingMode}
+              transferNumber={transferNumber}
+              onTransferChange={setTransferNumber}
+              clisteNumber={initial.phoneNumber}
+              fieldClass={fieldClass}
+            />
+          </SettingsSection>
+        ) : null}
 
         <SettingsSection title="Notifications">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
