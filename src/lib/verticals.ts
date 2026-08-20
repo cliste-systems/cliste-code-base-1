@@ -166,9 +166,7 @@ const RETAIL_PACK: VerticalPack = {
   customerNoun: { singular: "customer", plural: "customers" },
   locationNoun: "Store",
   nav: {
-    labelOverrides: {
-      [DASHBOARD_ROUTES.contacts]: "Customers",
-    },
+    hiddenHrefs: [DASHBOARD_ROUTES.contacts, DASHBOARD_ROUTES.routing],
   },
   capabilities: RETAIL_CAPABILITIES,
   onboarding: {
