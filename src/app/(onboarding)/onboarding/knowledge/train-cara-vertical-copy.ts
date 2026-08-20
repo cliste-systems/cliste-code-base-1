@@ -153,6 +153,11 @@ const TRAIN_CARA_INTRO_COPY: Record<VerticalId, TrainCaraIntroCopy> = {
     subheadline:
       "Treat the next sections like onboarding a new employee. The more Cara knows about your business, the better she'll handle real calls.",
   },
+  retail: {
+    headlineLines: ["Train Cara like a new team member on the shop floor."],
+    subheadline:
+      "The more Cara knows about your shop — your departments, your hours, your policies — the better she'll handle real calls.",
+  },
 };
 
 const TRAIN_CARA_VERTICAL_COPY: Record<
@@ -161,6 +166,7 @@ const TRAIN_CARA_VERTICAL_COPY: Record<
 > = {
   salon_beauty: salonCopy,
   generic: genericCopy,
+  retail: genericCopy,
 };
 
 /** Train Cara intro hero copy tailored to the org's vertical. */

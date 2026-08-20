@@ -12,7 +12,6 @@ export type VerticalPackVersion = {
 };
 
 export type DashboardVersionDisplay = {
-  platformLine: string;
   experienceLine: string;
   caraLine: string;
 };
@@ -21,7 +20,6 @@ export function dashboardVersionDisplay(
   pack: VerticalPackVersion,
 ): DashboardVersionDisplay {
   return {
-    platformLine: `Platform v${DASHBOARD_SHELL_VERSION}`,
     experienceLine: `${pack.experienceLabel} v${pack.packVersion}`,
     caraLine: `Cara v${CARA_VERSION}`,
   };

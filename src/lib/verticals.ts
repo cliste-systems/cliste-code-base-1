@@ -17,7 +17,7 @@ import {
  * `generic` is the deliberate fallback: anything we haven't tailored yet uses
  * neutral, business-agnostic copy.
  */
-export type VerticalId = "salon_beauty" | "generic";
+export type VerticalId = "salon_beauty" | "retail" | "generic";
 
 export type VerticalSelectionChoice = {
   id: VerticalId;
@@ -93,6 +93,18 @@ const SALON_CAPABILITIES: VerticalPackCapabilities = {
   defaultRouteTemplate: "booking-inquiry",
 };
 
+const RETAIL_CAPABILITIES: VerticalPackCapabilities = {
+  usesServiceCatalog: true,
+  skipServiceArea: true,
+  bookingMenuImport: false,
+  catalogSatisfiesServicesGate: true,
+  autoEnsureBookingRoute: false,
+  alwaysIncludeLinkChecklist: true,
+  linkChecklistUsesBookingInquiryRoute: false,
+  preferPackLabelInSettings: true,
+  defaultRouteTemplate: "form-application",
+};
+
 const GENERIC_CAPABILITIES: VerticalPackCapabilities = {
   usesServiceCatalog: false,
   skipServiceArea: false,
@@ -136,6 +148,37 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   },
 };
 
+/** Niches that roll up into the Retail vertical. */
+const RETAIL_NICHES = ["retail"] as const;
+
+const RETAIL_PACK: VerticalPack = {
+  id: "retail",
+  defaultNiche: "retail",
+  niches: RETAIL_NICHES,
+  selection: {
+    label: "Retail",
+    tagline: "Stores & supermarkets",
+    description:
+      "Shops and supermarkets — Cara answers hours and department questions, takes messages, and puts callers through.",
+  },
+  productNoun: "Store",
+  packVersion: "1.0",
+  customerNoun: { singular: "customer", plural: "customers" },
+  locationNoun: "Store",
+  nav: {
+    labelOverrides: {
+      [DASHBOARD_ROUTES.contacts]: "Customers",
+    },
+  },
+  capabilities: RETAIL_CAPABILITIES,
+  onboarding: {
+    profileHeaderTitle: "Tell us about your shop",
+    profileHeaderSubtitle:
+      "A few details so Cara can answer your customers the way you would.",
+    pickerIcon: "building",
+  },
+};
+
 const GENERIC_PACK: VerticalPack = {
   id: "generic",
   defaultNiche: "other",
@@ -161,6 +204,7 @@ const GENERIC_PACK: VerticalPack = {
 
 export const VERTICAL_PACKS: Record<VerticalId, VerticalPack> = {
   salon_beauty: SALON_BEAUTY_PACK,
+  retail: RETAIL_PACK,
   generic: GENERIC_PACK,
 };
 
@@ -170,13 +214,18 @@ export const VERTICAL_PACKS: Record<VerticalId, VerticalPack> = {
  * new pack here (e.g. trades) when its copy is ready.
  */
 export const VERTICAL_CHOICES: VerticalSelectionChoice[] = [
+  { id: RETAIL_PACK.id, ...RETAIL_PACK.selection },
   { id: SALON_BEAUTY_PACK.id, ...SALON_BEAUTY_PACK.selection },
   { id: GENERIC_PACK.id, ...GENERIC_PACK.selection },
 ];
 
-const NICHE_TO_VERTICAL: ReadonlyMap<OrganizationNiche, VerticalId> = new Map(
-  SALON_BEAUTY_NICHES.map((niche) => [niche, "salon_beauty" as VerticalId]),
-);
+const NICHE_TO_VERTICAL: ReadonlyMap<OrganizationNiche, VerticalId> = new Map<
+  OrganizationNiche,
+  VerticalId
+>([
+  ...SALON_BEAUTY_NICHES.map((niche) => [niche, "salon_beauty"] as const),
+  ...RETAIL_NICHES.map((niche) => [niche, "retail"] as const),
+]);
 
 /** Which vertical a stored niche belongs to. */
 export function verticalIdForNiche(
@@ -232,6 +281,9 @@ export function resolveNicheForVerticalChoice(
     return verticalIdForNiche(classifiedNiche) === "salon_beauty"
       ? classifiedNiche
       : SALON_BEAUTY_PACK.defaultNiche;
+  }
+  if (choice === "retail") {
+    return classifiedNiche === "retail" ? "retail" : RETAIL_PACK.defaultNiche;
   }
   return classifiedNiche;
 }
