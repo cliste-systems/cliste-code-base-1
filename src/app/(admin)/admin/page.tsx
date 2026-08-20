@@ -218,8 +218,11 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-4 p-4 lg:h-full lg:min-h-0 lg:flex-1 lg:flex-row lg:gap-5 lg:overflow-hidden lg:p-5">
-      <div className="flex min-h-[480px] min-w-0 flex-1 flex-col gap-4 overflow-hidden lg:min-h-0">
+    <div
+      data-admin-fill
+      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row lg:gap-5 lg:p-5"
+    >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
         {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
           <div className="flex justify-end">
             <NewClientDialog />
@@ -284,7 +287,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
         />
       </div>
 
-      <div className="flex min-h-[240px] shrink-0 flex-col lg:h-full lg:min-h-0 lg:w-[300px]">
+      <div className="flex min-h-0 w-full shrink-0 flex-col lg:h-full lg:min-h-0 lg:w-[300px]">
         <AdminTenantsPanel organizations={organizations} />
       </div>
     </div>

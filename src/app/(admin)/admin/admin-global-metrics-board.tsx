@@ -104,7 +104,7 @@ function Panel({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-col rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5",
+        "flex h-full min-h-0 flex-col rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5",
         className,
       )}
     >
@@ -162,10 +162,10 @@ export function AdminGlobalMetricsBoard({
 
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm"
       aria-labelledby="global-metrics-heading"
     >
-      <div className="bg-[#0b1220]">
+      <div className="shrink-0 bg-[#0b1220]">
         <div className="flex flex-col gap-4 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
