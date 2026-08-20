@@ -57,9 +57,6 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
         className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4"
         aria-label="Admin"
       >
-        <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-          Platform
-        </p>
         {nav.map(({ href, label, icon: Icon, exact }) => {
           const active = isActive(pathname, href, exact);
           return (
@@ -67,16 +64,19 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40",
+                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40",
                 active
-                  ? "bg-[#0b1220] font-medium text-white shadow-sm"
-                  : "font-normal text-slate-600 hover:bg-slate-100 hover:text-[#0b1220]",
+                  ? "bg-slate-100 font-medium text-[#0b1220]"
+                  : "font-normal text-slate-600 hover:bg-slate-50 hover:text-[#0b1220]",
               )}
+              aria-current={active ? "page" : undefined}
             >
               <Icon
                 className={cn(
-                  "size-4 shrink-0",
-                  active ? "text-white/90" : "text-slate-400",
+                  "size-4 shrink-0 transition-colors",
+                  active
+                    ? "text-[#0b1220]"
+                    : "text-slate-400 group-hover:text-slate-600",
                 )}
                 strokeWidth={1.5}
                 aria-hidden
@@ -89,7 +89,7 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
 
       <div className="shrink-0 border-t border-slate-100 p-4">
         <div className="mb-3 flex items-center gap-2.5 px-1">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0b1220] text-xs font-semibold text-white">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
             {initial}
           </span>
           <div className="min-w-0">

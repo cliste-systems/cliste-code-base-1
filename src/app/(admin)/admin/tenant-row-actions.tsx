@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ExternalLink, LogIn, MoreHorizontal, Trash2 } from "lucide-react";
+import { LogIn, MoreHorizontal, Settings2, Trash2 } from "lucide-react";
 
 import {
   createSupportDashboardLink,
@@ -34,6 +35,7 @@ export function TenantRowActions({
   organizationId,
   organizationName,
 }: TenantRowActionsProps) {
+  const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -72,49 +74,40 @@ export function TenantRowActions({
 
   return (
     <>
-      <div className="flex items-center justify-end gap-1">
-        <button
-          type="button"
-          disabled={loginPending}
-          onClick={openSupportDashboard}
-          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0b1220] disabled:opacity-60"
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0b1220]"
+          aria-label={`Actions for ${organizationName}`}
         >
-          <ExternalLink className="size-3.5 text-slate-400" aria-hidden />
-          {loginPending ? "Opening…" : "Dashboard"}
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0b1220]"
-            aria-label={`Actions for ${organizationName}`}
+          <MoreHorizontal className="size-4" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={() => router.push(`/admin/organizations/${organizationId}`)}
           >
-            <MoreHorizontal className="size-4" aria-hidden />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              disabled={loginPending}
-              onClick={openSupportDashboard}
-            >
-              <LogIn className="size-4" aria-hidden />
-              Open dashboard
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={deletePending}
-              onClick={() => {
-                setDeleteError(null);
-                setDeleteOpen(true);
-              }}
-            >
-              <Trash2 className="size-4" aria-hidden />
-              Delete tenant
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            <Settings2 className="size-4" aria-hidden />
+            Manage tenant
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={loginPending} onClick={openSupportDashboard}>
+            <LogIn className="size-4" aria-hidden />
+            {loginPending ? "Opening…" : "Open dashboard"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={deletePending}
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+          >
+            <Trash2 className="size-4" aria-hidden />
+            Delete tenant
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {rowError ? (
-        <p className="mt-1 max-w-[14rem] text-right text-xs leading-snug text-red-600">
+        <p className="mt-1 text-right text-xs leading-snug text-red-600">
           {rowError}
         </p>
       ) : null}
