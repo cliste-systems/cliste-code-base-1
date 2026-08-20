@@ -52,6 +52,20 @@ type SettingsViewProps = {
   className?: string;
 };
 
+function settingsPageDescription(
+  verticalId: string,
+  canManageAccount: boolean,
+): string {
+  if (verticalId === "retail") {
+    return canManageAccount
+      ? "Your profile, sign-in, store details, and notifications."
+      : "Store details, your Cliste number, and notifications.";
+  }
+  return canManageAccount
+    ? "Your profile, sign-in, business details, and notifications."
+    : "Business details, phone line, and notifications.";
+}
+
 export function SettingsView({
   initial,
   blockedNumbers,
@@ -62,6 +76,8 @@ export function SettingsView({
   className,
 }: SettingsViewProps) {
   const { copy, vertical } = useDashboardVertical();
+  const isRetail = vertical.id === "retail";
+  const businessNameLabel = isRetail ? "Store name" : "Business name";
   const showCallRoutingSettings = !(vertical.nav?.hiddenHrefs ?? []).includes(
     DASHBOARD_ROUTES.routing,
   );
@@ -124,7 +140,7 @@ export function SettingsView({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-hidden bg-white",
+        "flex min-h-0 flex-1 flex-col gap-4 overflow-hidden",
         className,
       )}
     >
@@ -132,11 +148,7 @@ export function SettingsView({
         tone="account"
         icon={SettingsIcon}
         title="Settings"
-        description={
-          canManageAccount
-            ? "Your profile, sign-in, business details, and notifications."
-            : "Business details, phone line, and notifications."
-        }
+        description={settingsPageDescription(vertical.id, canManageAccount)}
         actions={
           <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
             {saveButton}
@@ -154,7 +166,10 @@ export function SettingsView({
         }
       />
 
-      <DashboardFormScrollRegion scrollClassName="bg-[#fbfcfb] divide-y divide-[#dfe7e2]">
+      <DashboardFormScrollRegion
+        className="min-h-0 flex-1"
+        scrollClassName="divide-y divide-[#dfe7e2] bg-[#fbfcfb]"
+      >
         <DashboardAnimatedStack embedded>
           <SettingsSection title="Your profile">
             <DashboardProfileEditor
@@ -176,106 +191,108 @@ export function SettingsView({
           ) : null}
 
           <SettingsSection title={copy.settings.businessIdentityTitle}>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="business-name">Business name</Label>
-              <Input
-                id="business-name"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="Your business name"
-                className={fieldClass}
-              />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="business-name">{businessNameLabel}</Label>
+                <Input
+                  id="business-name"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  placeholder={isRetail ? "Your store name" : "Your business name"}
+                  className={fieldClass}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-segment">Business type</Label>
+                <Input
+                  id="signup-segment"
+                  readOnly
+                  tabIndex={-1}
+                  value={initial.signupSegment}
+                  className={cn(
+                    fieldClass,
+                    "cursor-default bg-slate-50/80 focus-visible:ring-0",
+                  )}
+                  aria-describedby="signup-segment-hint"
+                />
+                <p
+                  id="signup-segment-hint"
+                  className="text-[12px] leading-relaxed text-slate-500"
+                >
+                  Chosen at signup — Cara uses this to tailor your dashboard.
+                  Contact support if it needs updating.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cliste-number">Cliste number</Label>
+                <Input
+                  id="cliste-number"
+                  readOnly
+                  tabIndex={-1}
+                  value={phoneDisplay ?? "Not assigned yet"}
+                  className={cn(
+                    fieldClass,
+                    "cursor-default bg-slate-50/80 tabular-nums focus-visible:ring-0",
+                    phoneDisplay ? "text-[#0b1220]" : "text-slate-500",
+                  )}
+                  aria-describedby="cliste-number-hint"
+                />
+                <p
+                  id="cliste-number-hint"
+                  className="text-[12px] leading-relaxed text-slate-500"
+                >
+                  {hasClisteNumber
+                    ? "Assigned to your account — it can't be changed here."
+                    : "Assigned after onboarding — it can't be changed here."}{" "}
+                  Contact support if you have any questions.
+                </p>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signup-segment">Business type</Label>
-              <Input
-                id="signup-segment"
-                readOnly
-                tabIndex={-1}
-                value={initial.signupSegment}
-                className={cn(
-                  fieldClass,
-                  "cursor-default bg-slate-50/80 focus-visible:ring-0",
-                )}
-                aria-describedby="signup-segment-hint"
-              />
-              <p
-                id="signup-segment-hint"
-                className="text-[12px] leading-relaxed text-slate-500"
-              >
-                Chosen at signup — Cara uses this to tailor your dashboard. Contact
-                support if it needs updating.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cliste-number">Cliste number</Label>
-              <Input
-                id="cliste-number"
-                readOnly
-                tabIndex={-1}
-                value={phoneDisplay ?? "Not assigned yet"}
-                className={cn(
-                  fieldClass,
-                  "cursor-default bg-slate-50/80 tabular-nums focus-visible:ring-0",
-                  phoneDisplay ? "text-[#0b1220]" : "text-slate-500",
-                )}
-                aria-describedby="cliste-number-hint"
-              />
-              <p
-                id="cliste-number-hint"
-                className="text-[12px] leading-relaxed text-slate-500"
-              >
-                {hasClisteNumber
-                  ? "Assigned to your account — it can't be changed here."
-                  : "Assigned after onboarding — it can't be changed here."}{" "}
-                Contact support if you have any questions.
-              </p>
-            </div>
-          </div>
-        </SettingsSection>
-
-        {showCallRoutingSettings ? (
-          <SettingsSection title="Your number & forwarding">
-            <CallRoutingControls
-              mode={callRoutingMode}
-              onModeChange={setCallRoutingMode}
-              transferNumber={transferNumber}
-              onTransferChange={setTransferNumber}
-              clisteNumber={initial.phoneNumber}
-              fieldClass={fieldClass}
-            />
           </SettingsSection>
-        ) : null}
 
-        <SettingsSection title="Notifications">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="notification-email">Notification email</Label>
-              <Input
-                id="notification-email"
-                type="email"
-                value={notificationEmail}
-                onChange={(e) => setNotificationEmail(e.target.value)}
-                placeholder="you@business.com"
-                className={fieldClass}
+          {showCallRoutingSettings ? (
+            <SettingsSection title="Your number & forwarding">
+              <CallRoutingControls
+                mode={callRoutingMode}
+                onModeChange={setCallRoutingMode}
+                transferNumber={transferNumber}
+                onTransferChange={setTransferNumber}
+                clisteNumber={initial.phoneNumber}
+                fieldClass={fieldClass}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="notification-phone">Notification phone</Label>
-              <Input
-                id="notification-phone"
-                inputMode="tel"
-                value={notificationPhone}
-                onChange={(e) => setNotificationPhone(e.target.value)}
-                placeholder="+353…"
-                className={fieldClass}
-              />
-            </div>
-          </div>
-        </SettingsSection>
+            </SettingsSection>
+          ) : null}
 
-        <BlockedNumbersSection initial={blockedNumbers} />
+          <SettingsSection title="Notifications">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="notification-email">Notification email</Label>
+                <Input
+                  id="notification-email"
+                  type="email"
+                  autoComplete="email"
+                  value={notificationEmail}
+                  onChange={(e) => setNotificationEmail(e.target.value)}
+                  placeholder="you@business.com"
+                  className={fieldClass}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="notification-phone">Notification phone</Label>
+                <Input
+                  id="notification-phone"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={notificationPhone}
+                  onChange={(e) => setNotificationPhone(e.target.value)}
+                  placeholder="+353…"
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+          </SettingsSection>
+
+          <BlockedNumbersSection initial={blockedNumbers} />
         </DashboardAnimatedStack>
       </DashboardFormScrollRegion>
     </div>

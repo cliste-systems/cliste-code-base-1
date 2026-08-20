@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import {
-  DASHBOARD_PRIMARY_BUTTON_CLASS,
+  DASHBOARD_SECONDARY_BUTTON_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,7 +113,7 @@ function EmailChangeForm({
           <Input
             id="sign-in-email-new"
             type="email"
-            autoComplete="email"
+            autoComplete="off"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="you@business.com"
@@ -140,7 +140,7 @@ function EmailChangeForm({
         type="button"
         disabled={pending || !newEmail.trim()}
         onClick={submit}
-        className={DASHBOARD_PRIMARY_BUTTON_CLASS}
+        className={cn(DASHBOARD_SECONDARY_BUTTON_CLASS, "h-9 px-4 text-[13px]")}
       >
         {pending ? "Sending…" : "Update sign-in email"}
       </Button>
@@ -243,7 +243,7 @@ function PasswordChangeForm({ fieldClass }: { fieldClass: string }) {
         type="button"
         disabled={pending || !canSubmit}
         onClick={submit}
-        className={DASHBOARD_PRIMARY_BUTTON_CLASS}
+        className={cn(DASHBOARD_SECONDARY_BUTTON_CLASS, "h-9 px-4 text-[13px]")}
       >
         {pending ? "Updating…" : "Update password"}
       </Button>

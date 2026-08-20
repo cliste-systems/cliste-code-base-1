@@ -20,7 +20,7 @@ export function DashboardFormScrollRegion({
       data-debug-form-scroll-outer=""
       className={cn(
         DASHBOARD_FORM_STACK,
-        "flex h-auto max-h-full min-h-0 w-full flex-col self-start overflow-hidden divide-y-0",
+        "flex min-h-0 w-full flex-1 flex-col self-stretch overflow-hidden divide-y-0",
         className,
       )}
     >

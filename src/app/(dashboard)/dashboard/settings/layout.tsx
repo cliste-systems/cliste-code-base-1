@@ -13,7 +13,7 @@ export default function SettingsLayout({
   return (
     <div className={DASHBOARD_VIEWPORT_LAYOUT}>
       <div
-        className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "gap-2")}
+        className={cn(DASHBOARD_PAGE_SHELL_FILL_WHITE, "gap-2 overflow-hidden")}
         data-dashboard-fill
       >
         <div className={DASHBOARD_HOME_CONTENT_COLUMN}>{children}</div>
