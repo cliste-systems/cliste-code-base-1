@@ -166,7 +166,11 @@ const RETAIL_PACK: VerticalPack = {
   customerNoun: { singular: "customer", plural: "customers" },
   locationNoun: "Store",
   nav: {
-    hiddenHrefs: [DASHBOARD_ROUTES.contacts, DASHBOARD_ROUTES.routing],
+    hiddenHrefs: [
+      DASHBOARD_ROUTES.contacts,
+      DASHBOARD_ROUTES.routing,
+      DASHBOARD_ROUTES.caraTraining,
+    ],
   },
   capabilities: RETAIL_CAPABILITIES,
   onboarding: {
