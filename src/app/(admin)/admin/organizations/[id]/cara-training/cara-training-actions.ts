@@ -168,15 +168,53 @@ export async function loadCaraTrainingData(
   if (!UUID_RE.test(organizationId)) return null;
   const admin = await adminClient();
 
-  const { data: org } = await admin
+  const ORG_SELECT_FULL =
+    "id, name, greeting, custom_prompt, prompt_compile_warnings, assistant_display_name, agent_voice_id, agent_business_type, business_knowledge_summary, agent_extra_notes, agent_location_address, agent_location_eircode, agent_location_county, agent_base_town, agent_services_not_offered, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, quote_prices_on_calls, block_anonymous_callers, business_hours, call_routing_mode, agent_details_to_collect, agent_details_collect_mode, admin_notes";
+  const ORG_SELECT_LEGACY = ORG_SELECT_FULL.replace(", admin_notes", "");
+
+  let orgResult = await admin
     .from("organizations")
-    .select(
-      "id, name, greeting, custom_prompt, prompt_compile_warnings, assistant_display_name, agent_voice_id, agent_business_type, business_knowledge_summary, agent_extra_notes, agent_location_address, agent_location_eircode, agent_location_county, agent_base_town, agent_services_not_offered, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, quote_prices_on_calls, block_anonymous_callers, business_hours, call_routing_mode, agent_details_to_collect, agent_details_collect_mode, admin_notes",
-    )
+    .select(ORG_SELECT_FULL)
     .eq("id", organizationId)
     .maybeSingle();
 
+  if (orgResult.error?.message && /admin_notes|schema cache|column/i.test(orgResult.error.message)) {
+    orgResult = await admin
+      .from("organizations")
+      .select(ORG_SELECT_LEGACY)
+      .eq("id", organizationId)
+      .maybeSingle();
+  }
+
+  const org = orgResult.data;
+  if (orgResult.error && !org?.id) return null;
   if (!org?.id) return null;
+
+  const gapsWithKind = await admin
+    .from("cara_training_items")
+    .select(
+      "id, gap_kind, gap_summary, cara_question, occurrence_count, last_seen_at, status",
+    )
+    .eq("organization_id", organizationId)
+    .in("status", ["awaiting_answer", "draft_ready"])
+    .order("occurrence_count", { ascending: false })
+    .order("last_seen_at", { ascending: false })
+    .limit(50);
+
+  const gapsResult =
+    gapsWithKind.error &&
+    /gap_kind|schema cache|column/i.test(gapsWithKind.error.message)
+      ? await admin
+          .from("cara_training_items")
+          .select(
+            "id, gap_summary, cara_question, occurrence_count, last_seen_at, status",
+          )
+          .eq("organization_id", organizationId)
+          .in("status", ["awaiting_answer", "draft_ready"])
+          .order("occurrence_count", { ascending: false })
+          .order("last_seen_at", { ascending: false })
+          .limit(50)
+      : gapsWithKind;
 
   const [
     departments,
@@ -184,7 +222,6 @@ export async function loadCaraTrainingData(
     phoneSystem,
     hoursOverrides,
     voices,
-    gapsResult,
   ] = await Promise.all([
     loadStoreDepartments(admin, organizationId),
     admin
@@ -195,16 +232,6 @@ export async function loadCaraTrainingData(
     loadStorePhoneSystem(admin, organizationId),
     loadBusinessHoursOverrides(admin, organizationId),
     listElevenLabsVoices(),
-    admin
-      .from("cara_training_items")
-      .select(
-        "id, gap_kind, gap_summary, cara_question, occurrence_count, last_seen_at, status",
-      )
-      .eq("organization_id", organizationId)
-      .in("status", ["awaiting_answer", "draft_ready"])
-      .order("occurrence_count", { ascending: false })
-      .order("last_seen_at", { ascending: false })
-      .limit(50),
   ]);
 
   const callRoutingMode = parseCallRoutingMode(org.call_routing_mode);

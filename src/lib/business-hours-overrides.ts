@@ -15,6 +15,16 @@ export type BusinessHoursOverrideRow = {
   created_at: string;
 };
 
+function isSchemaCacheError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("schema cache") ||
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("relation")
+  );
+}
+
 export async function loadActiveBusinessHoursOverride(
   supabase: SupabaseClient,
   organizationId: string,
@@ -46,12 +56,17 @@ export async function loadBusinessHoursOverrides(
   organizationId: string,
 ): Promise<BusinessHoursOverrideRow[]> {
   const now = new Date().toISOString();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("business_hours_overrides")
     .select("id, organization_id, label, schedule, expires_at, created_at")
     .eq("organization_id", organizationId)
     .gt("expires_at", now)
     .order("expires_at", { ascending: true });
+
+  if (error) {
+    if (isSchemaCacheError(error.message)) return [];
+    throw new Error(error.message);
+  }
 
   return (data ?? []).map((row) => {
     const { schedule } = parseBusinessHoursBundle(row.schedule);
