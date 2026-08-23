@@ -11,6 +11,7 @@ import { AdminSegmentedTabs } from "@/components/admin/admin-segmented-tabs";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { AdminStatsGrid } from "@/components/admin/admin-stats-grid";
 import {
+  adminTableBodyClass,
   adminTableClass,
   adminTableEmptyClass,
   adminTableHeadClass,
@@ -285,7 +286,7 @@ function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
           <th className={adminTableThWidth("w-[22%]")}>IP</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
+      <tbody className={adminTableBodyClass}>
         {rows.length === 0 ? (
           <tr>
             <td colSpan={5} className={adminTableEmptyClass}>
@@ -356,7 +357,7 @@ function ComplianceTable({
           <th className={adminTableThWidth("w-[46%]")}>Details</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
+      <tbody className={adminTableBodyClass}>
         {rows.length === 0 ? (
           <tr>
             <td colSpan={4} className={adminTableEmptyClass}>
@@ -414,7 +415,7 @@ function PipelineTable({
           <th className={adminTableThWidth("w-[56%]")}>Error</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
+      <tbody className={adminTableBodyClass}>
         {rows.length === 0 ? (
           <tr>
             <td colSpan={4} className={adminTableEmptyClass}>

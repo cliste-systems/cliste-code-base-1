@@ -5,6 +5,7 @@ import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { AdminStatsGrid } from "@/components/admin/admin-stats-grid";
 import {
+  adminTableBodyClass,
   adminTableClass,
   adminTableEmptyClass,
   adminTableHeadClass,
@@ -110,7 +111,7 @@ export default async function PhonePoolAdminPage() {
               <th className={adminTableThWidth("w-[16%]")}>Since</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 text-gray-700">
+          <tbody className={adminTableBodyClass}>
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className={adminTableEmptyClass}>

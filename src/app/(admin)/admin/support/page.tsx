@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/admin-page-shell";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import {
+  adminTableBodyClass,
   adminTableClass,
   adminTableEmptyClass,
   adminTableHeadClass,
@@ -143,7 +144,7 @@ export default async function AdminSupportPage() {
                 <th className={adminTableThActionsClass}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className={adminTableBodyClass}>
               {tickets.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={adminTableEmptyClass}>
@@ -177,7 +178,7 @@ export default async function AdminSupportPage() {
                     >
                       {messagePreview(t.body)}
                     </td>
-                    <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                    <td className={adminTableTdClass}>
                       <AdminBadge className="capitalize">{t.status}</AdminBadge>
                     </td>
                     <td

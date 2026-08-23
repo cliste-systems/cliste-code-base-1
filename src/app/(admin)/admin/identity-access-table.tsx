@@ -6,6 +6,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
 import {
+  adminTableBodyClass,
   adminTableClass,
   adminTableEmptyClass,
   adminTableHeadClass,
@@ -63,7 +64,7 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
           <th className={adminTableThActionsClass}>Actions</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
+      <tbody className={adminTableBodyClass}>
         {rows.length === 0 ? (
           <tr>
             <td colSpan={7} className={adminTableEmptyClass}>
@@ -94,16 +95,18 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
                   </span>
                 )}
               </td>
-              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
-                <AdminBadge className="capitalize">{row.status}</AdminBadge>
+              <td className={adminTableTdClass}>
+                <AdminBadge variant="plain" className="capitalize">
+                  {row.status}
+                </AdminBadge>
               </td>
-              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
-                <AdminBadge>
+              <td className={adminTableTdClass}>
+                <AdminBadge variant="plain">
                   {row.passwordStatus === "must_set" ? "Must set" : "Set"}
                 </AdminBadge>
               </td>
-              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
-                <AdminBadge>
+              <td className={adminTableTdClass}>
+                <AdminBadge variant="plain">
                   {row.adminConsoleAccess
                     ? row.adminConsoleLocked
                       ? "Owner allowlist"

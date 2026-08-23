@@ -34,7 +34,7 @@ export function AdminListCard({
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
     >
       <header className="flex min-w-0 shrink-0 flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="shrink-0 text-sm text-gray-500">{countLabel}</p>
+        <p className="shrink-0 text-sm font-medium text-gray-700">{countLabel}</p>
         {toolbar ? (
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             {toolbar}

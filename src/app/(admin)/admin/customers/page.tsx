@@ -2,21 +2,22 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Users } from "lucide-react";
 
-import { AdminBadge } from "@/components/admin/admin-badge";
-import {
-  AdminListCard,
-} from "@/components/admin/admin-list-card";
+import { AdminBadge, adminTableMutedClass } from "@/components/admin/admin-badge";
+import { AdminListCard } from "@/components/admin/admin-list-card";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminSegmentedTabs } from "@/components/admin/admin-segmented-tabs";
 import {
+  adminTableBodyClass,
   adminTableClass,
   adminTableEmptyClass,
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
+  adminTableTdDateClass,
   adminTableTdTruncateClass,
   adminTableThActionsClass,
   adminTableThWidth,
+  adminTableThWidthRight,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import {
@@ -125,16 +126,16 @@ export default async function AdminCustomersPage({
           <table className={adminTableClass}>
             <thead className={adminTableHeadClass}>
               <tr>
-                <th className={adminTableThWidth("w-[24%]")}>Customer</th>
+                <th className={adminTableThWidth("w-[28%]")}>Customer</th>
                 <th className={adminTableThWidth("w-[10%]")}>Type</th>
-                <th className={adminTableThWidth("w-[12%]")}>Niche</th>
-                <th className={adminTableThWidth("w-[14%]")}>Status</th>
-                <th className={adminTableThWidth("w-[18%]")}>Owner</th>
-                <th className={adminTableThWidth("w-[13%]")}>Created</th>
+                <th className={adminTableThWidth("w-[11%]")}>Niche</th>
+                <th className={adminTableThWidth("w-[15%]")}>Status</th>
+                <th className={adminTableThWidth("w-[22%]")}>Owner</th>
+                <th className={adminTableThWidthRight("w-[12%]")}>Created</th>
                 <th className={adminTableThActionsClass}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className={adminTableBodyClass}>
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className={adminTableEmptyClass}>
@@ -148,32 +149,27 @@ export default async function AdminCustomersPage({
                     <td className={adminTableTdTruncateClass}>
                       <Link
                         href={`/admin/customers/${row.orgId}`}
-                        className="block min-w-0"
-                        title={row.name}
+                        className="block min-w-0 truncate font-medium text-gray-900 hover:underline"
+                        title={`${row.name}${row.slug ? `\n${row.slug}` : ""}`}
                       >
-                        <span className="block truncate text-sm font-medium text-gray-900 hover:underline">
-                          {displayCustomerName(row.name)}
-                        </span>
-                        <span className="mt-0.5 block truncate font-mono text-[11px] text-gray-400">
-                          {row.slug}
-                        </span>
+                        {displayCustomerName(row.name)}
                       </Link>
                     </td>
-                    <td className={`whitespace-nowrap ${adminTableTdClass}`}>
-                      <AdminBadge>
+                    <td className={adminTableTdClass}>
+                      <AdminBadge variant="plain">
                         {clientProvisionSourceLabel(row.provisionSource)}
                       </AdminBadge>
                     </td>
-                    <td
-                      className={`whitespace-nowrap text-sm text-gray-600 ${adminTableTdClass}`}
-                    >
-                      {
-                        ORGANIZATION_NICHE_ADMIN_LABELS[
-                          parseOrganizationNiche(row.niche)
-                        ]
-                      }
+                    <td className={adminTableTdTruncateClass}>
+                      <span className={adminTableMutedClass}>
+                        {
+                          ORGANIZATION_NICHE_ADMIN_LABELS[
+                            parseOrganizationNiche(row.niche)
+                          ]
+                        }
+                      </span>
                     </td>
-                    <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                    <td className={adminTableTdClass}>
                       {row.provisionSource === "managed" &&
                       row.provisioningStage ? (
                         <TenantProvisioningStageChip
@@ -190,17 +186,17 @@ export default async function AdminCustomersPage({
                       )}
                     </td>
                     <td
-                      className={`truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      className={adminTableTdTruncateClass}
                       title={row.ownerEmail ?? undefined}
                     >
-                      {row.ownerEmail ?? ""}
+                      <span className={adminTableMutedClass}>
+                        {row.ownerEmail ?? "—"}
+                      </span>
                     </td>
-                    <td
-                      className={`whitespace-nowrap text-sm text-gray-500 tabular-nums ${adminTableTdClass}`}
-                    >
+                    <td className={adminTableTdDateClass}>
                       {formatDateShort(row.createdAt)}
                     </td>
-                    <td className={`whitespace-nowrap text-right ${adminTableTdClass}`}>
+                    <td className={`text-right ${adminTableTdClass}`}>
                       <TenantRowActions
                         organizationId={row.orgId}
                         organizationName={row.name}
