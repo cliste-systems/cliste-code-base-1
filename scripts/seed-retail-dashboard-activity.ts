@@ -1,12 +1,12 @@
 /**
- * Dev-only: fill Murphy's SuperValu /dashboard with realistic activity so every
- * home panel, chart, and hero metric has data.
+ * Dev-only: fill Murphy's SuperValu /dashboard with realistic retail activity.
  *
  *   npx tsx scripts/seed-retail-dashboard-activity.ts
  *   npx tsx scripts/seed-retail-dashboard-activity.ts --email shop@cliste.test
- *   npx tsx scripts/seed-retail-dashboard-activity.ts --org <uuid>
+ *   npx tsx scripts/seed-retail-dashboard-activity.ts --screenshot
  *
- * Rows are tagged [smoke test] / RT-TEST-* / +353555* for easy cleanup.
+ * Demo rows use RT-TEST-* call_sid and +353555* numbers (invisible cleanup markers).
+ * Re-run immediately before taking a dashboard screenshot (default range = Today, Dublin).
  */
 
 import { config } from "dotenv";
@@ -19,18 +19,21 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { createAdminClient } from "../src/utils/supabase/admin";
 
 const DUBLIN = "Europe/Dublin";
-const SMOKE_TAG = "[smoke test]";
+const DEMO_CONTEXT = "__demo__";
+const ORG_DISPLAY_NAME = "Murphy's SuperValu Killarney";
 const DEFAULT_OWNER_EMAIL = "shop@cliste.test";
 
-function parseArgs(): { email: string; orgId: string } {
+function parseArgs(): { email: string; orgId: string; screenshot: boolean } {
   const args = process.argv.slice(2);
   let email = DEFAULT_OWNER_EMAIL;
   let orgId = "";
+  let screenshot = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--email" && args[i + 1]) email = args[++i];
     if (args[i] === "--org" && args[i + 1]) orgId = args[++i];
+    if (args[i] === "--screenshot") screenshot = true;
   }
-  return { email, orgId };
+  return { email, orgId, screenshot };
 }
 
 type CallSeed = {
@@ -40,6 +43,9 @@ type CallSeed = {
   outcome: string;
   aiSummary: string;
   minutesAgo: number;
+  transferConnected?: boolean;
+  transferDepartment?: string;
+  transferTarget?: string;
 };
 
 type TicketSeed = {
@@ -58,7 +64,7 @@ type TrainingSeed = {
   minutesAgo: number;
 };
 
-function smokePhone(index: number): string {
+function demoPhone(index: number): string {
   return `+353555${String(index).padStart(6, "0")}`;
 }
 
@@ -135,52 +141,18 @@ async function findRetailOrgId(
   return { orgId, accountId, billingPeriodStart };
 }
 
-async function cleanupSmokeData(
+async function cleanupDemoData(
   admin: ReturnType<typeof createAdminClient>,
   orgId: string,
 ): Promise<void> {
-  const { data: smokeCalls } = await admin
-    .from("call_logs")
-    .select("id")
-    .eq("organization_id", orgId)
-    .or(
-      `call_sid.like.RT-TEST-%,caller_number.like.+353555%,ai_summary.ilike.%${SMOKE_TAG}%`,
-    );
-
-  const callIds = (smokeCalls ?? []).map((row) => row.id as string);
-  if (callIds.length > 0) {
-    await admin
-      .from("cara_training_items")
-      .delete()
-      .eq("organization_id", orgId)
-      .in("call_log_id", callIds);
-  }
-
-  await admin
-    .from("cara_training_items")
-    .delete()
-    .eq("organization_id", orgId)
-    .ilike("gap_summary", `%${SMOKE_TAG}%`);
-
+  await admin.from("cara_training_items").delete().eq("organization_id", orgId);
+  await admin.from("action_tickets").delete().eq("organization_id", orgId);
   await admin
     .from("usage_records")
     .delete()
     .eq("organization_id", orgId)
     .like("call_sid", "RT-TEST-%");
-
-  await admin
-    .from("action_tickets")
-    .delete()
-    .eq("organization_id", orgId)
-    .ilike("summary", `%${SMOKE_TAG}%`);
-
-  await admin
-    .from("call_logs")
-    .delete()
-    .eq("organization_id", orgId)
-    .or(
-      `call_sid.like.RT-TEST-%,caller_number.like.+353555%,ai_summary.ilike.%${SMOKE_TAG}%`,
-    );
+  await admin.from("call_logs").delete().eq("organization_id", orgId);
 }
 
 async function ensurePhoneNumber(
@@ -227,109 +199,142 @@ async function ensurePhoneNumber(
   console.log(`  Assigned Cliste number ${row.e164}`);
 }
 
+async function renameDemoOrg(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  accountId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+  await admin
+    .from("organizations")
+    .update({ name: ORG_DISPLAY_NAME, updated_at: now })
+    .eq("id", orgId);
+  await admin
+    .from("accounts")
+    .update({ name: ORG_DISPLAY_NAME, updated_at: now })
+    .eq("id", accountId);
+}
+
 const CALLS: CallSeed[] = [
-  { callerNumber: smokePhone(1), callerName: "Siobhán Kelly", durationSeconds: 95, outcome: "answered", aiSummary: `${SMOKE_TAG} Asked about Sunday opening hours`, minutesAgo: 4 },
-  { callerNumber: smokePhone(2), callerName: "Tom O'Brien", durationSeconds: 110, outcome: "answered", aiSummary: `${SMOKE_TAG} Deli counter location`, minutesAgo: 8 },
-  { callerNumber: smokePhone(3), callerName: "Mary Walsh", durationSeconds: 88, outcome: "answered", aiSummary: `${SMOKE_TAG} Click and collect process`, minutesAgo: 12 },
-  { callerNumber: smokePhone(4), callerName: "James Lynch", durationSeconds: 102, outcome: "answered", aiSummary: `${SMOKE_TAG} Butcher counter hours`, minutesAgo: 18 },
-  { callerNumber: smokePhone(5), callerName: "Niamh O'Sullivan", durationSeconds: 76, outcome: "answered", aiSummary: `${SMOKE_TAG} Parking near Main Street`, minutesAgo: 22 },
-  { callerNumber: smokePhone(6), callerName: "Patrick Doyle", durationSeconds: 90, outcome: "answered", aiSummary: `${SMOKE_TAG} Bakery bread availability`, minutesAgo: 28 },
-  { callerNumber: smokePhone(7), callerName: "Aoife Byrne", durationSeconds: 85, outcome: "answered", aiSummary: `${SMOKE_TAG} Off-licence opening times`, minutesAgo: 35 },
-  { callerNumber: smokePhone(8), callerName: "Conor Murphy", durationSeconds: 92, outcome: "answered", aiSummary: `${SMOKE_TAG} Customer service desk location`, minutesAgo: 42 },
-  { callerNumber: smokePhone(9), callerName: "Emma Walsh", durationSeconds: 98, outcome: "answered", aiSummary: `${SMOKE_TAG} Gift voucher enquiry`, minutesAgo: 55 },
-  { callerNumber: smokePhone(10), callerName: "Liam O'Connor", durationSeconds: 87, outcome: "answered", aiSummary: `${SMOKE_TAG} Home delivery options`, minutesAgo: 68 },
-  { callerNumber: smokePhone(11), callerName: "Sarah Ryan", durationSeconds: 94, outcome: "answered", aiSummary: `${SMOKE_TAG} SuperValu loyalty card`, minutesAgo: 82 },
-  { callerNumber: smokePhone(12), callerName: "David Keane", durationSeconds: 80, outcome: "answered", aiSummary: `${SMOKE_TAG} ATM in store`, minutesAgo: 96 },
-  { callerNumber: smokePhone(13), callerName: "Kate O'Neill", durationSeconds: 105, outcome: "link_sent", aiSummary: `${SMOKE_TAG} Sent store link via SMS for product enquiry`, minutesAgo: 14 },
-  { callerNumber: smokePhone(14), callerName: "Brian O'Sullivan", durationSeconds: 98, outcome: "link_sent", aiSummary: `${SMOKE_TAG} Texted click and collect info link via SMS`, minutesAgo: 26 },
-  { callerNumber: smokePhone(15), callerName: "Fiona McCarthy", durationSeconds: 112, outcome: "link_sent", aiSummary: `${SMOKE_TAG} Sent directions link via SMS`, minutesAgo: 38 },
-  { callerNumber: smokePhone(16), callerName: "Sean O'Malley", durationSeconds: 120, outcome: "action_created", aiSummary: `${SMOKE_TAG} Caller interested in bulk order — follow-up needed`, minutesAgo: 16 },
-  { callerNumber: smokePhone(17), callerName: "Rita O'Donnell", durationSeconds: 115, outcome: "callback_requested", aiSummary: `${SMOKE_TAG} Caller wants callback about special order`, minutesAgo: 20 },
-  { callerNumber: smokePhone(18), callerName: "Unknown", durationSeconds: 15, outcome: "failed", aiSummary: `${SMOKE_TAG} Missed call — no answer`, minutesAgo: 6 },
-  { callerNumber: smokePhone(19), callerName: "Unknown", durationSeconds: 8, outcome: "voicemail_or_no_speech", aiSummary: `${SMOKE_TAG} Voicemail left`, minutesAgo: 10 },
-  { callerNumber: smokePhone(20), callerName: "Unhappy Customer", durationSeconds: 130, outcome: "answered", aiSummary: `${SMOKE_TAG} Complaint about refund on damaged goods`, minutesAgo: 24 },
-  { callerNumber: smokePhone(21), callerName: "Mairead Flynn", durationSeconds: 91, outcome: "answered", aiSummary: `${SMOKE_TAG} Fresh fish counter today`, minutesAgo: 120 },
-  { callerNumber: smokePhone(22), callerName: "Declan Healy", durationSeconds: 86, outcome: "answered", aiSummary: `${SMOKE_TAG} Wheelchair access at entrance`, minutesAgo: 150 },
-  { callerNumber: smokePhone(23), callerName: "Orla McNamara", durationSeconds: 99, outcome: "answered", aiSummary: `${SMOKE_TAG} EV charging nearby`, minutesAgo: 180 },
-  { callerNumber: smokePhone(24), callerName: "Paul Brennan", durationSeconds: 103, outcome: "link_sent", aiSummary: `${SMOKE_TAG} Sent weekly offers link via SMS`, minutesAgo: 210 },
-  { callerNumber: smokePhone(25), callerName: "Ciara Dunne", durationSeconds: 88, outcome: "answered", aiSummary: `${SMOKE_TAG} Pharmacy opening hours`, minutesAgo: 240 },
-  { callerNumber: smokePhone(26), callerName: "Eoin Fitzgerald", durationSeconds: 95, outcome: "answered", aiSummary: `${SMOKE_TAG} Lottery counter location`, minutesAgo: 300 },
-  { callerNumber: smokePhone(27), callerName: "Grainne O'Reilly", durationSeconds: 92, outcome: "answered", aiSummary: `${SMOKE_TAG} Pet food aisle`, minutesAgo: 360 },
-  { callerNumber: smokePhone(28), callerName: "Barry Nolan", durationSeconds: 84, outcome: "answered", aiSummary: `${SMOKE_TAG} Trolley deposit refund`, minutesAgo: 420 },
-  { callerNumber: smokePhone(29), callerName: "Helen Crowley", durationSeconds: 97, outcome: "callback_requested", aiSummary: `${SMOKE_TAG} Callback about party catering`, minutesAgo: 480 },
-  { callerNumber: smokePhone(30), callerName: "Mark Sullivan", durationSeconds: 108, outcome: "action_created", aiSummary: `${SMOKE_TAG} Corporate hamper enquiry captured`, minutesAgo: 540 },
+  { callerNumber: demoPhone(1), callerName: "Siobhán Kelly", durationSeconds: 95, outcome: "answered", aiSummary: "Asked about Real Rewards points balance and how to register a new card", minutesAgo: 5 },
+  { callerNumber: demoPhone(2), callerName: "Tom O'Brien", durationSeconds: 110, outcome: "answered", aiSummary: "Asked where the deli counter is and Sunday opening hours", minutesAgo: 9 },
+  { callerNumber: demoPhone(3), callerName: "Mary Walsh", durationSeconds: 88, outcome: "answered", aiSummary: "Asked about Click & Collect collection times for a grocery order", minutesAgo: 14 },
+  { callerNumber: demoPhone(4), callerName: "James Lynch", durationSeconds: 102, outcome: "transferred", aiSummary: "Wanted to speak to the butcher about a Sunday lamb roast — transferred to Butcher", minutesAgo: 17, transferConnected: true, transferDepartment: "Butcher", transferTarget: "+35364123001" },
+  { callerNumber: demoPhone(5), callerName: "Niamh O'Sullivan", durationSeconds: 76, outcome: "answered", aiSummary: "Asked about parking on Main Street and trolley deposit refund", minutesAgo: 21 },
+  { callerNumber: demoPhone(6), callerName: "Patrick Doyle", durationSeconds: 90, outcome: "answered", aiSummary: "Asked if the bakery has fresh soda bread this morning", minutesAgo: 28 },
+  { callerNumber: demoPhone(7), callerName: "Aoife Byrne", durationSeconds: 85, outcome: "answered", aiSummary: "Asked about off-licence wine offers for the weekend", minutesAgo: 33 },
+  { callerNumber: demoPhone(8), callerName: "Conor Murphy", durationSeconds: 92, outcome: "transferred", aiSummary: "Asked for Customer Service about a Real Rewards voucher — transferred", minutesAgo: 38, transferConnected: true, transferDepartment: "Customer Service", transferTarget: "+35364123003" },
+  { callerNumber: demoPhone(9), callerName: "Emma Walsh", durationSeconds: 98, outcome: "answered", aiSummary: "Asked about SuperValu gift vouchers for a staff prize draw", minutesAgo: 44 },
+  { callerNumber: demoPhone(10), callerName: "Liam O'Connor", durationSeconds: 87, outcome: "answered", aiSummary: "Asked about home delivery slots for Killarney town", minutesAgo: 52 },
+  { callerNumber: demoPhone(11), callerName: "Sarah Ryan", durationSeconds: 94, outcome: "link_sent", aiSummary: "Sent weekly offers link via SMS for Real Rewards app download", minutesAgo: 16 },
+  { callerNumber: demoPhone(12), callerName: "David Keane", durationSeconds: 80, outcome: "link_sent", aiSummary: "Texted Click & Collect booking link via SMS", minutesAgo: 27 },
+  { callerNumber: demoPhone(13), callerName: "Kate O'Neill", durationSeconds: 105, outcome: "link_sent", aiSummary: "Sent store directions link via SMS for a visitor from Tralee", minutesAgo: 39 },
+  { callerNumber: demoPhone(14), callerName: "Fiona McCarthy", durationSeconds: 112, outcome: "link_sent", aiSummary: "Sent Christmas hamper brochure link via SMS", minutesAgo: 58 },
+  { callerNumber: demoPhone(15), callerName: "Sean O'Malley", durationSeconds: 120, outcome: "action_created", aiSummary: "Caller interested in bulk catering for a GAA club dinner — follow-up needed", minutesAgo: 19 },
+  { callerNumber: demoPhone(16), callerName: "Rita O'Donnell", durationSeconds: 115, outcome: "callback_requested", aiSummary: "Caller wants a callback about gluten-free bread availability in bakery", minutesAgo: 23 },
+  { callerNumber: demoPhone(17), callerName: "Helen Crowley", durationSeconds: 97, outcome: "callback_requested", aiSummary: "Callback requested about party catering platter for 40 people", minutesAgo: 48 },
+  { callerNumber: demoPhone(18), callerName: "Unknown", durationSeconds: 15, outcome: "failed", aiSummary: "Missed call — rang out before Cara answered", minutesAgo: 7 },
+  { callerNumber: demoPhone(19), callerName: "Unknown", durationSeconds: 8, outcome: "voicemail_or_no_speech", aiSummary: "Caller hung up after greeting — no speech detected", minutesAgo: 11 },
+  { callerNumber: demoPhone(20), callerName: "Margaret Hayes", durationSeconds: 130, outcome: "answered", aiSummary: "Complaint about a refund on damaged packaging — unhappy with previous visit", minutesAgo: 31 },
+  { callerNumber: demoPhone(21), callerName: "Declan Healy", durationSeconds: 86, outcome: "answered", aiSummary: "Asked about wheelchair access at the Main Street entrance", minutesAgo: 72 },
+  { callerNumber: demoPhone(22), callerName: "Orla McNamara", durationSeconds: 99, outcome: "answered", aiSummary: "Asked if there is EV charging in the car park behind the store", minutesAgo: 95 },
+  { callerNumber: demoPhone(23), callerName: "Paul Brennan", durationSeconds: 103, outcome: "transferred", aiSummary: "Wanted the deli for a party platter quote — transferred to Deli", minutesAgo: 108, transferConnected: true, transferDepartment: "Deli", transferTarget: "+35364123000" },
+  { callerNumber: demoPhone(24), callerName: "Ciara Dunne", durationSeconds: 88, outcome: "answered", aiSummary: "Asked about ATM location inside the store", minutesAgo: 125 },
+  { callerNumber: demoPhone(25), callerName: "Eoin Fitzgerald", durationSeconds: 95, outcome: "answered", aiSummary: "Asked where the National Lottery counter is", minutesAgo: 145 },
+  { callerNumber: demoPhone(26), callerName: "Grainne O'Reilly", durationSeconds: 92, outcome: "answered", aiSummary: "Asked which aisle stocks premium dog food", minutesAgo: 168 },
+  { callerNumber: demoPhone(27), callerName: "Barry Nolan", durationSeconds: 84, outcome: "answered", aiSummary: "Asked about bank holiday opening hours for August", minutesAgo: 195 },
+  { callerNumber: demoPhone(28), callerName: "Mark Sullivan", durationSeconds: 108, outcome: "action_created", aiSummary: "Corporate hamper enquiry for a hotel welcome packs — message captured", minutesAgo: 220 },
+  { callerNumber: demoPhone(29), callerName: "Mairead Flynn", durationSeconds: 91, outcome: "answered", aiSummary: "Asked if the fish counter has fresh salmon today", minutesAgo: 260 },
+  { callerNumber: demoPhone(30), callerName: "Blocked Caller", durationSeconds: 0, outcome: "blocked", aiSummary: "Withheld caller ID — blocked per store policy", minutesAgo: 13 },
+  { callerNumber: demoPhone(31), callerName: "Unknown", durationSeconds: 22, outcome: "spam_or_abuse", aiSummary: "Abusive language after opening — call ended", minutesAgo: 35 },
+  { callerNumber: demoPhone(32), callerName: "Una Fitzgerald", durationSeconds: 118, outcome: "transferred", aiSummary: "Asked for manager about a delivery complaint — transfer to Customer Service failed", minutesAgo: 42, transferConnected: false, transferDepartment: "Customer Service", transferTarget: "+35364123003" },
+  { callerNumber: demoPhone(33), callerName: "Peter Costello", durationSeconds: 105, outcome: "answered", aiSummary: "Refund query on a Real Rewards promotion — disappointed with outcome", minutesAgo: 56 },
 ];
 
 const TICKETS: TicketSeed[] = [
-  { callerNumber: smokePhone(1), callerName: "Siobhán Kelly", summary: `${SMOKE_TAG} Pricing question — how much is the family deli platter?`, status: "open", minutesAgo: 11 },
-  { callerNumber: smokePhone(17), callerName: "Rita O'Donnell", summary: `${SMOKE_TAG} Callback request — ring back about gluten-free bread stock`, status: "open", minutesAgo: 19 },
-  { callerNumber: smokePhone(16), callerName: "Sean O'Malley", summary: `${SMOKE_TAG} New customer interested in bulk catering order`, status: "open", minutesAgo: 15 },
-  { callerNumber: smokePhone(13), callerName: "Kate O'Neill", summary: `${SMOKE_TAG} General enquiry — do ye deliver to Killarney town?`, status: "open", minutesAgo: 13 },
-  { callerNumber: smokePhone(29), callerName: "Helen Crowley", summary: `${SMOKE_TAG} Callback needed — party catering for 40 people`, status: "open", minutesAgo: 45 },
-  { callerNumber: smokePhone(3), callerName: "Mary Walsh", summary: `${SMOKE_TAG} Pricing question — cost of party sandwich platter`, status: "resolved", minutesAgo: 60 },
-  { callerNumber: smokePhone(4), callerName: "James Lynch", summary: `${SMOKE_TAG} Callback needed — butcher to confirm lamb availability`, status: "resolved", minutesAgo: 75 },
-  { callerNumber: smokePhone(5), callerName: "Niamh O'Sullivan", summary: `${SMOKE_TAG} New enquiry — interested in weekly grocery delivery`, status: "resolved", minutesAgo: 90 },
-  { callerNumber: smokePhone(6), callerName: "Patrick Doyle", summary: `${SMOKE_TAG} General enquiry — bank holiday opening hours`, status: "resolved", minutesAgo: 105 },
-  { callerNumber: smokePhone(7), callerName: "Aoife Byrne", summary: `${SMOKE_TAG} Pricing question — how much for a birthday cake order`, status: "resolved", minutesAgo: 120 },
-  { callerNumber: smokePhone(8), callerName: "Conor Murphy", summary: `${SMOKE_TAG} Callback request — call me back about off-licence wine list`, status: "resolved", minutesAgo: 135 },
-  { callerNumber: smokePhone(9), callerName: "Emma Walsh", summary: `${SMOKE_TAG} Product enquiry — do ye stock organic milk?`, status: "resolved", minutesAgo: 150 },
-  { callerNumber: smokePhone(10), callerName: "Liam O'Connor", summary: `${SMOKE_TAG} General enquiry — lost loyalty card replacement`, status: "resolved", minutesAgo: 165 },
-  { callerNumber: smokePhone(11), callerName: "Sarah Ryan", summary: `${SMOKE_TAG} Pricing question — estimate for corporate hamper`, status: "resolved", minutesAgo: 180 },
-  { callerNumber: smokePhone(12), callerName: "David Keane", summary: `${SMOKE_TAG} New enquiry — potential supplier for local honey`, status: "resolved", minutesAgo: 195 },
-  { callerNumber: smokePhone(30), callerName: "Mark Sullivan", summary: `${SMOKE_TAG} Product enquiry — interested in wine tasting event`, status: "resolved", minutesAgo: 210 },
+  { callerNumber: demoPhone(1), callerName: "Siobhán Kelly", summary: "Pricing question — how much is the large family deli platter?", status: "open", minutesAgo: 12 },
+  { callerNumber: demoPhone(16), callerName: "Rita O'Donnell", summary: "Callback request — ring back about gluten-free sourdough in the bakery", status: "open", minutesAgo: 20 },
+  { callerNumber: demoPhone(15), callerName: "Sean O'Malley", summary: "New customer interested in bulk catering for a GAA club dinner", status: "open", minutesAgo: 18 },
+  { callerNumber: demoPhone(10), callerName: "Liam O'Connor", summary: "General enquiry — do ye deliver to Killarney town centre?", status: "open", minutesAgo: 15 },
+  { callerNumber: demoPhone(17), callerName: "Helen Crowley", summary: "Callback needed — party catering platter for 40 people next Saturday", status: "open", minutesAgo: 46 },
+  { callerNumber: demoPhone(3), callerName: "Mary Walsh", summary: "Pricing question — cost of a party sandwich platter from the deli", status: "resolved", minutesAgo: 62 },
+  { callerNumber: demoPhone(4), callerName: "James Lynch", summary: "Callback needed — butcher to confirm lamb roast availability for Sunday", status: "resolved", minutesAgo: 78 },
+  { callerNumber: demoPhone(5), callerName: "Niamh O'Sullivan", summary: "New enquiry — interested in weekly grocery delivery slots", status: "resolved", minutesAgo: 92 },
+  { callerNumber: demoPhone(6), callerName: "Patrick Doyle", summary: "General enquiry — bank holiday opening hours in August", status: "resolved", minutesAgo: 108 },
+  { callerNumber: demoPhone(7), callerName: "Aoife Byrne", summary: "Pricing question — how much for a birthday cake order from the bakery", status: "resolved", minutesAgo: 122 },
+  { callerNumber: demoPhone(8), callerName: "Conor Murphy", summary: "Callback request — call me back about the off-licence wine list", status: "resolved", minutesAgo: 138 },
+  { callerNumber: demoPhone(9), callerName: "Emma Walsh", summary: "Product enquiry — do ye stock organic oat milk?", status: "resolved", minutesAgo: 155 },
+  { callerNumber: demoPhone(11), callerName: "Sarah Ryan", summary: "General enquiry — lost Real Rewards card replacement", status: "resolved", minutesAgo: 172 },
+  { callerNumber: demoPhone(12), callerName: "David Keane", summary: "Pricing question — estimate for a corporate Christmas hamper", status: "resolved", minutesAgo: 188 },
+  { callerNumber: demoPhone(28), callerName: "Mark Sullivan", summary: "Product enquiry — interested in a wine tasting evening at the off-licence", status: "resolved", minutesAgo: 215 },
+  { callerNumber: demoPhone(29), callerName: "Mairead Flynn", summary: "General enquiry — fresh fish counter opening times", status: "resolved", minutesAgo: 255 },
 ];
 
 const TRAINING: TrainingSeed[] = [
   {
     status: "awaiting_answer",
-    gapSummary: `${SMOKE_TAG} Do ye sell gluten-free sourdough in the bakery?`,
-    caraQuestion: "A caller asked about gluten-free sourdough. What should I tell them?",
-    callerContext: "Caller asked if gluten-free sourdough is available daily",
-    minutesAgo: 45,
+    gapSummary: "Do ye take Real Rewards points at fuel partner stations?",
+    caraQuestion: "A caller asked if Real Rewards works at partner petrol stations. What should I tell them?",
+    callerContext: `${DEMO_CONTEXT} Asked about Circle K and Applegreen redemption`,
+    minutesAgo: 40,
   },
   {
     status: "awaiting_answer",
-    gapSummary: `${SMOKE_TAG} Can customers pre-order a turkey for Christmas?`,
-    caraQuestion: "A caller asked about Christmas turkey pre-orders. What should I tell them?",
-    callerContext: "Asked about deposit and collection dates",
-    minutesAgo: 120,
+    gapSummary: "Christmas turkey pre-order — deposit and collection dates?",
+    caraQuestion: "A caller asked about ordering a Christmas turkey. What should I tell them?",
+    callerContext: `${DEMO_CONTEXT} Asked about deposit and collection week`,
+    minutesAgo: 85,
   },
   {
     status: "draft_ready",
-    gapSummary: `${SMOKE_TAG} Student discount policy for local college`,
+    gapSummary: "Student discount with MTU Kerry student card",
     caraQuestion: "A caller asked about student discounts. What should I tell them?",
-    callerContext: "Caller mentioned MTU Kerry student card",
-    minutesAgo: 180,
+    callerContext: `${DEMO_CONTEXT} Caller mentioned MTU Kerry student card`,
+    minutesAgo: 130,
   },
   {
     status: "awaiting_answer",
-    gapSummary: `${SMOKE_TAG} Is there EV charging in the car park?`,
-    caraQuestion: "A caller asked about EV charging. What should I tell them?",
-    callerContext: "Asked if chargers are free for customers",
-    minutesAgo: 240,
+    gapSummary: "Is there EV charging in the car park?",
+    caraQuestion: "A caller asked about EV charging on site. What should I tell them?",
+    callerContext: `${DEMO_CONTEXT} Asked if chargers are free for shoppers`,
+    minutesAgo: 90,
   },
   {
     status: "awaiting_answer",
-    gapSummary: `${SMOKE_TAG} Do ye price-match Dunnes on branded goods?`,
-    caraQuestion: "A caller asked about price matching. What should I tell them?",
-    callerContext: "Caller quoted a competitor leaflet",
-    minutesAgo: 300,
+    gapSummary: "Can I pre-order a lamb roast from the butcher for Sunday?",
+    caraQuestion: "A caller asked about pre-ordering meat from the butcher. What should I tell them?",
+    callerContext: `${DEMO_CONTEXT} Sunday roast for six people`,
+    minutesAgo: 55,
+  },
+  {
+    status: "awaiting_answer",
+    gapSummary: "Do ye price-match Dunnes on branded groceries?",
+    caraQuestion: "A caller asked about price matching competitors. What should I tell them?",
+    callerContext: `${DEMO_CONTEXT} Caller quoted a Dunnes leaflet`,
+    minutesAgo: 175,
   },
 ];
 
 async function main() {
-  const { email, orgId: orgIdArg } = parseArgs();
+  const { email, orgId: orgIdArg, screenshot } = parseArgs();
   const admin = createAdminClient();
-  const { orgId, billingPeriodStart } = await findRetailOrgId(
+  const { orgId, accountId, billingPeriodStart } = await findRetailOrgId(
     admin,
     email,
     orgIdArg,
   );
 
+  if (screenshot) {
+    console.log("\n📸 Screenshot mode — run this immediately before capturing /dashboard.\n");
+  }
+
   console.log(`\nSeeding dashboard activity for org ${orgId}\n`);
 
-  console.log("Cleaning previous smoke-test rows…");
-  await cleanupSmokeData(admin, orgId);
+  console.log("Cleaning previous demo rows…");
+  await cleanupDemoData(admin, orgId);
+
+  console.log(`Renaming org to "${ORG_DISPLAY_NAME}"…`);
+  await renameDemoOrg(admin, orgId, accountId);
 
   console.log("Ensuring Cliste phone number…");
   await ensurePhoneNumber(admin, orgId);
@@ -347,6 +352,13 @@ async function main() {
     ai_summary: call.aiSummary,
     call_sid: `RT-TEST-${String(index + 1).padStart(4, "0")}`,
     created_at: minutesAgoIso(call.minutesAgo),
+    ...(call.outcome === "transferred"
+      ? {
+          transfer_connected: call.transferConnected ?? false,
+          transfer_department: call.transferDepartment ?? null,
+          transfer_target: call.transferTarget ?? null,
+        }
+      : {}),
   }));
 
   const { error: callsErr } = await admin.from("call_logs").insert(callRows);
@@ -382,14 +394,14 @@ async function main() {
     .insert(trainingRows);
   if (trainingErr) throw new Error(`cara_training_items: ${trainingErr.message}`);
 
-  console.log("Inserting usage records (~86 billable minutes)…");
+  console.log("Inserting usage records (~85 billable minutes)…");
   const usageRows = Array.from({ length: 34 }, (_, index) => {
     const startedAt = new Date(Date.now() - (index + 1) * 75 * 60_000);
     const endedAt = new Date(startedAt.getTime() + 150_000);
     return {
       organization_id: orgId,
       call_sid: `RT-TEST-USAGE-${String(index + 1).padStart(3, "0")}`,
-      caller_number: smokePhone(100 + index),
+      caller_number: demoPhone(100 + index),
       started_at: startedAt.toISOString(),
       ended_at: endedAt.toISOString(),
       minutes_billable: 2.5,
@@ -403,19 +415,23 @@ async function main() {
   if (usageErr) throw new Error(`usage_records: ${usageErr.message}`);
 
   const openTickets = TICKETS.filter((t) => t.status === "open").length;
-  const routedCalls = CALLS.filter((c) =>
-    ["link_sent", "callback_requested", "action_created"].includes(c.outcome),
-  ).length;
+  const transferred = CALLS.filter((c) => c.outcome === "transferred").length;
+  const connected = CALLS.filter((c) => c.outcome === "transferred" && c.transferConnected).length;
 
   console.log("\n✓ Dashboard activity seeded\n");
+  console.log(`  Org name:           ${ORG_DISPLAY_NAME}`);
   console.log(`  Calls today:        ${CALLS.length}`);
   console.log(`  Enquiries captured: ${TICKETS.length}`);
-  console.log(`  Info sent / routed: ${routedCalls}`);
+  console.log(`  Transfers:          ${transferred} (${connected} connected)`);
   console.log(`  Needs attention:    ${openTickets} open tickets`);
   console.log(`  Cara training:      ${TRAINING.length} items`);
-  console.log(`  Billable minutes:   ~86`);
-  console.log("\n  Refresh http://localhost:3001/dashboard (hard refresh if cached)\n");
-  console.log("  Cleanup: re-run this script (clears RT-TEST / +353555 / [smoke test] rows)\n");
+  console.log(`  Billable minutes:   ~85`);
+  console.log("\n  Log in shop@cliste.test → http://localhost:3001/dashboard");
+  console.log("  Hard refresh; use a wide viewport (≥1024px) for bottom charts.\n");
+  if (screenshot) {
+    console.log("  Screenshot tip: capture now while timestamps are fresh (Today view).\n");
+  }
+  console.log("  Cleanup: re-run this script (wipes demo org activity and re-seeds)\n");
 }
 
 main().catch((err) => {

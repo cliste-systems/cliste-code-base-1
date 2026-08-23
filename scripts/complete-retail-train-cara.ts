@@ -26,8 +26,7 @@ import {
 import { createAdminClient } from "../src/utils/supabase/admin";
 
 const DEFAULT_EMAIL = "shop@cliste.test";
-const SMOKE_NAME = "[smoke test] Murphy's SuperValu Killarney";
-const SMOKE_TAG = "[smoke test]";
+const ORG_DISPLAY_NAME = "Murphy's SuperValu Killarney";
 
 function retailWeekSchedule(): WeekSchedule {
   return {
@@ -111,7 +110,7 @@ async function main() {
   });
 
   const greeting = buildDefaultVoiceGreeting(
-    SMOKE_NAME.replace(SMOKE_TAG, "").trim(),
+    ORG_DISPLAY_NAME,
     VOICE_ASSISTANT_DEFAULT_NAME,
     "How can I help you today?",
   );
@@ -148,7 +147,7 @@ async function main() {
   const { error: orgErr } = await admin
     .from("organizations")
     .update({
-      name: SMOKE_NAME,
+      name: ORG_DISPLAY_NAME,
       agent_business_type: "Retail & Grocery — local supermarket",
       raw_business_description: businessDescription,
       business_knowledge_summary: knowledgeSummary,
@@ -178,7 +177,7 @@ async function main() {
     .from("accounts")
     .update({
       provision_source: "managed",
-      name: SMOKE_NAME,
+      name: ORG_DISPLAY_NAME,
       updated_at: now,
     })
     .eq("id", accountId);
@@ -222,7 +221,7 @@ async function main() {
     main_line_e164: mainLine,
     has_ddi_range: true,
     ddi_pattern: "64123xxx",
-    notes: `${SMOKE_TAG} QA seed — PBX with DDI range for transfer tests.`,
+    notes: "Avaya IP Office PBX with DDI range for department transfers.",
     updated_at: now,
   });
   if (phoneErr) throw new Error(phoneErr.message);
@@ -265,7 +264,7 @@ async function main() {
 
   console.log("\n✓ Retail Train Cara complete\n");
   console.log(`  Org ID:     ${organizationId}`);
-  console.log(`  Name:       ${SMOKE_NAME}`);
+  console.log(`  Name:       ${ORG_DISPLAY_NAME}`);
   console.log(`  Owner:      ${ownerEmail}`);
   console.log(`  Prompt:     ${String(orgAfter?.custom_prompt ?? "").length} chars`);
   console.log(`  Warnings:   ${warningCount}`);
