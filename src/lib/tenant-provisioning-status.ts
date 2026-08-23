@@ -1,8 +1,14 @@
+import {
+  adminCaraTrainingReadinessDetail,
+  type AdminCaraTrainingReadinessInput,
+} from "@/lib/admin-cara-training-readiness";
+
 export type TenantProvisioningStepId =
   | "invite_sent"
   | "invite_accepted"
   | "legal_acceptance"
   | "phone_assigned"
+  | "cara_trained"
   | "live";
 
 export type TenantProvisioningStage =
@@ -41,6 +47,12 @@ export type TenantProvisioningInput = {
   businessHours: unknown;
   agentServicesDepartments: unknown;
   agentFaqs: unknown;
+  agentVoiceId: string;
+  agentBusinessType: string;
+  businessKnowledgeSummary: string;
+  agentServicesNotOffered: string;
+  agentExtraNotes: string;
+  promptCompileWarnings: unknown;
   ownerUserId: string | null;
   ownerHasLegalAcceptances: boolean;
   inviteSentAt: string | null;
@@ -57,6 +69,7 @@ export const TENANT_PROVISIONING_STEP_ORDER: {
   { id: "invite_accepted", label: "Invite accepted" },
   { id: "legal_acceptance", label: "Legal acceptance" },
   { id: "phone_assigned", label: "Phone assigned" },
+  { id: "cara_trained", label: "Cara training" },
   { id: "live", label: "Live" },
 ];
 
@@ -78,6 +91,21 @@ export function buildTenantProvisioningStatus(
     poolE164 === orgPhone;
 
   const live = Boolean(input.caraOnlineSince);
+
+  const caraTrainingInput: AdminCaraTrainingReadinessInput = {
+    assistantDisplayName: input.assistantDisplayName,
+    agentVoiceId: input.agentVoiceId,
+    greeting: input.greeting,
+    agentBusinessType: input.agentBusinessType,
+    businessKnowledgeSummary: input.businessKnowledgeSummary,
+    agentServicesDepartments: input.agentServicesDepartments,
+    agentServicesNotOffered: input.agentServicesNotOffered,
+    agentExtraNotes: input.agentExtraNotes,
+    businessHours: input.businessHours,
+    customPrompt: input.customPrompt,
+    promptCompileWarnings: input.promptCompileWarnings,
+  };
+  const caraTraining = adminCaraTrainingReadinessDetail(caraTrainingInput);
 
   const steps: TenantProvisioningStep[] = TENANT_PROVISIONING_STEP_ORDER.map(
     ({ id, label }) => {
@@ -117,6 +145,13 @@ export function buildTenantProvisioningStatus(
             detail: phoneAssigned
               ? `Cliste number ${orgPhone} assigned.`
               : "Assign an Irish Cliste number.",
+          };
+        case "cara_trained":
+          return {
+            id,
+            label,
+            complete: caraTraining.complete,
+            detail: caraTraining.detail,
           };
         case "live":
           return {

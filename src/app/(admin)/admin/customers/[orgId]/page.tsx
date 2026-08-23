@@ -214,6 +214,9 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
   if (isRetail) {
     const provisioning = await loadOrganizationProvisioning(orgId);
     const phoneStep = provisioning?.steps.find((s) => s.id === "phone_assigned");
+    const caraTrainingStep = provisioning?.steps.find(
+      (s) => s.id === "cara_trained",
+    );
     const clisteNumber = org.phone_number as string | null;
 
     return (
@@ -232,7 +235,10 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
           phoneNumber={clisteNumber}
           phoneAssignedComplete={phoneStep?.complete}
         />
-        <CaraTrainingLinkCard organizationId={orgId} />
+        <CaraTrainingLinkCard
+          organizationId={orgId}
+          trainedComplete={caraTrainingStep?.complete}
+        />
         <GoLiveCard
           organizationId={orgId}
           isActive={org.is_active === true}

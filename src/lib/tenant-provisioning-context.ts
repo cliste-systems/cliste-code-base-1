@@ -19,6 +19,12 @@ export type TenantProvisioningOrgRow = {
   business_hours?: unknown;
   agent_services_departments?: unknown;
   agent_faqs?: unknown;
+  agent_voice_id?: string | null;
+  agent_business_type?: string | null;
+  business_knowledge_summary?: string | null;
+  agent_services_not_offered?: string | null;
+  agent_extra_notes?: string | null;
+  prompt_compile_warnings?: unknown;
   cara_online_since?: string | null;
 };
 
@@ -67,6 +73,12 @@ export function buildTenantProvisioningInput(params: {
     businessHours: params.org.business_hours ?? null,
     agentServicesDepartments: params.org.agent_services_departments ?? [],
     agentFaqs: params.org.agent_faqs ?? [],
+    agentVoiceId: String(params.org.agent_voice_id ?? ""),
+    agentBusinessType: String(params.org.agent_business_type ?? ""),
+    businessKnowledgeSummary: String(params.org.business_knowledge_summary ?? ""),
+    agentServicesNotOffered: String(params.org.agent_services_not_offered ?? ""),
+    agentExtraNotes: String(params.org.agent_extra_notes ?? ""),
+    promptCompileWarnings: params.org.prompt_compile_warnings ?? [],
     ownerUserId: params.owner?.user_id ?? null,
     ownerHasLegalAcceptances: params.owner?.hasLegalAcceptances ?? false,
     inviteSentAt: params.invite?.sent_at ?? null,

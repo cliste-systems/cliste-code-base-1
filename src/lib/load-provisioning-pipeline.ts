@@ -33,7 +33,7 @@ export async function loadProvisioningPipeline(): Promise<PipelineOrganization[]
   const { data: orgs } = await admin
     .from("organizations")
     .select(
-      "id, name, greeting, custom_prompt, assistant_display_name, phone_number, call_routing_mode, fallback_number, store_public_number, divert_carrier, business_hours, agent_services_departments, agent_faqs, cara_online_since, niche",
+      "id, name, greeting, custom_prompt, assistant_display_name, phone_number, call_routing_mode, fallback_number, store_public_number, divert_carrier, business_hours, agent_services_departments, agent_faqs, agent_voice_id, agent_business_type, business_knowledge_summary, agent_services_not_offered, agent_extra_notes, prompt_compile_warnings, cara_online_since, niche",
     )
     .in("id", orgIds);
 
@@ -129,7 +129,7 @@ export async function loadProvisioningStagesByOrgId(
   const { data: orgs } = await admin
     .from("organizations")
     .select(
-      "id, name, greeting, custom_prompt, assistant_display_name, phone_number, call_routing_mode, fallback_number, store_public_number, divert_carrier, business_hours, agent_services_departments, agent_faqs, cara_online_since",
+      "id, name, greeting, custom_prompt, assistant_display_name, phone_number, call_routing_mode, fallback_number, store_public_number, divert_carrier, business_hours, agent_services_departments, agent_faqs, agent_voice_id, agent_business_type, business_knowledge_summary, agent_services_not_offered, agent_extra_notes, prompt_compile_warnings, cara_online_since",
     )
     .in("id", ids);
 
@@ -187,7 +187,7 @@ export async function loadOrganizationProvisioning(
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, greeting, custom_prompt, assistant_display_name, phone_number, call_routing_mode, fallback_number, store_public_number, divert_carrier, business_hours, agent_services_departments, agent_faqs, cara_online_since",
+      "id, name, greeting, custom_prompt, assistant_display_name, phone_number, call_routing_mode, fallback_number, store_public_number, divert_carrier, business_hours, agent_services_departments, agent_faqs, agent_voice_id, agent_business_type, business_knowledge_summary, agent_services_not_offered, agent_extra_notes, prompt_compile_warnings, cara_online_since",
     )
     .eq("id", organizationId)
     .maybeSingle();
