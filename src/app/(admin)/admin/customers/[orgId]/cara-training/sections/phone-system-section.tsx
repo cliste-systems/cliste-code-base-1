@@ -82,7 +82,7 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="5. Phone system & transfer"
-      description="PBX setup and warm-transfer hardware status. transfer_verified_at is set only by verified worker events."
+      description="PBX setup and warm-transfer hardware status."
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
@@ -172,20 +172,6 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
           rows={2}
         />
       </div>
-      {ps.transfer_verified_at ? (
-        <p className="text-muted-foreground text-xs">
-          Transfer verified at {new Date(ps.transfer_verified_at).toLocaleString()}{" "}
-          (read-only)
-        </p>
-      ) : (
-        <p className="text-muted-foreground text-xs">
-          Transfer not yet verified by a live worker event.
-        </p>
-      )}
-      <p className="text-muted-foreground text-xs">
-        Call routing mode: <strong>{data.callRoutingMode}</strong> — change on the
-        customer detail page if needed.
-      </p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save phone system"}
