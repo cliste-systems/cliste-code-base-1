@@ -4,10 +4,9 @@ import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
   Clock3,
-  Inbox,
   LifeBuoy,
   Phone,
-  Ticket,
+  ShieldAlert,
 } from "lucide-react";
 
 import type { AnalyticsSegment } from "@/lib/dashboard-home-analytics";
@@ -127,11 +126,10 @@ export type AdminGlobalMetricsBoardProps = {
   periodLabel: string;
   periodRangeLabel: string;
   calls: number;
-  openInbox: number;
-  urgent: number;
+  pipelineIncidents: number;
+  authFailures: number;
   support: number;
   organizations: number;
-  ticketsCreated: number;
   minutesUsed: string;
   callOutcomes: AnalyticsSegment[];
   topTenants: { orgId: string; name: string; calls: number }[];
@@ -148,11 +146,10 @@ export function AdminGlobalMetricsBoard({
   periodLabel,
   periodRangeLabel,
   calls,
-  openInbox,
-  urgent,
+  pipelineIncidents,
+  authFailures,
   support,
   organizations,
-  ticketsCreated,
   minutesUsed,
   callOutcomes,
   topTenants,
@@ -190,7 +187,7 @@ export function AdminGlobalMetricsBoard({
           </Suspense>
         </div>
 
-        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-6 lg:divide-x lg:divide-y-0">
+        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5 lg:divide-x lg:divide-y-0">
           <HeadlineMetric
             label={`Calls · ${periodLabel.toLowerCase()}`}
             value={formatInt(calls)}
@@ -202,20 +199,18 @@ export function AdminGlobalMetricsBoard({
             icon={Clock3}
           />
           <HeadlineMetric
-            label={`Actions captured · ${periodLabel.toLowerCase()}`}
-            value={formatInt(ticketsCreated)}
-            icon={Ticket}
-          />
-          <HeadlineMetric
-            label="Open actions"
-            value={formatInt(openInbox)}
-            icon={Inbox}
-          />
-          <HeadlineMetric
-            label="Urgent actions"
-            value={formatInt(urgent)}
+            label="Pipeline · 7d"
+            value={formatInt(pipelineIncidents)}
             icon={AlertTriangle}
-            tone={urgent > 0 ? "urgent" : "default"}
+            href="/admin/security?view=pipeline"
+            tone={pipelineIncidents > 0 ? "urgent" : "default"}
+          />
+          <HeadlineMetric
+            label="Auth fails · 24h"
+            value={formatInt(authFailures)}
+            icon={ShieldAlert}
+            href="/admin/security"
+            tone={authFailures > 0 ? "urgent" : "default"}
           />
           <HeadlineMetric
             label="Open support"

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   adminGlobalMetricPeriodRangeLabel,
   adminGlobalMetricPeriodShortLabel,
@@ -17,15 +16,6 @@ import { AdminTenantsPanel } from "./admin-tenants-panel";
 import { loadProvisioningStagesByOrgId } from "@/lib/load-provisioning-pipeline";
 
 export const dynamic = "force-dynamic";
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-IE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 function embeddedOrgName(
   org: { name: string } | { name: string }[] | null,
@@ -49,10 +39,9 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
 
   let orgCount = 0;
   let callsInRange = 0;
-  let openTickets = 0;
-  let urgentEngineeringOpen = 0;
   let openSupportTickets = 0;
-  let ticketsCreatedInRange = 0;
+  let pipelineIncidents7d = 0;
+  let authFailures24h = 0;
   let minutesInRange = 0;
   let callOutcomes = buildHomeCallOutcomeSegments([]);
   let topTenants: { orgId: string; name: string; calls: number }[] = [];
@@ -72,16 +61,10 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     created_at: string;
     provisioningStage?: import("@/lib/tenant-provisioning-status").TenantProvisioningStage | null;
   }[] = [];
-  type UrgentEngineeringRow = {
-    id: string;
-    caller_number: string;
-    summary: string;
-    created_at: string;
-    organization_id: string;
-    organizations: { name: string; slug: string } | { name: string; slug: string }[] | null;
-  };
-  let urgentEngineeringTickets: UrgentEngineeringRow[] = [];
   let loadError: string | null = null;
+
+  const dayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const weekAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   try {
     const admin = createAdminClient();
@@ -89,11 +72,9 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     const [
       orgsRes,
       callsRes,
-      ticketsRes,
-      ticketsCreatedRes,
-      urgentCountRes,
-      urgentListRes,
       supportRes,
+      pipelineRes,
+      authFailsRes,
       listRes,
       callsDetailRes,
     ] = await Promise.all([
@@ -104,32 +85,18 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
         .gte("created_at", rangeStartIso)
         .lt("created_at", rangeEndExclusiveIso),
       admin
-        .from("action_tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "open"),
-      admin
-        .from("action_tickets")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", rangeStartIso)
-        .lt("created_at", rangeEndExclusiveIso),
-      admin
-        .from("action_tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "open")
-        .eq("engineering_priority", "urgent"),
-      admin
-        .from("action_tickets")
-        .select(
-          "id, caller_number, summary, created_at, organization_id, organizations ( name, slug )",
-        )
-        .eq("status", "open")
-        .eq("engineering_priority", "urgent")
-        .order("created_at", { ascending: false })
-        .limit(20),
-      admin
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
         .eq("status", "open"),
+      admin
+        .from("voice_pipeline_incidents")
+        .select("id", { count: "exact", head: true })
+        .gte("occurred_at", weekAgoIso),
+      admin
+        .from("security_auth_events")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", dayAgoIso)
+        .in("outcome", ["failure", "rate_limited"]),
       admin
         .from("organizations")
         .select("id, name, slug, tier, niche, created_at")
@@ -147,20 +114,14 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
 
     if (orgsRes.error) throw new Error(orgsRes.error.message);
     if (callsRes.error) throw new Error(callsRes.error.message);
-    if (ticketsRes.error) throw new Error(ticketsRes.error.message);
-    if (ticketsCreatedRes.error) throw new Error(ticketsCreatedRes.error.message);
-    if (urgentCountRes.error) throw new Error(urgentCountRes.error.message);
-    if (urgentListRes.error) throw new Error(urgentListRes.error.message);
     if (listRes.error) throw new Error(listRes.error.message);
     if (callsDetailRes.error) throw new Error(callsDetailRes.error.message);
 
     orgCount = orgsRes.count ?? 0;
     callsInRange = callsRes.count ?? 0;
-    openTickets = ticketsRes.count ?? 0;
-    ticketsCreatedInRange = ticketsCreatedRes.count ?? 0;
-    urgentEngineeringOpen = urgentCountRes.count ?? 0;
-    urgentEngineeringTickets = (urgentListRes.data ?? []) as UrgentEngineeringRow[];
     openSupportTickets = supportRes.error ? 0 : (supportRes.count ?? 0);
+    pipelineIncidents7d = pipelineRes.error ? 0 : (pipelineRes.count ?? 0);
+    authFailures24h = authFailsRes.error ? 0 : (authFailsRes.count ?? 0);
     organizations = listRes.data ?? [];
 
     const stageByOrg = await loadProvisioningStagesByOrgId(
@@ -241,48 +202,14 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           </div>
         ) : null}
 
-        {!loadError && urgentEngineeringTickets.length > 0 ? (
-          <section aria-labelledby="eng-call-queue-heading">
-            <h2 id="eng-call-queue-heading" className="sr-only">
-              Engineering queue
-            </h2>
-            <ul className="space-y-2">
-              {urgentEngineeringTickets.slice(0, 3).map((t) => {
-                const orgName = embeddedOrgName(t.organizations);
-                return (
-                  <li
-                    key={t.id}
-                    className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950"
-                  >
-                    <span className="font-semibold">{orgName}</span>
-                    {" · "}
-                    {t.summary}
-                    {" · "}
-                    <Link
-                      href={`/admin/organizations/${t.organization_id}`}
-                      className="font-medium underline"
-                    >
-                      Manage
-                    </Link>
-                    <span className="ml-2 text-xs text-red-800/60">
-                      {formatDate(t.created_at)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ) : null}
-
         <AdminGlobalMetricsBoard
           periodLabel={periodShort}
           periodRangeLabel={periodRangeLabel}
           calls={callsInRange}
-          openInbox={openTickets}
-          urgent={urgentEngineeringOpen}
+          pipelineIncidents={pipelineIncidents7d}
+          authFailures={authFailures24h}
           support={openSupportTickets}
           organizations={orgCount}
-          ticketsCreated={ticketsCreatedInRange}
           minutesUsed={formatMinutes(minutesInRange)}
           callOutcomes={callOutcomes}
           topTenants={topTenants}
