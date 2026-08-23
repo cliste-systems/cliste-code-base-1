@@ -133,7 +133,7 @@ export function NewClientDialog() {
         render={
           <Button
             type="button"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 focus:outline-none"
+            className="inline-flex shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 focus:outline-none"
           />
         }
       >
