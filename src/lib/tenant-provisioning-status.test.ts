@@ -35,9 +35,6 @@ function baseInput(
   };
 }
 
-const compliantGreeting =
-  "You're through to Test SuperValu — I'm Cara, the AI assistant. This call may be recorded and transcribed. How can I help?";
-
 describe("buildTenantProvisioningStatus stages", () => {
   it("starts in invited when invite not accepted", () => {
     const status = buildTenantProvisioningStatus(baseInput());
@@ -51,29 +48,13 @@ describe("buildTenantProvisioningStatus stages", () => {
     assert.equal(status.stage, "configuring");
   });
 
-  it("moves to ready when all go-live steps complete", () => {
+  it("moves to ready when phone is assigned", () => {
     const status = buildTenantProvisioningStatus(
       baseInput({
         inviteAcceptedAt: "2026-01-02T00:00:00.000Z",
         phoneNumber: "+353871234567",
         poolPhoneE164: "+353871234567",
         poolPhoneAssigned: true,
-        storePublicNumber: "+353749876543",
-        divertCarrier: "vodafone",
-        fallbackNumber: "+353851111111",
-        greeting: compliantGreeting,
-        businessHours: {
-          monday: { open: true, start: "09:00", end: "18:00" },
-          _bankHolidaysConfigured: true,
-          _bankHolidaysOpen: false,
-          _bankHolidaysStart: "10:00",
-          _bankHolidaysEnd: "14:00",
-        },
-        agentServicesDepartments: ["Customer service", "Deli counter"],
-        agentFaqs: [{ q: "Hours?", a: "9–6" }],
-        customPrompt: "compiled prompt",
-        ownerUserId: "user-1",
-        ownerHasLegalAcceptances: true,
       }),
     );
     assert.equal(status.stage, "ready");
@@ -87,22 +68,6 @@ describe("buildTenantProvisioningStatus stages", () => {
         phoneNumber: "+353871234567",
         poolPhoneE164: "+353871234567",
         poolPhoneAssigned: true,
-        storePublicNumber: "+353749876543",
-        divertCarrier: "vodafone",
-        fallbackNumber: "+353851111111",
-        greeting: compliantGreeting,
-        businessHours: {
-          monday: { open: true, start: "09:00", end: "18:00" },
-          _bankHolidaysConfigured: true,
-          _bankHolidaysOpen: false,
-          _bankHolidaysStart: "10:00",
-          _bankHolidaysEnd: "14:00",
-        },
-        agentServicesDepartments: ["Customer service"],
-        agentFaqs: [{ q: "Hours?", a: "9–6" }],
-        customPrompt: "compiled prompt",
-        ownerUserId: "user-1",
-        ownerHasLegalAcceptances: true,
         caraOnlineSince: "2026-01-10T00:00:00.000Z",
       }),
     );
@@ -144,52 +109,6 @@ describe("phone_assigned", () => {
     );
     assert.equal(
       ok.steps.find((s) => s.id === "phone_assigned")?.complete,
-      true,
-    );
-  });
-});
-
-describe("routing_configured transfer-number conditional", () => {
-  it("requires fallback for cliste_number mode", () => {
-    const withoutFallback = buildTenantProvisioningStatus(
-      baseInput({
-        callRoutingMode: "cliste_number",
-        storePublicNumber: "+353749876543",
-        divertCarrier: "vodafone",
-        fallbackNumber: "",
-      }),
-    );
-    assert.equal(
-      withoutFallback.steps.find((s) => s.id === "routing_configured")
-        ?.complete,
-      false,
-    );
-
-    const withFallback = buildTenantProvisioningStatus(
-      baseInput({
-        callRoutingMode: "cliste_number",
-        storePublicNumber: "+353749876543",
-        divertCarrier: "vodafone",
-        fallbackNumber: "+353851111111",
-      }),
-    );
-    assert.equal(
-      withFallback.steps.find((s) => s.id === "routing_configured")?.complete,
-      true,
-    );
-  });
-
-  it("does not require fallback for forward_all mode", () => {
-    const status = buildTenantProvisioningStatus(
-      baseInput({
-        callRoutingMode: "forward_all",
-        storePublicNumber: "+353749876543",
-        divertCarrier: "vodafone",
-        fallbackNumber: "",
-      }),
-    );
-    assert.equal(
-      status.steps.find((s) => s.id === "routing_configured")?.complete,
       true,
     );
   });

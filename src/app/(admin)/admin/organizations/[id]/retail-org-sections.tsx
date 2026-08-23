@@ -43,10 +43,8 @@ export function ProvisioningStepsRail({
 
 export function CaraTrainingLinkCard({
   organizationId,
-  trainedComplete,
 }: {
   organizationId: string;
-  trainedComplete: boolean;
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -58,11 +56,6 @@ export function CaraTrainingLinkCard({
             Saves compile the worker prompt — no manual system-instruction edits.
           </p>
         </div>
-        {trainedComplete ? (
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800 ring-1 ring-emerald-200/80 ring-inset">
-            Trained
-          </span>
-        ) : null}
       </div>
       <Link
         href={`/admin/customers/${organizationId}/cara-training`}

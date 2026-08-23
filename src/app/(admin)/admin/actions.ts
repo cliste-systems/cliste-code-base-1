@@ -1550,13 +1550,7 @@ export type SetOrganizationLiveResult =
   | { ok: true }
   | { ok: false; message: string };
 
-const GO_LIVE_STEP_IDS = [
-  "phone_assigned",
-  "routing_configured",
-  "greeting_compliant",
-  "hours_set",
-  "cara_trained",
-] as const;
+const GO_LIVE_STEP_IDS = ["phone_assigned"] as const;
 
 export async function setOrganizationLive(
   organizationId: string,

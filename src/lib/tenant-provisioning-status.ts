@@ -1,17 +1,8 @@
-import { parseCallRoutingMode } from "@/lib/call-routing";
-import { isBusinessHoursUnset, parseBusinessHoursBundle } from "@/lib/business-hours";
-import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
-
 export type TenantProvisioningStepId =
   | "invite_sent"
   | "invite_accepted"
   | "legal_acceptance"
   | "phone_assigned"
-  | "routing_configured"
-  | "greeting_compliant"
-  | "hours_set"
-  | "cara_trained"
-  | "test_call_made"
   | "live";
 
 export type TenantProvisioningStage =
@@ -66,47 +57,10 @@ export const TENANT_PROVISIONING_STEP_ORDER: {
   { id: "invite_accepted", label: "Invite accepted" },
   { id: "legal_acceptance", label: "Legal acceptance" },
   { id: "phone_assigned", label: "Phone assigned" },
-  { id: "routing_configured", label: "Call routing" },
-  { id: "greeting_compliant", label: "Greeting compliance" },
-  { id: "hours_set", label: "Opening hours" },
-  { id: "cara_trained", label: "Cara trained" },
-  { id: "test_call_made", label: "Test call" },
   { id: "live", label: "Live" },
 ];
 
-const GO_LIVE_STEP_IDS: TenantProvisioningStepId[] = [
-  "phone_assigned",
-  "routing_configured",
-  "greeting_compliant",
-  "hours_set",
-  "cara_trained",
-];
-
-function parseDepartments(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw.map((d) => String(d).trim()).filter(Boolean);
-  }
-  if (typeof raw === "string" && raw.trim()) {
-    return raw
-      .split(/[,;\n]+/)
-      .map((d) => d.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function parseFaqs(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "string" && raw.trim()) {
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
+const GO_LIVE_STEP_IDS: TenantProvisioningStepId[] = ["phone_assigned"];
 
 export function buildTenantProvisioningStatus(
   input: TenantProvisioningInput,
@@ -123,38 +77,6 @@ export function buildTenantProvisioningStatus(
     input.poolPhoneAssigned &&
     poolE164 === orgPhone;
 
-  const mode = parseCallRoutingMode(input.callRoutingMode);
-  const fallback = input.fallbackNumber.trim();
-  const storePublic = input.storePublicNumber.trim();
-  const divertCarrier = input.divertCarrier.trim();
-
-  let routingConfigured =
-    Boolean(storePublic) &&
-    Boolean(divertCarrier);
-  if (mode === "cliste_number") {
-    routingConfigured = routingConfigured && Boolean(fallback);
-  }
-
-  const greetingCompliant = greetingDisclosesAi(
-    input.greeting,
-    input.assistantDisplayName,
-  );
-
-  const hoursUnset = isBusinessHoursUnset(input.businessHours);
-  const { meta } = hoursUnset
-    ? { meta: { bankHolidays: { configured: false } } }
-    : parseBusinessHoursBundle(input.businessHours);
-  const hoursSet =
-    !hoursUnset && meta.bankHolidays?.configured === true;
-
-  const departments = parseDepartments(input.agentServicesDepartments);
-  const faqs = parseFaqs(input.agentFaqs);
-  const caraTrained =
-    departments.length >= 1 &&
-    faqs.length >= 1 &&
-    Boolean(input.customPrompt.trim());
-
-  const testCallMade = input.hasInboundCallLog;
   const live = Boolean(input.caraOnlineSince);
 
   const steps: TenantProvisioningStep[] = TENANT_PROVISIONING_STEP_ORDER.map(
@@ -195,51 +117,6 @@ export function buildTenantProvisioningStatus(
             detail: phoneAssigned
               ? `Cliste number ${orgPhone} assigned.`
               : "Assign an Irish Cliste number.",
-          };
-        case "routing_configured":
-          return {
-            id,
-            label,
-            complete: routingConfigured,
-            detail: routingConfigured
-              ? "Call routing and divert details saved."
-              : "Configure call routing and transfer number.",
-          };
-        case "greeting_compliant":
-          return {
-            id,
-            label,
-            complete: greetingCompliant,
-            detail: greetingCompliant
-              ? "Greeting includes AI disclosure."
-              : "Set a compliant greeting with AI disclosure.",
-          };
-        case "hours_set":
-          return {
-            id,
-            label,
-            complete: hoursSet,
-            detail: hoursSet
-              ? "Store hours and bank holidays configured."
-              : "Set opening hours and bank holidays.",
-          };
-        case "cara_trained":
-          return {
-            id,
-            label,
-            complete: caraTrained,
-            detail: caraTrained
-              ? "Departments, FAQs, and compiled prompt in place."
-              : "Complete Cara training (departments, FAQs, prompt).",
-          };
-        case "test_call_made":
-          return {
-            id,
-            label,
-            complete: testCallMade,
-            detail: testCallMade
-              ? "Inbound call recorded."
-              : "Place a test call to the Cliste number.",
           };
         case "live":
           return {

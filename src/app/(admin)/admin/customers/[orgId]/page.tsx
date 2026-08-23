@@ -7,7 +7,6 @@ import {
   clientProvisionSourceDescription,
   clientProvisionSourceLabel,
 } from "@/lib/client-provision-source";
-import { parseCallRoutingMode } from "@/lib/call-routing";
 import { loadAdminClientDetail } from "@/lib/load-admin-clients";
 import { loadOrganizationProvisioning } from "@/lib/load-provisioning-pipeline";
 import { livekitUsNumbersEnabled } from "@/lib/livekit-us-numbers-flag";
@@ -15,17 +14,14 @@ import {
   ORGANIZATION_NICHE_ADMIN_LABELS,
   parseOrganizationNiche,
 } from "@/lib/organization-niche";
-import { getTwilioMessagingRegion } from "@/lib/twilio-ie-messaging";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { AccountPlanForm } from "@/app/(admin)/admin/organizations/[id]/account-plan-form";
-import { CallRoutingCard } from "@/app/(admin)/admin/organizations/[id]/call-routing-card";
 import { GoLiveCard } from "@/app/(admin)/admin/organizations/[id]/go-live-card";
 import { IrishPhoneCard } from "@/app/(admin)/admin/organizations/[id]/irish-phone-card";
 import { LiveKitPhoneCard } from "@/app/(admin)/admin/organizations/[id]/livekit-phone-card";
 import { OpenDashboardButton } from "@/app/(admin)/admin/organizations/[id]/open-dashboard-button";
 import { OrganizationNicheForm } from "@/app/(admin)/admin/organizations/[id]/organization-niche-form";
-import { PhoneLineVerifyCard } from "@/app/(admin)/admin/organizations/[id]/phone-line-verify-card";
 import {
   CaraTrainingLinkCard,
   ProvisioningStepsRail,
@@ -158,7 +154,7 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
   const { data: org } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, niche, greeting, custom_prompt, phone_number, account_id, call_routing_mode, fallback_number, store_public_number, divert_carrier, store_code, is_active",
+      "id, name, slug, niche, phone_number, account_id, store_code, is_active",
     )
     .eq("id", orgId)
     .maybeSingle();
@@ -218,29 +214,7 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
   if (isRetail) {
     const provisioning = await loadOrganizationProvisioning(orgId);
     const phoneStep = provisioning?.steps.find((s) => s.id === "phone_assigned");
-    const routingStep = provisioning?.steps.find(
-      (s) => s.id === "routing_configured",
-    );
-    const trainedStep = provisioning?.steps.find((s) => s.id === "cara_trained");
-
-    const { data: firstCall } = await admin
-      .from("call_logs")
-      .select("created_at")
-      .eq("organization_id", orgId)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
     const clisteNumber = org.phone_number as string | null;
-    let messagingRegion: string | null = null;
-    let messagingRegionOk = false;
-    let messagingRegionError: string | null = null;
-    if (clisteNumber?.trim()) {
-      const region = await getTwilioMessagingRegion(clisteNumber);
-      messagingRegion = region.messagingRegion;
-      messagingRegionOk = region.ok;
-      messagingRegionError = region.error ?? null;
-    }
 
     return (
       <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
@@ -258,28 +232,7 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
           phoneNumber={clisteNumber}
           phoneAssignedComplete={phoneStep?.complete}
         />
-        <CallRoutingCard
-          organizationId={orgId}
-          initialMode={parseCallRoutingMode(org.call_routing_mode)}
-          initialTransferNumber={String(org.fallback_number ?? "")}
-          initialStorePublicNumber={String(org.store_public_number ?? "")}
-          initialDivertCarrier={String(org.divert_carrier ?? "")}
-          clisteNumber={clisteNumber}
-          routingConfiguredComplete={routingStep?.complete}
-          retail
-        />
-        <PhoneLineVerifyCard
-          organizationId={orgId}
-          clisteNumber={clisteNumber}
-          firstCallAt={(firstCall?.created_at as string | null) ?? null}
-          messagingRegion={messagingRegion}
-          messagingRegionOk={messagingRegionOk}
-          messagingRegionError={messagingRegionError}
-        />
-        <CaraTrainingLinkCard
-          organizationId={orgId}
-          trainedComplete={trainedStep?.complete ?? false}
-        />
+        <CaraTrainingLinkCard organizationId={orgId} />
         <GoLiveCard
           organizationId={orgId}
           isActive={org.is_active === true}
@@ -287,14 +240,7 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
           missingStepLabel={
             provisioning
               ? (provisioning.steps.find(
-                  (s) =>
-                    [
-                      "phone_assigned",
-                      "routing_configured",
-                      "greeting_compliant",
-                      "hours_set",
-                      "cara_trained",
-                    ].includes(s.id) && !s.complete,
+                  (s) => s.id === "phone_assigned" && !s.complete,
                 )?.label ?? null)
               : null
           }
@@ -316,12 +262,6 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
         inviteAcceptedAt={client.inviteAcceptedAt}
       />
       <IrishPhoneCard organizationId={orgId} phoneNumber={org.phone_number} />
-      <CallRoutingCard
-        organizationId={orgId}
-        initialMode={parseCallRoutingMode(org.call_routing_mode)}
-        initialTransferNumber={String(org.fallback_number ?? "")}
-        clisteNumber={org.phone_number}
-      />
       {accountId ? (
         <AccountPlanForm accountId={accountId} initialPlanTier={planTier} />
       ) : null}
