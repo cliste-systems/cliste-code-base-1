@@ -66,30 +66,33 @@ export default async function AdminCustomersPage({
       icon={Users}
       title="Customers"
       description="Managed custom jobs and self-serve SaaS accounts — provision, configure, and support from one place."
-      actions={<NewClientDialog />}
+      className="flex min-h-full flex-col pb-16"
     >
-      <div className="flex flex-wrap gap-2">
-        {FILTER_TABS.map(({ value, label }) => {
-          const active = filter === value;
-          const href =
-            value === "all"
-              ? "/admin/customers"
-              : `/admin/customers?type=${value}`;
-          return (
-            <Link
-              key={value}
-              href={href}
-              className={cn(
-                "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-                active
-                  ? "border-gray-900 bg-gray-900 text-white"
-                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
-              )}
-            >
-              {label}
-            </Link>
-          );
-        })}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {FILTER_TABS.map(({ value, label }) => {
+            const active = filter === value;
+            const href =
+              value === "all"
+                ? "/admin/customers"
+                : `/admin/customers?type=${value}`;
+            return (
+              <Link
+                key={value}
+                href={href}
+                className={cn(
+                  "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+                  active
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
+                )}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+        <NewClientDialog />
       </div>
 
       {loadError ? (
@@ -100,11 +103,13 @@ export default async function AdminCustomersPage({
         <AdminSectionCard
           title="All customers"
           description={`${rows.length} customer${rows.length === 1 ? "" : "s"}${filter !== "all" ? ` (${clientProvisionSourceLabel(filter)})` : ""}.`}
+          className="flex min-h-[calc(100vh-15rem)] flex-col"
+          contentClassName="flex min-h-0 flex-1 flex-col"
         >
-          <div className="overflow-x-auto">
+          <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
             <table className="w-full min-w-[960px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-gray-200 bg-white">
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="border-b border-gray-200">
                   <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
                     Customer
                   </th>
@@ -135,9 +140,8 @@ export default async function AdminCustomersPage({
                       colSpan={7}
                       className="px-5 py-12 text-center text-sm text-gray-500"
                     >
-                      No customers yet. Use{" "}
-                      <strong>New client</strong> above to provision the first
-                      managed account.
+                      No customers yet. Use <strong>New client</strong> to
+                      provision the first managed account.
                     </td>
                   </tr>
                 ) : (

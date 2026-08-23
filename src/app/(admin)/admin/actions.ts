@@ -327,7 +327,6 @@ export async function createOrganization(payload: {
         status: "active",
         launch_status: "not_started",
         plan_tier: planTier,
-        provision_source: "managed",
       })
       .select("id")
       .single();
