@@ -14,7 +14,6 @@ import { formatMinutes } from "@/app/(dashboard)/dashboard/billing/usage-helpers
 
 import { AdminGlobalMetricsBoard } from "./admin-global-metrics-board";
 import { AdminTenantsPanel } from "./admin-tenants-panel";
-import { NewClientDialog } from "./new-client-dialog";
 import { loadProvisioningStagesByOrgId } from "@/lib/load-provisioning-pipeline";
 
 export const dynamic = "force-dynamic";
@@ -233,12 +232,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
       className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row lg:gap-5 lg:p-5"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
-        {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
-          <div className="flex justify-end">
-            <NewClientDialog />
-          </div>
-        ) : null}
-
         {loadError ? (
           <div
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-3"
