@@ -23,13 +23,12 @@ import {
 import { createOrganization } from "./actions";
 
 function slugify(name: string): string {
-  const s = name
+  return name
     .toLowerCase()
     .trim()
     .replace(/['']/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return s || "store";
 }
 
 export function NewClientDialog() {
@@ -60,7 +59,7 @@ export function NewClientDialog() {
 
   useEffect(() => {
     if (!slugTouched) {
-      setSlug(slugify(name));
+      setSlug(name.trim() ? slugify(name) : "");
     }
   }, [name, slugTouched]);
 
@@ -87,7 +86,7 @@ export function NewClientDialog() {
     startTransition(async () => {
       const result = await createOrganization({
         name,
-        slug: slug || slugify(name),
+        slug: (slug.trim() || slugify(name)).trim(),
         tier: "native",
         assignPhoneNumber,
         niche,
