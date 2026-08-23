@@ -213,7 +213,7 @@ async function getAppOriginForRedirect(
 }
 
 export type CreateOrganizationResult =
-  | { ok: true }
+  | { ok: true; organizationId: string; warning?: string }
   | { ok: false; message: string };
 
 function formatAuthError(message: string): string {
@@ -244,8 +244,11 @@ export async function createOrganization(payload: {
   name: string;
   slug: string;
   tier: "connect" | "native";
+  planTier?: PlanTier;
   ownerEmail: string;
   ownerName: string;
+  ownerMobile?: string | null;
+  assignPhoneNumber?: boolean;
   niche?: OrganizationNiche;
   /** Optional; shown on the public book directory and used for distance search */
   address?: string | null;
@@ -258,8 +261,12 @@ export async function createOrganization(payload: {
   const name = payload.name.trim();
   const slug = payload.slug.trim().toLowerCase();
   const tier = payload.tier;
+  const planTier =
+    payload.planTier && isPlanTier(payload.planTier) ? payload.planTier : "pro";
   const ownerEmail = payload.ownerEmail.trim().toLowerCase();
   const ownerName = payload.ownerName.trim();
+  const ownerMobile = (payload.ownerMobile ?? "").trim();
+  const assignPhoneNumber = payload.assignPhoneNumber !== false;
 
   if (!name || !slug) {
     return { ok: false, message: "Name and slug are required." };
@@ -316,6 +323,7 @@ export async function createOrganization(payload: {
         slug,
         status: "active",
         launch_status: "not_started",
+        plan_tier: planTier,
       })
       .select("id")
       .single();
@@ -337,8 +345,10 @@ export async function createOrganization(payload: {
         name,
         slug,
         tier,
+        plan_tier: planTier,
         niche,
-        is_active: true,
+        is_active: niche === "retail" ? false : true,
+        notification_phone: ownerMobile || null,
         address: addressTrim || null,
         storefront_eircode: eircodeTrim || null,
         storefront_map_lat: mapLat,
@@ -386,6 +396,24 @@ export async function createOrganization(payload: {
 
     userId = inviteResult.userId;
 
+    const { error: inviteRowError } = await admin.from("admin_invites").insert({
+      organization_id: organizationId,
+      email: ownerEmail,
+      recipient_name: ownerName,
+      invited_by: operator.id,
+      sent_at: new Date().toISOString(),
+    });
+
+    if (inviteRowError) {
+      await admin.auth.admin.deleteUser(userId);
+      await admin.from("organizations").delete().eq("id", organizationId);
+      await admin.from("accounts").delete().eq("id", accountId);
+      return {
+        ok: false,
+        message: `Invite record could not be saved: ${inviteRowError.message}`,
+      };
+    }
+
     const { error: profileError } = await admin.from("profiles").insert({
       id: userId,
       account_id: accountId,
@@ -411,7 +439,16 @@ export async function createOrganization(payload: {
       role: "admin",
     });
 
+    let warning: string | undefined;
+    if (assignPhoneNumber) {
+      const phoneResult = await provisionOrganizationPhoneNumber(organizationId);
+      if (!phoneResult.ok) {
+        warning = phoneResult.message;
+      }
+    }
+
     revalidatePath("/admin");
+    revalidatePath("/admin/onboarding");
     await recordAdminEvent(operator, {
       eventType: "admin_organization_created",
       outcome: "success",
@@ -421,10 +458,12 @@ export async function createOrganization(payload: {
         organization_id: organizationId,
         slug,
         tier,
+        plan_tier: planTier,
         niche,
+        assign_phone: assignPhoneNumber,
       },
     });
-    return { ok: true };
+    return { ok: true, organizationId, warning };
   } catch (e) {
     if (userId) {
       try {
@@ -454,6 +493,96 @@ export async function createOrganization(payload: {
           : "Provisioning failed. No changes were kept.",
     };
   }
+}
+
+export type ResendOrganizationInviteResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export async function resendOrganizationInvite(
+  organizationId: string,
+): Promise<ResendOrganizationInviteResult> {
+  const operator = await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("id, name, niche")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!org?.id) {
+    return { ok: false, message: "Organization not found." };
+  }
+
+  const { data: invite } = await admin
+    .from("admin_invites")
+    .select("id, email, recipient_name, accepted_at")
+    .eq("organization_id", id)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!invite?.email) {
+    return { ok: false, message: "No invite on file for this organization." };
+  }
+
+  if (invite.accepted_at) {
+    return { ok: false, message: "Owner has already accepted the invite." };
+  }
+
+  const appOrigin = await getAppOriginForRedirect(null);
+  const inviteRedirectTo = `${appOrigin}/auth/callback`;
+  const niche = parseOrganizationNiche(org.niche);
+  const productName = PRODUCT_NAME_BY_NICHE[niche];
+
+  const inviteResult = await sendInviteEmail({
+    email: invite.email,
+    recipientName: String(invite.recipient_name ?? ""),
+    businessName: String(org.name ?? ""),
+    productName,
+    redirectTo: inviteRedirectTo,
+    admin,
+  });
+
+  if (!inviteResult.ok) {
+    return { ok: false, message: formatAuthError(inviteResult.message) };
+  }
+
+  await admin
+    .from("admin_invites")
+    .update({
+      sent_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", invite.id);
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/onboarding");
+  revalidatePath(`/admin/organizations/${id}`);
+
+  await recordAdminEvent(operator, {
+    eventType: "admin_invite_resent",
+    outcome: "success",
+    targetUserId: inviteResult.userId,
+    targetEmail: invite.email,
+    metadata: { organization_id: id },
+  });
+
+  return { ok: true };
 }
 
 export type UpdateOrganizationNicheResult =

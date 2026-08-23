@@ -4,7 +4,9 @@ import {
   ORGANIZATION_NICHE_ADMIN_LABELS,
   parseOrganizationNiche,
 } from "@/lib/organization-niche";
+import type { TenantProvisioningStage } from "@/lib/tenant-provisioning-status";
 
+import { TenantProvisioningStageChip } from "./tenant-provisioning-chip";
 import { TenantRowActions } from "./tenant-row-actions";
 
 function formatDateShort(iso: string): string {
@@ -24,6 +26,7 @@ type AdminTenantsPanelProps = {
     tier: string;
     niche: string | null;
     created_at: string;
+    provisioningStage?: TenantProvisioningStage | null;
   }[];
 };
 
@@ -75,6 +78,11 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
                     {" · "}
                     {formatDateShort(org.created_at)}
                   </p>
+                  {org.provisioningStage ? (
+                    <div className="mt-1">
+                      <TenantProvisioningStageChip stage={org.provisioningStage} />
+                    </div>
+                  ) : null}
                 </Link>
                 <TenantRowActions
                   organizationId={org.id}

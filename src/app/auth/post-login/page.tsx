@@ -2,9 +2,39 @@ import { redirect } from "next/navigation";
 
 import { canAccessAdminConsole } from "@/lib/admin-session";
 import { redirectIfEmailUnconfirmed } from "@/lib/require-email-confirmed";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+async function stampAdminInviteAccepted(userId: string, email: string) {
+  try {
+    const admin = createAdminClient();
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile?.organization_id) return;
+
+    await admin
+      .from("admin_invites")
+      .update({
+        accepted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", profile.organization_id)
+      .ilike("email", normalizedEmail)
+      .is("accepted_at", null);
+  } catch (err) {
+    console.warn(
+      "[post-login] admin_invites accept stamp failed",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
 
 export default async function PostLoginRoutePage() {
   const supabase = await createClient();
@@ -17,6 +47,10 @@ export default async function PostLoginRoutePage() {
   }
 
   redirectIfEmailUnconfirmed(user);
+
+  if (user.email) {
+    await stampAdminInviteAccepted(user.id, user.email);
+  }
 
   if (canAccessAdminConsole(user)) {
     redirect("/admin");

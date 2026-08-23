@@ -15,6 +15,7 @@ import { formatMinutes } from "@/app/(dashboard)/dashboard/billing/usage-helpers
 import { AdminGlobalMetricsBoard } from "./admin-global-metrics-board";
 import { AdminTenantsPanel } from "./admin-tenants-panel";
 import { NewClientDialog } from "./new-client-dialog";
+import { loadProvisioningStagesByOrgId } from "@/lib/load-provisioning-pipeline";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     tier: string;
     niche: string | null;
     created_at: string;
+    provisioningStage?: import("@/lib/tenant-provisioning-status").TenantProvisioningStage | null;
   }[] = [];
   type UrgentEngineeringRow = {
     id: string;
@@ -161,6 +163,14 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     urgentEngineeringTickets = (urgentListRes.data ?? []) as UrgentEngineeringRow[];
     openSupportTickets = supportRes.error ? 0 : (supportRes.count ?? 0);
     organizations = listRes.data ?? [];
+
+    const stageByOrg = await loadProvisioningStagesByOrgId(
+      organizations.map((o) => o.id),
+    );
+    organizations = organizations.map((org) => ({
+      ...org,
+      provisioningStage: stageByOrg.get(org.id) ?? null,
+    }));
 
     type CallDetailRow = {
       id: string;

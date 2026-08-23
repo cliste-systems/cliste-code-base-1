@@ -22,10 +22,9 @@ const baseNav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
   {
     href: "/admin/onboarding",
-    label: "Onboarding queue",
+    label: "Onboarding",
     icon: Inbox,
     exact: false,
-    requiresPublicSignup: true,
   },
   {
     href: "/admin/phone-pool",
