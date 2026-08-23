@@ -65,7 +65,7 @@ export function CaraTrainingLinkCard({
         ) : null}
       </div>
       <Link
-        href={`/admin/organizations/${organizationId}/cara-training`}
+        href={`/admin/clients/${organizationId}/cara-training`}
         className="mt-4 inline-flex rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
       >
         Open Cara training

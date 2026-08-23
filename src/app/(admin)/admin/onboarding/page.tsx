@@ -79,7 +79,7 @@ export default async function OnboardingPipelinePage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <Link
-                                href={`/admin/organizations/${org.id}`}
+                                href={`/admin/clients/${org.id}`}
                                 className="block truncate text-sm font-medium text-gray-900 hover:underline"
                               >
                                 {org.name}

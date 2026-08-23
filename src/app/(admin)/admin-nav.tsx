@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
+  Briefcase,
   Inbox,
   LayoutGrid,
   LifeBuoy,
@@ -24,6 +25,12 @@ const baseNav = [
     href: "/admin/onboarding",
     label: "Onboarding",
     icon: Inbox,
+    exact: false,
+  },
+  {
+    href: "/admin/clients",
+    label: "Clients",
+    icon: Briefcase,
     exact: false,
   },
   {

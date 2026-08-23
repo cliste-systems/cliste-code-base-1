@@ -29,11 +29,13 @@ import {
 type TenantRowActionsProps = {
   organizationId: string;
   organizationName: string;
+  clientHref?: string;
 };
 
 export function TenantRowActions({
   organizationId,
   organizationName,
+  clientHref = `/admin/clients/${organizationId}`,
 }: TenantRowActionsProps) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -82,11 +84,9 @@ export function TenantRowActions({
           <MoreHorizontal className="size-4" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem
-            onClick={() => router.push(`/admin/organizations/${organizationId}`)}
-          >
+          <DropdownMenuItem onClick={() => router.push(clientHref)}>
             <Settings2 className="size-4" aria-hidden />
-            Manage tenant
+            Open client
           </DropdownMenuItem>
           <DropdownMenuItem disabled={loginPending} onClick={openSupportDashboard}>
             <LogIn className="size-4" aria-hidden />

@@ -48,11 +48,15 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
           <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
             <p className="text-sm font-medium text-slate-600">No tenants yet</p>
             <p className="mt-1 max-w-[200px] text-xs leading-relaxed text-slate-500">
-              New signups from{" "}
-              <Link href="/signup" className="font-medium text-[#0b1220] underline-offset-2 hover:underline">
-                /signup
+              Provision managed clients from{" "}
+              <Link href="/admin/onboarding" className="font-medium text-[#0b1220] underline-offset-2 hover:underline">
+                Onboarding
               </Link>{" "}
-              will appear here.
+              or browse{" "}
+              <Link href="/admin/clients" className="font-medium text-[#0b1220] underline-offset-2 hover:underline">
+                Clients
+              </Link>
+              .
             </p>
           </div>
         ) : (
@@ -63,7 +67,7 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
                 className="flex items-center gap-2 px-3 py-2.5 sm:px-4"
               >
                 <Link
-                  href={`/admin/organizations/${org.id}`}
+                  href={`/admin/clients/${org.id}`}
                   className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
                 >
                   <p className="truncate text-[13px] font-medium text-[#0b1220] hover:underline">

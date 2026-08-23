@@ -327,6 +327,7 @@ export async function createOrganization(payload: {
         status: "active",
         launch_status: "not_started",
         plan_tier: planTier,
+        provision_source: "managed",
       })
       .select("id")
       .single();
@@ -451,6 +452,7 @@ export async function createOrganization(payload: {
     }
 
     revalidatePath("/admin");
+    revalidatePath("/admin/clients");
     revalidatePath("/admin/onboarding");
     await recordAdminEvent(operator, {
       eventType: "admin_organization_created",

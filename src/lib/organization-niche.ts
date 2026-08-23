@@ -15,10 +15,10 @@ export const ORGANIZATION_NICHES = [
   "other",
 ] as const;
 
+export type OrganizationNiche = (typeof ORGANIZATION_NICHES)[number];
+
 /** Niches available in the admin new-client flow (expand as verticals ship). */
 export const ADMIN_PROVISIONING_NICHES = ["retail"] as const satisfies readonly OrganizationNiche[];
-
-export type OrganizationNiche = (typeof ORGANIZATION_NICHES)[number];
 
 export type AdminProvisioningNiche = (typeof ADMIN_PROVISIONING_NICHES)[number];
 

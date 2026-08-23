@@ -220,6 +220,7 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
     billing_period_start: new Date().toISOString().slice(0, 10),
     signup_ip: signupIp,
     signup_user_agent: ua ?? null,
+    provision_source: "self_serve" as const,
     ...(planTier ? { plan_tier: planTier, billing_interval: billingInterval } : {}),
   };
 
