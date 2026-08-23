@@ -2,15 +2,12 @@ import type { Metadata } from "next";
 import { Shield } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
-import {
-  ADMIN_LIST_PAGE_CLASS,
-  AdminListCard,
-} from "@/components/admin/admin-list-card";
+import { AdminListCard } from "@/components/admin/admin-list-card";
 import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
-import { AdminSectionCard } from "@/components/admin/admin-section-card";
+import { AdminSegmentedTabs } from "@/components/admin/admin-segmented-tabs";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import {
   adminTableClass,
@@ -18,7 +15,10 @@ import {
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
+  adminTableTdDateClass,
   adminTableThClass,
+  adminTableThDateClass,
+  cellOrBlank,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -28,6 +28,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: `${PRODUCT_NAME} Admin — Security`,
 };
+
+type SecurityView = "auth" | "compliance" | "pipeline";
 
 type SecurityEventRow = {
   id: number;
@@ -43,6 +45,33 @@ type SecurityEventRow = {
   metadata: Record<string, unknown> | null;
 };
 
+type ComplianceEventRow = {
+  id: string;
+  created_at: string;
+  event_type: string;
+  organization_id: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+const VIEW_TABS = [
+  { value: "auth", label: "Auth events", href: "/admin/security" },
+  {
+    value: "compliance",
+    label: "Compliance",
+    href: "/admin/security?view=compliance",
+  },
+  {
+    value: "pipeline",
+    label: "Pipeline",
+    href: "/admin/security?view=pipeline",
+  },
+] as const;
+
+function parseSecurityView(raw: string | undefined): SecurityView {
+  if (raw === "compliance" || raw === "pipeline") return raw;
+  return "auth";
+}
+
 function outcomeLabel(outcome: SecurityEventRow["outcome"]): string {
   switch (outcome) {
     case "success":
@@ -54,28 +83,48 @@ function outcomeLabel(outcome: SecurityEventRow["outcome"]): string {
     case "config_error":
       return "Config error";
     default:
-      return outcome;
+      return outcome.replace(/_/g, " ");
   }
 }
 
-function formatDate(iso: string): string {
+function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString("en-IE", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
-type ComplianceEventRow = {
-  id: string;
-  created_at: string;
-  event_type: string;
-  organization_id: string | null;
-  metadata: Record<string, unknown> | null;
-};
+function formatEventType(type: string): string {
+  return type.replace(/_/g, " ");
+}
 
-export default async function AdminSecurityPage() {
+function primaryIdentity(row: SecurityEventRow): string {
+  return (
+    cellOrBlank(row.actor_email) ||
+    cellOrBlank(row.login_email) ||
+    cellOrBlank(row.target_email)
+  );
+}
+
+function formatIp(row: SecurityEventRow): string {
+  const ip = cellOrBlank(row.ip_masked);
+  if (!ip) return "";
+  return row.ip_country ? `${ip} · ${row.ip_country}` : ip;
+}
+
+export default async function AdminSecurityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const { view: viewParam } = await searchParams;
+  const view = parseSecurityView(viewParam);
+
   let loadError: string | null = null;
   let rows: SecurityEventRow[] = [];
   let complianceRows: ComplianceEventRow[] = [];
@@ -94,7 +143,7 @@ export default async function AdminSecurityPage() {
     const { data, error } = await admin
       .from("security_auth_events")
       .select(
-        "id, created_at, event_type, outcome, actor_email, target_email, login_email, ip_masked, ip_country, attempt_count, metadata"
+        "id, created_at, event_type, outcome, actor_email, target_email, login_email, ip_masked, ip_country, attempt_count, metadata",
       )
       .order("created_at", { ascending: false })
       .limit(300);
@@ -147,36 +196,32 @@ export default async function AdminSecurityPage() {
   const failures24h = rows.filter(
     (r) =>
       (r.outcome === "failure" || r.outcome === "rate_limited") &&
-      new Date(r.created_at).getTime() >= dayAgo
+      new Date(r.created_at).getTime() >= dayAgo,
   ).length;
   const success24h = rows.filter(
     (r) =>
-      r.outcome === "success" && new Date(r.created_at).getTime() >= dayAgo
+      r.outcome === "success" && new Date(r.created_at).getTime() >= dayAgo,
   ).length;
   const uniqueIps24h = new Set(
     rows
       .filter((r) => new Date(r.created_at).getTime() >= dayAgo)
-      .map((r) => r.ip_masked || "unknown")
+      .map((r) => r.ip_masked || "unknown"),
   ).size;
 
-  const attemptsByIdentity = new Map<string, number>();
-  for (const row of rows) {
-    if (row.outcome !== "failure" && row.outcome !== "rate_limited") continue;
-    const who = row.login_email || row.actor_email || row.ip_masked || "unknown";
-    attemptsByIdentity.set(who, (attemptsByIdentity.get(who) ?? 0) + 1);
-  }
-  const topAttempts = [...attemptsByIdentity.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
-
-  const authCountLabel = `${rows.length} event${rows.length === 1 ? "" : "s"}`;
+  const countLabel =
+    view === "auth"
+      ? `${rows.length} auth event${rows.length === 1 ? "" : "s"}`
+      : view === "compliance"
+        ? `${complianceRows.length} compliance signal${complianceRows.length === 1 ? "" : "s"}`
+        : `${pipelineIncidents.length} pipeline incident${pipelineIncidents.length === 1 ? "" : "s"}`;
 
   return (
     <AdminPageShell
       icon={Shield}
       title="Security"
-      description="Track successful and failed logins, where attempts come from, and repeated attempts over time."
-      className={ADMIN_LIST_PAGE_CLASS}
+      description="Auth activity, voice compliance signals, and pipeline health."
+      fillViewport
+      className="max-w-6xl"
     >
       {loadError ? (
         <AdminErrorCard
@@ -189,202 +234,226 @@ export default async function AdminSecurityPage() {
         />
       ) : (
         <>
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <AdminStatCard label="Failed attempts (24h)" value={failures24h} />
-            <AdminStatCard label="Successful auths (24h)" value={success24h} />
+          <section className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-5">
+            <AdminStatCard label="Failed (24h)" value={failures24h} />
+            <AdminStatCard label="Successful (24h)" value={success24h} />
             <AdminStatCard label="Unique IPs (24h)" value={uniqueIps24h} />
-          </section>
-
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <AdminStatCard
-              label="Disclosure confirmed (7d)"
+              label="Disclosure (7d)"
               value={
                 disclosureConfirmedPct != null
                   ? `${disclosureConfirmedPct}%`
                   : "—"
               }
+              muted={disclosureConfirmedPct == null}
             />
             <AdminStatCard
-              label="Pipeline incidents (7d)"
+              label="Incidents (7d)"
               value={pipelineIncidents.length}
             />
           </section>
 
-          <AdminSectionCard
-            title="Repeated attempts"
-            description="Failed or rate-limited identities with the highest counts."
-            padded
+          <AdminListCard
+            fillRemaining
+            countLabel={countLabel}
+            toolbar={
+              <AdminSegmentedTabs
+                tabs={[...VIEW_TABS]}
+                activeValue={view}
+                ariaLabel="Security view"
+              />
+            }
           >
-            {topAttempts.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No failed or rate-limited attempts recorded yet.
-              </p>
+            {view === "auth" ? (
+              <AuthEventsTable rows={rows} />
+            ) : view === "compliance" ? (
+              <ComplianceTable
+                rows={complianceRows}
+                error={complianceError}
+              />
             ) : (
-              <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-                {topAttempts.map(([who, count]) => (
-                  <li
-                    key={who}
-                    className="flex items-center justify-between px-4 py-3 text-sm"
-                  >
-                    <span className="truncate text-gray-700">{who}</span>
-                    <span className="font-medium text-gray-900 tabular-nums">
-                      {count}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <PipelineTable rows={pipelineIncidents} />
             )}
-          </AdminSectionCard>
-
-          <AdminListCard countLabel={authCountLabel}>
-            <table className={`${adminTableClass} min-w-[1080px] text-sm`}>
-              <thead className={adminTableHeadClass}>
-                <tr>
-                  <th className={adminTableThClass}>When</th>
-                  <th className={adminTableThClass}>Event</th>
-                  <th className={adminTableThClass}>Outcome</th>
-                  <th className={adminTableThClass}>Login email</th>
-                  <th className={adminTableThClass}>Actor</th>
-                  <th className={adminTableThClass}>Target</th>
-                  <th className={adminTableThClass}>IP / Country</th>
-                  <th className={adminTableThClass}>Attempts</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className={adminTableEmptyClass}>
-                      No security events recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row) => (
-                    <tr key={row.id} className={adminTableRowClass}>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {formatDate(row.created_at)}
-                      </td>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {row.event_type}
-                      </td>
-                      <td className={adminTableTdClass}>
-                        <AdminBadge>{outcomeLabel(row.outcome)}</AdminBadge>
-                      </td>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {row.login_email ?? "—"}
-                      </td>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {row.actor_email ?? "—"}
-                      </td>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {row.target_email ?? "—"}
-                      </td>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {row.ip_masked ?? "—"}
-                        {row.ip_country ? ` (${row.ip_country})` : ""}
-                      </td>
-                      <td className={`text-gray-700 ${adminTableTdClass}`}>
-                        {row.attempt_count ?? "—"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
           </AdminListCard>
-
-          {pipelineIncidents.length > 0 ? (
-            <AdminSectionCard
-              title="Voice pipeline health"
-              description="Unrecoverable STT/LLM/TTS failures reported by the worker."
-              contentClassName="p-0"
-            >
-              <div className="overflow-x-auto">
-                <table className={`${adminTableClass} min-w-[720px] text-sm`}>
-                  <thead className={adminTableHeadClass}>
-                    <tr>
-                      <th className={adminTableThClass}>When</th>
-                      <th className={adminTableThClass}>Stage</th>
-                      <th className={adminTableThClass}>DID</th>
-                      <th className={adminTableThClass}>Error</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {pipelineIncidents.map((inc) => (
-                      <tr key={inc.id} className={adminTableRowClass}>
-                        <td className={`whitespace-nowrap text-gray-600 ${adminTableTdClass}`}>
-                          {formatDate(inc.occurred_at)}
-                        </td>
-                        <td className={`font-medium text-gray-900 ${adminTableTdClass}`}>
-                          {inc.stage}
-                        </td>
-                        <td className={`text-gray-600 ${adminTableTdClass}`}>
-                          {inc.called_number ?? "—"}
-                        </td>
-                        <td className={`max-w-md truncate text-gray-700 ${adminTableTdClass}`}>
-                          {inc.error_message}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </AdminSectionCard>
-          ) : null}
-
-          <AdminSectionCard
-            title="Voice compliance signals"
-            description="Disclosure misses and other compliance telemetry from the voice pipeline."
-            contentClassName="p-0"
-          >
-            {complianceError ? (
-              <p className="px-4 py-3 text-sm text-gray-700">
-                Compliance events unavailable: {complianceError}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className={`${adminTableClass} min-w-[720px] text-sm`}>
-                  <thead className={adminTableHeadClass}>
-                    <tr>
-                      <th className={adminTableThClass}>When</th>
-                      <th className={adminTableThClass}>Event</th>
-                      <th className={adminTableThClass}>Organization</th>
-                      <th className={adminTableThClass}>Metadata</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {complianceRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className={adminTableEmptyClass}>
-                          No compliance events recorded yet.
-                        </td>
-                      </tr>
-                    ) : (
-                      complianceRows.map((row) => (
-                        <tr key={row.id} className={adminTableRowClass}>
-                          <td className={`text-gray-700 ${adminTableTdClass}`}>
-                            {formatDate(row.created_at)}
-                          </td>
-                          <td className={`text-gray-700 ${adminTableTdClass}`}>
-                            {row.event_type}
-                          </td>
-                          <td className={`font-mono text-xs text-gray-600 ${adminTableTdClass}`}>
-                            {row.organization_id ?? "—"}
-                          </td>
-                          <td className={`text-xs text-gray-600 ${adminTableTdClass}`}>
-                            {row.metadata
-                              ? JSON.stringify(row.metadata).slice(0, 120)
-                              : "—"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </AdminSectionCard>
         </>
       )}
     </AdminPageShell>
+  );
+}
+
+function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
+  return (
+    <table className={`${adminTableClass} min-w-[760px] text-sm`}>
+      <thead className={adminTableHeadClass}>
+        <tr>
+          <th className={adminTableThDateClass}>When</th>
+          <th className={adminTableThClass}>Event</th>
+          <th className={`${adminTableThClass} w-[1%] whitespace-nowrap`}>
+            Outcome
+          </th>
+          <th className={adminTableThClass}>Identity</th>
+          <th className={adminTableThClass}>IP</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={5} className={adminTableEmptyClass}>
+              No security events recorded yet.
+            </td>
+          </tr>
+        ) : (
+          rows.map((row) => {
+            const identity = primaryIdentity(row);
+            const ip = formatIp(row);
+            return (
+              <tr key={row.id} className={adminTableRowClass}>
+                <td className={adminTableTdDateClass}>
+                  {formatWhen(row.created_at)}
+                </td>
+                <td
+                  className={`max-w-[240px] truncate text-gray-900 ${adminTableTdClass}`}
+                  title={row.event_type}
+                >
+                  {formatEventType(row.event_type)}
+                </td>
+                <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                  <AdminBadge>{outcomeLabel(row.outcome)}</AdminBadge>
+                </td>
+                <td
+                  className={`max-w-[220px] truncate text-gray-600 ${adminTableTdClass}`}
+                  title={identity || undefined}
+                >
+                  {identity}
+                </td>
+                <td
+                  className={`whitespace-nowrap text-gray-500 ${adminTableTdClass}`}
+                >
+                  {ip}
+                </td>
+              </tr>
+            );
+          })
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+function ComplianceTable({
+  rows,
+  error,
+}: {
+  rows: ComplianceEventRow[];
+  error: string | null;
+}) {
+  if (error) {
+    return (
+      <p className="px-4 py-8 text-sm text-gray-600">
+        Compliance events unavailable: {error}
+      </p>
+    );
+  }
+
+  return (
+    <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+      <thead className={adminTableHeadClass}>
+        <tr>
+          <th className={adminTableThDateClass}>When</th>
+          <th className={adminTableThClass}>Event</th>
+          <th className={adminTableThClass}>Organization</th>
+          <th className={adminTableThClass}>Details</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={4} className={adminTableEmptyClass}>
+              No compliance events recorded yet.
+            </td>
+          </tr>
+        ) : (
+          rows.map((row) => (
+            <tr key={row.id} className={adminTableRowClass}>
+              <td className={adminTableTdDateClass}>
+                {formatWhen(row.created_at)}
+              </td>
+              <td className={`text-gray-900 ${adminTableTdClass}`}>
+                {formatEventType(row.event_type)}
+              </td>
+              <td
+                className={`max-w-[180px] truncate font-mono text-xs text-gray-500 ${adminTableTdClass}`}
+              >
+                {cellOrBlank(row.organization_id)}
+              </td>
+              <td
+                className={`max-w-md truncate text-xs text-gray-600 ${adminTableTdClass}`}
+                title={
+                  row.metadata ? JSON.stringify(row.metadata) : undefined
+                }
+              >
+                {row.metadata ? JSON.stringify(row.metadata).slice(0, 120) : ""}
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+function PipelineTable({
+  rows,
+}: {
+  rows: {
+    id: string;
+    occurred_at: string;
+    stage: string;
+    error_message: string;
+    called_number: string | null;
+  }[];
+}) {
+  return (
+    <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+      <thead className={adminTableHeadClass}>
+        <tr>
+          <th className={adminTableThDateClass}>When</th>
+          <th className={adminTableThClass}>Stage</th>
+          <th className={adminTableThClass}>DID</th>
+          <th className={adminTableThClass}>Error</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={4} className={adminTableEmptyClass}>
+              No pipeline incidents in the last 7 days.
+            </td>
+          </tr>
+        ) : (
+          rows.map((inc) => (
+            <tr key={inc.id} className={adminTableRowClass}>
+              <td className={adminTableTdDateClass}>
+                {formatWhen(inc.occurred_at)}
+              </td>
+              <td className={`font-medium text-gray-900 ${adminTableTdClass}`}>
+                {inc.stage}
+              </td>
+              <td
+                className={`whitespace-nowrap font-mono text-xs text-gray-600 ${adminTableTdClass}`}
+              >
+                {cellOrBlank(inc.called_number)}
+              </td>
+              <td
+                className={`max-w-md truncate text-gray-700 ${adminTableTdClass}`}
+                title={inc.error_message}
+              >
+                {inc.error_message}
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
   );
 }

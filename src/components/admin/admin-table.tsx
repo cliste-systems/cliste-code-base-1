@@ -1,5 +1,7 @@
 /** Shared admin data-table styling (matches Customers page). */
 
+import { cn } from "@/lib/utils";
+
 export const adminTableClass = "w-full border-collapse text-left";
 
 export const adminTableHeadClass =
@@ -8,9 +10,24 @@ export const adminTableHeadClass =
 export const adminTableThClass =
   "px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase";
 
+export const adminTableThDateClass = cn(
+  adminTableThClass,
+  "w-[1%] whitespace-nowrap",
+);
+
 export const adminTableTdClass = "px-4 py-3";
+
+export const adminTableTdDateClass = cn(
+  adminTableTdClass,
+  "whitespace-nowrap text-sm tabular-nums text-gray-500",
+);
 
 export const adminTableRowClass = "hover:bg-gray-50/60";
 
 export const adminTableEmptyClass =
   "px-4 py-16 text-center text-sm text-gray-500";
+
+export function cellOrBlank(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+

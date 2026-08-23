@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { Users } from "lucide-react";
 
-import {
-  ADMIN_LIST_PAGE_CLASS,
-  AdminListCard,
-} from "@/components/admin/admin-list-card";
+import { AdminListCard } from "@/components/admin/admin-list-card";
 import {
   AdminErrorCard,
   AdminPageShell,
@@ -164,12 +161,13 @@ export default async function AdminIdentityAccessPage() {
       icon={Users}
       title="Identity & access"
       description="Use each user's action menu to grant or revoke admin console access."
-      className={ADMIN_LIST_PAGE_CLASS}
+      fillViewport
+      className="max-w-6xl"
     >
       {loadError ? (
         <AdminErrorCard message={loadError} />
       ) : (
-        <AdminListCard countLabel={countLabel}>
+        <AdminListCard fillRemaining countLabel={countLabel}>
           <IdentityAccessTable rows={rows} bare />
         </AdminListCard>
       )}

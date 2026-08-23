@@ -23,6 +23,8 @@ type AdminPageShellProps = {
   backLabel?: string;
   children: ReactNode;
   className?: string;
+  /** Lock page to viewport height (pairs with AdminListCard fillRemaining). */
+  fillViewport?: boolean;
 };
 
 export function AdminPageShell({
@@ -35,11 +37,16 @@ export function AdminPageShell({
   backLabel,
   children,
   className,
+  fillViewport = false,
 }: AdminPageShellProps) {
   return (
     <div
+      {...(fillViewport ? { "data-admin-fill": true } : {})}
       className={cn(
-        "mx-auto space-y-8 px-6 py-10",
+        "mx-auto px-6 py-10",
+        fillViewport
+          ? "flex min-h-0 flex-1 flex-col space-y-6 overflow-hidden pb-6"
+          : "space-y-8",
         MAX_WIDTH_CLASS[maxWidth],
         className,
       )}
@@ -54,7 +61,7 @@ export function AdminPageShell({
         </Link>
       ) : null}
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold text-gray-900">
             <Icon className="h-5 w-5 text-gray-500" aria-hidden />

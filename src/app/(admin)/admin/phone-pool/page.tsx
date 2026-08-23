@@ -1,9 +1,6 @@
 import { Phone } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
-import {
-  ADMIN_LIST_PAGE_CLASS,
-} from "@/components/admin/admin-list-card";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import {
@@ -68,7 +65,8 @@ export default async function PhonePoolAdminPage() {
       icon={Phone}
       title="Phone pool"
       description="Irish DIDs Cliste owns. Pool refills nightly when IE-available drops below the low-water mark."
-      className={ADMIN_LIST_PAGE_CLASS}
+      fillViewport
+      className="max-w-6xl"
     >
       {!twilioReady ? (
         <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
@@ -84,7 +82,7 @@ export default async function PhonePoolAdminPage() {
         </p>
       ) : null}
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <section className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-5">
         <AdminStatCard label="Available (IE)" value={health.availableIE.toLocaleString("en-IE")} />
         <AdminStatCard
           label="Available (other)"

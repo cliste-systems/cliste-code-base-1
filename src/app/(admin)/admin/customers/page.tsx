@@ -4,7 +4,6 @@ import { Users } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
 import {
-  ADMIN_LIST_PAGE_CLASS,
   AdminListCard,
 } from "@/components/admin/admin-list-card";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
@@ -101,7 +100,8 @@ export default async function AdminCustomersPage({
       icon={Users}
       title="Customers"
       description="Managed custom jobs and self-serve SaaS accounts — provision, configure, and support from one place."
-      className={ADMIN_LIST_PAGE_CLASS}
+      fillViewport
+      className="max-w-6xl"
     >
       {loadError ? (
         <p className="text-sm text-red-700" role="alert">
@@ -109,6 +109,7 @@ export default async function AdminCustomersPage({
         </p>
       ) : (
         <AdminListCard
+          fillRemaining
           countLabel={countLabel}
           toolbar={
             <>

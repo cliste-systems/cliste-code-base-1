@@ -3,10 +3,7 @@ import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
-import {
-  ADMIN_LIST_PAGE_CLASS,
-  AdminListCard,
-} from "@/components/admin/admin-list-card";
+import { AdminListCard } from "@/components/admin/admin-list-card";
 import {
   AdminErrorCard,
   AdminPageShell,
@@ -115,7 +112,8 @@ export default async function AdminSupportPage() {
           history.
         </>
       }
-      className={ADMIN_LIST_PAGE_CLASS}
+      fillViewport
+      className="max-w-6xl"
     >
       {loadError ? (
         <AdminErrorCard
@@ -132,7 +130,7 @@ export default async function AdminSupportPage() {
           }
         />
       ) : (
-        <AdminListCard countLabel={countLabel}>
+        <AdminListCard fillRemaining countLabel={countLabel}>
           <table className={`${adminTableClass} min-w-[900px]`}>
             <thead className={adminTableHeadClass}>
               <tr>
