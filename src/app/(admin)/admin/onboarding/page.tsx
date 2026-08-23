@@ -45,26 +45,16 @@ export default async function OnboardingPipelinePage() {
             Admin-led retail store provisioning — from invite through go-live.
           </p>
         </div>
-        {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
-          <NewClientDialog />
-        ) : null}
+        <NewClientDialog />
       </header>
 
       {pipeline.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
           <p>No admin-provisioned stores yet.</p>
-          {process.env.ADMIN_ALLOW_MANUAL_CREATE === "1" ? (
-            <p className="mt-2">
-              Use <strong>New retail client</strong> above to provision the
-              first store.
-            </p>
-          ) : (
-            <p className="mt-2">
-              Manual create is disabled — set{" "}
-              <code className="text-xs">ADMIN_ALLOW_MANUAL_CREATE=1</code> to
-              enable provisioning.
-            </p>
-          )}
+          <p className="mt-2">
+            Use <strong>New retail client</strong> above to provision the first
+            store.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-4">
