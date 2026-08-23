@@ -4,6 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
+import { AdminBadge } from "@/components/admin/admin-badge";
+import {
+  adminTableClass,
+  adminTableEmptyClass,
+  adminTableHeadClass,
+  adminTableRowClass,
+  adminTableTdClass,
+  adminTableThClass,
+} from "@/components/admin/admin-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,173 +49,95 @@ type IdentityAccessTableProps = {
 
 export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableProps) {
   const table = (
-      <table className="w-full min-w-[900px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-gray-200 bg-white">
-            <th className="w-[30%] px-5 py-3.5 text-xs font-medium text-gray-500">
-              User email
-            </th>
-            <th className="w-[20%] px-5 py-3.5 text-xs font-medium text-gray-500">
-              Linked client
-            </th>
-            <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
-              Status
-            </th>
-            <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
-              Password
-            </th>
-            <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
-              Admin console
-            </th>
-            <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-              Last login
-            </th>
-            <th className="px-5 py-3.5 text-right text-xs font-medium text-gray-500">
-              Actions
-            </th>
+    <table className={`${adminTableClass} min-w-[900px]`}>
+      <thead className={adminTableHeadClass}>
+        <tr>
+          <th className={adminTableThClass}>User email</th>
+          <th className={adminTableThClass}>Linked client</th>
+          <th className={adminTableThClass}>Status</th>
+          <th className={adminTableThClass}>Password</th>
+          <th className={adminTableThClass}>Admin console</th>
+          <th className={adminTableThClass}>Last login</th>
+          <th className={`${adminTableThClass} text-right`}>Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={7} className={adminTableEmptyClass}>
+              No auth users found.
+            </td>
           </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {rows.length === 0 ? (
-            <tr>
+        ) : (
+          rows.map((row) => (
+            <tr key={row.userId} className={adminTableRowClass}>
               <td
-                colSpan={7}
-                className="px-5 py-12 text-center text-sm text-gray-500"
+                className={`text-sm font-medium whitespace-nowrap text-gray-900 ${adminTableTdClass}`}
               >
-                No auth users found.
+                {row.email || "—"}
+              </td>
+              <td
+                className={`text-sm font-medium whitespace-nowrap text-gray-900 ${adminTableTdClass}`}
+              >
+                {row.organizationId ? (
+                  <Link
+                    href={`/admin/customers/${row.organizationId}`}
+                    className="text-gray-900 underline-offset-2 hover:underline"
+                  >
+                    {row.organizationName}
+                  </Link>
+                ) : (
+                  row.organizationName
+                )}
+              </td>
+              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                <AdminBadge className="capitalize">{row.status}</AdminBadge>
+              </td>
+              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                <AdminBadge>
+                  {row.passwordStatus === "must_set" ? "Must set" : "Set"}
+                </AdminBadge>
+              </td>
+              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                <AdminBadge>
+                  {row.adminConsoleAccess
+                    ? row.adminConsoleLocked
+                      ? "Owner allowlist"
+                      : "Granted"
+                    : "No access"}
+                </AdminBadge>
+              </td>
+              <td
+                className={`text-sm whitespace-nowrap text-gray-500 ${adminTableTdClass}`}
+              >
+                {row.lastLoginLabel}
+              </td>
+              <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                <div className="flex items-center justify-end">
+                  <RowActions
+                    userId={row.userId}
+                    email={row.email}
+                    status={row.status}
+                    hasAdminConsoleAccess={row.adminConsoleAccess}
+                    adminConsoleLocked={row.adminConsoleLocked}
+                  />
+                </div>
               </td>
             </tr>
-          ) : (
-            rows.map((row) => (
-              <tr
-                key={row.userId}
-                className="group transition-colors hover:bg-gray-50/50"
-              >
-                <td className="px-5 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
-                  {row.email || "—"}
-                </td>
-                <td className="px-5 py-4 text-sm font-medium whitespace-nowrap text-gray-900">
-                  {row.organizationId ? (
-                    <Link
-                      href={`/admin/organizations/${row.organizationId}`}
-                      className="text-gray-900 underline-offset-2 hover:underline"
-                    >
-                      {row.organizationName}
-                    </Link>
-                  ) : (
-                    row.organizationName
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-5 py-4">
-                  <StatusBadge status={row.status} />
-                </td>
-                <td className="whitespace-nowrap px-5 py-4">
-                  <PasswordBadge status={row.passwordStatus} />
-                </td>
-                <td className="whitespace-nowrap px-5 py-4">
-                  <AdminConsoleBadge
-                    hasAccess={row.adminConsoleAccess}
-                    locked={row.adminConsoleLocked}
-                  />
-                </td>
-                <td className="px-5 py-4 text-sm font-normal whitespace-nowrap text-gray-500">
-                  {row.lastLoginLabel}
-                </td>
-                <td className="whitespace-nowrap px-5 py-4">
-                  <div className="flex items-center justify-end">
-                    <RowActions
-                      userId={row.userId}
-                      email={row.email}
-                      status={row.status}
-                      hasAdminConsoleAccess={row.adminConsoleAccess}
-                      adminConsoleLocked={row.adminConsoleLocked}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+          ))
+        )}
+      </tbody>
+    </table>
   );
 
   if (bare) {
-    return <div className="overflow-x-auto">{table}</div>;
+    return table;
   }
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
       {table}
     </div>
-  );
-}
-
-function PasswordBadge({
-  status,
-}: {
-  status: IdentityAccessRow["passwordStatus"];
-}) {
-  if (status === "must_set") {
-    return (
-      <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-        Must set
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-md border border-gray-200/80 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
-      Set
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: IdentityAccessRow["status"] }) {
-  if (status === "suspended") {
-    return (
-      <span className="inline-flex items-center rounded-md border border-red-200/60 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-        Suspended
-      </span>
-    );
-  }
-  if (status === "active") {
-    return (
-      <span className="inline-flex items-center rounded-md border border-green-200/60 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-        Active
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-      Pending
-    </span>
-  );
-}
-
-function AdminConsoleBadge({
-  hasAccess,
-  locked,
-}: {
-  hasAccess: boolean;
-  locked: boolean;
-}) {
-  if (hasAccess && locked) {
-    return (
-      <span className="inline-flex items-center rounded-md border border-blue-200/70 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-        Owner allowlist
-      </span>
-    );
-  }
-  if (hasAccess) {
-    return (
-      <span className="inline-flex items-center rounded-md border border-green-200/60 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-        Granted
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-md border border-gray-200/80 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
-      No access
-    </span>
   );
 }
 

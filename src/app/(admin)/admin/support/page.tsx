@@ -2,13 +2,24 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LifeBuoy } from "lucide-react";
 
+import { AdminBadge } from "@/components/admin/admin-badge";
+import {
+  ADMIN_LIST_PAGE_CLASS,
+  AdminListCard,
+} from "@/components/admin/admin-list-card";
 import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
-import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { PRODUCT_NAME } from "@/lib/company-details";
-import { cn } from "@/lib/utils";
+import {
+  adminTableClass,
+  adminTableEmptyClass,
+  adminTableHeadClass,
+  adminTableRowClass,
+  adminTableTdClass,
+  adminTableThClass,
+} from "@/components/admin/admin-table";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { CloseSupportButton } from "./close-support-button";
@@ -82,6 +93,11 @@ export default async function AdminSupportPage() {
       e instanceof Error ? e.message : "Failed to load support tickets.";
   }
 
+  const openCount = tickets.filter((t) => t.status === "open").length;
+  const countLabel = `${tickets.length} ticket${tickets.length === 1 ? "" : "s"}${
+    openCount > 0 ? ` · ${openCount} open` : ""
+  }`;
+
   return (
     <AdminPageShell
       icon={LifeBuoy}
@@ -99,6 +115,7 @@ export default async function AdminSupportPage() {
           history.
         </>
       }
+      className={ADMIN_LIST_PAGE_CLASS}
     >
       {loadError ? (
         <AdminErrorCard
@@ -115,112 +132,78 @@ export default async function AdminSupportPage() {
           }
         />
       ) : (
-        <AdminSectionCard
-          title="All tickets"
-          description="Newest first. Open tickets are highlighted."
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-gray-200 bg-white">
-                  <th className="w-[15%] px-5 py-3.5 text-xs font-medium text-gray-500">
-                    Client
-                  </th>
-                  <th className="w-[20%] px-5 py-3.5 text-xs font-medium text-gray-500">
-                    Subject
-                  </th>
-                  <th className="w-[25%] px-5 py-3.5 text-xs font-medium text-gray-500">
-                    Message
-                  </th>
-                  <th className="w-[10%] px-5 py-3.5 text-xs font-medium text-gray-500">
-                    Status
-                  </th>
-                  <th className="w-[20%] px-5 py-3.5 text-xs font-medium text-gray-500">
-                    Submitted
-                  </th>
-                  <th className="w-[10%] px-5 py-3.5 text-right text-xs font-medium text-gray-500">
-                    Actions
-                  </th>
+        <AdminListCard countLabel={countLabel}>
+          <table className={`${adminTableClass} min-w-[900px]`}>
+            <thead className={adminTableHeadClass}>
+              <tr>
+                <th className={adminTableThClass}>Client</th>
+                <th className={adminTableThClass}>Subject</th>
+                <th className={adminTableThClass}>Message</th>
+                <th className={adminTableThClass}>Status</th>
+                <th className={adminTableThClass}>Submitted</th>
+                <th className={`${adminTableThClass} text-right`}>Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {tickets.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className={adminTableEmptyClass}>
+                    No support tickets yet.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {tickets.length === 0 ? (
-                  <tr>
+              ) : (
+                tickets.map((t) => (
+                  <tr key={t.id} className={adminTableRowClass}>
+                    <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">
+                          {orgLabel(t)}
+                        </span>
+                        {orgSlug(t) ? (
+                          <span className="mt-0.5 font-mono text-[11px] text-gray-400">
+                            {orgSlug(t)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td
-                      colSpan={6}
-                      className="px-5 py-12 text-center text-sm text-gray-500"
+                      className={`max-w-[200px] truncate text-sm text-gray-600 ${adminTableTdClass}`}
                     >
-                      No support tickets yet.
+                      {t.subject}
+                    </td>
+                    <td
+                      className={`max-w-md truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      title={t.body}
+                    >
+                      {messagePreview(t.body)}
+                    </td>
+                    <td className={`whitespace-nowrap ${adminTableTdClass}`}>
+                      <AdminBadge className="capitalize">{t.status}</AdminBadge>
+                    </td>
+                    <td
+                      className={`whitespace-nowrap text-sm text-gray-500 tabular-nums ${adminTableTdClass}`}
+                    >
+                      {formatWhen(t.created_at)}
+                    </td>
+                    <td className={`whitespace-nowrap text-right ${adminTableTdClass}`}>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Link
+                          href={`/admin/support/${t.id}`}
+                          className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                        >
+                          View thread
+                        </Link>
+                        {t.status === "open" ? (
+                          <CloseSupportButton ticketId={t.id} />
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
-                ) : (
-                  tickets.map((t) => {
-                    const isOpen = t.status === "open";
-                    return (
-                      <tr
-                        key={t.id}
-                        className={cn(
-                          "transition-colors hover:bg-gray-50/50",
-                          isOpen && "bg-emerald-50/35",
-                        )}
-                      >
-                        <td className="whitespace-nowrap px-5 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">
-                              {orgLabel(t)}
-                            </span>
-                            {orgSlug(t) ? (
-                              <span className="mt-0.5 font-mono text-xs text-gray-400">
-                                {orgSlug(t)}
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="max-w-[200px] truncate px-5 py-4 text-sm text-gray-600">
-                          {t.subject}
-                        </td>
-                        <td
-                          className="max-w-md truncate px-5 py-4 text-sm text-gray-600"
-                          title={t.body}
-                        >
-                          {messagePreview(t.body)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize",
-                              isOpen
-                                ? "border-emerald-200/80 bg-emerald-50 text-emerald-800"
-                                : "border-gray-200/80 bg-gray-50 text-gray-600",
-                            )}
-                          >
-                            {t.status}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500 tabular-nums">
-                          {formatWhen(t.created_at)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <Link
-                              href={`/admin/support/${t.id}`}
-                              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                            >
-                              View thread
-                            </Link>
-                            {isOpen ? (
-                              <CloseSupportButton ticketId={t.id} />
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </AdminSectionCard>
+                ))
+              )}
+            </tbody>
+          </table>
+        </AdminListCard>
       )}
     </AdminPageShell>
   );

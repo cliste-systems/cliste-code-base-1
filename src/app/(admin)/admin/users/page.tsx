@@ -3,10 +3,13 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { Users } from "lucide-react";
 
 import {
+  ADMIN_LIST_PAGE_CLASS,
+  AdminListCard,
+} from "@/components/admin/admin-list-card";
+import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
-import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { isAdminEmailAllowlisted } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -153,7 +156,7 @@ export default async function AdminIdentityAccessPage() {
       e instanceof Error ? e.message : "Failed to load identity & access data.";
   }
 
-  const userLabel =
+  const countLabel =
     rows.length === 1 ? "1 user" : `${rows.length} users`;
 
   return (
@@ -161,22 +164,14 @@ export default async function AdminIdentityAccessPage() {
       icon={Users}
       title="Identity & access"
       description="Use each user's action menu to grant or revoke admin console access."
-      actions={
-        <div className="flex items-center gap-1.5 text-sm text-gray-400">
-          <Users className="size-4 shrink-0" aria-hidden />
-          <span className="tabular-nums">{userLabel}</span>
-        </div>
-      }
+      className={ADMIN_LIST_PAGE_CLASS}
     >
       {loadError ? (
         <AdminErrorCard message={loadError} />
       ) : (
-        <AdminSectionCard
-          title="All users"
-          description="Auth users sorted by most recent login."
-        >
+        <AdminListCard countLabel={countLabel}>
           <IdentityAccessTable rows={rows} bare />
-        </AdminSectionCard>
+        </AdminListCard>
       )}
     </AdminPageShell>
   );

@@ -1,13 +1,23 @@
 import { Phone } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
+import {
+  ADMIN_LIST_PAGE_CLASS,
+} from "@/components/admin/admin-list-card";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
-import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import {
+  adminTableClass,
+  adminTableEmptyClass,
+  adminTableHeadClass,
+  adminTableRowClass,
+  adminTableTdClass,
+  adminTableThClass,
+} from "@/components/admin/admin-table";
 import { poolHealthCheck, twilioIsConfigured } from "@/lib/phone-pool";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-import { PhonePoolToolbar } from "./refill-button";
+import { PhonePoolListCard } from "./phone-pool-list-card";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +61,14 @@ export default async function PhonePoolAdminPage() {
   }
 
   const twilioReady = twilioIsConfigured();
+  const countLabel = `${rows.length} number${rows.length === 1 ? "" : "s"}`;
 
   return (
     <AdminPageShell
       icon={Phone}
       title="Phone pool"
       description="Irish DIDs Cliste owns. Pool refills nightly when IE-available drops below the low-water mark."
-      className="space-y-6"
+      className={ADMIN_LIST_PAGE_CLASS}
     >
       {!twilioReady ? (
         <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
@@ -88,72 +99,53 @@ export default async function PhonePoolAdminPage() {
         />
       </section>
 
-      <PhonePoolToolbar />
-
-      <AdminSectionCard
-        title="All numbers"
-        description={`${rows.length} number${rows.length === 1 ? "" : "s"} · newest first`}
-        contentClassName="p-0"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50/80">
+      <PhonePoolListCard countLabel={countLabel}>
+        <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+          <thead className={adminTableHeadClass}>
+            <tr>
+              <th className={adminTableThClass}>Number</th>
+              <th className={adminTableThClass}>Provider</th>
+              <th className={adminTableThClass}>Status</th>
+              <th className={adminTableThClass}>Assigned to</th>
+              <th className={adminTableThClass}>Since</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-gray-700">
+            {rows.length === 0 ? (
               <tr>
-                <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Number
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Provider
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Assigned to
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Since
-                </th>
+                <td colSpan={5} className={adminTableEmptyClass}>
+                  Pool is empty. Trigger a refill or seed numbers manually.
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-gray-700">
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-16 text-center text-sm text-gray-500"
-                  >
-                    Pool is empty. Trigger a refill or seed numbers manually.
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className={adminTableRowClass}>
+                  <td className={`font-mono text-sm ${adminTableTdClass}`}>
+                    {r.e164}
+                    <span className="ml-2 inline-flex items-center rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                      {r.country_code}
+                    </span>
+                  </td>
+                  <td className={`text-gray-600 ${adminTableTdClass}`}>
+                    {r.provider}
+                  </td>
+                  <td className={adminTableTdClass}>
+                    <AdminBadge className="capitalize">{r.status}</AdminBadge>
+                  </td>
+                  <td className={`text-gray-600 ${adminTableTdClass}`}>
+                    {r.organization_id
+                      ? (orgNameIndex.get(r.organization_id) ?? "(linked)")
+                      : "—"}
+                  </td>
+                  <td className={`text-gray-500 ${adminTableTdClass}`}>
+                    {formatAgeLabel(r)}
                   </td>
                 </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-3 font-mono text-sm">
-                      {r.e164}
-                      <span className="ml-2 inline-flex items-center rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
-                        {r.country_code}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{r.provider}</td>
-                    <td className="px-4 py-3">
-                      <AdminBadge className="capitalize">{r.status}</AdminBadge>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {r.organization_id
-                        ? (orgNameIndex.get(r.organization_id) ?? "(linked)")
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {formatAgeLabel(r)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </AdminSectionCard>
+              ))
+            )}
+          </tbody>
+        </table>
+      </PhonePoolListCard>
     </AdminPageShell>
   );
 }

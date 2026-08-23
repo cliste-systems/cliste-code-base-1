@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import { LifeBuoy } from "lucide-react";
 
+import { AdminBadge } from "@/components/admin/admin-badge";
+import {
+  ADMIN_LIST_PAGE_CLASS,
+} from "@/components/admin/admin-list-card";
 import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
 import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { SupportThreadMessages } from "@/components/support/support-thread-messages";
-import { cn } from "@/lib/utils";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { CloseSupportButton } from "../close-support-button";
@@ -63,19 +66,7 @@ function formatWhen(iso: string): string {
 }
 
 function TicketStatusChip({ status }: { status: string }) {
-  const isOpen = status === "open";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize",
-        isOpen
-          ? "border-emerald-200/80 bg-emerald-50 text-emerald-800"
-          : "border-gray-200/80 bg-gray-50 text-gray-600",
-      )}
-    >
-      {status}
-    </span>
-  );
+  return <AdminBadge className="capitalize">{status}</AdminBadge>;
 }
 
 export default async function AdminSupportTicketPage({
@@ -117,6 +108,7 @@ export default async function AdminSupportTicketPage({
         maxWidth="3xl"
         backHref="/admin/support"
         backLabel="Support tickets"
+        className={ADMIN_LIST_PAGE_CLASS}
       >
         <AdminErrorCard message={loadError} />
       </AdminPageShell>
@@ -152,6 +144,7 @@ export default async function AdminSupportTicketPage({
       maxWidth="3xl"
       backHref="/admin/support"
       backLabel="Support tickets"
+      className={ADMIN_LIST_PAGE_CLASS}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <TicketStatusChip status={ticket.status} />

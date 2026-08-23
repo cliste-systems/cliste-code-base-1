@@ -1,12 +1,25 @@
 import type { Metadata } from "next";
 import { Shield } from "lucide-react";
 
+import { AdminBadge } from "@/components/admin/admin-badge";
+import {
+  ADMIN_LIST_PAGE_CLASS,
+  AdminListCard,
+} from "@/components/admin/admin-list-card";
 import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
 import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import {
+  adminTableClass,
+  adminTableEmptyClass,
+  adminTableHeadClass,
+  adminTableRowClass,
+  adminTableTdClass,
+  adminTableThClass,
+} from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -42,19 +55,6 @@ function outcomeLabel(outcome: SecurityEventRow["outcome"]): string {
       return "Config error";
     default:
       return outcome;
-  }
-}
-
-function outcomeClass(outcome: SecurityEventRow["outcome"]): string {
-  switch (outcome) {
-    case "success":
-      return "border-green-200/60 bg-green-50 text-green-700";
-    case "failure":
-      return "border-red-200/60 bg-red-50 text-red-700";
-    case "rate_limited":
-      return "border-amber-200/80 bg-amber-50 text-amber-800";
-    default:
-      return "border-gray-200/80 bg-gray-50 text-gray-700";
   }
 }
 
@@ -169,11 +169,14 @@ export default async function AdminSecurityPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
 
+  const authCountLabel = `${rows.length} event${rows.length === 1 ? "" : "s"}`;
+
   return (
     <AdminPageShell
       icon={Shield}
       title="Security"
       description="Track successful and failed logins, where attempts come from, and repeated attempts over time."
+      className={ADMIN_LIST_PAGE_CLASS}
     >
       {loadError ? (
         <AdminErrorCard
@@ -186,33 +189,13 @@ export default async function AdminSecurityPage() {
         />
       ) : (
         <>
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <AdminStatCard label="Failed attempts (24h)" value={failures24h} />
             <AdminStatCard label="Successful auths (24h)" value={success24h} />
             <AdminStatCard label="Unique IPs (24h)" value={uniqueIps24h} />
           </section>
 
-          <AdminSectionCard title="Repeated attempts" padded>
-            {topAttempts.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No failed or rate-limited attempts recorded yet.
-              </p>
-            ) : (
-              <ul className="space-y-1">
-                {topAttempts.map(([who, count]) => (
-                  <li
-                    key={who}
-                    className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2 text-sm"
-                  >
-                    <span className="truncate text-gray-700">{who}</span>
-                    <span className="font-medium text-gray-900">{count}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </AdminSectionCard>
-
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <AdminStatCard
               label="Disclosure confirmed (7d)"
               value={
@@ -227,42 +210,117 @@ export default async function AdminSecurityPage() {
             />
           </section>
 
+          <AdminSectionCard
+            title="Repeated attempts"
+            description="Failed or rate-limited identities with the highest counts."
+            padded
+          >
+            {topAttempts.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No failed or rate-limited attempts recorded yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                {topAttempts.map(([who, count]) => (
+                  <li
+                    key={who}
+                    className="flex items-center justify-between px-4 py-3 text-sm"
+                  >
+                    <span className="truncate text-gray-700">{who}</span>
+                    <span className="font-medium text-gray-900 tabular-nums">
+                      {count}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </AdminSectionCard>
+
+          <AdminListCard countLabel={authCountLabel}>
+            <table className={`${adminTableClass} min-w-[1080px] text-sm`}>
+              <thead className={adminTableHeadClass}>
+                <tr>
+                  <th className={adminTableThClass}>When</th>
+                  <th className={adminTableThClass}>Event</th>
+                  <th className={adminTableThClass}>Outcome</th>
+                  <th className={adminTableThClass}>Login email</th>
+                  <th className={adminTableThClass}>Actor</th>
+                  <th className={adminTableThClass}>Target</th>
+                  <th className={adminTableThClass}>IP / Country</th>
+                  <th className={adminTableThClass}>Attempts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className={adminTableEmptyClass}>
+                      No security events recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => (
+                    <tr key={row.id} className={adminTableRowClass}>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {formatDate(row.created_at)}
+                      </td>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {row.event_type}
+                      </td>
+                      <td className={adminTableTdClass}>
+                        <AdminBadge>{outcomeLabel(row.outcome)}</AdminBadge>
+                      </td>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {row.login_email ?? "—"}
+                      </td>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {row.actor_email ?? "—"}
+                      </td>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {row.target_email ?? "—"}
+                      </td>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {row.ip_masked ?? "—"}
+                        {row.ip_country ? ` (${row.ip_country})` : ""}
+                      </td>
+                      <td className={`text-gray-700 ${adminTableTdClass}`}>
+                        {row.attempt_count ?? "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </AdminListCard>
+
           {pipelineIncidents.length > 0 ? (
             <AdminSectionCard
               title="Voice pipeline health"
               description="Unrecoverable STT/LLM/TTS failures reported by the worker."
+              contentClassName="p-0"
             >
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-white">
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        When
-                      </th>
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        Stage
-                      </th>
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        DID
-                      </th>
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        Error
-                      </th>
+                <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+                  <thead className={adminTableHeadClass}>
+                    <tr>
+                      <th className={adminTableThClass}>When</th>
+                      <th className={adminTableThClass}>Stage</th>
+                      <th className={adminTableThClass}>DID</th>
+                      <th className={adminTableThClass}>Error</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {pipelineIncidents.map((inc) => (
-                      <tr key={inc.id} className="hover:bg-gray-50/40">
-                        <td className="px-5 py-4 whitespace-nowrap text-gray-600">
+                      <tr key={inc.id} className={adminTableRowClass}>
+                        <td className={`whitespace-nowrap text-gray-600 ${adminTableTdClass}`}>
                           {formatDate(inc.occurred_at)}
                         </td>
-                        <td className="px-5 py-4 font-medium text-gray-900">
+                        <td className={`font-medium text-gray-900 ${adminTableTdClass}`}>
                           {inc.stage}
                         </td>
-                        <td className="px-5 py-4 text-gray-600">
+                        <td className={`text-gray-600 ${adminTableTdClass}`}>
                           {inc.called_number ?? "—"}
                         </td>
-                        <td className="max-w-md truncate px-5 py-4 text-gray-700">
+                        <td className={`max-w-md truncate text-gray-700 ${adminTableTdClass}`}>
                           {inc.error_message}
                         </td>
                       </tr>
@@ -276,53 +334,43 @@ export default async function AdminSecurityPage() {
           <AdminSectionCard
             title="Voice compliance signals"
             description="Disclosure misses and other compliance telemetry from the voice pipeline."
+            contentClassName="p-0"
           >
             {complianceError ? (
-              <p className="text-sm text-amber-800">
+              <p className="px-4 py-3 text-sm text-gray-700">
                 Compliance events unavailable: {complianceError}
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-white">
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        When
-                      </th>
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        Event
-                      </th>
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        Organization
-                      </th>
-                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                        Metadata
-                      </th>
+                <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+                  <thead className={adminTableHeadClass}>
+                    <tr>
+                      <th className={adminTableThClass}>When</th>
+                      <th className={adminTableThClass}>Event</th>
+                      <th className={adminTableThClass}>Organization</th>
+                      <th className={adminTableThClass}>Metadata</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {complianceRows.length === 0 ? (
                       <tr>
-                        <td
-                          colSpan={4}
-                          className="px-5 py-12 text-center text-sm text-gray-500"
-                        >
+                        <td colSpan={4} className={adminTableEmptyClass}>
                           No compliance events recorded yet.
                         </td>
                       </tr>
                     ) : (
                       complianceRows.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50/40">
-                          <td className="px-5 py-4 text-sm text-gray-700">
+                        <tr key={row.id} className={adminTableRowClass}>
+                          <td className={`text-gray-700 ${adminTableTdClass}`}>
                             {formatDate(row.created_at)}
                           </td>
-                          <td className="px-5 py-4 text-sm text-gray-700">
+                          <td className={`text-gray-700 ${adminTableTdClass}`}>
                             {row.event_type}
                           </td>
-                          <td className="px-5 py-4 font-mono text-xs text-gray-600">
+                          <td className={`font-mono text-xs text-gray-600 ${adminTableTdClass}`}>
                             {row.organization_id ?? "—"}
                           </td>
-                          <td className="px-5 py-4 text-xs text-gray-600">
+                          <td className={`text-xs text-gray-600 ${adminTableTdClass}`}>
                             {row.metadata
                               ? JSON.stringify(row.metadata).slice(0, 120)
                               : "—"}
@@ -334,90 +382,6 @@ export default async function AdminSecurityPage() {
                 </table>
               </div>
             )}
-          </AdminSectionCard>
-
-          <AdminSectionCard
-            title="Auth events"
-            description="Recent login and access activity across the platform."
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-white">
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      When
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      Event
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      Outcome
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      Login email
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      Actor
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      Target
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      IP / Country
-                    </th>
-                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
-                      Attempts
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={8}
-                        className="px-5 py-12 text-center text-sm text-gray-500"
-                      >
-                        No security events recorded yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50/40">
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {formatDate(row.created_at)}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {row.event_type}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium ${outcomeClass(row.outcome)}`}
-                          >
-                            {outcomeLabel(row.outcome)}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {row.login_email ?? "—"}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {row.actor_email ?? "—"}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {row.target_email ?? "—"}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {row.ip_masked ?? "—"}
-                          {row.ip_country ? ` (${row.ip_country})` : ""}
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-700">
-                          {row.attempt_count ?? "—"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           </AdminSectionCard>
         </>
       )}
