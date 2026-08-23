@@ -10,5 +10,5 @@ export default async function AdminOrganizationDetailRedirect({
   params,
 }: PageProps) {
   const { id } = await params;
-  redirect(`/admin/clients/${id}`);
+  redirect(`/admin/customers/${id}`);
 }

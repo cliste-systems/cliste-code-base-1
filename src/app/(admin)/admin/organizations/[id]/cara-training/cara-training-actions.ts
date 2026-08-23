@@ -33,7 +33,7 @@ type ActionResult = { ok: true } | { ok: false; message: string };
 function revalidateAll(orgId: string) {
   revalidatePath(`/admin/organizations/${orgId}`);
   revalidatePath(`/admin/organizations/${orgId}/cara-training`);
-  revalidatePath("/admin/onboarding");
+  revalidatePath("/admin/customers");
   for (const path of AGENT_CONFIG_REVALIDATE_PATHS) {
     revalidatePath(path);
   }

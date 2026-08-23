@@ -8,5 +8,5 @@ type PageProps = {
 
 export default async function LegacyCaraTrainingRedirect({ params }: PageProps) {
   const { id } = await params;
-  redirect(`/admin/clients/${id}/cara-training`);
+  redirect(`/admin/customers/${id}/cara-training`);
 }

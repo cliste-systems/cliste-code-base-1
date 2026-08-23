@@ -452,8 +452,7 @@ export async function createOrganization(payload: {
     }
 
     revalidatePath("/admin");
-    revalidatePath("/admin/clients");
-    revalidatePath("/admin/onboarding");
+    revalidatePath("/admin/customers");
     await recordAdminEvent(operator, {
       eventType: "admin_organization_created",
       outcome: "success",
@@ -576,7 +575,7 @@ export async function resendOrganizationInvite(
     .eq("id", invite.id);
 
   revalidatePath("/admin");
-  revalidatePath("/admin/onboarding");
+  revalidatePath("/admin/customers");
   revalidatePath(`/admin/organizations/${id}`);
 
   await recordAdminEvent(operator, {
@@ -1325,7 +1324,7 @@ export async function releasePoolPhoneFromOrganization(
   revalidatePath(`/admin/organizations/${id}`);
   revalidatePath("/admin");
   revalidatePath("/admin/phone-pool");
-  revalidatePath("/admin/onboarding");
+  revalidatePath("/admin/customers");
   await recordAdminEvent(operator, {
     eventType: "admin_phone_released",
     outcome: "success",
@@ -1610,7 +1609,7 @@ export async function setOrganizationLive(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/admin/organizations/${id}`);
-  revalidatePath("/admin/onboarding");
+  revalidatePath("/admin/customers");
   await recordAdminEvent(operator, {
     eventType: live ? "admin_store_went_live" : "admin_store_taken_offline",
     outcome: "success",

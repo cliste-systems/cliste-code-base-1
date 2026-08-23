@@ -5,8 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
-  Briefcase,
-  Inbox,
   LayoutGrid,
   LifeBuoy,
   Phone,
@@ -22,15 +20,9 @@ import { AdminSignOutButton } from "./admin-sign-out-button";
 const baseNav = [
   { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
   {
-    href: "/admin/onboarding",
-    label: "Onboarding",
-    icon: Inbox,
-    exact: false,
-  },
-  {
-    href: "/admin/clients",
-    label: "Clients",
-    icon: Briefcase,
+    href: "/admin/customers",
+    label: "Customers",
+    icon: Users,
     exact: false,
   },
   {
