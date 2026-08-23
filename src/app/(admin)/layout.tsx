@@ -1,9 +1,7 @@
-import { PRODUCT_NAME } from "@/lib/company-details";
 import Link from "next/link";
 
-import { Building2 } from "lucide-react";
-
 import { DashboardViewportLock } from "@/app/(dashboard)/dashboard/dashboard-viewport-lock";
+import { ClisteLogoMark } from "@/components/cliste-logo-mark";
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
 
@@ -53,19 +51,13 @@ export default async function AdminShellLayout({
                   href="/admin"
                   className="flex items-center gap-3 rounded-lg outline-none transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:ring-slate-400/40"
                 >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-                    <Building2
-                      className="size-4 text-slate-600"
-                      strokeWidth={1.5}
-                      aria-hidden
-                    />
-                  </div>
+                  <ClisteLogoMark size={36} priority className="shrink-0" />
                   <div className="min-w-0 flex-col">
                     <span className="block text-sm font-semibold leading-tight text-[#0b1220]">
-                      {PRODUCT_NAME}
+                      Cliste Systems
                     </span>
                     <span className="mt-0.5 block text-xs text-slate-500">
-                      Admin console
+                      Admin Console
                     </span>
                   </div>
                 </Link>

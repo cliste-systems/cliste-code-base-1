@@ -35,11 +35,11 @@ export type IdentityAccessRow = {
 
 type IdentityAccessTableProps = {
   rows: IdentityAccessRow[];
+  bare?: boolean;
 };
 
-export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableProps) {
+  const table = (
       <table className="w-full min-w-[900px] border-collapse text-left">
         <thead>
           <tr className="border-b border-gray-200 bg-white">
@@ -128,6 +128,15 @@ export function IdentityAccessTable({ rows }: IdentityAccessTableProps) {
           )}
         </tbody>
       </table>
+  );
+
+  if (bare) {
+    return <div className="overflow-x-auto">{table}</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      {table}
     </div>
   );
 }

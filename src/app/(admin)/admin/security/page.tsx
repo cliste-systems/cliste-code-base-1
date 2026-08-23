@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { Shield } from "lucide-react";
 
+import {
+  AdminErrorCard,
+  AdminPageShell,
+} from "@/components/admin/admin-page-shell";
+import { AdminSectionCard } from "@/components/admin/admin-section-card";
+import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -164,67 +170,35 @@ export default async function AdminSecurityPage() {
     .slice(0, 8);
 
   return (
-    <div className="mx-auto max-w-[1200px] p-6 pb-24 sm:p-10 lg:p-12">
-      <header className="mb-10">
-        <div className="mb-3 flex items-center gap-2">
-          <Shield className="size-4 shrink-0 text-gray-400" strokeWidth={1.5} aria-hidden />
-          <p className="text-xs font-medium tracking-widest text-gray-500 uppercase">
-            Security
-          </p>
-        </div>
-        <h1 className="text-3xl font-medium tracking-tight text-gray-900">
-          Access activity
-        </h1>
-        <p className="mt-2 text-sm text-gray-500">
-          Track successful and failed logins, where attempts come from, and repeated
-          attempts over time.
-        </p>
-      </header>
-
+    <AdminPageShell
+      icon={Shield}
+      title="Security"
+      description="Track successful and failed logins, where attempts come from, and repeated attempts over time."
+    >
       {loadError ? (
-        <div className="rounded-xl border border-red-200/80 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold text-red-700">{loadError}</p>
-          <p className="mt-2 text-xs text-red-700/80">
-            If this is a missing-table error, run the latest Supabase migration.
-          </p>
-        </div>
+        <AdminErrorCard
+          message={loadError}
+          hint={
+            <p className="text-xs text-red-700/80">
+              If this is a missing-table error, run the latest Supabase migration.
+            </p>
+          }
+        />
       ) : (
         <>
-          <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
-                Failed attempts (24h)
-              </p>
-              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
-                {failures24h}
-              </p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
-                Successful auths (24h)
-              </p>
-              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
-                {success24h}
-              </p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
-                Unique IPs (24h)
-              </p>
-              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
-                {uniqueIps24h}
-              </p>
-            </div>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <AdminStatCard label="Failed attempts (24h)" value={failures24h} />
+            <AdminStatCard label="Successful auths (24h)" value={success24h} />
+            <AdminStatCard label="Unique IPs (24h)" value={uniqueIps24h} />
           </section>
 
-          <section className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-medium text-gray-900">Repeated attempts</h2>
+          <AdminSectionCard title="Repeated attempts" padded>
             {topAttempts.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="text-sm text-gray-500">
                 No failed or rate-limited attempts recorded yet.
               </p>
             ) : (
-              <ul className="mt-3 space-y-1">
+              <ul className="space-y-1">
                 {topAttempts.map(([who, count]) => (
                   <li
                     key={who}
@@ -236,180 +210,217 @@ export default async function AdminSecurityPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </AdminSectionCard>
 
-          <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
-                Disclosure confirmed (7d)
-              </p>
-              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
-                {disclosureConfirmedPct != null ? `${disclosureConfirmedPct}%` : "—"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">
-                Pipeline incidents (7d)
-              </p>
-              <p className="mt-2 text-3xl font-medium tracking-tight text-gray-900">
-                {pipelineIncidents.length}
-              </p>
-            </div>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <AdminStatCard
+              label="Disclosure confirmed (7d)"
+              value={
+                disclosureConfirmedPct != null
+                  ? `${disclosureConfirmedPct}%`
+                  : "—"
+              }
+            />
+            <AdminStatCard
+              label="Pipeline incidents (7d)"
+              value={pipelineIncidents.length}
+            />
           </section>
 
           {pipelineIncidents.length > 0 ? (
-            <section className="mb-8 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="border-b border-gray-200 px-4 py-3">
-                <h2 className="text-sm font-medium text-gray-900">
-                  Voice pipeline health
-                </h2>
-                <p className="mt-1 text-xs text-gray-500">
-                  Unrecoverable STT/LLM/TTS failures reported by the worker.
-                </p>
-              </div>
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-gray-100 text-xs text-gray-500 uppercase">
-                  <tr>
-                    <th className="px-4 py-2">When</th>
-                    <th className="px-4 py-2">Stage</th>
-                    <th className="px-4 py-2">DID</th>
-                    <th className="px-4 py-2">Error</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pipelineIncidents.map((inc) => (
-                    <tr key={inc.id} className="border-b border-gray-50">
-                      <td className="px-4 py-2 whitespace-nowrap text-gray-600">
-                        {formatDate(inc.occurred_at)}
-                      </td>
-                      <td className="px-4 py-2 font-medium text-gray-900">
-                        {inc.stage}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600">
-                        {inc.called_number ?? "—"}
-                      </td>
-                      <td className="max-w-md truncate px-4 py-2 text-gray-700">
-                        {inc.error_message}
-                      </td>
+            <AdminSectionCard
+              title="Voice pipeline health"
+              description="Unrecoverable STT/LLM/TTS failures reported by the worker."
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-white">
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        When
+                      </th>
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        Stage
+                      </th>
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        DID
+                      </th>
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        Error
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {pipelineIncidents.map((inc) => (
+                      <tr key={inc.id} className="hover:bg-gray-50/40">
+                        <td className="px-5 py-4 whitespace-nowrap text-gray-600">
+                          {formatDate(inc.occurred_at)}
+                        </td>
+                        <td className="px-5 py-4 font-medium text-gray-900">
+                          {inc.stage}
+                        </td>
+                        <td className="px-5 py-4 text-gray-600">
+                          {inc.called_number ?? "—"}
+                        </td>
+                        <td className="max-w-md truncate px-5 py-4 text-gray-700">
+                          {inc.error_message}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </AdminSectionCard>
           ) : null}
 
-          <section className="mb-8 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-200 px-4 py-3">
-              <h2 className="text-sm font-medium text-gray-900">
-                Voice compliance signals
-              </h2>
-              <p className="mt-1 text-xs text-gray-500">
-                Disclosure misses and other compliance telemetry from the voice pipeline.
-              </p>
-            </div>
+          <AdminSectionCard
+            title="Voice compliance signals"
+            description="Disclosure misses and other compliance telemetry from the voice pipeline."
+          >
             {complianceError ? (
-              <p className="px-4 py-6 text-sm text-amber-800">
+              <p className="text-sm text-amber-800">
                 Compliance events unavailable: {complianceError}
               </p>
             ) : (
-              <table className="w-full min-w-[720px] border-collapse text-left">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-white">
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        When
+                      </th>
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        Event
+                      </th>
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        Organization
+                      </th>
+                      <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                        Metadata
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {complianceRows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-5 py-12 text-center text-sm text-gray-500"
+                        >
+                          No compliance events recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      complianceRows.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50/40">
+                          <td className="px-5 py-4 text-sm text-gray-700">
+                            {formatDate(row.created_at)}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-gray-700">
+                            {row.event_type}
+                          </td>
+                          <td className="px-5 py-4 font-mono text-xs text-gray-600">
+                            {row.organization_id ?? "—"}
+                          </td>
+                          <td className="px-5 py-4 text-xs text-gray-600">
+                            {row.metadata
+                              ? JSON.stringify(row.metadata).slice(0, 120)
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AdminSectionCard>
+
+          <AdminSectionCard
+            title="Auth events"
+            description="Recent login and access activity across the platform."
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1080px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-gray-200 bg-white">
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500">When</th>
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500">Event</th>
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500">Organization</th>
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500">Metadata</th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      When
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      Event
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      Outcome
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      Login email
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      Actor
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      Target
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      IP / Country
+                    </th>
+                    <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                      Attempts
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {complianceRows.length === 0 ? (
+                  {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
-                        No compliance events recorded yet.
+                      <td
+                        colSpan={8}
+                        className="px-5 py-12 text-center text-sm text-gray-500"
+                      >
+                        No security events recorded yet.
                       </td>
                     </tr>
                   ) : (
-                    complianceRows.map((row) => (
+                    rows.map((row) => (
                       <tr key={row.id} className="hover:bg-gray-50/40">
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-5 py-4 text-sm text-gray-700">
                           {formatDate(row.created_at)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-5 py-4 text-sm text-gray-700">
                           {row.event_type}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                          {row.organization_id ?? "—"}
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium ${outcomeClass(row.outcome)}`}
+                          >
+                            {outcomeLabel(row.outcome)}
+                          </span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-600">
-                          {row.metadata
-                            ? JSON.stringify(row.metadata).slice(0, 120)
-                            : "—"}
+                        <td className="px-5 py-4 text-sm text-gray-700">
+                          {row.login_email ?? "—"}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-700">
+                          {row.actor_email ?? "—"}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-700">
+                          {row.target_email ?? "—"}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-700">
+                          {row.ip_masked ?? "—"}
+                          {row.ip_country ? ` (${row.ip_country})` : ""}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-700">
+                          {row.attempt_count ?? "—"}
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
-            )}
-          </section>
-
-          <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="w-full min-w-[1080px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-gray-200 bg-white">
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">When</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Event</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Outcome</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Login email</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Actor</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Target</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">IP / Country</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Attempts</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">
-                      No security events recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50/40">
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.created_at)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{row.event_type}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium ${outcomeClass(row.outcome)}`}
-                        >
-                          {outcomeLabel(row.outcome)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {row.login_email ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {row.actor_email ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {row.target_email ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {row.ip_masked ?? "—"}
-                        {row.ip_country ? ` (${row.ip_country})` : ""}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {row.attempt_count ?? "—"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </section>
+            </div>
+          </AdminSectionCard>
         </>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

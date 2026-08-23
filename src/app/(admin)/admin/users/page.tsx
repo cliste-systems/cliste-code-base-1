@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { Shield, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
+import {
+  AdminErrorCard,
+  AdminPageShell,
+} from "@/components/admin/admin-page-shell";
+import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { isAdminEmailAllowlisted } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -152,43 +157,27 @@ export default async function AdminIdentityAccessPage() {
     rows.length === 1 ? "1 user" : `${rows.length} users`;
 
   return (
-    <div className="mx-auto max-w-[1100px] p-6 pb-24 sm:p-10 lg:p-12">
-      <header className="mb-10">
-        <div className="mb-3 flex items-center gap-2">
-          <Shield
-            className="size-4 shrink-0 text-gray-400"
-            strokeWidth={1.5}
-            aria-hidden
-          />
-          <p className="text-xs font-medium tracking-widest text-gray-500 uppercase">
-            Identity &amp; access
-          </p>
+    <AdminPageShell
+      icon={Users}
+      title="Identity & access"
+      description="Use each user's action menu to grant or revoke admin console access."
+      actions={
+        <div className="flex items-center gap-1.5 text-sm text-gray-400">
+          <Users className="size-4 shrink-0" aria-hidden />
+          <span className="tabular-nums">{userLabel}</span>
         </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-medium tracking-tight text-gray-900">
-              Access log
-            </h1>
-            <p className="mt-2 text-sm text-gray-500">
-              Use each user&apos;s action menu to grant or revoke admin console access.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5 text-sm text-gray-400 sm:mb-0.5">
-            <Users className="size-4 shrink-0" aria-hidden />
-            <span className="tabular-nums">{userLabel}</span>
-          </div>
-        </div>
-      </header>
-
+      }
+    >
       {loadError ? (
-        <div className="rounded-xl border border-red-200/80 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold text-red-700">{loadError}</p>
-        </div>
+        <AdminErrorCard message={loadError} />
       ) : (
-        <section aria-label="Auth users">
-          <IdentityAccessTable rows={rows} />
-        </section>
+        <AdminSectionCard
+          title="All users"
+          description="Auth users sorted by most recent login."
+        >
+          <IdentityAccessTable rows={rows} bare />
+        </AdminSectionCard>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

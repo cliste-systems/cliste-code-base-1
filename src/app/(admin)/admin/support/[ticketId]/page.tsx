@@ -1,18 +1,14 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { LifeBuoy } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { createAdminClient } from "@/utils/supabase/admin";
-
+  AdminErrorCard,
+  AdminPageShell,
+} from "@/components/admin/admin-page-shell";
+import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { SupportThreadMessages } from "@/components/support/support-thread-messages";
+import { cn } from "@/lib/utils";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 import { CloseSupportButton } from "../close-support-button";
 import { TicketAdminReplyForm } from "../ticket-admin-reply-form";
@@ -66,6 +62,22 @@ function formatWhen(iso: string): string {
   });
 }
 
+function TicketStatusChip({ status }: { status: string }) {
+  const isOpen = status === "open";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize",
+        isOpen
+          ? "border-emerald-200/80 bg-emerald-50 text-emerald-800"
+          : "border-gray-200/80 bg-gray-50 text-gray-600",
+      )}
+    >
+      {status}
+    </span>
+  );
+}
+
 export default async function AdminSupportTicketPage({
   params,
 }: {
@@ -98,16 +110,16 @@ export default async function AdminSupportTicketPage({
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 p-6 md:p-8">
-        <Link
-          href="/admin/support"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-          All tickets
-        </Link>
-        <p className="text-destructive text-sm">{loadError}</p>
-      </div>
+      <AdminPageShell
+        icon={LifeBuoy}
+        title="Support tickets"
+        description="Ticket detail"
+        maxWidth="3xl"
+        backHref="/admin/support"
+        backLabel="Support tickets"
+      >
+        <AdminErrorCard message={loadError} />
+      </AdminPageShell>
     );
   }
 
@@ -119,71 +131,52 @@ export default async function AdminSupportTicketPage({
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6 md:p-8">
-      <Link
-        href="/admin/support"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ChevronLeft className="size-4" aria-hidden />
-        All tickets
-      </Link>
+  const slug = orgSlug(ticket);
+  const description = (
+    <>
+      {orgLabel(ticket)}
+      {slug ? (
+        <span className="ml-2 font-mono text-xs text-gray-400">{slug}</span>
+      ) : null}
+      <span className="mt-1 block text-xs tabular-nums">
+        Opened {formatWhen(ticket.created_at)}
+      </span>
+    </>
+  );
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground text-xs font-medium uppercase">
-            {orgLabel(ticket)}
-            {orgSlug(ticket) ? (
-              <span className="text-muted-foreground ml-2 font-mono normal-case">
-                {orgSlug(ticket)}
-              </span>
-            ) : null}
-          </p>
-          <h1 className="text-foreground mt-1 text-2xl font-semibold tracking-tight">
-            {ticket.subject}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-xs tabular-nums">
-            Opened {formatWhen(ticket.created_at)}
-          </p>
-        </div>
+  return (
+    <AdminPageShell
+      icon={LifeBuoy}
+      title={ticket.subject}
+      description={description}
+      maxWidth="3xl"
+      backHref="/admin/support"
+      backLabel="Support tickets"
+      actions={
         <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            variant={ticket.status === "open" ? "default" : "secondary"}
-            className="capitalize"
-          >
-            {ticket.status}
-          </Badge>
+          <TicketStatusChip status={ticket.status} />
           {ticket.status === "open" ? (
             <CloseSupportButton ticketId={ticket.id} />
           ) : null}
         </div>
-      </div>
+      }
+    >
+      <AdminSectionCard
+        title="Conversation"
+        description="Original request and all replies. The client sees this on Support."
+        padded
+      >
+        <SupportThreadMessages
+          openedAt={ticket.created_at}
+          initialBody={ticket.body}
+          messages={messages}
+          perspective="admin"
+        />
+      </AdminSectionCard>
 
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Conversation</CardTitle>
-          <CardDescription>
-            Original request and all replies. The client sees this on Support.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <SupportThreadMessages
-            openedAt={ticket.created_at}
-            initialBody={ticket.body}
-            messages={messages}
-            perspective="admin"
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Add reply</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TicketAdminReplyForm ticketId={ticket.id} />
-        </CardContent>
-      </Card>
-    </div>
+      <AdminSectionCard title="Add reply" padded>
+        <TicketAdminReplyForm ticketId={ticket.id} />
+      </AdminSectionCard>
+    </AdminPageShell>
   );
 }

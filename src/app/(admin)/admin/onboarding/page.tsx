@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { LayoutGrid } from "lucide-react";
+import { Inbox } from "lucide-react";
 
+import {
+  AdminPageEmptyState,
+  AdminPageShell,
+} from "@/components/admin/admin-page-shell";
 import { loadProvisioningPipeline } from "@/lib/load-provisioning-pipeline";
 import {
   tenantProvisioningStageLabel,
@@ -34,28 +38,20 @@ export default async function OnboardingPipelinePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-gray-900">
-            <LayoutGrid className="h-5 w-5 text-gray-500" />
-            Onboarding
-          </h1>
-          <p className="text-sm text-gray-500">
-            Admin-led retail store provisioning — from invite through go-live.
-          </p>
-        </div>
-        <NewClientDialog />
-      </header>
-
+    <AdminPageShell
+      icon={Inbox}
+      title="Onboarding"
+      description="Admin-led retail store provisioning — from invite through go-live."
+      actions={<NewClientDialog />}
+    >
       {pipeline.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+        <AdminPageEmptyState>
           <p>No admin-provisioned stores yet.</p>
           <p className="mt-2">
             Use <strong>New retail client</strong> above to provision the first
             store.
           </p>
-        </div>
+        </AdminPageEmptyState>
       ) : (
         <div className="grid gap-4 lg:grid-cols-4">
           {STAGE_ORDER.map((stage) => {
@@ -73,9 +69,7 @@ export default async function OnboardingPipelinePage() {
                 </header>
                 <ul className="flex-1 divide-y divide-gray-50 overflow-y-auto">
                   {rows.length === 0 ? (
-                    <li className="px-4 py-6 text-xs text-gray-400">
-                      None
-                    </li>
+                    <li className="px-4 py-6 text-xs text-gray-400">None</li>
                   ) : (
                     rows.map(({ org, provisioning, inviteEmail }) => {
                       const completeCount = provisioning.steps.filter(
@@ -118,6 +112,6 @@ export default async function OnboardingPipelinePage() {
           })}
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }
