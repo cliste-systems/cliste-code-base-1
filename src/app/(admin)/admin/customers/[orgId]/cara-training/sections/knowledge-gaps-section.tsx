@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import type { CaraTrainingGapItem } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
+import { CaraTrainingInternalBanner } from "@/components/admin/cara-training-field";
 
 import { SectionCard } from "./section-card";
 
@@ -15,8 +16,12 @@ export function KnowledgeGapsSection({ organizationId, gaps }: Props) {
   return (
     <SectionCard
       title="9. Knowledge gaps"
-      description="Open gaps from live calls. Learnable gaps can be answered in the tenant dashboard."
+      description="Open gaps from live calls — not in Cara's prompt until answered."
     >
+      <CaraTrainingInternalBanner>
+        Gaps are a mirror of live-call questions. Cara only learns an answer after
+        you approve it in the tenant training inbox.
+      </CaraTrainingInternalBanner>
       {gaps.length === 0 ? (
         <p className="text-muted-foreground text-sm">No open knowledge gaps.</p>
       ) : (

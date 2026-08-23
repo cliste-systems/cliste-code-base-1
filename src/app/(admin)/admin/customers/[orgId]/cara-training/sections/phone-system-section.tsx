@@ -2,9 +2,12 @@
 
 import { useCallback, useState, useTransition } from "react";
 
+import {
+  CaraTrainingField,
+  CaraTrainingInternalBanner,
+} from "@/components/admin/cara-training-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   StoreTransferMethod,
@@ -82,11 +85,14 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="5. Phone system & transfer"
-      description="PBX setup and warm-transfer hardware status."
+      description="Provisioning notes for the store line. Transfer settings change department wording in Cara's prompt."
     >
+      <CaraTrainingInternalBanner>
+        System type, vendor, and notes are for your team only. Transfer method and
+        hardware status decide whether Cara may offer to put callers through.
+      </CaraTrainingInternalBanner>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>System type</Label>
+        <CaraTrainingField label="System type" feed="internal">
           <select
             className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
             value={ps.system_type}
@@ -98,16 +104,18 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-2">
-          <Label>Vendor</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="Vendor" feed="internal">
           <Input
             value={ps.vendor ?? ""}
             onChange={(e) => patchPhone({ vendor: e.target.value || null })}
           />
-        </div>
-        <div className="space-y-2">
-          <Label>Transfer method</Label>
+        </CaraTrainingField>
+        <CaraTrainingField
+          label="Transfer method"
+          feed="behaviour"
+          hint="With hardware ready, this enables transfer language in the departments section."
+        >
           <select
             className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
             value={ps.transfer_method}
@@ -121,9 +129,12 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-2">
-          <Label>Warm transfer hardware</Label>
+        </CaraTrainingField>
+        <CaraTrainingField
+          label="Warm transfer hardware"
+          feed="behaviour"
+          hint="Must be “go” before Cara can offer live transfers."
+        >
           <select
             className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
             value={ps.warm_transfer_hardware_status}
@@ -140,18 +151,16 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
               </option>
             ))}
           </select>
-        </div>
-        <div className="space-y-2">
-          <Label>Main line (E.164)</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="Main line (E.164)" feed="internal">
           <Input
             value={ps.main_line_e164 ?? ""}
             onChange={(e) =>
               patchPhone({ main_line_e164: e.target.value || null })
             }
           />
-        </div>
-        <div className="space-y-2">
-          <Label>Handset count</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="Handset count" feed="internal">
           <Input
             type="number"
             min={0}
@@ -162,16 +171,15 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
               })
             }
           />
-        </div>
+        </CaraTrainingField>
       </div>
-      <div className="space-y-2">
-        <Label>Notes</Label>
+      <CaraTrainingField label="Notes" feed="internal">
         <Textarea
           value={ps.notes ?? ""}
           onChange={(e) => patchPhone({ notes: e.target.value || null })}
           rows={2}
         />
-      </div>
+      </CaraTrainingField>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save phone system"}

@@ -4,6 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { OpeningHoursEditor } from "@/components/agent-knowledge/opening-hours-editor";
+import { CaraTrainingField, CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,72 +76,74 @@ export function StoreFactsSection({ data, onChange, onSaved }: Props) {
       description="Address, opening hours, bank holidays, and knowledge summary."
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Business type</Label>
+        <CaraTrainingField label="Business type" feed="prompt">
           <Input
             value={data.agentBusinessType}
             onChange={(e) => onChange({ agentBusinessType: e.target.value })}
             placeholder="Supermarket"
           />
-        </div>
-        <div className="space-y-2">
-          <Label>Base town</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="Base town" feed="prompt">
           <Input
             value={data.agentBaseTown}
             onChange={(e) => onChange({ agentBaseTown: e.target.value })}
           />
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label>Address</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="Address" feed="prompt" className="sm:col-span-2">
           <Input
             value={data.agentLocationAddress}
             onChange={(e) => onChange({ agentLocationAddress: e.target.value })}
           />
-        </div>
-        <div className="space-y-2">
-          <Label>Eircode</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="Eircode" feed="prompt">
           <Input
             value={data.agentLocationEircode}
             onChange={(e) => onChange({ agentLocationEircode: e.target.value })}
           />
-        </div>
-        <div className="space-y-2">
-          <Label>County</Label>
+        </CaraTrainingField>
+        <CaraTrainingField label="County" feed="prompt">
           <Input
             value={data.agentLocationCounty}
             onChange={(e) => onChange({ agentLocationCounty: e.target.value })}
           />
-        </div>
+        </CaraTrainingField>
       </div>
-      <div className="space-y-2">
-        <Label>Knowledge summary</Label>
+      <CaraTrainingField label="Knowledge summary" feed="prompt">
         <Textarea
           value={data.businessKnowledgeSummary}
           onChange={(e) => onChange({ businessKnowledgeSummary: e.target.value })}
           rows={4}
         />
-      </div>
-      <OpeningHoursEditor
-        value={data.openingHoursSchedule}
-        onChange={(schedule) => onChange({ openingHoursSchedule: schedule })}
-        open24_7={data.open24_7}
-        onOpen24_7Change={(open24_7) => onChange({ open24_7 })}
-        bankHolidays={data.bankHolidays}
-        onBankHolidaysChange={(bankHolidays) => onChange({ bankHolidays })}
-      />
+      </CaraTrainingField>
+      <CaraTrainingField label="Opening hours" feed="prompt">
+        <OpeningHoursEditor
+          value={data.openingHoursSchedule}
+          onChange={(schedule) => onChange({ openingHoursSchedule: schedule })}
+          open24_7={data.open24_7}
+          onOpen24_7Change={(open24_7) => onChange({ open24_7 })}
+          bankHolidays={data.bankHolidays}
+          onBankHolidaysChange={(bankHolidays) => onChange({ bankHolidays })}
+        />
+      </CaraTrainingField>
 
       <div className="space-y-3 border-t border-slate-100 pt-4">
-        <div className="flex items-center justify-between">
-          <Label>Temporary hours overrides</Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CaraTrainingFieldLabel
+            label="Temporary hours overrides"
+            feed="prompt"
+          />
           <Button type="button" variant="outline" size="sm" onClick={addOverride}>
             <Plus className="size-3.5" aria-hidden />
             Add override
           </Button>
         </div>
+        <p className="text-muted-foreground text-[11px]">
+          Active overrides replace normal hours in Cara&apos;s prompt until they expire.
+        </p>
         {data.hoursOverrides.map((override, index) => (
           <div
             key={override.id || `override-${index}`}
-            className="rounded-lg border border-slate-200 p-3"
+            className="rounded-lg border border-violet-200/60 bg-violet-50/30 p-3"
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">

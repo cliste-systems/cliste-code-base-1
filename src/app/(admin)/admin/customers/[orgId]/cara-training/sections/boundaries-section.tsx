@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { CaraTrainingField } from "@/components/admin/cara-training-field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   RETAIL_ALLERGEN_INSTRUCTION,
@@ -57,30 +57,33 @@ export function BoundariesSection({ data, onChange, onSaved }: Props) {
       title="6. Boundaries"
       description="Retail guardrails, services not offered, and conduct rules."
     >
-      <ul className="space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-        <li>{RETAIL_LIVE_STOCK_PRICE_INSTRUCTION}</li>
-        <li>{RETAIL_AGE_RESTRICTED_INSTRUCTION}</li>
-        <li>{RETAIL_ALLERGEN_INSTRUCTION}</li>
-        <li>{RETAIL_NO_MEDICAL_LEGAL_FINANCIAL_INSTRUCTION}</li>
-      </ul>
-      <div className="space-y-2">
-        <Label>Services not offered</Label>
+      <CaraTrainingField
+        label="Retail guardrails"
+        feed="prompt"
+        hint="Always included for managed retail stores."
+      >
+        <ul className="space-y-1 text-xs text-slate-700">
+          <li>{RETAIL_LIVE_STOCK_PRICE_INSTRUCTION}</li>
+          <li>{RETAIL_AGE_RESTRICTED_INSTRUCTION}</li>
+          <li>{RETAIL_ALLERGEN_INSTRUCTION}</li>
+          <li>{RETAIL_NO_MEDICAL_LEGAL_FINANCIAL_INSTRUCTION}</li>
+        </ul>
+      </CaraTrainingField>
+      <CaraTrainingField label="Services not offered" feed="prompt">
         <Textarea
           value={data.agentServicesNotOffered}
           onChange={(e) => onChange({ agentServicesNotOffered: e.target.value })}
           rows={2}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Extra notes (compiled into prompt)</Label>
+      </CaraTrainingField>
+      <CaraTrainingField label="Extra notes" feed="prompt">
         <Textarea
           value={data.agentExtraNotes}
           onChange={(e) => onChange({ agentExtraNotes: e.target.value })}
           rows={3}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Business rules (one per line)</Label>
+      </CaraTrainingField>
+      <CaraTrainingField label="Business rules (one per line)" feed="prompt">
         <Textarea
           value={data.agentBusinessRules.join("\n")}
           onChange={(e) =>
@@ -93,31 +96,42 @@ export function BoundariesSection({ data, onChange, onSaved }: Props) {
           }
           rows={3}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Cara conduct</Label>
+      </CaraTrainingField>
+      <CaraTrainingField label="Cara conduct" feed="prompt">
         <Textarea
           value={data.agentCaraConduct}
           onChange={(e) => onChange({ agentCaraConduct: e.target.value })}
           rows={2}
         />
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={data.quotePricesOnCalls}
-          onChange={(e) => onChange({ quotePricesOnCalls: e.target.checked })}
-        />
-        Quote prices on calls when known (explicit choice required)
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={data.blockAnonymousCallers}
-          onChange={(e) => onChange({ blockAnonymousCallers: e.target.checked })}
-        />
-        Block anonymous callers
-      </label>
+      </CaraTrainingField>
+      <CaraTrainingField
+        label="Quote prices on calls when known"
+        feed="prompt"
+        hint="Explicit choice — changes whether Cara may quote prices from her knowledge."
+      >
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={data.quotePricesOnCalls}
+            onChange={(e) => onChange({ quotePricesOnCalls: e.target.checked })}
+          />
+          Allow price quotes when the answer is in her knowledge
+        </label>
+      </CaraTrainingField>
+      <CaraTrainingField
+        label="Block anonymous callers"
+        feed="behaviour"
+        hint="Call handling rule — not spoken to callers."
+      >
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={data.blockAnonymousCallers}
+            onChange={(e) => onChange({ blockAnonymousCallers: e.target.checked })}
+          />
+          Reject calls with hidden caller ID
+        </label>
+      </CaraTrainingField>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save boundaries"}

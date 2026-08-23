@@ -4,8 +4,8 @@ import { useCallback, useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
 import { validateDepartmentExtension } from "@/lib/store-departments";
@@ -129,8 +129,8 @@ export function StoreDepartmentsEditor({
               </label>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs">Name</Label>
+              <div className="space-y-1 rounded-md border border-violet-200/60 bg-violet-50/40 px-2.5 py-2 sm:col-span-2">
+                <CaraTrainingFieldLabel label="Name" feed="prompt" />
                 <Input
                   value={dept.name}
                   disabled={disabled}
@@ -138,8 +138,8 @@ export function StoreDepartmentsEditor({
                   onChange={(e) => update(index, { name: e.target.value })}
                 />
               </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs">Manager name</Label>
+              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50/50 px-2.5 py-2 sm:col-span-2">
+                <CaraTrainingFieldLabel label="Manager name" feed="internal" />
                 <Input
                   value={dept.manager_name ?? ""}
                   disabled={disabled}
@@ -149,8 +149,8 @@ export function StoreDepartmentsEditor({
                   }
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Department number</Label>
+              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50/50 px-2.5 py-2">
+                <CaraTrainingFieldLabel label="Department number" feed="internal" />
                 <Input
                   value={dept.extension ?? ""}
                   disabled={disabled}
@@ -160,8 +160,8 @@ export function StoreDepartmentsEditor({
                   }
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Phone</Label>
+              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50/50 px-2.5 py-2">
+                <CaraTrainingFieldLabel label="Phone" feed="internal" />
                 <Input
                   value={dept.phone_e164 ?? ""}
                   disabled={disabled}
@@ -171,8 +171,8 @@ export function StoreDepartmentsEditor({
                   }
                 />
               </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs">Email</Label>
+              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50/50 px-2.5 py-2 sm:col-span-2">
+                <CaraTrainingFieldLabel label="Email" feed="internal" />
                 <Input
                   type="email"
                   value={dept.contact_email ?? ""}
@@ -184,8 +184,8 @@ export function StoreDepartmentsEditor({
                 />
               </div>
             </div>
-            <div className="mt-2 space-y-1">
-              <Label className="text-xs">Cara note (optional)</Label>
+            <div className="mt-2 space-y-1 rounded-md border border-violet-200/60 bg-violet-50/40 px-2.5 py-2">
+              <CaraTrainingFieldLabel label="Cara note (optional)" feed="prompt" />
               <Textarea
                 value={dept.cara_note ?? ""}
                 disabled={disabled}

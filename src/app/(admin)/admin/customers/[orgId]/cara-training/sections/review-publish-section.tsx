@@ -3,13 +3,13 @@
 import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 import {
   saveCaraTrainingAdminNotes,
   type CaraTrainingData,
 } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
+import { CaraTrainingField } from "@/components/admin/cara-training-field";
 
 import { SectionCard } from "./section-card";
 
@@ -50,15 +50,14 @@ export function ReviewPublishSection({ data, onChange, onSaved }: Props) {
       title="11. Review & publish"
       description="Internal notes never appear in the compiled prompt. Recompile happens on each section save."
     >
-      <div className="space-y-2">
-        <Label>Admin notes (internal only)</Label>
+      <CaraTrainingField label="Admin notes" feed="internal">
         <Textarea
           value={data.adminNotes}
           onChange={(e) => onChange({ adminNotes: e.target.value })}
           rows={3}
           placeholder="Provisioning notes, hardware quirks, escalation contacts…"
         />
-      </div>
+      </CaraTrainingField>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" disabled={pending} onClick={saveNotes}>
           {pending ? "Saving…" : "Save admin notes"}
@@ -73,15 +72,15 @@ export function ReviewPublishSection({ data, onChange, onSaved }: Props) {
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        <Label>Compiled prompt</Label>
-        <p className="text-muted-foreground text-xs">
-          Read-only — updated when you save any section above.
-        </p>
-        <pre className="max-h-72 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
+      <CaraTrainingField
+        label="Compiled prompt"
+        feed="prompt"
+        hint="Read-only output saved to Supabase — rebuilt when you save any section above."
+      >
+        <pre className="max-h-72 overflow-auto rounded-md border border-violet-100 bg-slate-950 p-3 text-xs text-slate-100">
           {data.customPrompt || "— not compiled yet —"}
         </pre>
-      </div>
+      </CaraTrainingField>
 
       {error ? (
         <p className="text-destructive text-sm" role="alert">

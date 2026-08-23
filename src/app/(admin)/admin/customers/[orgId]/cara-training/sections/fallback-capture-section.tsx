@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { CaraTrainingField } from "@/components/admin/cara-training-field";
 import { Textarea } from "@/components/ui/textarea";
 import type { DetailsCollectMode } from "@/lib/details-collect-mode";
 import { buildDetailsCollectionPromptSection } from "@/lib/details-collect-mode";
@@ -55,17 +55,15 @@ export function FallbackCaptureSection({ data, onChange, onSaved }: Props) {
       title="8. When Cara can't answer"
       description="What Cara collects before creating an action ticket."
     >
-      <div className="space-y-2">
-        <Label>Details to collect (comma or newline separated)</Label>
+      <CaraTrainingField label="Details to collect" feed="prompt">
         <Textarea
           value={data.agentDetailsToCollect}
           onChange={(e) => onChange({ agentDetailsToCollect: e.target.value })}
           rows={3}
           placeholder="Name, callback number, order reference"
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Collection mode</Label>
+      </CaraTrainingField>
+      <CaraTrainingField label="Collection mode" feed="prompt">
         <select
           className="border-input bg-background flex h-9 w-full max-w-xs rounded-md border px-3 text-sm"
           value={data.detailsCollectMode}
@@ -78,11 +76,17 @@ export function FallbackCaptureSection({ data, onChange, onSaved }: Props) {
           <option value="conversational">Conversational</option>
           <option value="fixed">Fixed order</option>
         </select>
-      </div>
+      </CaraTrainingField>
       {preview ? (
-        <pre className="max-h-40 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
-          {preview}
-        </pre>
+        <CaraTrainingField
+          label="Compiled fallback instructions"
+          feed="prompt"
+          hint="This is what Cara sees after save."
+        >
+          <pre className="max-h-40 overflow-auto rounded-md border border-violet-100 bg-slate-950 p-3 text-xs text-slate-100">
+            {preview}
+          </pre>
+        </CaraTrainingField>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={pending} onClick={save}>

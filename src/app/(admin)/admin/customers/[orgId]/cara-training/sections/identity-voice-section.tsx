@@ -3,9 +3,11 @@
 import { useCallback, useState, useTransition } from "react";
 import { Volume2 } from "lucide-react";
 
+import {
+  CaraTrainingField,
+} from "@/components/admin/cara-training-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
 import {
   VOICE_ASSISTANT_DEFAULT_NAME,
@@ -93,24 +95,27 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="1. Identity & voice"
-      description="ElevenLabs voice and greeting with locked legal disclosure."
+      description="Greeting is spoken on every call. Voice ID controls how Cara sounds, not what she says."
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="cara-assistant-name">Caller-facing name</Label>
+        <CaraTrainingField
+          label="Caller-facing name"
+          feed="prompt"
+          hint="Fixed as Cara on every call."
+        >
           <div
             id="cara-assistant-name"
-            className="border-input bg-muted flex h-9 items-center rounded-md border px-3 text-sm font-medium"
+            className="border-input bg-background flex h-9 items-center rounded-md border px-3 text-sm font-medium"
             aria-readonly="true"
           >
             {assistantName}
           </div>
-          <p className="text-muted-foreground text-xs">
-            Cara is the phone assistant on every call — this cannot be changed.
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Voice ID (ElevenLabs)</Label>
+        </CaraTrainingField>
+        <CaraTrainingField
+          label="Voice ID (ElevenLabs)"
+          feed="internal"
+          hint="Worker voice synthesis only — not part of the text prompt."
+        >
           <Input
             value={data.agentVoiceId}
             onChange={(e) => onChange({ agentVoiceId: e.target.value })}
@@ -125,25 +130,29 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
               Voice name could not be resolved — check the ID before save.
             </p>
           ) : null}
-        </div>
+        </CaraTrainingField>
       </div>
-      <div className="space-y-2">
-        <Label>Greeting intro</Label>
+      <CaraTrainingField label="Greeting intro" feed="prompt">
         <Input
           value={data.greetingIntro}
           onChange={(e) => onChange({ greetingIntro: e.target.value })}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Greeting closing</Label>
+      </CaraTrainingField>
+      <CaraTrainingField label="Greeting closing" feed="prompt">
         <Input
           value={data.greetingClosing}
           onChange={(e) => onChange({ greetingClosing: e.target.value })}
         />
-      </div>
-      <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-        {greetingPreview}
-      </p>
+      </CaraTrainingField>
+      <CaraTrainingField
+        label="Full greeting preview"
+        feed="prompt"
+        hint="Includes the locked AI and recording disclosure."
+      >
+        <p className="rounded-md border border-violet-100 bg-white/80 px-3 py-2 text-sm text-slate-700">
+          {greetingPreview}
+        </p>
+      </CaraTrainingField>
       {greetingWarning ? (
         <p className="text-destructive text-sm" role="alert">
           Greeting must include AI and recording disclosure.

@@ -31,7 +31,7 @@ export function DepartmentsSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="3. Departments"
-      description="Each department: name, manager, department number, phone, and email. Contact details are for internal routing — not spoken to callers."
+      description="Department names and Cara notes feed her prompt. Contact numbers and emails are internal routing only."
     >
       <StoreDepartmentsEditor
         departments={data.departments}

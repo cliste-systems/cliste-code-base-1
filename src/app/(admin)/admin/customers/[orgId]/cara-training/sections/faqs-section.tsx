@@ -3,8 +3,8 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CaraTrainingField, CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RETAIL_FAQ_STARTER_PACK } from "@/lib/retail-faq-starter-pack";
 
@@ -89,10 +89,10 @@ export function FaqsSection({ data, onChange, onSaved }: Props) {
         {data.agentFaqs.map((faq, index) => (
           <div
             key={`faq-${index}`}
-            className="rounded-lg border border-slate-200 p-3"
+            className="rounded-lg border border-violet-200/60 bg-violet-50/30 p-3"
           >
             <div className="space-y-2">
-              <Label className="text-xs">Question</Label>
+              <CaraTrainingFieldLabel label="Question" feed="prompt" />
               <Input
                 value={faq.question}
                 onChange={(e) => {
@@ -103,7 +103,7 @@ export function FaqsSection({ data, onChange, onSaved }: Props) {
               />
             </div>
             <div className="mt-2 space-y-2">
-              <Label className="text-xs">Answer</Label>
+              <CaraTrainingFieldLabel label="Answer" feed="prompt" />
               <Textarea
                 value={faq.answer}
                 rows={2}

@@ -1,6 +1,7 @@
 "use client";
 
 import { OpenDashboardButton } from "@/app/(admin)/admin/organizations/[id]/open-dashboard-button";
+import { CaraTrainingField } from "@/components/admin/cara-training-field";
 
 import { SectionCard } from "./section-card";
 
@@ -12,13 +13,15 @@ export function FilesLinkSection({
   return (
     <SectionCard
       title="10. Files"
-      description="Business files upload lives in the tenant dashboard. Structured fields and FAQs take precedence over uploaded files."
+      description="Uploads in the tenant dashboard can supplement structured knowledge."
     >
-      <OpenDashboardButton organizationId={organizationId} />
-      <p className="text-muted-foreground text-xs">
-        Uploaded price lists and FAQ documents supplement structured knowledge but
-        do not override departments, hours, or approved FAQ answers.
-      </p>
+      <CaraTrainingField
+        label="Business files"
+        feed="prompt"
+        hint="Cara reads files you enable for answers. Structured fields and FAQs still take precedence."
+      >
+        <OpenDashboardButton organizationId={organizationId} />
+      </CaraTrainingField>
     </SectionCard>
   );
 }

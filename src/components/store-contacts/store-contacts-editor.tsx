@@ -4,8 +4,8 @@ import { useCallback, useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CaraTrainingFieldLabel, CaraTrainingInternalBanner } from "@/components/admin/cara-training-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   STORE_CONTACT_ROLES,
   type StoreContactRole,
@@ -84,10 +84,9 @@ export function StoreContactsEditor({
 
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-xs">
-        Staff contact details are for internal routing only — they are never
-        spoken to callers in the compiled prompt.
-      </p>
+      <CaraTrainingInternalBanner>
+        Staff names, roles, and contact details are never spoken to callers.
+      </CaraTrainingInternalBanner>
 
       {contacts.length === 0 ? (
         <p className="text-muted-foreground text-sm">No contacts configured.</p>
@@ -117,7 +116,7 @@ export function StoreContactsEditor({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label className="text-xs">Name</Label>
+                <CaraTrainingFieldLabel label="Name" feed="internal" />
                 <Input
                   value={contact.name}
                   disabled={disabled}
@@ -125,7 +124,7 @@ export function StoreContactsEditor({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Role</Label>
+                <CaraTrainingFieldLabel label="Role" feed="internal" />
                 <select
                   className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
                   value={contact.role}
@@ -142,7 +141,7 @@ export function StoreContactsEditor({
                 </select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Phone (E.164, internal)</Label>
+                <CaraTrainingFieldLabel label="Phone (E.164)" feed="internal" />
                 <Input
                   value={contact.phone_e164 ?? ""}
                   disabled={disabled}
@@ -152,7 +151,7 @@ export function StoreContactsEditor({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Email (internal)</Label>
+                <CaraTrainingFieldLabel label="Email" feed="internal" />
                 <Input
                   value={contact.email ?? ""}
                   disabled={disabled}

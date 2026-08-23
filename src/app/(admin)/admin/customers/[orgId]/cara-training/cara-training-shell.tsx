@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle } from "lucide-react";
 
 import type { AdminCaraTrainingSectionCheck } from "@/lib/admin-cara-training-readiness";
+import { CaraTrainingFeedLegend } from "@/components/admin/cara-training-field";
 import { cn } from "@/lib/utils";
 
 import type { CaraTrainingData } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
@@ -93,6 +94,7 @@ export function CaraTrainingShell({ initial }: Props) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="space-y-6">
+        <CaraTrainingFeedLegend />
         <IdentityVoiceSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <StoreFactsSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <DepartmentsSection data={data} onChange={patch} onSaved={refreshPrompt} />
