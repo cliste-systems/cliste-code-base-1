@@ -4,6 +4,13 @@ import twilio from "twilio";
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { ensureTwilioIe1MessagingRegion } from "@/lib/twilio-ie-messaging";
+import {
+  assignFromPoolForOrg,
+  findAssignedNumberForOrg,
+  type AssignFromPoolResult,
+} from "@/lib/phone-pool-assign";
+export { syncOrgPhoneNumberCache } from "@/lib/phone-pool-org-sync";
+export type { AssignFromPoolResult } from "@/lib/phone-pool-assign";
 
 /**
  * Cliste phone-number pool.
@@ -274,42 +281,13 @@ export async function purchaseIrishDids(count: number): Promise<PurchaseResult> 
   return { ok: true, purchased };
 }
 
-export type AssignFromPoolResult =
-  | { ok: true; e164: string; phoneNumberId: string }
+export type PurchaseResult =
+  | { ok: true; purchased: Array<{ e164: string; sid: string }> }
   | { ok: false; message: string };
 
-/**
- * Atomically claim an available IE pool row for an organisation. Uses a
- * Postgres transaction with `FOR UPDATE SKIP LOCKED` semantics via a two-step
- * update pattern that Supabase supports: we select a candidate row, then
- * update-if-still-available, then retry once. In practice this contention
- * never matters at our scale, but the SKIP-LOCKED pattern means two parallel
- * signups never hand out the same number.
- */
 function devPlaceholderE164(organizationId: string): string {
   const digits = organizationId.replace(/\D/g, "").slice(0, 7).padEnd(7, "0");
   return `+3531555${digits}`;
-}
-
-async function findAssignedNumberForOrg(
-  admin: ReturnType<typeof createAdminClient>,
-  organizationId: string,
-): Promise<AssignFromPoolResult | null> {
-  const { data: assigned } = await admin
-    .from("phone_numbers")
-    .select("id, e164")
-    .eq("organization_id", organizationId)
-    .eq("status", "assigned")
-    .maybeSingle();
-
-  if (assigned?.e164) {
-    return {
-      ok: true,
-      e164: assigned.e164,
-      phoneNumberId: assigned.id,
-    };
-  }
-  return null;
 }
 
 /**
@@ -376,91 +354,11 @@ export async function provisionOrganizationPhoneNumber(
   return result;
 }
 
-function devPreferredPoolE164(): string | null {
-  if (process.env.NODE_ENV === "production") return null;
-  const raw = process.env.CLISTE_DEV_POOL_E164?.trim();
-  return raw?.startsWith("+") ? raw : null;
-}
-
 export async function assignFromPool(
   organizationId: string,
-  country: "IE" | "US" = "IE"
+  country: "IE" | "US" = "IE",
 ): Promise<AssignFromPoolResult> {
-  const admin = createAdminClient();
-  const preferredE164 = devPreferredPoolE164();
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    let candidate: { id: string; e164: string } | null = null;
-    let pickErr: { message: string; code?: string } | null = null;
-
-    if (attempt === 0 && preferredE164) {
-      const { data, error } = await admin
-        .from("phone_numbers")
-        .select("id, e164")
-        .eq("status", "available")
-        .eq("country_code", country)
-        .eq("e164", preferredE164)
-        .maybeSingle();
-      candidate = data;
-      pickErr = error;
-    }
-
-    if (!candidate) {
-      const { data, error } = await admin
-        .from("phone_numbers")
-        .select("id, e164")
-        .eq("status", "available")
-        .eq("country_code", country)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      candidate = data;
-      pickErr = error;
-    }
-
-    if (pickErr) {
-      return { ok: false, message: pickErr.message };
-    }
-    if (!candidate) {
-      return {
-        ok: false,
-        message:
-          "No phone numbers available in the pool. Contact support or wait for the nightly refill.",
-      };
-    }
-
-    const nowIso = new Date().toISOString();
-    const { data: claimed, error: claimErr } = await admin
-      .from("phone_numbers")
-      .update({
-        status: "assigned",
-        organization_id: organizationId,
-        assigned_at: nowIso,
-        updated_at: nowIso,
-      })
-      .eq("id", candidate.id)
-      .eq("status", "available")
-      .select("id, e164")
-      .maybeSingle();
-
-    if (claimErr) {
-      if (claimErr.code === "23505") {
-        const raced = await findAssignedNumberForOrg(admin, organizationId);
-        if (raced) return raced;
-      }
-      return { ok: false, message: claimErr.message };
-    }
-    if (claimed?.id) {
-      return { ok: true, e164: claimed.e164, phoneNumberId: claimed.id };
-    }
-    // Someone else grabbed it first — retry.
-  }
-
-  return {
-    ok: false,
-    message:
-      "Could not claim a pool number after retries. Refresh and try again.",
-  };
+  return assignFromPoolForOrg(createAdminClient(), organizationId, country);
 }
 
 /**
