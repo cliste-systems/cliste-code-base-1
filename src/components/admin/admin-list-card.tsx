@@ -33,19 +33,19 @@ export function AdminListCard({
       )}
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
     >
-      <header className="flex shrink-0 flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex shrink-0 flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-500">{countLabel}</p>
         {toolbar ? (
           <div className="flex flex-wrap items-center gap-3">{toolbar}</div>
         ) : null}
       </header>
       {stats ? (
-        <div className="shrink-0 border-b border-gray-100 px-4 py-3">
+        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
           {stats}
         </div>
       ) : null}
       {banner ? (
-        <div className="shrink-0 border-b border-gray-100 px-4 py-3">
+        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
           {banner}
         </div>
       ) : null}

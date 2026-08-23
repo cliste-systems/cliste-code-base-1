@@ -49,7 +49,7 @@ export function AdminPageShell({
         "mx-auto w-full",
         ADMIN_PAGE_X_PADDING,
         fillViewport
-          ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-10 pb-6"
+          ? "flex min-h-0 flex-1 flex-col gap-6 overflow-hidden pt-10 pb-6"
           : "space-y-8 py-10",
         MAX_WIDTH_CLASS[maxWidth],
         className,
@@ -71,7 +71,7 @@ export function AdminPageShell({
             <Icon className="h-5 w-5 text-gray-500" aria-hidden />
             {title}
           </h1>
-          <p className="text-sm text-gray-500">{description}</p>
+          <p className="mt-1 text-sm text-gray-500">{description}</p>
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </header>
