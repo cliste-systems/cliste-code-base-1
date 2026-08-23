@@ -35,7 +35,6 @@ import {
   listElevenLabsVoices,
   resolveElevenLabsVoiceName,
 } from "@/lib/elevenlabs-voice";
-import { countDepartmentsWithTransferTargets } from "@/lib/store-departments";
 import {
   finalizeCaraTrainingSave,
   syncStoreDepartmentsToOrg,
@@ -107,7 +106,6 @@ export type CaraTrainingData = {
   callRoutingMode: CallRoutingMode;
   phoneSystem: StorePhoneSystemRow | null;
   canTransfer: boolean;
-  departmentsWithTransferTargets: number;
   agentDetailsToCollect: string;
   detailsCollectMode: DetailsCollectMode;
   trainingGaps: CaraTrainingGapItem[];
@@ -325,7 +323,6 @@ export async function loadCaraTrainingData(
     callRoutingMode,
     phoneSystem,
     canTransfer: retailExtras.canTransfer,
-    departmentsWithTransferTargets: countDepartmentsWithTransferTargets(departments),
     agentDetailsToCollect: String(org.agent_details_to_collect ?? ""),
     detailsCollectMode: parseDetailsCollectMode(org.agent_details_collect_mode),
     trainingGaps: (gapsResult.data ?? []).map((g) => ({

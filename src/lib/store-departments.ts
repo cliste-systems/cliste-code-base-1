@@ -10,20 +10,6 @@ export function syncAgentServicesDepartmentsFromStore(
     .join(", ");
 }
 
-export function countDepartmentsWithTransferTargets(
-  departments: Pick<
-    StoreDepartmentRow,
-    "active" | "transfer_enabled" | "extension" | "phone_e164"
-  >[],
-): number {
-  return departments.filter(
-    (d) =>
-      d.active &&
-      d.transfer_enabled &&
-      Boolean(d.extension?.trim() || d.phone_e164?.trim()),
-  ).length;
-}
-
 export function validateDepartmentExtension(
   extension: string | null | undefined,
 ): string | null {

@@ -35,7 +35,6 @@ export function DepartmentsSection({ data, onChange, onSaved }: Props) {
     >
       <StoreDepartmentsEditor
         departments={data.departments}
-        canTransfer={data.canTransfer}
         onChange={(departments) =>
           onChange({ departments: departments as CaraTrainingData["departments"] })
         }

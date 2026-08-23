@@ -17,7 +17,6 @@ export type DepartmentDraft = Omit<
 
 type Props = {
   departments: DepartmentDraft[];
-  canTransfer: boolean;
   onChange: (departments: DepartmentDraft[]) => void;
   onSave: () => Promise<{ ok: true } | { ok: false; message: string }>;
   disabled?: boolean;
@@ -45,7 +44,6 @@ function emptyDepartment(sortOrder: number): DepartmentDraft {
 
 export function StoreDepartmentsEditor({
   departments,
-  canTransfer,
   onChange,
   onSave,
   disabled = false,
@@ -107,13 +105,6 @@ export function StoreDepartmentsEditor({
       {departments.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           No departments yet. Add one for each staffed counter or team.
-        </p>
-      ) : null}
-
-      {!canTransfer ? (
-        <p className="text-muted-foreground text-xs">
-          Department numbers are saved for routing. Cara will only transfer
-          callers once phone system setup allows it.
         </p>
       ) : null}
 

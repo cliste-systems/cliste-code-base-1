@@ -4,7 +4,6 @@ import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle } from "lucide-react";
 
-import { TransferCapabilityBanner } from "@/components/admin/transfer-capability-banner";
 import type { AdminCaraTrainingSectionCheck } from "@/lib/admin-cara-training-readiness";
 import { cn } from "@/lib/utils";
 
@@ -94,12 +93,6 @@ export function CaraTrainingShell({ initial }: Props) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="space-y-6">
-        <TransferCapabilityBanner
-          callRoutingMode={data.callRoutingMode}
-          canTransfer={data.canTransfer}
-          departmentsWithTransferTargets={data.departmentsWithTransferTargets}
-        />
-
         <IdentityVoiceSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <StoreFactsSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <DepartmentsSection data={data} onChange={patch} onSaved={refreshPrompt} />
