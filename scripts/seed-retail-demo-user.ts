@@ -118,7 +118,6 @@ async function main() {
   );
 
   await deleteUserByEmail(admin, email);
-  await deleteUserByEmail(admin, "admin@cliste.test");
 
   const businessDescription =
     "Independent supermarket — grocery, deli, butcher, bakery, and off-licence.";
