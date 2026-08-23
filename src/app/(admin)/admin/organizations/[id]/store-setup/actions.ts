@@ -235,8 +235,12 @@ export async function saveStoreDepartment(
     id?: string;
     name: string;
     phoneE164: string;
+    extension?: string;
     transferEnabled: boolean;
     caraNote: string;
+    handlesText?: string;
+    isOffLicence?: boolean;
+    isAnPost?: boolean;
     sortOrder: number;
     active: boolean;
   },
@@ -248,8 +252,12 @@ export async function saveStoreDepartment(
     organization_id: organizationId,
     name: payload.name.trim(),
     phone_e164: payload.phoneE164.trim() || null,
+    extension: payload.extension?.trim() || null,
     transfer_enabled: payload.transferEnabled,
     cara_note: payload.caraNote.trim() || null,
+    handles_text: payload.handlesText?.trim() || null,
+    is_off_licence: payload.isOffLicence === true,
+    is_an_post: payload.isAnPost === true,
     sort_order: payload.sortOrder,
     active: payload.active,
     updated_at: new Date().toISOString(),
@@ -267,7 +275,10 @@ export async function saveStoreDepartment(
     if (error) return { ok: false, message: error.message };
   }
 
-  await syncStoreRoutingLinks(admin, organizationId);
+  const { syncStoreDepartmentsToOrg } = await import("@/lib/sync-store-departments");
+  const sync = await syncStoreDepartmentsToOrg(admin, organizationId);
+  if (!sync.ok) return sync;
+  await regenerateCaraCustomPrompt(admin, organizationId);
   revalidateOrg(organizationId);
   return { ok: true };
 }

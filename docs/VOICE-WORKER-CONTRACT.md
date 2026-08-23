@@ -223,6 +223,18 @@ When a matched route has `targetType: "phone"`:
 5. On no-answer, busy, or failed connect: take a message, create an Action Inbox ticket, report `action_created`. **Never drop the caller.**
 6. On successful connect: report `outcome: "transferred"`.
 
+### `transferred` payload (required metadata)
+
+When reporting `outcome: "transferred"`, include in the JSON body (top-level or under `metadata`):
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `transfer_department` | string | Department label the caller asked for (e.g. `Deli counter`). |
+| `transfer_target` | string | E.164 or PBX extension actually dialled. |
+| `transfer_connected` | boolean | `true` only when the human answered; `false` if the worker mis-reported (should not happen — use `action_created` on failed connect). |
+
+On the first verified successful transfer for an org, the dashboard may set `store_phone_systems.transfer_verified_at` (staff cannot set this manually).
+
 Retail org metadata (`store_code`, `retail_banner`) may be attached to Action Inbox tickets for support — never spoken to callers.
 
 ## Retail hard rules (prompt-enforced)

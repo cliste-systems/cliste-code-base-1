@@ -1,5 +1,4 @@
-import { AdminBadge } from "@/components/admin/admin-badge";
-import { cn } from "@/lib/utils";
+import { AdminSetupStatusBadge } from "@/components/admin/admin-setup-status-badge";
 import {
   tenantProvisioningStageLabel,
   type TenantProvisioningStage,
@@ -13,9 +12,9 @@ export function TenantProvisioningStageChip({
   className?: string;
 }) {
   return (
-    <AdminBadge className={className}>
+    <AdminSetupStatusBadge isLive={stage === "live"} className={className}>
       {tenantProvisioningStageLabel(stage)}
-    </AdminBadge>
+    </AdminSetupStatusBadge>
   );
 }
 

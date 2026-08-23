@@ -80,7 +80,7 @@ describe("compileCaraPrompt service area", () => {
       baseTown: "Letterkenny",
       serviceArea: "Donegal",
     });
-    assert.match(prompt, /We're based in Letterkenny/);
+    assert.match(prompt, /We're based at Letterkenny/);
     assert.match(prompt, /We cover Donegal/);
   });
 

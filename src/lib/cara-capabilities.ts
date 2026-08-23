@@ -16,20 +16,25 @@ export type CaraCapabilities = {
 export function deriveCaraCapabilities(
   routes: RoutingActionSummary[] | undefined,
   transferNumber: string | undefined,
+  canTransfer = true,
 ): CaraCapabilities {
   const actionBlob = (routes ?? [])
     .map((r) => r.action.toLowerCase())
     .join(" ");
 
+  const routePromisesTransfer =
+    canTransfer &&
+    (routes ?? []).some((r) => {
+      const action = r.action.toLowerCase();
+      return (
+        action.includes("put them through") || action.includes("transfer")
+      );
+    });
+
   return {
     transfer:
-      Boolean(transferNumber?.trim()) ||
-      (routes ?? []).some((r) => {
-        const action = r.action.toLowerCase();
-        return (
-          action.includes("put them through") || action.includes("transfer")
-        );
-      }),
+      canTransfer &&
+      (Boolean(transferNumber?.trim()) || routePromisesTransfer),
     book: false,
     sendLink:
       actionBlob.includes("text them the saved link") ||

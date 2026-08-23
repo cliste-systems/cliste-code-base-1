@@ -129,6 +129,14 @@ export type CaraSetupPromptInput = {
   routes?: RoutingActionSummary[];
   fallbackNote?: string;
   transferNumber?: string;
+  /** When false, prompt must not promise live transfers. */
+  canTransfer?: boolean;
+  /** Retail department routing copy from store_departments. */
+  storeDepartmentsSection?: string;
+  /** Universal retail boundary lines (stock, age-restricted, etc.). */
+  retailBoundaryLines?: string[];
+  /** Internal admin notes — must never be compiled. */
+  adminNotes?: string;
   businessFiles?: BusinessFileListItem[];
 };
 
@@ -438,7 +446,11 @@ function sendableFileActions(files: BusinessFileListItem[]): string[] {
 }
 
 function availableActionsSection(input: CaraSetupPromptInput): string {
-  const caps = deriveCaraCapabilities(input.routes, input.transferNumber);
+  const caps = deriveCaraCapabilities(
+    input.routes,
+    input.transferNumber,
+    input.canTransfer !== false,
+  );
   const actions = [
     ...formatAvailableActionsForPrompt(caps),
     ...sendableFileActions(input.businessFiles ?? []),
@@ -594,6 +606,25 @@ function assemblePromptWithBudget(
   return { prompt, compileMeta: meta };
 }
 
+function routesForPrompt(input: CaraSetupPromptInput): RoutingActionSummary[] {
+  const routes = (input.routes ?? []).filter((r) => r.trigger.trim());
+  if (input.canTransfer !== false) return routes;
+  return routes.map((r) => {
+    const action = r.action.toLowerCase();
+    if (
+      action.includes("put them through") ||
+      action.includes("transfer") ||
+      action.includes("try to put")
+    ) {
+      return {
+        ...r,
+        action: "take a message for the team",
+      };
+    }
+    return r;
+  });
+}
+
 function buildProtectedParts(
   input: CaraSetupPromptInput,
   businessName: string,
@@ -617,7 +648,7 @@ function buildProtectedParts(
   );
 
   const fallbackNote = fallbackNoteForPrompt(input.fallbackNote);
-  const routes = (input.routes ?? []).filter((r) => r.trigger.trim());
+  const routes = routesForPrompt(input);
 
   if (routes.length > 0) {
     const lines = routes.map((r) =>
@@ -629,13 +660,17 @@ function buildProtectedParts(
           : undefined,
       ),
     );
+    const transferBuiltin =
+      input.canTransfer === false
+        ? "Built-in: when someone asks to speak to a person, I take their name, number, and what they need — I do not put callers through on this setup."
+        : "Built-in: when someone asks to speak to a person, I try to put them through when transfer is configured and allowed — otherwise I take a message. I never ring out in silence; if there's no answer I take their details.";
     parts.push(
       [
         "How I decide: answer factual questions from my knowledge first; when a route matches, I act on it; if two routes are plausible I ask one short clarifying question; if nothing matches I take a message.",
         "Routes are in priority order — when two could match, the higher route wins.",
         lines.join("\n"),
         `Otherwise I ${fallbackNote}.`,
-        "Built-in: when someone asks to speak to a person, I try to put them through when transfer is configured and allowed — otherwise I take a message. I never ring out in silence; if there's no answer I take their details.",
+        transferBuiltin,
         'Before any send or transfer I propose and confirm: e.g. "I can text you the booking link — shall I send it to the number you\'re calling from?" After sending: "That\'s sent now."',
         "If they didn't receive a text, I resend once — then take their details with a delivery-failed note. If they decline an action, I answer from knowledge or take a message — I never insist.",
         'When they have several requests, I handle each in turn and ask "anything else?" before wrapping up.',
@@ -645,13 +680,17 @@ function buildProtectedParts(
     );
   }
 
-  const transfer = input.transferNumber?.trim();
+  const transfer = input.canTransfer !== false ? input.transferNumber?.trim() : "";
   if (transfer) {
     parts.push(
       `If they need a person or I can't help, I offer to put them through to ${transfer}. Otherwise I ${fallbackNote}.`,
     );
   } else if (routes.length === 0) {
     parts.push(`If I can't help, I ${fallbackNote}.`);
+  } else if (input.canTransfer === false) {
+    parts.push(
+      `If they need a person or I can't help, I take their name, number, and what they need — I do not put callers through on this setup. Otherwise I ${fallbackNote}.`,
+    );
   }
 
   parts.push(...buildProtectedKnowledgePrecedenceParts(input));
@@ -675,6 +714,21 @@ function buildDroppableSections(
       parts: [
         `Your rules — I follow these unless they clash with the non-negotiables above:\n${rules.map((r) => `• ${r}`).join("\n")}`,
       ],
+    });
+  }
+
+  const retailLines = input.retailBoundaryLines ?? [];
+  if (retailLines.length > 0) {
+    sections.push({
+      id: "retailBoundaries",
+      parts: [retailLines.join("\n")],
+    });
+  }
+
+  if (input.storeDepartmentsSection?.trim()) {
+    sections.push({
+      id: "storeDepartments",
+      parts: [input.storeDepartmentsSection.trim()],
     });
   }
 

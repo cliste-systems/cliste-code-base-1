@@ -1,0 +1,166 @@
+"use client";
+
+import { useCallback, useState, useTransition } from "react";
+import { Volume2 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
+import { voiceLegalDisclosure } from "@/lib/voice-greeting";
+
+import {
+  saveCaraTrainingIdentity,
+  type CaraTrainingData,
+} from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
+
+import { SectionCard } from "./section-card";
+
+type Props = {
+  data: CaraTrainingData;
+  onChange: (patch: Partial<CaraTrainingData>) => void;
+  onSaved: () => Promise<void>;
+};
+
+export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [previewPending, setPreviewPending] = useState(false);
+
+  const greetingPreview = [
+    data.greetingIntro.trim(),
+    voiceLegalDisclosure(data.assistantDisplayName),
+    data.greetingClosing.trim(),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const greetingWarning = !greetingDisclosesAi(
+    greetingPreview,
+    data.assistantDisplayName,
+  );
+
+  const save = useCallback(() => {
+    setError(null);
+    setSaved(false);
+    startTransition(async () => {
+      const result = await saveCaraTrainingIdentity(data.organizationId, {
+        assistantDisplayName: data.assistantDisplayName,
+        greetingIntro: data.greetingIntro,
+        greetingClosing: data.greetingClosing,
+        agentVoiceId: data.agentVoiceId,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setSaved(true);
+      await onSaved();
+    });
+  }, [data, onSaved]);
+
+  const playSample = useCallback(async () => {
+    setPreviewPending(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/voice-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: greetingPreview,
+          voiceId: data.agentVoiceId,
+          assistantDisplayName: data.assistantDisplayName,
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json()) as { error?: string };
+        throw new Error(body.error ?? "Preview failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await audio.play();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Preview failed.");
+    } finally {
+      setPreviewPending(false);
+    }
+  }, [data.agentVoiceId, data.assistantDisplayName, greetingPreview]);
+
+  return (
+    <SectionCard
+      title="1. Identity & voice"
+      description="Assistant name, ElevenLabs voice, and greeting with locked legal disclosure."
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Assistant name</Label>
+          <Input
+            value={data.assistantDisplayName}
+            onChange={(e) => onChange({ assistantDisplayName: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Voice ID (ElevenLabs)</Label>
+          <Input
+            value={data.agentVoiceId}
+            onChange={(e) => onChange({ agentVoiceId: e.target.value })}
+            className="font-mono text-sm"
+          />
+          {data.resolvedVoiceName ? (
+            <p className="text-muted-foreground text-xs">
+              Resolved: {data.resolvedVoiceName}
+            </p>
+          ) : data.agentVoiceId ? (
+            <p className="text-amber-700 text-xs">
+              Voice name could not be resolved — check the ID before save.
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Greeting intro</Label>
+        <Input
+          value={data.greetingIntro}
+          onChange={(e) => onChange({ greetingIntro: e.target.value })}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Greeting closing</Label>
+        <Input
+          value={data.greetingClosing}
+          onChange={(e) => onChange({ greetingClosing: e.target.value })}
+        />
+      </div>
+      <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        {greetingPreview}
+      </p>
+      {greetingWarning ? (
+        <p className="text-destructive text-sm" role="alert">
+          Greeting must include AI and recording disclosure.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" disabled={pending} onClick={save}>
+          {pending ? "Saving…" : "Save identity & voice"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={previewPending || !data.agentVoiceId}
+          onClick={playSample}
+        >
+          <Volume2 className="size-4" aria-hidden />
+          {previewPending ? "Playing…" : "Play sample"}
+        </Button>
+        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
+        {error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </SectionCard>
+  );
+}

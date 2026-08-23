@@ -17,4 +17,9 @@ describe("normalizeCallOutcome transferred", () => {
     assert.equal(normalizeCallOutcome("transfer"), "transferred");
     assert.equal(normalizeCallOutcome("Caller was forwarded to deli"), "transferred");
   });
+
+  it("does not fold transferred into answered", () => {
+    assert.notEqual(normalizeCallOutcome("transferred"), "answered");
+    assert.notEqual(normalizeCallOutcome("transfer"), "answered");
+  });
 });

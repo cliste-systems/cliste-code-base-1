@@ -4,8 +4,8 @@ import { ChevronLeft } from "lucide-react";
 
 import { loadAdminClientDetail } from "@/lib/load-admin-clients";
 
-import { CaraTrainingForm } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-form";
 import { loadCaraTrainingData } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
+import { CaraTrainingShell } from "./cara-training-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function ClientCaraTrainingPage({ params }: PageProps) {
   if (!data) notFound();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
       <div>
         <Link
           href={`/admin/customers/${orgId}`}
@@ -41,7 +41,7 @@ export default async function ClientCaraTrainingPage({ params }: PageProps) {
           raw system instructions elsewhere.
         </p>
       </div>
-      <CaraTrainingForm initial={data} />
+      <CaraTrainingShell initial={data} />
     </div>
   );
 }

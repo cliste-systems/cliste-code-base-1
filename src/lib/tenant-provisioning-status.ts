@@ -53,6 +53,10 @@ export type TenantProvisioningInput = {
   agentServicesNotOffered: string;
   agentExtraNotes: string;
   promptCompileWarnings: unknown;
+  agentDetailsToCollect?: string;
+  phoneSystem?: import("@/lib/store-transfer-capability").StorePhoneSystemRow | null;
+  canTransfer?: boolean;
+  quotePricesOnCalls?: boolean;
   ownerUserId: string | null;
   ownerHasLegalAcceptances: boolean;
   inviteSentAt: string | null;
@@ -96,12 +100,29 @@ export function buildTenantProvisioningStatus(
     assistantDisplayName: input.assistantDisplayName,
     agentVoiceId: input.agentVoiceId,
     greeting: input.greeting,
+    greetingIntro: "",
+    greetingClosing: "",
     agentBusinessType: input.agentBusinessType,
     businessKnowledgeSummary: input.businessKnowledgeSummary,
-    agentServicesDepartments: input.agentServicesDepartments,
+    departments: [],
+    legacyDepartments: input.agentServicesDepartments,
     agentServicesNotOffered: input.agentServicesNotOffered,
     agentExtraNotes: input.agentExtraNotes,
     businessHours: input.businessHours,
+    agentFaqs: Array.isArray(input.agentFaqs)
+      ? input.agentFaqs.map((f) =>
+          typeof f === "object" && f && "question" in f
+            ? {
+                question: String((f as { question: unknown }).question ?? ""),
+                answer: String((f as { answer: unknown }).answer ?? ""),
+              }
+            : { question: "", answer: "" },
+        )
+      : [],
+    agentDetailsToCollect: input.agentDetailsToCollect ?? "",
+    phoneSystem: input.phoneSystem ?? null,
+    canTransfer: input.canTransfer ?? false,
+    quotePricesOnCalls: input.quotePricesOnCalls,
     customPrompt: input.customPrompt,
     promptCompileWarnings: input.promptCompileWarnings,
   };

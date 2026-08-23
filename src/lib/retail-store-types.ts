@@ -51,9 +51,13 @@ export type StoreDepartmentRow = {
   organization_id: string;
   name: string;
   phone_e164: string | null;
+  extension: string | null;
   hours: Record<string, unknown> | null;
   transfer_enabled: boolean;
   cara_note: string | null;
+  handles_text: string | null;
+  is_off_licence: boolean;
+  is_an_post: boolean;
   sort_order: number;
   active: boolean;
 };

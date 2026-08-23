@@ -43,11 +43,20 @@ import {
 
 import { parseDetailsCollectMode } from "@/lib/details-collect-mode";
 import { parseStoredLocation } from "@/lib/location-fields";
+import {
+  buildRetailPromptExtras,
+  loadStoreDepartments,
+  loadStorePhoneSystem,
+} from "@/lib/load-store-phone-system";
+import {
+  loadActiveBusinessHoursOverride,
+  mergeHoursOverrideIntoBundle,
+} from "@/lib/business-hours-overrides";
 import { listServicesForOrg } from "@/lib/service-catalog";
 import { parseStoredServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
 
 const PROMPT_ORG_COLUMNS =
-  "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, agent_location_county, agent_extra_notes, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche";
+  "name, assistant_display_name, greeting, agent_business_type, business_knowledge_summary, agent_opening_hours, business_hours, agent_service_area, agent_service_area_exclusions, agent_base_town, agent_services_departments, agent_services_not_offered, agent_service_catalog_supplement, agent_details_to_collect, agent_details_collect_mode, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, agent_location_address, agent_location_eircode, agent_location_county, agent_extra_notes, routing_links, fallback_number, call_routing_mode, quote_prices_on_calls, niche, admin_notes";
 
 export type PromptCompileWarnings = CaraCompileMeta & {
   trimmedAt: string;
@@ -265,12 +274,53 @@ export async function regenerateCaraCustomPrompt(
     (org as PromptOrgRow | null)?.agent_service_catalog_supplement,
   );
 
+  const nicheStr = String((org as PromptOrgRow | null)?.niche ?? "");
+  const isRetail = nicheStr === "retail";
+  let retailExtras: ReturnType<typeof buildRetailPromptExtras> | null = null;
+  const hoursOverride = await loadActiveBusinessHoursOverride(
+    supabase,
+    organizationId,
+  );
+  const orgForPrompt = hoursOverride
+    ? {
+        ...(org as PromptOrgRow),
+        business_hours: mergeHoursOverrideIntoBundle(
+          (org as PromptOrgRow | null)?.business_hours,
+          hoursOverride,
+        ),
+      }
+    : (org as PromptOrgRow | null);
+  if (isRetail) {
+    const [phoneSystem, departments] = await Promise.all([
+      loadStorePhoneSystem(supabase, organizationId),
+      loadStoreDepartments(supabase, organizationId),
+    ]);
+    retailExtras = buildRetailPromptExtras({
+      callRoutingMode: (org as PromptOrgRow | null)?.call_routing_mode,
+      phoneSystem,
+      departments,
+    });
+  }
+
+  const adminNotes = String((org as PromptOrgRow | null)?.admin_notes ?? "").trim();
+
   const { prompt, compileMeta } = compileCaraPromptWithMeta({
-    ...buildCaraSetupPromptInputFromOrg(org as PromptOrgRow | null),
+    ...buildCaraSetupPromptInputFromOrg(orgForPrompt),
     businessFiles,
     serviceCatalog: serviceCatalog.length > 0 ? serviceCatalog : undefined,
     serviceCatalogSupplement: serviceCatalogSupplement ?? undefined,
+    canTransfer: retailExtras?.canTransfer ?? true,
+    storeDepartmentsSection: retailExtras?.storeDepartmentsSection,
+    retailBoundaryLines: retailExtras?.retailBoundaryLines,
+    adminNotes: adminNotes || undefined,
   });
+
+  if (adminNotes && prompt.includes(adminNotes)) {
+    return {
+      ok: false,
+      message: "Internal admin notes leaked into compiled prompt — aborting save.",
+    };
+  }
 
   const promptCompileWarnings: PromptCompileWarnings | null = compileMeta.wasTrimmed
     ? { ...compileMeta, trimmedAt: new Date().toISOString() }

@@ -685,6 +685,7 @@ export function buildCallHandlingConflictWarnings(input: {
 export function buildCaraCapabilitiesFromPromptExtras(
   routes?: RoutingActionSummary[],
   transferNumber?: string,
+  canTransfer = true,
 ): CaraCapabilities {
-  return deriveCaraCapabilities(routes, transferNumber);
+  return deriveCaraCapabilities(routes, transferNumber, canTransfer);
 }
