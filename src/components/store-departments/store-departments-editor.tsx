@@ -117,6 +117,13 @@ export function StoreDepartmentsEditor({
         </p>
       ) : null}
 
+      {!canTransfer ? (
+        <p className="text-muted-foreground text-xs">
+          Extension and external numbers can be saved now. Cara will only dial
+          them once transfer hardware is verified and routing allows handoff.
+        </p>
+      ) : null}
+
       <div className="space-y-3">
         {departments.map((dept, index) => (
           <div
@@ -162,8 +169,8 @@ export function StoreDepartmentsEditor({
                 <Label className="text-xs">Extension</Label>
                 <Input
                   value={dept.extension ?? ""}
-                  disabled={disabled || !canTransfer}
-                  placeholder={canTransfer ? "e.g. 101" : "Transfers disabled"}
+                  disabled={disabled}
+                  placeholder="e.g. 101"
                   onChange={(e) =>
                     update(index, { extension: e.target.value || null })
                   }
@@ -173,8 +180,8 @@ export function StoreDepartmentsEditor({
                 <Label className="text-xs">External number (E.164)</Label>
                 <Input
                   value={dept.phone_e164 ?? ""}
-                  disabled={disabled || !canTransfer}
-                  placeholder={canTransfer ? "+353..." : "Transfers disabled"}
+                  disabled={disabled}
+                  placeholder="+353..."
                   onChange={(e) =>
                     update(index, { phone_e164: e.target.value || null })
                   }
