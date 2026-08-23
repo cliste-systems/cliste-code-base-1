@@ -545,6 +545,7 @@ export async function saveCaraTrainingDepartments(
       phone_e164: dept.phone_e164?.trim() || null,
       extension: dept.extension?.trim() || null,
       contact_email: dept.contact_email?.trim() || null,
+      manager_name: dept.manager_name?.trim() || null,
       hours: dept.hours,
       transfer_enabled: hasTransferTarget,
       cara_note: dept.cara_note?.trim() || null,

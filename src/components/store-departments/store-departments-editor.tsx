@@ -35,6 +35,7 @@ function emptyDepartment(sortOrder: number): DepartmentDraft {
     cara_note: null,
     handles_text: null,
     contact_email: null,
+    manager_name: null,
     is_off_licence: false,
     is_an_post: false,
     sort_order: sortOrder,
@@ -144,6 +145,17 @@ export function StoreDepartmentsEditor({
                   disabled={disabled}
                   placeholder="Deli counter"
                   onChange={(e) => update(index, { name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">Manager name</Label>
+                <Input
+                  value={dept.manager_name ?? ""}
+                  disabled={disabled}
+                  placeholder="e.g. Sarah O'Brien"
+                  onChange={(e) =>
+                    update(index, { manager_name: e.target.value || null })
+                  }
                 />
               </div>
               <div className="space-y-1">

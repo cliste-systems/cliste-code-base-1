@@ -14,7 +14,7 @@ import type { StoreDepartmentRow } from "@/lib/retail-store-types";
 import { parseCallRoutingMode } from "@/lib/call-routing";
 
 const DEPARTMENT_SELECT_FULL =
-  "id, organization_id, name, phone_e164, hours, transfer_enabled, cara_note, sort_order, active, extension, handles_text, contact_email, is_off_licence, is_an_post";
+  "id, organization_id, name, phone_e164, hours, transfer_enabled, cara_note, sort_order, active, extension, handles_text, contact_email, manager_name, is_off_licence, is_an_post";
 const DEPARTMENT_SELECT_LEGACY =
   "id, organization_id, name, phone_e164, hours, transfer_enabled, cara_note, sort_order, active";
 
@@ -42,6 +42,7 @@ function normalizeDepartmentRow(row: Record<string, unknown>): StoreDepartmentRo
     extension: (row.extension as string | null) ?? null,
     handles_text: (row.handles_text as string | null) ?? null,
     contact_email: (row.contact_email as string | null) ?? null,
+    manager_name: (row.manager_name as string | null) ?? null,
     is_off_licence: row.is_off_licence === true,
     is_an_post: row.is_an_post === true,
   };
