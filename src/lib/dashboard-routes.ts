@@ -23,6 +23,7 @@ export const DASHBOARD_ROUTES = {
   /** @deprecated Use legalDataRequests */
   gdpr: "/dashboard/legal/data-requests",
   settings: "/dashboard/settings",
+  phoneSetup: "/dashboard/settings/phone-setup",
   locations: "/dashboard/locations",
   team: "/dashboard/team",
 } as const;

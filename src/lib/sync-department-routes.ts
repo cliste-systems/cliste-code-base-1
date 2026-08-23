@@ -1,5 +1,6 @@
 import type { RoutingLink } from "@/app/(dashboard)/dashboard/routing/routing-links";
 import { parseRoutingLinks } from "@/app/(dashboard)/dashboard/routing/routing-links";
+import type { TransferCapability } from "@/lib/transfer-capability";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
 import { buildRetailRoutePack } from "@/lib/retail-route-pack";
 
@@ -14,22 +15,29 @@ function departmentKeywords(name: string): string {
 
 export function buildDepartmentTransferRoutes(
   departments: StoreDepartmentRow[],
+  capability: TransferCapability,
 ): RoutingLink[] {
   return departments
-    .filter((d) => d.active && d.transfer_enabled)
-    .map((d) => ({
-      id: `dept-${d.id}`,
-      presetId: "transfer",
-      label: d.name,
-      intent: d.name.toLowerCase(),
-      targetType: "phone" as const,
-      url: d.phone_e164?.trim() || "",
-      transferLabel: d.name,
-      transferDuringHoursOnly: d.hours != null,
-      keywords: departmentKeywords(d.name),
-      description: d.cara_note?.trim() || undefined,
-      active: true,
-    }));
+    .filter((d) => {
+      const deptCap = capability.perDepartment[d.id];
+      return d.active && deptCap?.canTransfer && deptCap.target;
+    })
+    .map((d) => {
+      const target = capability.perDepartment[d.id]!.target!;
+      return {
+        id: `dept-${d.id}`,
+        presetId: "transfer",
+        label: d.name,
+        intent: d.name.toLowerCase(),
+        targetType: "phone" as const,
+        url: target,
+        transferLabel: d.name,
+        transferDuringHoursOnly: d.hours != null,
+        keywords: departmentKeywords(d.name),
+        description: d.cara_note?.trim() || undefined,
+        active: true,
+      };
+    });
 }
 
 const RETAIL_STATIC_PREFIXES = new Set([
@@ -44,6 +52,7 @@ export function mergeRetailRoutingLinks(input: {
   existingLinks: unknown;
   clickCollectUrl?: string;
   mapsUrl?: string;
+  capability: TransferCapability;
 }): RoutingLink[] {
   const existing = parseRoutingLinks(input.existingLinks ?? null);
   const preserved = existing.filter((link) => {
@@ -58,7 +67,10 @@ export function mergeRetailRoutingLinks(input: {
     mapsUrl: input.mapsUrl,
   });
 
-  const departmentRoutes = buildDepartmentTransferRoutes(input.departments);
+  const departmentRoutes = buildDepartmentTransferRoutes(
+    input.departments,
+    input.capability,
+  );
 
   const byId = new Map<string, RoutingLink>();
   for (const link of [...staticPack, ...departmentRoutes, ...preserved]) {
@@ -72,6 +84,7 @@ export function syncDepartmentRoutesPayload(input: {
   departments: StoreDepartmentRow[];
   existingLinks: unknown;
   clickCollectUrl?: string;
+  capability: TransferCapability;
 }): RoutingLink[] {
   return mergeRetailRoutingLinks(input);
 }

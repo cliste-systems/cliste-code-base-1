@@ -11,6 +11,32 @@ import {
 const compliantGreeting =
   "You're through to Test SuperValu — I'm Cara, the AI assistant. This call may be recorded and transcribed. How can I help?";
 
+function mockPhoneSystem(
+  overrides: Partial<NonNullable<AdminCaraTrainingReadinessInput["phoneSystem"]>> = {},
+): NonNullable<AdminCaraTrainingReadinessInput["phoneSystem"]> {
+  return {
+    organization_id: "org-1",
+    system_type: "pbx",
+    vendor: null,
+    model: null,
+    handset_count: null,
+    installer_name: null,
+    installer_contact: null,
+    trunk_provider: null,
+    has_ddi_range: null,
+    ddi_pattern: null,
+    transfer_method: "none",
+    warm_transfer_hardware_status: "unknown",
+    transfer_verified_at: null,
+    transfer_verified_by: null,
+    transfer_last_test_result: null,
+    transfer_verification_pending: false,
+    main_line_e164: null,
+    notes: null,
+    ...overrides,
+  };
+}
+
 function baseInput(
   overrides: Partial<AdminCaraTrainingReadinessInput> = {},
 ): AdminCaraTrainingReadinessInput {
@@ -58,17 +84,12 @@ describe("isAdminCaraTrainingComplete", () => {
             { question: "Returns?", answer: "Receipt required." },
           ],
           agentDetailsToCollect: "Name, callback number",
-          phoneSystem: {
-            organization_id: "org-1",
-            system_type: "pbx",
+          phoneSystem: mockPhoneSystem({
             vendor: "Avaya",
             handset_count: 12,
             transfer_method: "sip_refer",
             warm_transfer_hardware_status: "go",
-            transfer_verified_at: null,
-            main_line_e164: null,
-            notes: null,
-          },
+          }),
           quotePricesOnCalls: false,
           businessHours: {
             monday: { open: true, start: "09:00", end: "18:00" },
@@ -101,17 +122,9 @@ describe("isAdminCaraTrainingComplete", () => {
             { question: "Returns?", answer: "Receipt required." },
           ],
           agentDetailsToCollect: "Name, callback number",
-          phoneSystem: {
-            organization_id: "org-1",
-            system_type: "pbx",
-            vendor: null,
-            handset_count: null,
-            transfer_method: "none",
+          phoneSystem: mockPhoneSystem({
             warm_transfer_hardware_status: "pending",
-            transfer_verified_at: null,
-            main_line_e164: null,
-            notes: null,
-          },
+          }),
           quotePricesOnCalls: true,
           businessHours: {
             monday: { open: true, start: "09:00", end: "18:00" },
@@ -135,17 +148,7 @@ describe("adminCaraTrainingSectionChecks", () => {
   it("marks phone system incomplete when hardware status is unknown", () => {
     const checks = adminCaraTrainingSectionChecks(
       baseInput({
-        phoneSystem: {
-          organization_id: "org-1",
-          system_type: "unknown",
-          vendor: null,
-          handset_count: null,
-          transfer_method: "none",
-          warm_transfer_hardware_status: "unknown",
-          transfer_verified_at: null,
-          main_line_e164: null,
-          notes: null,
-        },
+        phoneSystem: mockPhoneSystem(),
       }),
     );
     const phone = checks.find((c) => c.id === "phoneSystem");

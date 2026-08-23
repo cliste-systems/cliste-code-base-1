@@ -17,6 +17,7 @@ import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { captureObservedError } from "@/lib/observability";
 import { logDisclosureCompliance } from "@/lib/voice-compliance";
+import { stampStoreTransferVerified } from "@/lib/transfer-verification-db";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,10 @@ type VoiceCallCompleteBody = {
   booking?: BookingPayload | null;
   /** Optional knowledge gaps Cara could not answer — creates Cara Training items. */
   knowledge_gaps?: KnowledgeGapPayload[] | null;
+  transfer_department?: string | null;
+  transfer_target?: string | null;
+  transfer_connected?: boolean;
+  verification_call?: boolean;
 };
 
 function unauthorized() {
@@ -366,6 +371,17 @@ export async function POST(request: Request) {
       ? blockedCallDashboardSummary(businessName)
       : null);
 
+  const transferDepartment =
+    typeof body.transfer_department === "string"
+      ? body.transfer_department.trim().slice(0, 120) || null
+      : null;
+  const transferTarget =
+    typeof body.transfer_target === "string"
+      ? body.transfer_target.trim().slice(0, 40) || null
+      : null;
+  const transferConnected = body.transfer_connected === true;
+  const verificationCall = body.verification_call === true;
+
   const { data: insertedCall, error: callErr } = await admin
     .from("call_logs")
     .insert({
@@ -377,6 +393,10 @@ export async function POST(request: Request) {
       transcript: transcriptRedacted.text,
       transcript_review: reviewRedacted.text,
       ai_summary: aiSummaryForInsert,
+      transfer_department: transferDepartment,
+      transfer_target: transferTarget,
+      transfer_connected: transferConnected,
+      verification_call: verificationCall,
       ...(callSid ? { call_sid: callSid } : {}),
       ...(roomName ? { room_name: roomName } : {}),
     })
@@ -417,6 +437,22 @@ export async function POST(request: Request) {
   }
 
   const callLogId = insertedCall.id as string;
+
+  if (
+    verificationCall &&
+    outcome === "transferred" &&
+    transferConnected
+  ) {
+    try {
+      const resultLabel = transferDepartment
+        ? `Verified transfer to ${transferDepartment}`
+        : "Verified transfer test";
+      await stampStoreTransferVerified(admin, orgId, resultLabel);
+    } catch (e) {
+      console.warn("[voice/call-complete] transfer verification stamp", e);
+    }
+  }
+
   let appointmentId: string | null = null;
 
   const booking = body.booking;

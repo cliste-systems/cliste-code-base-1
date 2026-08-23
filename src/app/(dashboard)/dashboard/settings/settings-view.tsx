@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   Check,
   PhoneForwarded,
@@ -260,6 +261,22 @@ export function SettingsView({
                 clisteNumber={initial.phoneNumber}
                 fieldClass={fieldClass}
               />
+            </SettingsSection>
+          ) : null}
+
+          {isRetail ? (
+            <SettingsSection title="Phone setup & transfers">
+              <p className="text-[13px] leading-relaxed text-slate-600">
+                See which departments Cara can put callers through to, and when
+                your transfer setup was last verified.
+              </p>
+              <Link
+                href={DASHBOARD_ROUTES.phoneSetup}
+                className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
+              >
+                <PhoneForwarded className="size-4" aria-hidden />
+                View phone setup
+              </Link>
             </SettingsSection>
           ) : null}
 

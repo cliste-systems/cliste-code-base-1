@@ -8,7 +8,6 @@ import { CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
-import { validateDepartmentExtension } from "@/lib/store-departments";
 
 export type DepartmentDraft = Omit<
   StoreDepartmentRow,
@@ -28,6 +27,7 @@ function emptyDepartment(sortOrder: number): DepartmentDraft {
     organization_id: "",
     name: "",
     phone_e164: null,
+    direct_dial_e164: null,
     extension: null,
     hours: null,
     transfer_enabled: false,
@@ -79,11 +79,6 @@ export function StoreDepartmentsEditor({
     setError(null);
     setSaved(false);
     for (const dept of departments) {
-      const extErr = validateDepartmentExtension(dept.extension);
-      if (extErr) {
-        setError(`${dept.name || "Department"}: ${extErr}`);
-        return;
-      }
       const email = dept.contact_email?.trim() ?? "";
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         setError(`${dept.name || "Department"}: Enter a valid email address.`);
@@ -146,28 +141,6 @@ export function StoreDepartmentsEditor({
                   placeholder="e.g. Sarah O'Brien"
                   onChange={(e) =>
                     update(index, { manager_name: e.target.value || null })
-                  }
-                />
-              </div>
-              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50/50 px-2.5 py-2">
-                <CaraTrainingFieldLabel label="Department number" feed="internal" />
-                <Input
-                  value={dept.extension ?? ""}
-                  disabled={disabled}
-                  placeholder="e.g. 101"
-                  onChange={(e) =>
-                    update(index, { extension: e.target.value || null })
-                  }
-                />
-              </div>
-              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50/50 px-2.5 py-2">
-                <CaraTrainingFieldLabel label="Phone" feed="internal" />
-                <Input
-                  value={dept.phone_e164 ?? ""}
-                  disabled={disabled}
-                  placeholder="+353..."
-                  onChange={(e) =>
-                    update(index, { phone_e164: e.target.value || null })
                   }
                 />
               </div>

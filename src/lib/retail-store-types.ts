@@ -52,6 +52,7 @@ export type StoreDepartmentRow = {
   name: string;
   phone_e164: string | null;
   extension: string | null;
+  direct_dial_e164: string | null;
   hours: Record<string, unknown> | null;
   transfer_enabled: boolean;
   cara_note: string | null;

@@ -167,13 +167,20 @@ export function buildTenantProvisioningStatus(
               ? `Cliste number ${orgPhone} assigned.`
               : "Assign an Irish Cliste number.",
           };
-        case "cara_trained":
+        case "cara_trained": {
+          const needsTelecomsInfo =
+            input.phoneSystem?.has_ddi_range === null &&
+            input.phoneSystem != null;
+          const detail = caraTraining.detail;
           return {
             id,
             label,
             complete: caraTraining.complete,
-            detail: caraTraining.detail,
+            detail: needsTelecomsInfo
+              ? `${detail} Needs telecoms info: confirm whether departments have direct-dial numbers.`
+              : detail,
           };
+        }
         case "live":
           return {
             id,

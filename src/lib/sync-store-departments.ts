@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { parseCallRoutingMode } from "@/lib/call-routing";
+import {
+  buildRetailPromptExtras,
+  loadStorePhoneSystem,
+} from "@/lib/load-store-phone-system";
 import { mergeRetailRoutingLinks } from "@/lib/sync-department-routes";
 import { syncAgentServicesDepartmentsFromStore } from "@/lib/store-departments";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
@@ -13,23 +18,31 @@ export async function syncStoreDepartmentsToOrg(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: org } = await admin
     .from("organizations")
-    .select("routing_links, retail_click_collect_url")
+    .select("routing_links, retail_click_collect_url, call_routing_mode")
     .eq("id", organizationId)
     .maybeSingle();
 
   const { data: departments } = await admin
     .from("store_departments")
     .select(
-      "id, organization_id, name, phone_e164, hours, transfer_enabled, cara_note, sort_order, active, extension, handles_text, contact_email, manager_name, is_off_licence, is_an_post",
+      "id, organization_id, name, phone_e164, direct_dial_e164, hours, transfer_enabled, cara_note, sort_order, active, extension, handles_text, contact_email, manager_name, is_off_licence, is_an_post",
     )
     .eq("organization_id", organizationId)
     .order("sort_order", { ascending: true });
 
   const deptRows = (departments ?? []) as StoreDepartmentRow[];
+  const phoneSystem = await loadStorePhoneSystem(admin, organizationId);
+  const { capability } = buildRetailPromptExtras({
+    callRoutingMode: parseCallRoutingMode(org?.call_routing_mode),
+    phoneSystem,
+    departments: deptRows,
+  });
+
   const merged = mergeRetailRoutingLinks({
     departments: deptRows,
     existingLinks: org?.routing_links,
     clickCollectUrl: String(org?.retail_click_collect_url ?? ""),
+    capability,
   });
 
   const agentServices = syncAgentServicesDepartmentsFromStore(deptRows);

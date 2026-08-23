@@ -28,6 +28,11 @@ import {
   type StoreContactRole,
 } from "@/lib/retail-store-types";
 import { buildRetailRoutePack } from "@/lib/retail-route-pack";
+import {
+  buildRetailPromptExtras,
+  loadStoreDepartments,
+  loadStorePhoneSystem,
+} from "@/lib/load-store-phone-system";
 import { mergeRetailRoutingLinks } from "@/lib/sync-department-routes";
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -324,22 +329,23 @@ async function syncStoreRoutingLinks(
 ) {
   const { data: org } = await admin
     .from("organizations")
-    .select("routing_links, retail_click_collect_url")
+    .select("routing_links, retail_click_collect_url, call_routing_mode")
     .eq("id", organizationId)
     .maybeSingle();
 
-  const { data: departments } = await admin
-    .from("store_departments")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .order("sort_order", { ascending: true });
+  const departments = await loadStoreDepartments(admin, organizationId);
+  const phoneSystem = await loadStorePhoneSystem(admin, organizationId);
+  const { capability } = buildRetailPromptExtras({
+    callRoutingMode: parseCallRoutingMode(org?.call_routing_mode),
+    phoneSystem,
+    departments,
+  });
 
   const merged = mergeRetailRoutingLinks({
-    departments: (departments ?? []) as Parameters<
-      typeof mergeRetailRoutingLinks
-    >[0]["departments"],
+    departments,
     existingLinks: org?.routing_links,
     clickCollectUrl: String(org?.retail_click_collect_url ?? ""),
+    capability,
   });
 
   await admin
@@ -427,7 +433,7 @@ export async function seedRetailRoutePack(
 
   const { data: org } = await admin
     .from("organizations")
-    .select("retail_click_collect_url")
+    .select("retail_click_collect_url, call_routing_mode")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -443,10 +449,19 @@ export async function seedRetailRoutePack(
     .eq("id", organizationId)
     .maybeSingle();
 
+  const departments = await loadStoreDepartments(admin, organizationId);
+  const phoneSystem = await loadStorePhoneSystem(admin, organizationId);
+  const { capability } = buildRetailPromptExtras({
+    callRoutingMode: parseCallRoutingMode(org?.call_routing_mode),
+    phoneSystem,
+    departments,
+  });
+
   const merged = mergeRetailRoutingLinks({
-    departments: [],
+    departments,
     existingLinks: refreshed?.routing_links ?? pack,
     clickCollectUrl: String(org?.retail_click_collect_url ?? ""),
+    capability,
   });
 
   const { error } = await admin

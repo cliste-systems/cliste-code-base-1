@@ -8,7 +8,8 @@ import { DashboardHomeNeedsAttentionCard } from "@/components/dashboard/dashboar
 import { DashboardHomeRequestTypesCard } from "@/components/dashboard/dashboard-home-request-types-card";
 import { DashboardHomeResizeItem } from "@/components/dashboard/dashboard-home-resize-motion";
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
-import type { AnalyticsSegment } from "@/lib/dashboard-home-analytics";
+import type { AnalyticsSegment, TransferHealthSnapshot } from "@/lib/dashboard-home-analytics";
+import { DashboardHomeTransferHealthCard } from "@/components/dashboard/dashboard-home-transfer-health-card";
 import type { HomeCaraPerformanceSnapshot } from "@/lib/dashboard-home-cara-performance";
 import type { HomeCallTimesBucket } from "@/lib/dashboard-home-call-times";
 import type { HomeCaraTrainingRow, HomeRequestRow } from "@/lib/dashboard-home-requests";
@@ -28,6 +29,7 @@ export function DashboardHomeCardsGrid({
   requestTypeSegments,
   callOutcomeSegments,
   callTimes,
+  transferHealth,
   className,
 }: {
   activity: TimelineFeedRow[];
@@ -39,6 +41,7 @@ export function DashboardHomeCardsGrid({
   requestTypeSegments: AnalyticsSegment[];
   callOutcomeSegments: AnalyticsSegment[];
   callTimes: HomeCallTimesBucket[];
+  transferHealth: TransferHealthSnapshot | null;
   className?: string;
 }) {
   return (
@@ -91,10 +94,17 @@ export function DashboardHomeCardsGrid({
           />
         </DashboardHomeResizeItem>
         <DashboardHomeResizeItem className="h-full min-h-0 overflow-hidden">
-          <DashboardHomeCallTimesCard
-            buckets={callTimes}
-            className="h-full min-h-0"
-          />
+          {transferHealth ? (
+            <DashboardHomeTransferHealthCard
+              transferHealth={transferHealth}
+              className="h-full min-h-0"
+            />
+          ) : (
+            <DashboardHomeCallTimesCard
+              buckets={callTimes}
+              className="h-full min-h-0"
+            />
+          )}
         </DashboardHomeResizeItem>
       </DashboardHomeResizeItem>
 

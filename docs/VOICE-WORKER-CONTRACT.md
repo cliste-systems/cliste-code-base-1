@@ -231,7 +231,8 @@ When reporting `outcome: "transferred"`, include in the JSON body (top-level or 
 |-------|------|---------|
 | `transfer_department` | string | Department label the caller asked for (e.g. `Deli counter`). |
 | `transfer_target` | string | E.164 or PBX extension actually dialled. |
-| `transfer_connected` | boolean | `true` only when the human answered; `false` if the worker mis-reported (should not happen — use `action_created` on failed connect). |
+| `transfer_connected` | boolean | `true` only when the human answered; `false` when the dial was attempted but no human answered (same call — fall back to message-taking, report `action_created` for the fallback, not `transferred`). |
+| `verification_call` | boolean | `true` when this call is a staff-initiated transfer verification test (set `transfer_connected` accurately). On success, the app stamps `store_phone_systems.transfer_verified_at`. |
 
 On the first verified successful transfer for an org, the dashboard may set `store_phone_systems.transfer_verified_at` (staff cannot set this manually).
 

@@ -99,6 +99,7 @@ export function DashboardHomeLive({
         requestTypeSegments={snapshot.requestTypeSegments}
         callOutcomeSegments={snapshot.callOutcomeSegments}
         callTimes={snapshot.callTimes}
+        transferHealth={snapshot.transferHealth}
       />
     </DashboardHomeEnter>
   );

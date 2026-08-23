@@ -87,6 +87,30 @@ export function buildHomeRequestTypeSegments(
   );
 }
 
+export type TransferHealthSnapshot = {
+  attempted: number;
+  connected: number;
+  connectionRate: number | null;
+};
+
+export function buildTransferHealthSnapshot(
+  rows: { outcome: string | null | undefined; transfer_connected?: boolean | null }[],
+): TransferHealthSnapshot {
+  let attempted = 0;
+  let connected = 0;
+  for (const row of rows) {
+    if (normalizeCallOutcome(String(row.outcome ?? "")) !== "transferred") continue;
+    attempted += 1;
+    if (row.transfer_connected === true) connected += 1;
+  }
+  return {
+    attempted,
+    connected,
+    connectionRate:
+      attempted > 0 ? Math.round((connected / attempted) * 100) : null,
+  };
+}
+
 export function buildHomeCallOutcomeSegments(
   outcomes: (string | null | undefined)[],
 ): AnalyticsSegment[] {

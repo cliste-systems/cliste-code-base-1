@@ -23,6 +23,8 @@ import {
   buildHomeCallOutcomeSegments,
   buildHomeRequestTypeSegments,
   buildHomeUsageSnapshot,
+  buildTransferHealthSnapshot,
+  type TransferHealthSnapshot,
 } from "@/lib/dashboard-home-analytics";
 import { buildHomeCaraPerformance } from "@/lib/dashboard-home-cara-performance";
 import { buildHomeCallTimesBuckets } from "@/lib/dashboard-home-call-times";
@@ -88,6 +90,7 @@ export type DashboardHomeSnapshot = {
   requestTypeSegments: AnalyticsSegment[];
   callOutcomeSegments: AnalyticsSegment[];
   callTimes: HomeCallTimesBucket[];
+  transferHealth: TransferHealthSnapshot | null;
 };
 
 function countExact(res: {
@@ -202,7 +205,7 @@ export async function loadDashboardHomeSnapshot(input: {
       applyOrganizationScope(
         supabase
           .from("call_logs")
-          .select("outcome, duration_seconds, ai_summary")
+          .select("outcome, duration_seconds, ai_summary, transfer_connected")
           .gte("created_at", metricRangeStartIso),
         scopedOrgIds,
       ),
@@ -387,6 +390,16 @@ export async function loadDashboardHomeSnapshot(input: {
   const callOutcomeSegmentsLive = buildHomeCallOutcomeSegments(
     callsForMetricRollups.map((row) => row.outcome),
   );
+  const transferHealthLive =
+    niche === "retail"
+      ? buildTransferHealthSnapshot(
+          callsForMetricRollups.map((row) => ({
+            outcome: row.outcome,
+            transfer_connected: (row as { transfer_connected?: boolean | null })
+              .transfer_connected,
+          })),
+        )
+      : null;
   const usageSnapshotLive = buildHomeUsageSnapshot({
     minutesUsed: billingMinutesUsed > 0 ? billingMinutesUsed : minutesUsedLive,
     includedMinutes: plan.includedMinutes,
@@ -428,6 +441,7 @@ export async function loadDashboardHomeSnapshot(input: {
   const callOutcomeSegments = useHomeMock
     ? [...DASHBOARD_HOME_MOCK.callOutcomeSegments]
     : callOutcomeSegmentsLive;
+  const transferHealth = useHomeMock ? null : transferHealthLive;
   const callTimes = useHomeMock ? [...DASHBOARD_HOME_MOCK.callTimes] : callTimesLive;
   const caraPerformance = useHomeMock
     ? DASHBOARD_HOME_MOCK.caraPerformance
@@ -496,5 +510,6 @@ export async function loadDashboardHomeSnapshot(input: {
     requestTypeSegments,
     callOutcomeSegments,
     callTimes,
+    transferHealth,
   };
 }

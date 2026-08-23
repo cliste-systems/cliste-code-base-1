@@ -277,6 +277,8 @@ export async function regenerateCaraCustomPrompt(
   const nicheStr = String((org as PromptOrgRow | null)?.niche ?? "");
   const isRetail = nicheStr === "retail";
   let retailExtras: ReturnType<typeof buildRetailPromptExtras> | null = null;
+  let retailPhoneSystem: Awaited<ReturnType<typeof loadStorePhoneSystem>> | null =
+    null;
   const hoursOverride = await loadActiveBusinessHoursOverride(
     supabase,
     organizationId,
@@ -295,6 +297,7 @@ export async function regenerateCaraCustomPrompt(
       loadStorePhoneSystem(supabase, organizationId),
       loadStoreDepartments(supabase, organizationId),
     ]);
+    retailPhoneSystem = phoneSystem;
     retailExtras = buildRetailPromptExtras({
       callRoutingMode: (org as PromptOrgRow | null)?.call_routing_mode,
       phoneSystem,
@@ -320,6 +323,17 @@ export async function regenerateCaraCustomPrompt(
       ok: false,
       message: "Internal admin notes leaked into compiled prompt — aborting save.",
     };
+  }
+
+  if (isRetail && retailPhoneSystem) {
+    const installerContact = retailPhoneSystem.installer_contact?.trim();
+    if (installerContact && prompt.includes(installerContact)) {
+      return {
+        ok: false,
+        message:
+          "Installer contact leaked into compiled prompt — aborting save.",
+      };
+    }
   }
 
   const promptCompileWarnings: PromptCompileWarnings | null = compileMeta.wasTrimmed

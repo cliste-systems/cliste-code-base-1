@@ -28,8 +28,10 @@ import { parseDetailsCollectMode, type DetailsCollectMode } from "@/lib/details-
 import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
 import {
   buildRetailPromptExtras,
+  loadClisteTransferReadiness,
   loadStoreDepartments,
   loadStorePhoneSystem,
+  type ClisteTransferReadiness,
 } from "@/lib/load-store-phone-system";
 import {
   listElevenLabsVoices,
@@ -46,8 +48,14 @@ import type {
 import type {
   StorePhoneSystemRow,
   StoreTransferMethod,
+  TransferCapability,
   WarmTransferHardwareStatus,
 } from "@/lib/store-transfer-capability";
+import { buildTransferConfigFingerprint } from "@/lib/transfer-config-fingerprint";
+import {
+  invalidateStoreTransferVerification,
+  setStoreTransferVerificationPending,
+} from "@/lib/transfer-verification-db";
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { AGENT_CONFIG_REVALIDATE_PATHS } from "@/lib/dashboard-routes";
@@ -107,6 +115,8 @@ export type CaraTrainingData = {
   callRoutingMode: CallRoutingMode;
   phoneSystem: StorePhoneSystemRow | null;
   canTransfer: boolean;
+  transferCapability: TransferCapability;
+  clisteTransferReadiness: ClisteTransferReadiness | null;
   agentDetailsToCollect: string;
   detailsCollectMode: DetailsCollectMode;
   trainingGaps: CaraTrainingGapItem[];
@@ -221,6 +231,7 @@ export async function loadCaraTrainingData(
     phoneSystem,
     hoursOverrides,
     voices,
+    clisteTransferReadiness,
   ] = await Promise.all([
     loadStoreDepartments(admin, organizationId),
     admin
@@ -231,6 +242,7 @@ export async function loadCaraTrainingData(
     loadStorePhoneSystem(admin, organizationId),
     loadBusinessHoursOverrides(admin, organizationId),
     listElevenLabsVoices(),
+    loadClisteTransferReadiness(admin, organizationId),
   ]);
 
   const callRoutingMode = parseCallRoutingMode(org.call_routing_mode);
@@ -324,13 +336,15 @@ export async function loadCaraTrainingData(
     callRoutingMode,
     phoneSystem,
     canTransfer: retailExtras.canTransfer,
+    transferCapability: retailExtras.capability,
+    clisteTransferReadiness,
     agentDetailsToCollect: String(org.agent_details_to_collect ?? ""),
     detailsCollectMode: parseDetailsCollectMode(org.agent_details_collect_mode),
     trainingGaps: (gapsResult.data ?? []).map((g) => ({
       id: String(g.id),
-      gapKind: (g.gap_kind === "live_info" ? "live_info" : "learnable") as
-        | "learnable"
-        | "live_info",
+      gapKind: ("gap_kind" in g && g.gap_kind === "live_info"
+        ? "live_info"
+        : "learnable") as "learnable" | "live_info",
       gapSummary: String(g.gap_summary ?? ""),
       caraQuestion: String(g.cara_question ?? ""),
       occurrenceCount: Number(g.occurrence_count ?? 1),
@@ -535,18 +549,16 @@ export async function saveCaraTrainingDepartments(
   const keptIds = new Set<string>();
 
   for (const [index, dept] of departments.entries()) {
-    const hasTransferTarget = Boolean(
-      dept.extension?.trim() || dept.phone_e164?.trim(),
-    );
+    const directDial = dept.direct_dial_e164?.trim() ?? "";
+    const hasDirectDial = /^\+[1-9][0-9]{6,14}$/.test(directDial);
     const row = {
       organization_id: organizationId,
       name: dept.name.trim(),
-      phone_e164: dept.phone_e164?.trim() || null,
       extension: dept.extension?.trim() || null,
       contact_email: dept.contact_email?.trim() || null,
       manager_name: dept.manager_name?.trim() || null,
       hours: dept.hours,
-      transfer_enabled: hasTransferTarget,
+      transfer_enabled: hasDirectDial,
       cara_note: dept.cara_note?.trim() || null,
       handles_text: dept.handles_text?.trim() || null,
       is_off_licence: dept.is_off_licence,
@@ -648,11 +660,22 @@ export async function saveCaraTrainingPhoneSystem(
   payload: {
     systemType: string;
     vendor: string;
+    model: string;
     handsetCount: number | null;
+    installerName: string;
+    installerContact: string;
+    trunkProvider: string;
+    ddiRangeChoice: "yes" | "no" | "unknown";
+    ddiPattern: string;
     transferMethod: StoreTransferMethod;
     warmTransferHardwareStatus: WarmTransferHardwareStatus;
     mainLineE164: string;
     notes: string;
+    departmentDdis: {
+      id: string;
+      extension: string | null;
+      direct_dial_e164: string | null;
+    }[];
   },
 ): Promise<ActionResult> {
   if (!UUID_RE.test(organizationId)) {
@@ -660,11 +683,54 @@ export async function saveCaraTrainingPhoneSystem(
   }
   const admin = await adminClient();
 
+  const hasDdiRange =
+    payload.ddiRangeChoice === "yes"
+      ? true
+      : payload.ddiRangeChoice === "no"
+        ? false
+        : null;
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("call_routing_mode")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  const callRoutingMode = parseCallRoutingMode(org?.call_routing_mode);
+  const existingPhone = await loadStorePhoneSystem(admin, organizationId);
+  const existingDepartments = await loadStoreDepartments(admin, organizationId);
+
+  const previousFingerprint = buildTransferConfigFingerprint({
+    callRoutingMode,
+    transferMethod: existingPhone?.transfer_method ?? "none",
+    hasDdiRange: existingPhone?.has_ddi_range ?? null,
+    departments: existingDepartments.map((d) => ({
+      id: d.id,
+      direct_dial_e164: d.direct_dial_e164,
+    })),
+  });
+
+  const nextFingerprint = buildTransferConfigFingerprint({
+    callRoutingMode,
+    transferMethod: payload.transferMethod,
+    hasDdiRange,
+    departments: payload.departmentDdis.map((d) => ({
+      id: d.id,
+      direct_dial_e164: d.direct_dial_e164,
+    })),
+  });
+
   const row = {
     organization_id: organizationId,
     system_type: payload.systemType,
     vendor: payload.vendor.trim() || null,
+    model: payload.model.trim() || null,
     handset_count: payload.handsetCount,
+    installer_name: payload.installerName.trim() || null,
+    installer_contact: payload.installerContact.trim() || null,
+    trunk_provider: payload.trunkProvider.trim() || null,
+    has_ddi_range: hasDdiRange,
+    ddi_pattern: payload.ddiPattern.trim() || null,
     transfer_method: payload.transferMethod,
     warm_transfer_hardware_status: payload.warmTransferHardwareStatus,
     main_line_e164: payload.mainLineE164.trim() || null,
@@ -674,7 +740,88 @@ export async function saveCaraTrainingPhoneSystem(
 
   const { error } = await admin.from("store_phone_systems").upsert(row);
   if (error) return { ok: false, message: error.message };
+
+  for (const dept of payload.departmentDdis) {
+    if (!dept.id) continue;
+    const directDial = dept.direct_dial_e164?.trim() || null;
+    const hasDirectDial = Boolean(
+      directDial && /^\+[1-9][0-9]{6,14}$/.test(directDial),
+    );
+    const { error: deptErr } = await admin
+      .from("store_departments")
+      .update({
+        extension: dept.extension?.trim() || null,
+        direct_dial_e164: directDial,
+        transfer_enabled: hasDirectDial,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", dept.id)
+      .eq("organization_id", organizationId);
+    if (deptErr) return { ok: false, message: deptErr.message };
+  }
+
+  if (previousFingerprint !== nextFingerprint && existingPhone?.transfer_verified_at) {
+    try {
+      await invalidateStoreTransferVerification(admin, organizationId);
+    } catch (e) {
+      return {
+        ok: false,
+        message: e instanceof Error ? e.message : "Could not invalidate verification.",
+      };
+    }
+  }
+
+  const sync = await syncStoreDepartmentsToOrg(admin, organizationId);
+  if (!sync.ok) return sync;
   return finalizeCaraTrainingSave(admin, organizationId);
+}
+
+export type RunTransferVerificationResult =
+  | { ok: true; instruction: string }
+  | { ok: false; message: string };
+
+export async function runTransferVerification(
+  organizationId: string,
+  departmentId?: string,
+): Promise<RunTransferVerificationResult> {
+  if (!UUID_RE.test(organizationId)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+  const admin = await adminClient();
+
+  const readiness = await loadClisteTransferReadiness(admin, organizationId);
+  if (!readiness.clisteNumber) {
+    return {
+      ok: false,
+      message: "Assign a Cliste number before running a transfer test.",
+    };
+  }
+
+  const phoneSystem = await loadStorePhoneSystem(admin, organizationId);
+  if (!phoneSystem) {
+    return {
+      ok: false,
+      message: "Save phone system details before running a transfer test.",
+    };
+  }
+
+  try {
+    await setStoreTransferVerificationPending(admin, organizationId, true);
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Could not start verification.",
+    };
+  }
+
+  const deptHint = departmentId
+    ? " Ask to be put through to the department you are testing."
+    : " Ask to be put through to a department with a direct-dial number.";
+
+  return {
+    ok: true,
+    instruction: `Call ${readiness.clisteNumber} from a mobile.${deptHint} When the handset rings and you answer, verification completes automatically.`,
+  };
 }
 
 export async function saveCaraTrainingBoundaries(

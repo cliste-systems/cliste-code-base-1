@@ -1,20 +1,19 @@
 import { sanitizePromptFreeText } from "@/lib/compile-cara-prompt";
+import type { TransferCapability } from "@/lib/transfer-capability";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
 
 export type StoreDepartmentsPromptInput = {
   departments: Pick<
     StoreDepartmentRow,
+    | "id"
     | "name"
     | "active"
-    | "transfer_enabled"
-    | "extension"
-    | "phone_e164"
     | "cara_note"
     | "handles_text"
     | "is_off_licence"
     | "is_an_post"
   >[];
-  canTransfer: boolean;
+  capability: TransferCapability;
 };
 
 function activeDepartments(
@@ -45,17 +44,16 @@ export function storeDepartmentsPromptSection(
     if (d.is_an_post) {
       return `• ${name}${handlesPart} — An Post: I never guess tracking or delivery status; I send them to the counter.`;
     }
-    if (input.canTransfer && d.transfer_enabled) {
-      const target = d.extension?.trim() || d.phone_e164?.trim();
-      const targetPart = target ? ` (${target})` : "";
-      return `• ${name}${handlesPart} — I try to put them through${targetPart}; if no answer I take their name, number, and what they need.`;
+    const deptCap = input.capability.perDepartment[d.id];
+    if (deptCap?.canTransfer) {
+      return `• ${name}${handlesPart} — I can put you through to ${name}.`;
     }
     return `• ${name}${handlesPart} — I take their name, number, and what they need, and pass it to ${name}.`;
   });
 
-  const header = input.canTransfer
+  const header = input.capability.canTransfer
     ? "Store departments — when transfer is available:"
-    : "Store departments — message-taking only (transfer not available on this setup):";
+    : "Store departments — message-taking only:";
 
   return [header, ...lines].join("\n");
 }
