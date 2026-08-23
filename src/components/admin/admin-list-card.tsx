@@ -27,16 +27,18 @@ export function AdminListCard({
   return (
     <AdminSectionCard
       className={cn(
-        "flex min-h-0 flex-col",
+        "flex min-h-0 min-w-0 flex-col",
         fillRemaining && "flex-1",
         className,
       )}
       contentClassName="flex min-h-0 flex-1 flex-col p-0"
     >
-      <header className="flex shrink-0 flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-gray-500">{countLabel}</p>
+      <header className="flex min-w-0 shrink-0 flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="shrink-0 text-sm text-gray-500">{countLabel}</p>
         {toolbar ? (
-          <div className="flex flex-wrap items-center gap-3">{toolbar}</div>
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+            {toolbar}
+          </div>
         ) : null}
       </header>
       {stats ? (
@@ -49,7 +51,7 @@ export function AdminListCard({
           {banner}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {children}
       </div>
     </AdminSectionCard>

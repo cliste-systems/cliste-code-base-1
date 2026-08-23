@@ -17,8 +17,8 @@ import {
   adminTableRowClass,
   adminTableTdClass,
   adminTableTdDateClass,
-  adminTableThClass,
   adminTableThDateClass,
+  adminTableThWidth,
   cellOrBlank,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
@@ -275,16 +275,14 @@ export default async function AdminSecurityPage({
 
 function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
   return (
-    <table className={`${adminTableClass} min-w-[760px] text-sm`}>
+    <table className={`${adminTableClass} text-sm`}>
       <thead className={adminTableHeadClass}>
         <tr>
           <th className={adminTableThDateClass}>When</th>
-          <th className={adminTableThClass}>Event</th>
-          <th className={`${adminTableThClass} w-[1%] whitespace-nowrap`}>
-            Outcome
-          </th>
-          <th className={adminTableThClass}>Identity</th>
-          <th className={adminTableThClass}>IP</th>
+          <th className={adminTableThWidth("w-[20%]")}>Event</th>
+          <th className={adminTableThWidth("w-[12%]")}>Outcome</th>
+          <th className={adminTableThWidth("w-[32%]")}>Identity</th>
+          <th className={adminTableThWidth("w-[22%]")}>IP</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
@@ -304,7 +302,7 @@ function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
                   {formatWhen(row.created_at)}
                 </td>
                 <td
-                  className={`max-w-[240px] truncate text-gray-900 ${adminTableTdClass}`}
+                  className={`truncate text-gray-900 ${adminTableTdClass}`}
                   title={row.event_type}
                 >
                   {formatEventType(row.event_type)}
@@ -313,13 +311,14 @@ function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
                   <AdminBadge>{outcomeLabel(row.outcome)}</AdminBadge>
                 </td>
                 <td
-                  className={`max-w-[220px] truncate text-gray-600 ${adminTableTdClass}`}
+                  className={`truncate text-gray-600 ${adminTableTdClass}`}
                   title={identity || undefined}
                 >
                   {identity}
                 </td>
                 <td
-                  className={`whitespace-nowrap text-gray-500 ${adminTableTdClass}`}
+                  className={`truncate text-gray-500 ${adminTableTdClass}`}
+                  title={ip || undefined}
                 >
                   {ip}
                 </td>
@@ -348,13 +347,13 @@ function ComplianceTable({
   }
 
   return (
-    <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+    <table className={`${adminTableClass} text-sm`}>
       <thead className={adminTableHeadClass}>
         <tr>
           <th className={adminTableThDateClass}>When</th>
-          <th className={adminTableThClass}>Event</th>
-          <th className={adminTableThClass}>Organization</th>
-          <th className={adminTableThClass}>Details</th>
+          <th className={adminTableThWidth("w-[22%]")}>Event</th>
+          <th className={adminTableThWidth("w-[18%]")}>Organization</th>
+          <th className={adminTableThWidth("w-[46%]")}>Details</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
@@ -370,16 +369,16 @@ function ComplianceTable({
               <td className={adminTableTdDateClass}>
                 {formatWhen(row.created_at)}
               </td>
-              <td className={`text-gray-900 ${adminTableTdClass}`}>
+              <td className={`truncate text-gray-900 ${adminTableTdClass}`}>
                 {formatEventType(row.event_type)}
               </td>
               <td
-                className={`max-w-[180px] truncate font-mono text-xs text-gray-500 ${adminTableTdClass}`}
+                className={`truncate font-mono text-xs text-gray-500 ${adminTableTdClass}`}
               >
                 {cellOrBlank(row.organization_id)}
               </td>
               <td
-                className={`max-w-md truncate text-xs text-gray-600 ${adminTableTdClass}`}
+                className={`truncate text-xs text-gray-600 ${adminTableTdClass}`}
                 title={
                   row.metadata ? JSON.stringify(row.metadata) : undefined
                 }
@@ -406,13 +405,13 @@ function PipelineTable({
   }[];
 }) {
   return (
-    <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+    <table className={`${adminTableClass} text-sm`}>
       <thead className={adminTableHeadClass}>
         <tr>
           <th className={adminTableThDateClass}>When</th>
-          <th className={adminTableThClass}>Stage</th>
-          <th className={adminTableThClass}>DID</th>
-          <th className={adminTableThClass}>Error</th>
+          <th className={adminTableThWidth("w-[14%]")}>Stage</th>
+          <th className={adminTableThWidth("w-[16%]")}>DID</th>
+          <th className={adminTableThWidth("w-[56%]")}>Error</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
@@ -428,16 +427,16 @@ function PipelineTable({
               <td className={adminTableTdDateClass}>
                 {formatWhen(inc.occurred_at)}
               </td>
-              <td className={`font-medium text-gray-900 ${adminTableTdClass}`}>
+              <td className={`truncate font-medium text-gray-900 ${adminTableTdClass}`}>
                 {inc.stage}
               </td>
               <td
-                className={`whitespace-nowrap font-mono text-xs text-gray-600 ${adminTableTdClass}`}
+                className={`truncate font-mono text-xs text-gray-600 ${adminTableTdClass}`}
               >
                 {cellOrBlank(inc.called_number)}
               </td>
               <td
-                className={`max-w-md truncate text-gray-700 ${adminTableTdClass}`}
+                className={`truncate text-gray-700 ${adminTableTdClass}`}
                 title={inc.error_message}
               >
                 {inc.error_message}

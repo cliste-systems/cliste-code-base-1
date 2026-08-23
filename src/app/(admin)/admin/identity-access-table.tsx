@@ -11,7 +11,10 @@ import {
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
+  adminTableTdTruncateClass,
+  adminTableThActionsClass,
   adminTableThClass,
+  adminTableThWidth,
 } from "@/components/admin/admin-table";
 import {
   DropdownMenu,
@@ -49,16 +52,16 @@ type IdentityAccessTableProps = {
 
 export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableProps) {
   const table = (
-    <table className={`${adminTableClass} min-w-[900px]`}>
+    <table className={adminTableClass}>
       <thead className={adminTableHeadClass}>
         <tr>
-          <th className={adminTableThClass}>User email</th>
-          <th className={adminTableThClass}>Linked client</th>
-          <th className={adminTableThClass}>Status</th>
-          <th className={adminTableThClass}>Password</th>
-          <th className={adminTableThClass}>Admin console</th>
-          <th className={adminTableThClass}>Last login</th>
-          <th className={`${adminTableThClass} text-right`}>Actions</th>
+          <th className={adminTableThWidth("w-[20%]")}>User email</th>
+          <th className={adminTableThWidth("w-[16%]")}>Linked client</th>
+          <th className={adminTableThWidth("w-[9%]")}>Status</th>
+          <th className={adminTableThWidth("w-[9%]")}>Password</th>
+          <th className={adminTableThWidth("w-[12%]")}>Admin console</th>
+          <th className={adminTableThWidth("w-[15%]")}>Last login</th>
+          <th className={adminTableThActionsClass}>Actions</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
@@ -72,22 +75,24 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
           rows.map((row) => (
             <tr key={row.userId} className={adminTableRowClass}>
               <td
-                className={`text-sm font-medium whitespace-nowrap text-gray-900 ${adminTableTdClass}`}
+                className={`truncate text-sm font-medium text-gray-900 ${adminTableTdClass}`}
+                title={row.email || undefined}
               >
-                {row.email || "—"}
+                {row.email || ""}
               </td>
-              <td
-                className={`text-sm font-medium whitespace-nowrap text-gray-900 ${adminTableTdClass}`}
-              >
+              <td className={adminTableTdTruncateClass}>
                 {row.organizationId ? (
                   <Link
                     href={`/admin/customers/${row.organizationId}`}
-                    className="text-gray-900 underline-offset-2 hover:underline"
+                    className="block truncate text-sm font-medium text-gray-900 underline-offset-2 hover:underline"
+                    title={row.organizationName}
                   >
                     {row.organizationName}
                   </Link>
                 ) : (
-                  row.organizationName
+                  <span className="block truncate text-sm font-medium text-gray-900">
+                    {row.organizationName}
+                  </span>
                 )}
               </td>
               <td className={`whitespace-nowrap ${adminTableTdClass}`}>
@@ -108,7 +113,8 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
                 </AdminBadge>
               </td>
               <td
-                className={`text-sm whitespace-nowrap text-gray-500 ${adminTableTdClass}`}
+                className={`truncate text-sm text-gray-500 ${adminTableTdClass}`}
+                title={row.lastLoginLabel}
               >
                 {row.lastLoginLabel}
               </td>
@@ -135,7 +141,7 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="overflow-x-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       {table}
     </div>
   );

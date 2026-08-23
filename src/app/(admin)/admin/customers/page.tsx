@@ -14,7 +14,10 @@ import {
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
+  adminTableTdTruncateClass,
+  adminTableThActionsClass,
   adminTableThClass,
+  adminTableThWidth,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import {
@@ -120,16 +123,16 @@ export default async function AdminCustomersPage({
             </>
           }
         >
-          <table className={`${adminTableClass} min-w-[920px]`}>
+          <table className={adminTableClass}>
             <thead className={adminTableHeadClass}>
               <tr>
-                <th className={adminTableThClass}>Customer</th>
-                <th className={adminTableThClass}>Type</th>
-                <th className={adminTableThClass}>Niche</th>
-                <th className={adminTableThClass}>Status</th>
-                <th className={adminTableThClass}>Owner</th>
-                <th className={adminTableThClass}>Created</th>
-                <th className={`${adminTableThClass} text-right`}>Actions</th>
+                <th className={adminTableThWidth("w-[24%]")}>Customer</th>
+                <th className={adminTableThWidth("w-[10%]")}>Type</th>
+                <th className={adminTableThWidth("w-[12%]")}>Niche</th>
+                <th className={adminTableThWidth("w-[14%]")}>Status</th>
+                <th className={adminTableThWidth("w-[18%]")}>Owner</th>
+                <th className={adminTableThWidth("w-[13%]")}>Created</th>
+                <th className={adminTableThActionsClass}>Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -143,13 +146,13 @@ export default async function AdminCustomersPage({
               ) : (
                 rows.map((row) => (
                   <tr key={row.orgId} className={adminTableRowClass}>
-                    <td className={adminTableTdClass}>
+                    <td className={adminTableTdTruncateClass}>
                       <Link
                         href={`/admin/customers/${row.orgId}`}
                         className="block min-w-0"
                         title={row.name}
                       >
-                        <span className="text-sm font-medium text-gray-900 hover:underline">
+                        <span className="block truncate text-sm font-medium text-gray-900 hover:underline">
                           {displayCustomerName(row.name)}
                         </span>
                         <span className="mt-0.5 block truncate font-mono text-[11px] text-gray-400">
@@ -188,9 +191,10 @@ export default async function AdminCustomersPage({
                       )}
                     </td>
                     <td
-                      className={`max-w-[180px] truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      className={`truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      title={row.ownerEmail ?? undefined}
                     >
-                      {row.ownerEmail ?? "—"}
+                      {row.ownerEmail ?? ""}
                     </td>
                     <td
                       className={`whitespace-nowrap text-sm text-gray-500 tabular-nums ${adminTableTdClass}`}

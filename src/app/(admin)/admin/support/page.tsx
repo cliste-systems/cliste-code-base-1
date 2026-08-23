@@ -15,7 +15,10 @@ import {
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
+  adminTableTdTruncateClass,
+  adminTableThActionsClass,
   adminTableThClass,
+  adminTableThWidth,
 } from "@/components/admin/admin-table";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -130,15 +133,15 @@ export default async function AdminSupportPage() {
         />
       ) : (
         <AdminListCard countLabel={countLabel}>
-          <table className={`${adminTableClass} min-w-[900px]`}>
+          <table className={adminTableClass}>
             <thead className={adminTableHeadClass}>
               <tr>
-                <th className={adminTableThClass}>Client</th>
-                <th className={adminTableThClass}>Subject</th>
-                <th className={adminTableThClass}>Message</th>
-                <th className={adminTableThClass}>Status</th>
-                <th className={adminTableThClass}>Submitted</th>
-                <th className={`${adminTableThClass} text-right`}>Actions</th>
+                <th className={adminTableThWidth("w-[14%]")}>Client</th>
+                <th className={adminTableThWidth("w-[16%]")}>Subject</th>
+                <th className={adminTableThWidth("w-[28%]")}>Message</th>
+                <th className={adminTableThWidth("w-[10%]")}>Status</th>
+                <th className={adminTableThWidth("w-[15%]")}>Submitted</th>
+                <th className={adminTableThActionsClass}>Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -151,25 +154,26 @@ export default async function AdminSupportPage() {
               ) : (
                 tickets.map((t) => (
                   <tr key={t.id} className={adminTableRowClass}>
-                    <td className={`whitespace-nowrap ${adminTableTdClass}`}>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">
+                    <td className={adminTableTdTruncateClass}>
+                      <div className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-gray-900">
                           {orgLabel(t)}
                         </span>
                         {orgSlug(t) ? (
-                          <span className="mt-0.5 font-mono text-[11px] text-gray-400">
+                          <span className="mt-0.5 block truncate font-mono text-[11px] text-gray-400">
                             {orgSlug(t)}
                           </span>
                         ) : null}
                       </div>
                     </td>
                     <td
-                      className={`max-w-[200px] truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      className={`truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      title={t.subject}
                     >
                       {t.subject}
                     </td>
                     <td
-                      className={`max-w-md truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      className={`truncate text-sm text-gray-600 ${adminTableTdClass}`}
                       title={t.body}
                     >
                       {messagePreview(t.body)}
@@ -182,13 +186,13 @@ export default async function AdminSupportPage() {
                     >
                       {formatWhen(t.created_at)}
                     </td>
-                    <td className={`whitespace-nowrap text-right ${adminTableTdClass}`}>
-                      <div className="flex flex-wrap items-center justify-end gap-2">
+                    <td className={`text-right ${adminTableTdClass}`}>
+                      <div className="flex flex-col items-end gap-1.5">
                         <Link
                           href={`/admin/support/${t.id}`}
-                          className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                          className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
                         >
-                          View thread
+                          View
                         </Link>
                         {t.status === "open" ? (
                           <CloseSupportButton ticketId={t.id} />

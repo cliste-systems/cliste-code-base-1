@@ -11,6 +11,7 @@ import {
   adminTableRowClass,
   adminTableTdClass,
   adminTableThClass,
+  adminTableThWidth,
 } from "@/components/admin/admin-table";
 import { poolHealthCheck, twilioIsConfigured } from "@/lib/phone-pool";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -100,14 +101,14 @@ export default async function PhonePoolAdminPage() {
       fillViewport
     >
       <PhonePoolListCard countLabel={countLabel} stats={stats} notice={notice}>
-        <table className={`${adminTableClass} min-w-[720px] text-sm`}>
+        <table className={`${adminTableClass} text-sm`}>
           <thead className={adminTableHeadClass}>
             <tr>
-              <th className={adminTableThClass}>Number</th>
-              <th className={adminTableThClass}>Provider</th>
-              <th className={adminTableThClass}>Status</th>
-              <th className={adminTableThClass}>Assigned to</th>
-              <th className={adminTableThClass}>Since</th>
+              <th className={adminTableThWidth("w-[22%]")}>Number</th>
+              <th className={adminTableThWidth("w-[14%]")}>Provider</th>
+              <th className={adminTableThWidth("w-[12%]")}>Status</th>
+              <th className={adminTableThWidth("w-[26%]")}>Assigned to</th>
+              <th className={adminTableThWidth("w-[16%]")}>Since</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -120,24 +121,24 @@ export default async function PhonePoolAdminPage() {
             ) : (
               rows.map((r) => (
                 <tr key={r.id} className={adminTableRowClass}>
-                  <td className={`font-mono text-sm ${adminTableTdClass}`}>
+                  <td className={`truncate font-mono text-sm ${adminTableTdClass}`}>
                     {r.e164}
                     <span className="ml-2 inline-flex items-center rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
                       {r.country_code}
                     </span>
                   </td>
-                  <td className={`text-gray-600 ${adminTableTdClass}`}>
+                  <td className={`truncate text-gray-600 ${adminTableTdClass}`}>
                     {r.provider}
                   </td>
                   <td className={adminTableTdClass}>
                     <AdminBadge className="capitalize">{r.status}</AdminBadge>
                   </td>
-                  <td className={`text-gray-600 ${adminTableTdClass}`}>
+                  <td className={`truncate text-gray-600 ${adminTableTdClass}`}>
                     {r.organization_id
                       ? (orgNameIndex.get(r.organization_id) ?? "(linked)")
                       : "—"}
                   </td>
-                  <td className={`text-gray-500 ${adminTableTdClass}`}>
+                  <td className={`whitespace-nowrap text-gray-500 ${adminTableTdClass}`}>
                     {formatAgeLabel(r)}
                   </td>
                 </tr>

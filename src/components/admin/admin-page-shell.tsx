@@ -46,11 +46,11 @@ export function AdminPageShell({
     <div
       {...(fillViewport ? { "data-admin-fill": true } : {})}
       className={cn(
-        "mx-auto w-full",
+        "mx-auto w-full min-w-0",
         ADMIN_PAGE_X_PADDING,
         fillViewport
-          ? "flex min-h-0 flex-1 flex-col gap-6 overflow-hidden pt-10 pb-6"
-          : "space-y-8 py-10",
+          ? "flex min-h-0 flex-1 flex-col gap-6 overflow-x-hidden overflow-hidden pt-10 pb-6"
+          : "space-y-8 overflow-x-hidden py-10",
         MAX_WIDTH_CLASS[maxWidth],
         className,
       )}
@@ -77,7 +77,7 @@ export function AdminPageShell({
       </header>
 
       {fillViewport ? (
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       ) : (
         children
       )}

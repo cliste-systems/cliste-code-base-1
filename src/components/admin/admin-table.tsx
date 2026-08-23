@@ -2,7 +2,8 @@
 
 import { cn } from "@/lib/utils";
 
-export const adminTableClass = "w-full border-collapse text-left";
+/** Fluid table — no horizontal scroll; columns share viewport width. */
+export const adminTableClass = "w-full table-fixed border-collapse text-left";
 
 export const adminTableHeadClass =
   "sticky top-0 z-10 border-b border-gray-100 bg-gray-50/80 backdrop-blur-sm";
@@ -12,10 +13,17 @@ export const adminTableThClass =
 
 export const adminTableThDateClass = cn(
   adminTableThClass,
-  "w-[1%] whitespace-nowrap",
+  "w-[14%] whitespace-nowrap",
+);
+
+export const adminTableThActionsClass = cn(
+  adminTableThClass,
+  "w-[9%] text-right",
 );
 
 export const adminTableTdClass = "px-5 py-3.5";
+
+export const adminTableTdTruncateClass = cn(adminTableTdClass, "max-w-0 truncate");
 
 export const adminTableTdDateClass = cn(
   adminTableTdClass,
@@ -31,3 +39,6 @@ export function cellOrBlank(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
+export function adminTableThWidth(width: string): string {
+  return cn(adminTableThClass, width);
+}
