@@ -15,9 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  ORGANIZATION_NICHES,
+  ADMIN_PROVISIONING_NICHES,
   ORGANIZATION_NICHE_ADMIN_LABELS,
-  type OrganizationNiche,
+  type AdminProvisioningNiche,
 } from "@/lib/organization-niche";
 
 import { createOrganization } from "./actions";
@@ -48,7 +48,7 @@ export function NewClientDialog() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [assignPhoneNumber, setAssignPhoneNumber] = useState(true);
-  const [niche, setNiche] = useState<OrganizationNiche>("retail");
+  const [niche, setNiche] = useState<AdminProvisioningNiche>("retail");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [ownerMobile, setOwnerMobile] = useState("");
@@ -138,24 +138,24 @@ export function NewClientDialog() {
           />
         }
       >
-        New retail client
+        New client
       </DialogTrigger>
       <DialogContent showCloseButton className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New retail client</DialogTitle>
+          <DialogTitle>New client</DialogTitle>
           <DialogDescription>
-            Store identity, owner contact, and optional phone assignment.
+            Business details, owner contact, and optional phone assignment.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor={nameId}>Store name</Label>
+            <Label htmlFor={nameId}>Business name</Label>
             <Input
               id={nameId}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="SuperValu Donegal Town"
+              placeholder="Acme Ltd"
             />
           </div>
           <div className="space-y-2">
@@ -197,10 +197,12 @@ export function NewClientDialog() {
             <select
               id={nicheId}
               value={niche}
-              onChange={(e) => setNiche(e.target.value as OrganizationNiche)}
+              onChange={(e) =>
+                setNiche(e.target.value as AdminProvisioningNiche)
+              }
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
             >
-              {ORGANIZATION_NICHES.map((key) => (
+              {ADMIN_PROVISIONING_NICHES.map((key) => (
                 <option key={key} value={key}>
                   {ORGANIZATION_NICHE_ADMIN_LABELS[key]}
                 </option>
@@ -228,7 +230,7 @@ export function NewClientDialog() {
               placeholder="+353 87 123 4567"
             />
             <p className="text-muted-foreground text-xs">
-              Stored as the store notification number for alerts.
+              Stored as the notification number for alerts.
             </p>
           </div>
           <div className="space-y-2">

@@ -41,15 +41,14 @@ export default async function OnboardingPipelinePage() {
     <AdminPageShell
       icon={Inbox}
       title="Onboarding"
-      description="Admin-led retail store provisioning — from invite through go-live."
+      description="Admin-led client provisioning — from invite through go-live."
       actions={<NewClientDialog />}
     >
       {pipeline.length === 0 ? (
         <AdminPageEmptyState>
-          <p>No admin-provisioned stores yet.</p>
+          <p>No provisioned clients yet.</p>
           <p className="mt-2">
-            Use <strong>New retail client</strong> above to provision the first
-            store.
+            Use <strong>New client</strong> above to provision the first one.
           </p>
         </AdminPageEmptyState>
       ) : (
