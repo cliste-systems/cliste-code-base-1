@@ -13,7 +13,7 @@ export const adminTableThClass =
 
 export const adminTableThDateClass = cn(
   adminTableThClass,
-  "text-right",
+  "w-0",
 );
 
 export const adminTableThActionsClass = cn(
@@ -34,7 +34,7 @@ export const adminTableTdTruncateClass = cn(
 
 export const adminTableTdDateClass = cn(
   adminTableTdClass,
-  "whitespace-nowrap text-right text-sm tabular-nums text-gray-500",
+  "w-0 whitespace-nowrap text-sm tabular-nums text-gray-500",
 );
 
 export const adminTableRowClass =
