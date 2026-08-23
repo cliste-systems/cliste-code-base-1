@@ -162,12 +162,11 @@ export default async function AdminIdentityAccessPage() {
       title="Identity & access"
       description="Use each user's action menu to grant or revoke admin console access."
       fillViewport
-      className="max-w-6xl"
     >
       {loadError ? (
         <AdminErrorCard message={loadError} />
       ) : (
-        <AdminListCard fillRemaining countLabel={countLabel}>
+        <AdminListCard countLabel={countLabel}>
           <IdentityAccessTable rows={rows} bare />
         </AdminListCard>
       )}

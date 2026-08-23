@@ -11,9 +11,13 @@ import { triggerPhonePoolRefill } from "./actions";
 
 export function PhonePoolListCard({
   countLabel,
+  stats,
+  notice,
   children,
 }: {
   countLabel: string;
+  stats?: ReactNode;
+  notice?: ReactNode;
   children: ReactNode;
 }) {
   const [pending, start] = useTransition();
@@ -58,7 +62,7 @@ export function PhonePoolListCard({
     </button>
   );
 
-  const banner = feedback ? (
+  const feedbackBanner = feedback ? (
     <p
       role="status"
       className={cn(
@@ -70,11 +74,13 @@ export function PhonePoolListCard({
     </p>
   ) : null;
 
+  const banner = feedbackBanner ?? notice ?? null;
+
   return (
     <AdminListCard
-      fillRemaining
       countLabel={countLabel}
       toolbar={button}
+      stats={stats}
       banner={banner}
     >
       {children}

@@ -113,7 +113,6 @@ export default async function AdminSupportPage() {
         </>
       }
       fillViewport
-      className="max-w-6xl"
     >
       {loadError ? (
         <AdminErrorCard
@@ -130,7 +129,7 @@ export default async function AdminSupportPage() {
           }
         />
       ) : (
-        <AdminListCard fillRemaining countLabel={countLabel}>
+        <AdminListCard countLabel={countLabel}>
           <table className={`${adminTableClass} min-w-[900px]`}>
             <thead className={adminTableHeadClass}>
               <tr>

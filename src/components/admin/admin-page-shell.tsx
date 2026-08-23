@@ -13,6 +13,9 @@ const MAX_WIDTH_CLASS: Record<AdminPageShellMaxWidth, string> = {
   "3xl": "max-w-3xl",
 };
 
+/** Shared horizontal padding for all admin pages. */
+export const ADMIN_PAGE_X_PADDING = "px-6";
+
 type AdminPageShellProps = {
   icon: IconType;
   title: string;
@@ -23,7 +26,7 @@ type AdminPageShellProps = {
   backLabel?: string;
   children: ReactNode;
   className?: string;
-  /** Lock page to viewport height (pairs with AdminListCard fillRemaining). */
+  /** Lock page to viewport height (pairs with AdminListCard). */
   fillViewport?: boolean;
 };
 
@@ -43,10 +46,11 @@ export function AdminPageShell({
     <div
       {...(fillViewport ? { "data-admin-fill": true } : {})}
       className={cn(
-        "mx-auto px-6 py-10",
+        "mx-auto w-full",
+        ADMIN_PAGE_X_PADDING,
         fillViewport
-          ? "flex min-h-0 flex-1 flex-col space-y-6 overflow-hidden pb-6"
-          : "space-y-8",
+          ? "flex min-h-0 flex-1 flex-col overflow-hidden pt-10 pb-6"
+          : "space-y-8 py-10",
         MAX_WIDTH_CLASS[maxWidth],
         className,
       )}
@@ -54,7 +58,7 @@ export function AdminPageShell({
       {backHref ? (
         <Link
           href={backHref}
-          className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900"
+          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900"
         >
           <ChevronLeft className="size-4" aria-hidden />
           {backLabel ?? "Back"}
@@ -72,7 +76,11 @@ export function AdminPageShell({
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </header>
 
-      {children}
+      {fillViewport ? (
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      ) : (
+        children
+      )}
     </div>
   );
 }

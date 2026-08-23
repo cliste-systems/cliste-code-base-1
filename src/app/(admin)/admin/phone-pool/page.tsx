@@ -3,6 +3,7 @@ import { Phone } from "lucide-react";
 import { AdminBadge } from "@/components/admin/admin-badge";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import { AdminStatsGrid } from "@/components/admin/admin-stats-grid";
 import {
   adminTableClass,
   adminTableEmptyClass,
@@ -60,44 +61,45 @@ export default async function PhonePoolAdminPage() {
   const twilioReady = twilioIsConfigured();
   const countLabel = `${rows.length} number${rows.length === 1 ? "" : "s"}`;
 
+  const stats = (
+    <AdminStatsGrid>
+      <AdminStatCard label="Available (IE)" value={health.availableIE.toLocaleString("en-IE")} />
+      <AdminStatCard
+        label="Available (other)"
+        value={health.availableOther.toLocaleString("en-IE")}
+      />
+      <AdminStatCard label="Assigned" value={health.assigned.toLocaleString("en-IE")} />
+      <AdminStatCard label="Cooldown" value={health.cooldown.toLocaleString("en-IE")} />
+      <AdminStatCard
+        label="Low-water mark"
+        value={health.lowWaterMark.toLocaleString("en-IE")}
+        muted
+      />
+    </AdminStatsGrid>
+  );
+
+  const notice = !twilioReady ? (
+    <p className="text-sm text-gray-700">
+      Twilio credentials are not configured — pool refill is a no-op. Set{" "}
+      <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
+        TWILIO_ACCOUNT_SID
+      </code>{" "}
+      and{" "}
+      <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
+        TWILIO_AUTH_TOKEN
+      </code>{" "}
+      to enable automated purchases.
+    </p>
+  ) : undefined;
+
   return (
     <AdminPageShell
       icon={Phone}
       title="Phone pool"
       description="Irish DIDs Cliste owns. Pool refills nightly when IE-available drops below the low-water mark."
       fillViewport
-      className="max-w-6xl"
     >
-      {!twilioReady ? (
-        <p className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-          Twilio credentials are not configured — pool refill is a no-op. Set{" "}
-          <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
-            TWILIO_ACCOUNT_SID
-          </code>{" "}
-          and{" "}
-          <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
-            TWILIO_AUTH_TOKEN
-          </code>{" "}
-          to enable automated purchases.
-        </p>
-      ) : null}
-
-      <section className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-5">
-        <AdminStatCard label="Available (IE)" value={health.availableIE.toLocaleString("en-IE")} />
-        <AdminStatCard
-          label="Available (other)"
-          value={health.availableOther.toLocaleString("en-IE")}
-        />
-        <AdminStatCard label="Assigned" value={health.assigned.toLocaleString("en-IE")} />
-        <AdminStatCard label="Cooldown" value={health.cooldown.toLocaleString("en-IE")} />
-        <AdminStatCard
-          label="Low-water mark"
-          value={health.lowWaterMark.toLocaleString("en-IE")}
-          muted
-        />
-      </section>
-
-      <PhonePoolListCard countLabel={countLabel}>
+      <PhonePoolListCard countLabel={countLabel} stats={stats} notice={notice}>
         <table className={`${adminTableClass} min-w-[720px] text-sm`}>
           <thead className={adminTableHeadClass}>
             <tr>

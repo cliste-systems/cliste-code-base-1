@@ -229,7 +229,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   return (
     <div
       data-admin-fill
-      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row lg:gap-5 lg:p-5"
+      className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-6 lg:flex-row lg:gap-5"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
         {loadError ? (

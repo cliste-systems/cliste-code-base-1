@@ -9,6 +9,7 @@ import {
 } from "@/components/admin/admin-page-shell";
 import { AdminSegmentedTabs } from "@/components/admin/admin-segmented-tabs";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import { AdminStatsGrid } from "@/components/admin/admin-stats-grid";
 import {
   adminTableClass,
   adminTableEmptyClass,
@@ -215,13 +216,28 @@ export default async function AdminSecurityPage({
         ? `${complianceRows.length} compliance signal${complianceRows.length === 1 ? "" : "s"}`
         : `${pipelineIncidents.length} pipeline incident${pipelineIncidents.length === 1 ? "" : "s"}`;
 
+  const stats = (
+    <AdminStatsGrid>
+      <AdminStatCard label="Failed (24h)" value={failures24h} />
+      <AdminStatCard label="Successful (24h)" value={success24h} />
+      <AdminStatCard label="Unique IPs (24h)" value={uniqueIps24h} />
+      <AdminStatCard
+        label="Disclosure (7d)"
+        value={
+          disclosureConfirmedPct != null ? `${disclosureConfirmedPct}%` : "—"
+        }
+        muted={disclosureConfirmedPct == null}
+      />
+      <AdminStatCard label="Incidents (7d)" value={pipelineIncidents.length} />
+    </AdminStatsGrid>
+  );
+
   return (
     <AdminPageShell
       icon={Shield}
       title="Security"
       description="Auth activity, voice compliance signals, and pipeline health."
       fillViewport
-      className="max-w-6xl"
     >
       {loadError ? (
         <AdminErrorCard
@@ -233,49 +249,25 @@ export default async function AdminSecurityPage({
           }
         />
       ) : (
-        <>
-          <section className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-5">
-            <AdminStatCard label="Failed (24h)" value={failures24h} />
-            <AdminStatCard label="Successful (24h)" value={success24h} />
-            <AdminStatCard label="Unique IPs (24h)" value={uniqueIps24h} />
-            <AdminStatCard
-              label="Disclosure (7d)"
-              value={
-                disclosureConfirmedPct != null
-                  ? `${disclosureConfirmedPct}%`
-                  : "—"
-              }
-              muted={disclosureConfirmedPct == null}
+        <AdminListCard
+          countLabel={countLabel}
+          stats={stats}
+          toolbar={
+            <AdminSegmentedTabs
+              tabs={[...VIEW_TABS]}
+              activeValue={view}
+              ariaLabel="Security view"
             />
-            <AdminStatCard
-              label="Incidents (7d)"
-              value={pipelineIncidents.length}
-            />
-          </section>
-
-          <AdminListCard
-            fillRemaining
-            countLabel={countLabel}
-            toolbar={
-              <AdminSegmentedTabs
-                tabs={[...VIEW_TABS]}
-                activeValue={view}
-                ariaLabel="Security view"
-              />
-            }
-          >
-            {view === "auth" ? (
-              <AuthEventsTable rows={rows} />
-            ) : view === "compliance" ? (
-              <ComplianceTable
-                rows={complianceRows}
-                error={complianceError}
-              />
-            ) : (
-              <PipelineTable rows={pipelineIncidents} />
-            )}
-          </AdminListCard>
-        </>
+          }
+        >
+          {view === "auth" ? (
+            <AuthEventsTable rows={rows} />
+          ) : view === "compliance" ? (
+            <ComplianceTable rows={complianceRows} error={complianceError} />
+          ) : (
+            <PipelineTable rows={pipelineIncidents} />
+          )}
+        </AdminListCard>
       )}
     </AdminPageShell>
   );

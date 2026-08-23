@@ -3,9 +3,6 @@ import { LifeBuoy } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
 import {
-  ADMIN_LIST_PAGE_CLASS,
-} from "@/components/admin/admin-list-card";
-import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
@@ -105,10 +102,9 @@ export default async function AdminSupportTicketPage({
         icon={LifeBuoy}
         title="Support tickets"
         description="Ticket detail"
-        maxWidth="3xl"
         backHref="/admin/support"
         backLabel="Support tickets"
-        className={ADMIN_LIST_PAGE_CLASS}
+        fillViewport
       >
         <AdminErrorCard message={loadError} />
       </AdminPageShell>
@@ -141,10 +137,9 @@ export default async function AdminSupportTicketPage({
       icon={LifeBuoy}
       title={ticket.subject}
       description={description}
-      maxWidth="3xl"
       backHref="/admin/support"
       backLabel="Support tickets"
-      className={ADMIN_LIST_PAGE_CLASS}
+      fillViewport
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <TicketStatusChip status={ticket.status} />
