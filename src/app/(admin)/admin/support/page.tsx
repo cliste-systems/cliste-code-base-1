@@ -18,7 +18,7 @@ import {
   adminTableTdClass,
   adminTableTdTruncateClass,
   adminTableThActionsClass,
-  adminTableThWidth,
+  adminTableThClass,
 } from "@/components/admin/admin-table";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -136,11 +136,11 @@ export default async function AdminSupportPage() {
           <table className={adminTableClass}>
             <thead className={adminTableHeadClass}>
               <tr>
-                <th className={adminTableThWidth("w-[14%]")}>Client</th>
-                <th className={adminTableThWidth("w-[16%]")}>Subject</th>
-                <th className={adminTableThWidth("w-[28%]")}>Message</th>
-                <th className={adminTableThWidth("w-[10%]")}>Status</th>
-                <th className={adminTableThWidth("w-[15%]")}>Submitted</th>
+                <th className={adminTableThClass}>Client</th>
+                <th className={adminTableThClass}>Subject</th>
+                <th className={adminTableThClass}>Message</th>
+                <th className={adminTableThClass}>Status</th>
+                <th className={adminTableThClass}>Submitted</th>
                 <th className={adminTableThActionsClass}>Actions</th>
               </tr>
             </thead>
@@ -154,26 +154,23 @@ export default async function AdminSupportPage() {
               ) : (
                 tickets.map((t) => (
                   <tr key={t.id} className={adminTableRowClass}>
-                    <td className={adminTableTdTruncateClass}>
-                      <div className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-gray-900">
+                    <td className={adminTableTdClass}>
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
                           {orgLabel(t)}
                         </span>
                         {orgSlug(t) ? (
-                          <span className="mt-0.5 block truncate font-mono text-[11px] text-gray-400">
+                          <span className="mt-0.5 block font-mono text-xs text-gray-400">
                             {orgSlug(t)}
                           </span>
                         ) : null}
                       </div>
                     </td>
-                    <td
-                      className={`truncate text-sm text-gray-600 ${adminTableTdClass}`}
-                      title={t.subject}
-                    >
+                    <td className={`text-sm text-gray-600 ${adminTableTdClass}`}>
                       {t.subject}
                     </td>
                     <td
-                      className={`truncate text-sm text-gray-600 ${adminTableTdClass}`}
+                      className={`text-sm text-gray-600 ${adminTableTdTruncateClass}`}
                       title={t.body}
                     >
                       {messagePreview(t.body)}

@@ -12,9 +12,8 @@ import {
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
-  adminTableTdTruncateClass,
   adminTableThActionsClass,
-  adminTableThWidth,
+  adminTableThClass,
 } from "@/components/admin/admin-table";
 import {
   DropdownMenu,
@@ -55,12 +54,12 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
     <table className={adminTableClass}>
       <thead className={adminTableHeadClass}>
         <tr>
-          <th className={adminTableThWidth("w-[20%]")}>User email</th>
-          <th className={adminTableThWidth("w-[16%]")}>Linked client</th>
-          <th className={adminTableThWidth("w-[9%]")}>Status</th>
-          <th className={adminTableThWidth("w-[9%]")}>Password</th>
-          <th className={adminTableThWidth("w-[12%]")}>Admin console</th>
-          <th className={adminTableThWidth("w-[15%]")}>Last login</th>
+          <th className={adminTableThClass}>User email</th>
+          <th className={adminTableThClass}>Linked client</th>
+          <th className={adminTableThClass}>Status</th>
+          <th className={adminTableThClass}>Password</th>
+          <th className={adminTableThClass}>Admin console</th>
+          <th className={adminTableThClass}>Last login</th>
           <th className={adminTableThActionsClass}>Actions</th>
         </tr>
       </thead>
@@ -74,23 +73,19 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
         ) : (
           rows.map((row) => (
             <tr key={row.userId} className={adminTableRowClass}>
-              <td
-                className={`truncate text-sm font-medium text-gray-900 ${adminTableTdClass}`}
-                title={row.email || undefined}
-              >
+              <td className={`text-sm font-medium text-gray-900 ${adminTableTdClass}`}>
                 {row.email || ""}
               </td>
-              <td className={adminTableTdTruncateClass}>
+              <td className={adminTableTdClass}>
                 {row.organizationId ? (
                   <Link
                     href={`/admin/customers/${row.organizationId}`}
-                    className="block truncate text-sm font-medium text-gray-900 underline-offset-2 hover:underline"
-                    title={row.organizationName}
+                    className="text-sm font-medium text-gray-900 underline-offset-2 hover:underline"
                   >
                     {row.organizationName}
                   </Link>
                 ) : (
-                  <span className="block truncate text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-gray-900">
                     {row.organizationName}
                   </span>
                 )}
@@ -114,10 +109,7 @@ export function IdentityAccessTable({ rows, bare = false }: IdentityAccessTableP
                     : "No access"}
                 </AdminBadge>
               </td>
-              <td
-                className={`truncate text-sm text-gray-500 ${adminTableTdClass}`}
-                title={row.lastLoginLabel}
-              >
+              <td className={`text-sm text-gray-500 ${adminTableTdClass}`}>
                 {row.lastLoginLabel}
               </td>
               <td className={`whitespace-nowrap ${adminTableTdClass}`}>

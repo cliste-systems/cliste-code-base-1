@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
-type AdminPageShellMaxWidth = "6xl" | "3xl";
+type AdminPageShellMaxWidth = "full" | "6xl" | "3xl";
 
 const MAX_WIDTH_CLASS: Record<AdminPageShellMaxWidth, string> = {
+  full: "max-w-none",
   "6xl": "max-w-6xl",
   "3xl": "max-w-3xl",
 };
@@ -35,7 +36,7 @@ export function AdminPageShell({
   title,
   description,
   actions,
-  maxWidth = "6xl",
+  maxWidth = "full",
   backHref,
   backLabel,
   children,

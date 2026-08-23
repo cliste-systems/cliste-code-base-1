@@ -18,8 +18,8 @@ import {
   adminTableRowClass,
   adminTableTdClass,
   adminTableTdDateClass,
+  adminTableThClass,
   adminTableThDateClass,
-  adminTableThWidth,
   cellOrBlank,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
@@ -280,10 +280,10 @@ function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
       <thead className={adminTableHeadClass}>
         <tr>
           <th className={adminTableThDateClass}>When</th>
-          <th className={adminTableThWidth("w-[20%]")}>Event</th>
-          <th className={adminTableThWidth("w-[12%]")}>Outcome</th>
-          <th className={adminTableThWidth("w-[32%]")}>Identity</th>
-          <th className={adminTableThWidth("w-[22%]")}>IP</th>
+          <th className={adminTableThClass}>Event</th>
+          <th className={adminTableThClass}>Outcome</th>
+          <th className={adminTableThClass}>Identity</th>
+          <th className={adminTableThClass}>IP</th>
         </tr>
       </thead>
       <tbody className={adminTableBodyClass}>
@@ -302,25 +302,16 @@ function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
                 <td className={adminTableTdDateClass}>
                   {formatWhen(row.created_at)}
                 </td>
-                <td
-                  className={`truncate text-gray-900 ${adminTableTdClass}`}
-                  title={row.event_type}
-                >
+                <td className={`text-gray-900 ${adminTableTdClass}`}>
                   {formatEventType(row.event_type)}
                 </td>
                 <td className={`whitespace-nowrap ${adminTableTdClass}`}>
                   <AdminBadge>{outcomeLabel(row.outcome)}</AdminBadge>
                 </td>
-                <td
-                  className={`truncate text-gray-600 ${adminTableTdClass}`}
-                  title={identity || undefined}
-                >
+                <td className={`text-gray-600 ${adminTableTdClass}`}>
                   {identity}
                 </td>
-                <td
-                  className={`truncate text-gray-500 ${adminTableTdClass}`}
-                  title={ip || undefined}
-                >
+                <td className={`text-gray-500 ${adminTableTdClass}`}>
                   {ip}
                 </td>
               </tr>
@@ -352,9 +343,9 @@ function ComplianceTable({
       <thead className={adminTableHeadClass}>
         <tr>
           <th className={adminTableThDateClass}>When</th>
-          <th className={adminTableThWidth("w-[22%]")}>Event</th>
-          <th className={adminTableThWidth("w-[18%]")}>Organization</th>
-          <th className={adminTableThWidth("w-[46%]")}>Details</th>
+          <th className={adminTableThClass}>Event</th>
+          <th className={adminTableThClass}>Organization</th>
+          <th className={adminTableThClass}>Details</th>
         </tr>
       </thead>
       <tbody className={adminTableBodyClass}>
@@ -370,16 +361,14 @@ function ComplianceTable({
               <td className={adminTableTdDateClass}>
                 {formatWhen(row.created_at)}
               </td>
-              <td className={`truncate text-gray-900 ${adminTableTdClass}`}>
+              <td className={`text-gray-900 ${adminTableTdClass}`}>
                 {formatEventType(row.event_type)}
               </td>
-              <td
-                className={`truncate font-mono text-xs text-gray-500 ${adminTableTdClass}`}
-              >
+              <td className={`font-mono text-xs text-gray-500 ${adminTableTdClass}`}>
                 {cellOrBlank(row.organization_id)}
               </td>
               <td
-                className={`truncate text-xs text-gray-600 ${adminTableTdClass}`}
+                className={`max-w-xl truncate text-xs text-gray-600 ${adminTableTdClass}`}
                 title={
                   row.metadata ? JSON.stringify(row.metadata) : undefined
                 }
@@ -410,9 +399,9 @@ function PipelineTable({
       <thead className={adminTableHeadClass}>
         <tr>
           <th className={adminTableThDateClass}>When</th>
-          <th className={adminTableThWidth("w-[14%]")}>Stage</th>
-          <th className={adminTableThWidth("w-[16%]")}>DID</th>
-          <th className={adminTableThWidth("w-[56%]")}>Error</th>
+          <th className={adminTableThClass}>Stage</th>
+          <th className={adminTableThClass}>DID</th>
+          <th className={adminTableThClass}>Error</th>
         </tr>
       </thead>
       <tbody className={adminTableBodyClass}>
@@ -428,16 +417,14 @@ function PipelineTable({
               <td className={adminTableTdDateClass}>
                 {formatWhen(inc.occurred_at)}
               </td>
-              <td className={`truncate font-medium text-gray-900 ${adminTableTdClass}`}>
+              <td className={`font-medium text-gray-900 ${adminTableTdClass}`}>
                 {inc.stage}
               </td>
-              <td
-                className={`truncate font-mono text-xs text-gray-600 ${adminTableTdClass}`}
-              >
+              <td className={`font-mono text-xs text-gray-600 ${adminTableTdClass}`}>
                 {cellOrBlank(inc.called_number)}
               </td>
               <td
-                className={`truncate text-gray-700 ${adminTableTdClass}`}
+                className={`max-w-2xl text-gray-700 ${adminTableTdClass}`}
                 title={inc.error_message}
               >
                 {inc.error_message}

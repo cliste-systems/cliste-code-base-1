@@ -51,7 +51,7 @@ export function AdminListCard({
           {banner}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
         {children}
       </div>
     </AdminSectionCard>

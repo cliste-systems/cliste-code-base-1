@@ -2,31 +2,35 @@
 
 import { cn } from "@/lib/utils";
 
-/** Fluid table — no horizontal scroll; columns share viewport width. */
-export const adminTableClass = "w-full table-fixed border-collapse text-left text-sm";
+/** Natural column sizing — content stays readable; card scrolls on very narrow viewports. */
+export const adminTableClass = "w-full table-auto border-collapse text-left text-sm";
 
 export const adminTableHeadClass =
   "sticky top-0 z-10 border-b border-gray-200 bg-gray-50";
 
 export const adminTableThClass =
-  "px-4 py-2.5 text-left text-[11px] font-semibold tracking-normal text-gray-500";
+  "whitespace-nowrap px-4 py-3 text-left text-[11px] font-semibold tracking-normal text-gray-500";
 
 export const adminTableThDateClass = cn(
   adminTableThClass,
-  "w-[14%] whitespace-nowrap text-right",
+  "text-right",
 );
 
 export const adminTableThActionsClass = cn(
   adminTableThClass,
-  "w-[8%] text-right",
+  "text-right",
 );
 
 export const adminTableBodyClass =
   "[&_tr:nth-child(even)]:bg-gray-50/50 [&_tr]:border-b [&_tr]:border-gray-100 [&_tr:last-child]:border-0";
 
-export const adminTableTdClass = "px-4 py-2 align-middle";
+export const adminTableTdClass = "px-4 py-3 align-middle";
 
-export const adminTableTdTruncateClass = cn(adminTableTdClass, "max-w-0 truncate");
+/** Optional helper for long free-text cells (e.g. message previews). */
+export const adminTableTdTruncateClass = cn(
+  adminTableTdClass,
+  "max-w-md truncate",
+);
 
 export const adminTableTdDateClass = cn(
   adminTableTdClass,

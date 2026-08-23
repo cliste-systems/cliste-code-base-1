@@ -6,6 +6,7 @@ import { AdminBadge, adminTableMutedClass } from "@/components/admin/admin-badge
 import { AdminListCard } from "@/components/admin/admin-list-card";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminSegmentedTabs } from "@/components/admin/admin-segmented-tabs";
+import { AdminSetupStatusBadge } from "@/components/admin/admin-setup-status-badge";
 import {
   adminTableBodyClass,
   adminTableClass,
@@ -14,12 +15,12 @@ import {
   adminTableRowClass,
   adminTableTdClass,
   adminTableTdDateClass,
-  adminTableTdTruncateClass,
   adminTableThActionsClass,
-  adminTableThWidth,
-  adminTableThWidthRight,
+  adminTableThClass,
+  adminTableThDateClass,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
+import { isAdminClientLive } from "@/lib/admin-client-setup-status";
 import {
   clientProvisionSourceLabel,
   parseClientProvisionFilter,
@@ -126,12 +127,12 @@ export default async function AdminCustomersPage({
           <table className={adminTableClass}>
             <thead className={adminTableHeadClass}>
               <tr>
-                <th className={adminTableThWidth("w-[28%]")}>Customer</th>
-                <th className={adminTableThWidth("w-[10%]")}>Type</th>
-                <th className={adminTableThWidth("w-[11%]")}>Niche</th>
-                <th className={adminTableThWidth("w-[15%]")}>Status</th>
-                <th className={adminTableThWidth("w-[22%]")}>Owner</th>
-                <th className={adminTableThWidthRight("w-[12%]")}>Created</th>
+                <th className={adminTableThClass}>Customer</th>
+                <th className={adminTableThClass}>Type</th>
+                <th className={adminTableThClass}>Niche</th>
+                <th className={adminTableThClass}>Status</th>
+                <th className={adminTableThClass}>Owner</th>
+                <th className={adminTableThDateClass}>Created</th>
                 <th className={adminTableThActionsClass}>Actions</th>
               </tr>
             </thead>
@@ -146,21 +147,25 @@ export default async function AdminCustomersPage({
               ) : (
                 rows.map((row) => (
                   <tr key={row.orgId} className={adminTableRowClass}>
-                    <td className={adminTableTdTruncateClass}>
+                    <td className={adminTableTdClass}>
                       <Link
                         href={`/admin/customers/${row.orgId}`}
-                        className="block min-w-0 truncate font-medium text-gray-900 hover:underline"
-                        title={`${row.name}${row.slug ? `\n${row.slug}` : ""}`}
+                        className="font-medium text-gray-900 hover:underline"
                       >
                         {displayCustomerName(row.name)}
                       </Link>
+                      {row.slug ? (
+                        <span className="mt-0.5 block font-mono text-xs text-gray-400">
+                          {row.slug}
+                        </span>
+                      ) : null}
                     </td>
                     <td className={adminTableTdClass}>
                       <AdminBadge variant="plain">
                         {clientProvisionSourceLabel(row.provisionSource)}
                       </AdminBadge>
                     </td>
-                    <td className={adminTableTdTruncateClass}>
+                    <td className={adminTableTdClass}>
                       <span className={adminTableMutedClass}>
                         {
                           ORGANIZATION_NICHE_ADMIN_LABELS[
@@ -176,19 +181,19 @@ export default async function AdminCustomersPage({
                           stage={row.provisioningStage}
                         />
                       ) : (
-                        <AdminBadge className="capitalize">
+                        <AdminSetupStatusBadge
+                          isLive={isAdminClientLive(row)}
+                          className="capitalize"
+                        >
                           {formatStatusLabel(
                             row.orgStatus,
                             row.accountStatus,
                             row.onboardingStep,
                           )}
-                        </AdminBadge>
+                        </AdminSetupStatusBadge>
                       )}
                     </td>
-                    <td
-                      className={adminTableTdTruncateClass}
-                      title={row.ownerEmail ?? undefined}
-                    >
+                    <td className={adminTableTdClass}>
                       <span className={adminTableMutedClass}>
                         {row.ownerEmail ?? "—"}
                       </span>
