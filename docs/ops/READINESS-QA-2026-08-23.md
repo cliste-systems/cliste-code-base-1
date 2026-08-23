@@ -80,7 +80,7 @@ See [Adversarial playbook (Layer C)](#layer-c-adversarial-playbook-manual) below
 | `DASHBOARD_HOME_MOCK` | Off | Off | ✓ |
 | Provisioning stage | `live` when active + trained | Not fully automated in script — org is active with complete training | Partial |
 
-**UI surfaces** (`/admin`, `/dashboard`) were not browser-tested in this run; counts above trace to live `call_logs` / `action_tickets` / `cara_training_items` rows with no mock flags.
+**UI surfaces** (`/admin`, `/dashboard`) were browser-tested on 2026-08-23 (localhost:3001): admin overview metrics match Supabase (37 calls, 54.2 billable min, 1 live tenant); customer list shows one smoke store; tenant dashboard shows real charts (not `DASHBOARD_HOME_MOCK`); Action Inbox shows 5 open tickets and 6 knowledge gaps. Completeness rail in UI matches script (9/9).
 
 ## Pass checklist
 
@@ -97,14 +97,14 @@ See [Adversarial playbook (Layer C)](#layer-c-adversarial-playbook-manual) below
 | Area | Expected | Actual | Severity | Fix |
 |------|----------|--------|----------|-----|
 | Layer C adversarial calls | Live worker scores LLM | Worker repo not in workspace | P1 | Run playbook in `code-base-2` when worker deployed |
-| `seed-retail-demo-user` deletes `admin@cliste.test` | Both users coexist | Retail seed removes admin user | P2 | Remove `deleteUserByEmail(admin@cliste.test)` from retail seed |
+| `seed-retail-demo-user` deletes `admin@cliste.test` | Both users coexist | Retail seed removed admin user | P2 | **Fixed** — no longer deletes `admin@cliste.test` |
 | `finalizeCaraTrainingSave` in CLI scripts | Prompt regen without Next context | `revalidatePath` throws outside Next | P2 | Scripts should call `regenerateCaraCustomPrompt` only (fixed in `complete-retail-train-cara.ts`) |
 | Store setup 11-step UI | Admin can run full retail setup | Pages unwired per `RETAILSTORESETUP.md` | P2 | Wire store-setup flow or merge into customer detail |
 | `PhoneLineVerifyCard` | First real call UX | Built but unwired | P2 | Add to customer detail |
 | Admin mock cleanup | Also deletes `call_logs` for smoke orgs | Orphan risk after cleanup | P2 | Extend `seed-admin-customers-mock --cleanup` |
 | `call-complete` integration tests | CI coverage | None | P2 | Add route tests with mocked Supabase |
 | `hasInboundCallLog` in provisioning | Test-call step tied to pipeline | Unused in provisioning input | P3 | Wire into go-live checklist |
-| Browser UI verification | Manual spot-check `/admin` + `/dashboard` | Script-only verification this run | P3 | Spot-check charts/feeds in browser |
+| Browser UI verification | Manual spot-check `/admin` + `/dashboard` | Browser pass — metrics match Supabase | — | Done |
 
 ## Recommended additions (from run)
 
