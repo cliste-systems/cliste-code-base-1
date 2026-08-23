@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Users } from "lucide-react";
 
+import { AdminBadge } from "@/components/admin/admin-badge";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import {
-  clientProvisionSourceBadgeClass,
   clientProvisionSourceLabel,
   parseClientProvisionFilter,
 } from "@/lib/client-provision-source";
@@ -37,6 +37,22 @@ function formatDateShort(iso: string): string {
   });
 }
 
+function displayCustomerName(name: string): string {
+  return name.replace(/^\[smoke test\]\s*/i, "");
+}
+
+function formatStatusLabel(
+  orgStatus: string | null,
+  accountStatus: string,
+  onboardingStep: number | null,
+): string {
+  const base = (orgStatus ?? accountStatus).replace(/_/g, " ");
+  if (onboardingStep != null && onboardingStep > 0) {
+    return `${base} · step ${onboardingStep}`;
+  }
+  return base;
+}
+
 const FILTER_TABS = [
   { value: "all", label: "All" },
   { value: "managed", label: "Managed" },
@@ -61,74 +77,85 @@ export default async function AdminCustomersPage({
       e instanceof Error ? e.message : "Failed to load customers.";
   }
 
+  const countLabel = `${rows.length} customer${rows.length === 1 ? "" : "s"}${
+    filter !== "all" ? ` · ${clientProvisionSourceLabel(filter)}` : ""
+  }`;
+
   return (
     <AdminPageShell
       icon={Users}
       title="Customers"
       description="Managed custom jobs and self-serve SaaS accounts — provision, configure, and support from one place."
-      className="flex min-h-full flex-col pb-16"
+      className="flex min-h-full flex-col space-y-6 pb-16"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {FILTER_TABS.map(({ value, label }) => {
-            const active = filter === value;
-            const href =
-              value === "all"
-                ? "/admin/customers"
-                : `/admin/customers?type=${value}`;
-            return (
-              <Link
-                key={value}
-                href={href}
-                className={cn(
-                  "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-                  active
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
-                )}
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </div>
-        <NewClientDialog />
-      </div>
-
       {loadError ? (
         <p className="text-sm text-red-700" role="alert">
           {loadError}
         </p>
       ) : (
         <AdminSectionCard
-          title="All customers"
-          description={`${rows.length} customer${rows.length === 1 ? "" : "s"}${filter !== "all" ? ` (${clientProvisionSourceLabel(filter)})` : ""}.`}
-          className="flex min-h-[calc(100vh-15rem)] flex-col"
-          contentClassName="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-[calc(100vh-14rem)] flex-col"
+          contentClassName="flex min-h-0 flex-1 flex-col p-0"
         >
+          <header className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">{countLabel}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5"
+                role="tablist"
+                aria-label="Customer type"
+              >
+                {FILTER_TABS.map(({ value, label }) => {
+                  const active = filter === value;
+                  const href =
+                    value === "all"
+                      ? "/admin/customers"
+                      : `/admin/customers?type=${value}`;
+                  return (
+                    <Link
+                      key={value}
+                      href={href}
+                      role="tab"
+                      aria-selected={active}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900",
+                      )}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+              <NewClientDialog />
+            </div>
+          </header>
+
           <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
-            <table className="w-full min-w-[960px] border-collapse text-left">
-              <thead className="sticky top-0 z-10 bg-white">
-                <tr className="border-b border-gray-200">
-                  <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+            <table className="w-full min-w-[920px] border-collapse text-left">
+              <thead className="sticky top-0 z-10 border-b border-gray-100 bg-gray-50/80 backdrop-blur-sm">
+                <tr>
+                  <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Customer
                   </th>
-                  <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Type
                   </th>
-                  <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Niche
                   </th>
-                  <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Status
                   </th>
-                  <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Owner
                   </th>
-                  <th className="px-5 py-3.5 text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Created
                   </th>
-                  <th className="px-5 py-3.5 text-right text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2.5 text-right text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Actions
                   </th>
                 </tr>
@@ -138,7 +165,7 @@ export default async function AdminCustomersPage({
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-5 py-12 text-center text-sm text-gray-500"
+                      className="px-4 py-16 text-center text-sm text-gray-500"
                     >
                       No customers yet. Use <strong>New client</strong> to
                       provision the first managed account.
@@ -146,59 +173,56 @@ export default async function AdminCustomersPage({
                   </tr>
                 ) : (
                   rows.map((row) => (
-                    <tr key={row.orgId} className="hover:bg-gray-50/50">
-                      <td className="px-5 py-4">
+                    <tr key={row.orgId} className="hover:bg-gray-50/60">
+                      <td className="px-4 py-3">
                         <Link
                           href={`/admin/customers/${row.orgId}`}
                           className="block min-w-0"
+                          title={row.name}
                         >
                           <span className="text-sm font-medium text-gray-900 hover:underline">
-                            {row.name}
+                            {displayCustomerName(row.name)}
                           </span>
-                          <span className="mt-0.5 block font-mono text-xs text-gray-400">
+                          <span className="mt-0.5 block truncate font-mono text-[11px] text-gray-400">
                             {row.slug}
                           </span>
                         </Link>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-4">
-                        <span
-                          className={clientProvisionSourceBadgeClass(
-                            row.provisionSource,
-                          )}
-                        >
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <AdminBadge>
                           {clientProvisionSourceLabel(row.provisionSource)}
-                        </span>
+                        </AdminBadge>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-600">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">
                         {
                           ORGANIZATION_NICHE_ADMIN_LABELS[
                             parseOrganizationNiche(row.niche)
                           ]
                         }
                       </td>
-                      <td className="whitespace-nowrap px-5 py-4">
+                      <td className="whitespace-nowrap px-4 py-3">
                         {row.provisionSource === "managed" &&
                         row.provisioningStage ? (
                           <TenantProvisioningStageChip
                             stage={row.provisioningStage}
                           />
                         ) : (
-                          <span className="text-sm capitalize text-gray-600">
-                            {row.orgStatus ?? row.accountStatus}
-                            {row.onboardingStep != null &&
-                            row.onboardingStep > 0
-                              ? ` · step ${row.onboardingStep}`
-                              : ""}
-                          </span>
+                          <AdminBadge className="capitalize">
+                            {formatStatusLabel(
+                              row.orgStatus,
+                              row.accountStatus,
+                              row.onboardingStep,
+                            )}
+                          </AdminBadge>
                         )}
                       </td>
-                      <td className="max-w-[180px] truncate px-5 py-4 text-sm text-gray-600">
+                      <td className="max-w-[180px] truncate px-4 py-3 text-sm text-gray-600">
                         {row.ownerEmail ?? "—"}
                       </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500 tabular-nums">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 tabular-nums">
                         {formatDateShort(row.createdAt)}
                       </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-right">
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
                         <TenantRowActions
                           organizationId={row.orgId}
                           organizationName={row.name}

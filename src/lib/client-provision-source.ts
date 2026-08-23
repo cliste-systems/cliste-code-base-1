@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { adminBadgeClass } from "@/components/admin/admin-badge";
 
 export const CLIENT_PROVISION_SOURCES = ["managed", "self_serve"] as const;
 
@@ -32,12 +32,7 @@ export function clientProvisionSourceDescription(
 }
 
 export function clientProvisionSourceBadgeClass(
-  source: ClientProvisionSource,
+  _source: ClientProvisionSource,
 ): string {
-  return cn(
-    "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
-    source === "managed"
-      ? "border-blue-200/80 bg-blue-50 text-blue-800"
-      : "border-violet-200/80 bg-violet-50 text-violet-800",
-  );
+  return adminBadgeClass;
 }
