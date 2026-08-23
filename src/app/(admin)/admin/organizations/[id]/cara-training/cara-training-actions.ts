@@ -344,7 +344,7 @@ export async function loadCaraTrainingData(
     promptCompileWarnings: Array.isArray(org.prompt_compile_warnings)
       ? org.prompt_compile_warnings
       : [],
-    sectionChecks: adminCaraTrainingSectionChecks({} as AdminCaraTrainingReadinessInput),
+    sectionChecks: [],
   };
 
   data.sectionChecks = adminCaraTrainingSectionChecks(readinessInputFromData(data));

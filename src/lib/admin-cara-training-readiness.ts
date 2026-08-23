@@ -77,7 +77,8 @@ function departmentsFromLegacy(raw: unknown): Pick<StoreDepartmentRow, "name" | 
 function departmentsForCheck(
   input: AdminCaraTrainingReadinessInput,
 ): Pick<StoreDepartmentRow, "name" | "active">[] {
-  if (input.departments.length > 0) return input.departments;
+  const departments = input.departments ?? [];
+  if (departments.length > 0) return departments;
   return departmentsFromLegacy(input.legacyDepartments);
 }
 
@@ -92,9 +93,9 @@ function activeDepartments(
 
 function greetingPreview(input: AdminCaraTrainingReadinessInput): string {
   return [
-    input.greetingIntro.trim(),
+    String(input.greetingIntro ?? "").trim(),
     voiceLegalDisclosure(input.assistantDisplayName),
-    input.greetingClosing.trim(),
+    String(input.greetingClosing ?? "").trim(),
   ]
     .filter(Boolean)
     .join(" ");
@@ -111,8 +112,8 @@ export function adminCaraTrainingSectionChecks(
 ): AdminCaraTrainingSectionCheck[] {
   const greeting = greetingForCheck(input);
   const identityComplete =
-    Boolean(input.assistantDisplayName.trim()) &&
-    Boolean(input.agentVoiceId.trim()) &&
+    Boolean(String(input.assistantDisplayName ?? "").trim()) &&
+    Boolean(String(input.agentVoiceId ?? "").trim()) &&
     Boolean(greeting.trim()) &&
     greetingDisclosesAi(greeting, input.assistantDisplayName);
 
