@@ -31,7 +31,7 @@ export function PeopleEscalationSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="4. People & escalation"
-      description="Store contacts for notifications and internal transfers — never spoken to callers."
+      description="Store contacts for internal routing — never spoken to callers."
     >
       <StoreContactsEditor
         contacts={data.contacts}

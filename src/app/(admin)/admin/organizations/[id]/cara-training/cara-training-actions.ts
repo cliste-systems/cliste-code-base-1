@@ -608,9 +608,9 @@ export async function saveCaraTrainingContacts(
       role: contact.role,
       phone_e164: contact.phone_e164?.trim() || null,
       email: contact.email?.trim() || null,
-      is_notification_target: contact.is_notification_target,
-      can_receive_transfers: contact.can_receive_transfers,
-      active: contact.active,
+      is_notification_target: true,
+      can_receive_transfers: false,
+      active: true,
       updated_at: new Date().toISOString(),
     };
 

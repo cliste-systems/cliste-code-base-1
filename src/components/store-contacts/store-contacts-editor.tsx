@@ -85,8 +85,8 @@ export function StoreContactsEditor({
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground text-xs">
-        Staff contact details are used for internal routing and notifications
-        only — they are never spoken to callers in the compiled prompt.
+        Staff contact details are for internal routing only — they are never
+        spoken to callers in the compiled prompt.
       </p>
 
       {contacts.length === 0 ? (
@@ -99,6 +99,22 @@ export function StoreContactsEditor({
             key={contact.id || `new-${index}`}
             className="rounded-lg border border-slate-200 bg-slate-50/50 p-3"
           >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-slate-500">
+                Contact {index + 1}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive"
+                disabled={disabled}
+                onClick={() => remove(index)}
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+                Remove
+              </Button>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Name</Label>
@@ -145,50 +161,6 @@ export function StoreContactsEditor({
                   }
                 />
               </div>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={contact.is_notification_target}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    update(index, { is_notification_target: e.target.checked })
-                  }
-                />
-                Notification target
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={contact.can_receive_transfers}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    update(index, { can_receive_transfers: e.target.checked })
-                  }
-                />
-                Can receive transfers
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={contact.active}
-                  disabled={disabled}
-                  onChange={(e) => update(index, { active: e.target.checked })}
-                />
-                Active
-              </label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="ml-auto text-destructive"
-                disabled={disabled}
-                onClick={() => remove(index)}
-              >
-                <Trash2 className="size-3.5" aria-hidden />
-                Remove
-              </Button>
             </div>
           </div>
         ))}
