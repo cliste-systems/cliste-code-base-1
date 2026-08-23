@@ -52,6 +52,7 @@ import { requireAdminSessionUser } from "@/lib/admin-session";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { AGENT_CONFIG_REVALIDATE_PATHS } from "@/lib/dashboard-routes";
 import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
+import { VOICE_ASSISTANT_DEFAULT_NAME } from "@/lib/voice-greeting";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -270,7 +271,7 @@ export async function loadCaraTrainingData(
     greeting: String(org.greeting ?? ""),
     customPrompt: String(org.custom_prompt ?? ""),
     promptCompileWarnings: [],
-    assistantDisplayName: String(org.assistant_display_name ?? "Cara"),
+    assistantDisplayName: VOICE_ASSISTANT_DEFAULT_NAME,
     agentVoiceId: String(org.agent_voice_id ?? ""),
     isActive: false,
     caraOnlineSince: null,
@@ -290,7 +291,7 @@ export async function loadCaraTrainingData(
   const data: CaraTrainingData = {
     organizationId,
     name: String(org.name ?? ""),
-    assistantDisplayName: String(org.assistant_display_name ?? "Cara"),
+    assistantDisplayName: VOICE_ASSISTANT_DEFAULT_NAME,
     greetingIntro: parts.intro,
     greetingClosing: parts.closing,
     agentVoiceId,
@@ -377,6 +378,7 @@ export async function saveCaraTrainingIdentity(
   }
   const admin = await adminClient();
 
+  const assistantDisplayName = VOICE_ASSISTANT_DEFAULT_NAME;
   const voiceCheck = await validateVoiceId(admin, payload.agentVoiceId);
   if (!voiceCheck.ok) return voiceCheck;
 
@@ -413,7 +415,7 @@ export async function saveCaraTrainingIdentity(
       greeting: "",
       customPrompt: "",
       promptCompileWarnings: [],
-      assistantDisplayName: payload.assistantDisplayName,
+      assistantDisplayName,
       agentVoiceId: payload.agentVoiceId,
       isActive: false,
       caraOnlineSince: null,
@@ -427,7 +429,7 @@ export async function saveCaraTrainingIdentity(
     payload.greetingClosing,
   );
 
-  if (!greetingDisclosesAi(greeting, payload.assistantDisplayName)) {
+  if (!greetingDisclosesAi(greeting, assistantDisplayName)) {
     return {
       ok: false,
       message:
@@ -438,7 +440,7 @@ export async function saveCaraTrainingIdentity(
   const { error } = await admin
     .from("organizations")
     .update({
-      assistant_display_name: payload.assistantDisplayName.trim() || "Cara",
+      assistant_display_name: assistantDisplayName,
       agent_voice_id: payload.agentVoiceId.trim() || null,
       greeting,
       updated_at: new Date().toISOString(),

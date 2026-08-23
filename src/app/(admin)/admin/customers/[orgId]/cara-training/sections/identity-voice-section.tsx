@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
-import { voiceLegalDisclosure } from "@/lib/voice-greeting";
+import {
+  VOICE_ASSISTANT_DEFAULT_NAME,
+  voiceLegalDisclosure,
+} from "@/lib/voice-greeting";
 
 import {
   saveCaraTrainingIdentity,
@@ -28,25 +31,24 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
   const [pending, startTransition] = useTransition();
   const [previewPending, setPreviewPending] = useState(false);
 
+  const assistantName = VOICE_ASSISTANT_DEFAULT_NAME;
+
   const greetingPreview = [
     data.greetingIntro.trim(),
-    voiceLegalDisclosure(data.assistantDisplayName),
+    voiceLegalDisclosure(assistantName),
     data.greetingClosing.trim(),
   ]
     .filter(Boolean)
     .join(" ");
 
-  const greetingWarning = !greetingDisclosesAi(
-    greetingPreview,
-    data.assistantDisplayName,
-  );
+  const greetingWarning = !greetingDisclosesAi(greetingPreview, assistantName);
 
   const save = useCallback(() => {
     setError(null);
     setSaved(false);
     startTransition(async () => {
       const result = await saveCaraTrainingIdentity(data.organizationId, {
-        assistantDisplayName: data.assistantDisplayName,
+        assistantDisplayName: assistantName,
         greetingIntro: data.greetingIntro,
         greetingClosing: data.greetingClosing,
         agentVoiceId: data.agentVoiceId,
@@ -58,7 +60,7 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
       setSaved(true);
       await onSaved();
     });
-  }, [data, onSaved]);
+  }, [assistantName, data.agentVoiceId, data.greetingClosing, data.greetingIntro, data.organizationId, onSaved]);
 
   const playSample = useCallback(async () => {
     setPreviewPending(true);
@@ -70,7 +72,7 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
         body: JSON.stringify({
           text: greetingPreview,
           voiceId: data.agentVoiceId,
-          assistantDisplayName: data.assistantDisplayName,
+          assistantDisplayName: assistantName,
         }),
       });
       if (!response.ok) {
@@ -86,20 +88,26 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
     } finally {
       setPreviewPending(false);
     }
-  }, [data.agentVoiceId, data.assistantDisplayName, greetingPreview]);
+  }, [assistantName, data.agentVoiceId, greetingPreview]);
 
   return (
     <SectionCard
       title="1. Identity & voice"
-      description="Assistant name, ElevenLabs voice, and greeting with locked legal disclosure."
+      description="ElevenLabs voice and greeting with locked legal disclosure."
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label>Assistant name</Label>
-          <Input
-            value={data.assistantDisplayName}
-            onChange={(e) => onChange({ assistantDisplayName: e.target.value })}
-          />
+          <Label htmlFor="cara-assistant-name">Caller-facing name</Label>
+          <div
+            id="cara-assistant-name"
+            className="border-input bg-muted flex h-9 items-center rounded-md border px-3 text-sm font-medium"
+            aria-readonly="true"
+          >
+            {assistantName}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Cara is the phone assistant on every call — this cannot be changed.
+          </p>
         </div>
         <div className="space-y-2">
           <Label>Voice ID (ElevenLabs)</Label>
