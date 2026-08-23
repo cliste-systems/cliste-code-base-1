@@ -3,6 +3,8 @@
  * home panel, chart, and hero metric has data.
  *
  *   npx tsx scripts/seed-retail-dashboard-activity.ts
+ *   npx tsx scripts/seed-retail-dashboard-activity.ts --email shop@cliste.test
+ *   npx tsx scripts/seed-retail-dashboard-activity.ts --org <uuid>
  *
  * Rows are tagged [smoke test] / RT-TEST-* / +353555* for easy cleanup.
  */
@@ -18,7 +20,18 @@ import { createAdminClient } from "../src/utils/supabase/admin";
 
 const DUBLIN = "Europe/Dublin";
 const SMOKE_TAG = "[smoke test]";
-const OWNER_EMAIL = "admin@cliste.test";
+const DEFAULT_OWNER_EMAIL = "shop@cliste.test";
+
+function parseArgs(): { email: string; orgId: string } {
+  const args = process.argv.slice(2);
+  let email = DEFAULT_OWNER_EMAIL;
+  let orgId = "";
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--email" && args[i + 1]) email = args[++i];
+    if (args[i] === "--org" && args[i + 1]) orgId = args[++i];
+  }
+  return { email, orgId };
+}
 
 type CallSeed = {
   callerNumber: string;
@@ -61,34 +74,50 @@ function dublinTodayStartIso(now = new Date()): string {
 
 async function findRetailOrgId(
   admin: ReturnType<typeof createAdminClient>,
+  email: string,
+  orgIdArg: string,
 ): Promise<{ orgId: string; accountId: string; billingPeriodStart: string }> {
-  const { data: users, error: usersErr } = await admin.auth.admin.listUsers({
-    perPage: 200,
-  });
-  if (usersErr) throw usersErr;
+  let orgId = orgIdArg.trim();
 
-  const owner = users.users.find(
-    (u) => u.email?.trim().toLowerCase() === OWNER_EMAIL,
-  );
-  if (!owner) {
-    throw new Error(
-      `No auth user ${OWNER_EMAIL}. Run scripts/seed-retail-demo-user.ts first.`,
+  if (!orgId) {
+    const { data: users, error: usersErr } = await admin.auth.admin.listUsers({
+      perPage: 200,
+    });
+    if (usersErr) throw usersErr;
+
+    const owner = users.users.find(
+      (u) => u.email?.trim().toLowerCase() === email.trim().toLowerCase(),
     );
+    if (!owner) {
+      throw new Error(
+        `No auth user ${email}. Run scripts/seed-retail-demo-user.ts first.`,
+      );
+    }
+
+    const { data: profile, error: profileErr } = await admin
+      .from("profiles")
+      .select("organization_id, active_organization_id, account_id")
+      .eq("id", owner.id)
+      .maybeSingle();
+    if (profileErr || !profile) {
+      throw new Error(profileErr?.message ?? "Profile not found for retail owner.");
+    }
+
+    orgId =
+      (profile.active_organization_id as string | null) ??
+      (profile.organization_id as string);
   }
 
-  const { data: profile, error: profileErr } = await admin
-    .from("profiles")
-    .select("organization_id, active_organization_id, account_id")
-    .eq("id", owner.id)
+  const { data: orgRow, error: orgErr } = await admin
+    .from("organizations")
+    .select("account_id")
+    .eq("id", orgId)
     .maybeSingle();
-  if (profileErr || !profile) {
-    throw new Error(profileErr?.message ?? "Profile not found for retail owner.");
+  if (orgErr || !orgRow?.account_id) {
+    throw new Error(orgErr?.message ?? `Organization ${orgId} not found.`);
   }
 
-  const orgId =
-    (profile.active_organization_id as string | null) ??
-    (profile.organization_id as string);
-  const accountId = profile.account_id as string;
+  const accountId = orgRow.account_id as string;
 
   const { data: account, error: accountErr } = await admin
     .from("accounts")
@@ -289,8 +318,13 @@ const TRAINING: TrainingSeed[] = [
 ];
 
 async function main() {
+  const { email, orgId: orgIdArg } = parseArgs();
   const admin = createAdminClient();
-  const { orgId, billingPeriodStart } = await findRetailOrgId(admin);
+  const { orgId, billingPeriodStart } = await findRetailOrgId(
+    admin,
+    email,
+    orgIdArg,
+  );
 
   console.log(`\nSeeding dashboard activity for org ${orgId}\n`);
 

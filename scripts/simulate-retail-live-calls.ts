@@ -15,7 +15,7 @@ import { randomInt } from "node:crypto";
 
 import { createAdminClient } from "../src/utils/supabase/admin";
 
-const OWNER_EMAIL = "admin@cliste.test";
+const DEFAULT_OWNER_EMAIL = "shop@cliste.test";
 const INTERVAL_MS = 18_000;
 const SMOKE_TAG = "[smoke test]";
 
@@ -60,10 +60,10 @@ async function findOrgId(
   const { data: users, error } = await admin.auth.admin.listUsers({ perPage: 200 });
   if (error) throw error;
   const owner = users.users.find(
-    (u) => u.email?.trim().toLowerCase() === OWNER_EMAIL,
+    (u) => u.email?.trim().toLowerCase() === DEFAULT_OWNER_EMAIL,
   );
   if (!owner) {
-    throw new Error(`No ${OWNER_EMAIL} — run seed-retail-demo-user.ts first.`);
+    throw new Error(`No ${DEFAULT_OWNER_EMAIL} — run seed-retail-demo-user.ts first.`);
   }
   const { data: profile } = await admin
     .from("profiles")
