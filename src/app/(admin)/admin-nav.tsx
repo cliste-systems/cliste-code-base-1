@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   LifeBuoy,
   Phone,
+  ScrollText,
   Shield,
   Users,
 } from "lucide-react";
@@ -33,6 +34,12 @@ const baseNav = [
   },
   { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },
   { href: "/admin/security", label: "Security", icon: Shield, exact: false },
+  {
+    href: "/admin/platform-rules",
+    label: "Platform rules",
+    icon: ScrollText,
+    exact: false,
+  },
   {
     href: "/admin/support",
     label: "Support tickets",

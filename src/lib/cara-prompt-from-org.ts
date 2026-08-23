@@ -31,6 +31,7 @@ import {
   type CaraCompileMeta,
   type CaraSetupPromptInput,
 } from "@/lib/compile-cara-prompt";
+import { loadPlatformCaraRules } from "@/lib/platform-cara-rules";
 import { verticalPackForNiche } from "@/lib/verticals";
 import {
   assistantNameLabel,
@@ -307,6 +308,8 @@ export async function regenerateCaraCustomPrompt(
 
   const adminNotes = String((org as PromptOrgRow | null)?.admin_notes ?? "").trim();
 
+  const platformRules = await loadPlatformCaraRules(supabase);
+
   const { prompt, compileMeta } = compileCaraPromptWithMeta({
     ...buildCaraSetupPromptInputFromOrg(orgForPrompt),
     businessFiles,
@@ -316,6 +319,7 @@ export async function regenerateCaraCustomPrompt(
     storeDepartmentsSection: retailExtras?.storeDepartmentsSection,
     retailBoundaryLines: retailExtras?.retailBoundaryLines,
     adminNotes: adminNotes || undefined,
+    platformRules,
   });
 
   if (adminNotes && prompt.includes(adminNotes)) {

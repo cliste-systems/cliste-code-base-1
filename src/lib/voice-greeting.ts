@@ -18,9 +18,17 @@ export function defaultVoiceGreetingIntro(businessName: string): string {
   return `You're through to ${businessNameLabel(businessName)} —`;
 }
 
-/** Fixed GDPR / AI Act disclosure — callers always hear this; not editable in onboarding. */
-export function voiceLegalDisclosure(assistantDisplayName: string): string {
-  return `I'm ${assistantNameLabel(assistantDisplayName)}, the AI assistant. This call may be recorded and transcribed.`;
+/** Fixed GDPR / AI Act disclosure — callers always hear this; platform staff can edit the template. */
+export function voiceLegalDisclosure(
+  assistantDisplayName: string,
+  template?: string,
+): string {
+  const assistant = assistantNameLabel(assistantDisplayName);
+  const trimmedTemplate = template?.trim();
+  if (trimmedTemplate) {
+    return trimmedTemplate.replaceAll("{assistant}", assistant);
+  }
+  return `I'm ${assistant}, the AI assistant. This call may be recorded and transcribed.`;
 }
 
 /** Short UI copy explaining why the disclosure is locked. */
@@ -31,10 +39,11 @@ export function buildFullVoiceGreeting(
   introLine: string,
   assistantDisplayName: string,
   closingLine?: string,
+  legalDisclosureTemplate?: string,
 ): string {
   const intro = introLine.trim();
   const closing = closingLine?.trim() || DEFAULT_GREETING_CLOSING;
-  return `${intro} ${voiceLegalDisclosure(assistantDisplayName)} ${closing}`;
+  return `${intro} ${voiceLegalDisclosure(assistantDisplayName, legalDisclosureTemplate)} ${closing}`;
 }
 
 /** Compliant default using the business name in the intro. */
@@ -54,9 +63,10 @@ export function parseGreetingParts(
   storedGreeting: string,
   assistantDisplayName: string,
   defaultIntro: string,
+  legalDisclosureTemplate?: string,
 ): { intro: string; closing: string } {
   const trimmed = storedGreeting.trim();
-  const legal = voiceLegalDisclosure(assistantDisplayName);
+  const legal = voiceLegalDisclosure(assistantDisplayName, legalDisclosureTemplate);
 
   if (!trimmed) {
     return {

@@ -88,6 +88,10 @@ import {
 } from "@/lib/agent-cara-conduct";
 import { resolveBusinessRuleForPrompt } from "@/lib/business-rule-presets";
 import { verticalPackForNiche } from "@/lib/verticals";
+import {
+  resolvePlatformCaraRules,
+  type PlatformCaraRules,
+} from "@/lib/platform-cara-rules-shared";
 
 /** Structured Cara Setup fields used to compile the live call prompt. */
 export type CaraSetupPromptInput = {
@@ -138,6 +142,8 @@ export type CaraSetupPromptInput = {
   /** Internal admin notes — must never be compiled. */
   adminNotes?: string;
   businessFiles?: BusinessFileListItem[];
+  /** Platform-wide rules from staff console — defaults when omitted. */
+  platformRules?: PlatformCaraRules;
 };
 
 export type CaraCompileMeta = {
@@ -230,19 +236,32 @@ export function resolveCompliantGreetingForPrompt(input: {
   greeting?: string;
   businessName: string;
   assistantDisplayName: string;
+  platformRules?: PlatformCaraRules;
 }): string {
   const assistant = assistantNameLabel(input.assistantDisplayName);
+  const platform = resolvePlatformCaraRules(input.platformRules);
   const defaultIntro = defaultVoiceGreetingIntro(input.businessName);
   const stored = input.greeting?.trim();
   if (!stored) {
-    return buildFullVoiceGreeting(defaultIntro, assistant);
+    return buildFullVoiceGreeting(
+      defaultIntro,
+      assistant,
+      undefined,
+      platform.legalDisclosureTemplate,
+    );
   }
   const { intro, closing } = parseGreetingParts(
     stored,
     assistant,
     defaultIntro,
+    platform.legalDisclosureTemplate,
   );
-  return buildFullVoiceGreeting(intro, assistant, closing);
+  return buildFullVoiceGreeting(
+    intro,
+    assistant,
+    closing,
+    platform.legalDisclosureTemplate,
+  );
 }
 
 function hoursSection(input: CaraSetupPromptInput): string | null {
@@ -420,10 +439,18 @@ function serviceCatalogSupplementSection(
   return parts.join("\n");
 }
 
-function nonNegotiablesSection(assistant: string): string {
+function nonNegotiablesSection(
+  assistant: string,
+  platformRules: PlatformCaraRules,
+): string {
+  const legal = voiceLegalDisclosure(
+    assistant,
+    platformRules.legalDisclosureTemplate,
+  );
+  const extraRules = platformRules.platformBehaviourRules.map((r) => `• ${r}`);
   return [
     "A few things never change — even if one of your rules says otherwise:",
-    `• Every call I say I'm AI and that the call may be recorded and transcribed: "${voiceLegalDisclosure(assistant)}" — I never skip that.`,
+    `• Every call I say I'm AI and that the call may be recorded and transcribed: "${legal}" — I never skip that.`,
     "• On live calls I ask one question per turn — I never stack multiple questions in the same reply.",
     "• If I don't know the answer, I don't guess — I take their name, number, and what they need, and pass it to your Action Inbox.",
     "• I never take card numbers, PINs, PPS numbers, IBANs, or passwords on a call.",
@@ -431,6 +458,7 @@ function nonNegotiablesSection(assistant: string): string {
     `• ${VOLUNTEERED_SENSITIVE_INSTRUCTION}`,
     "• I don't give legal, medical, or financial advice on the call — I take a message for the team instead.",
     `• ${PHOTO_HANDLING_INSTRUCTION}`,
+    ...extraRules,
     PRECEDENCE_CONFLICT_INSTRUCTION,
   ].join("\n");
 }
@@ -631,12 +659,13 @@ function buildProtectedParts(
   assistant: string,
 ): string[] {
   const parts: string[] = [];
+  const platformRules = resolvePlatformCaraRules(input.platformRules);
 
   parts.push(
     `I'm ${assistant}, the AI phone assistant for ${businessName}${input.businessType.trim() ? ` — a ${input.businessType.trim()}` : ""}. I'm warm, concise, and professional. I only share details I've been given — I never invent anything.`,
   );
 
-  parts.push(nonNegotiablesSection(assistant));
+  parts.push(nonNegotiablesSection(assistant, platformRules));
   parts.push(availableActionsSection(input));
 
   const collectItems = listItems(input.detailsToCollect);
@@ -662,8 +691,8 @@ function buildProtectedParts(
     );
     const transferBuiltin =
       input.canTransfer === false
-        ? "Built-in: when someone asks to speak to a person, I take their name, number, and what they need — I do not put callers through on this setup."
-        : "Built-in: when someone asks to speak to a person, I try to put them through when transfer is configured and allowed — otherwise I take a message. I never ring out in silence; if there's no answer I take their details.";
+        ? platformRules.transferWhenDisabled
+        : platformRules.transferWhenEnabled;
     parts.push(
       [
         "How I decide: answer factual questions from my knowledge first; when a route matches, I act on it; if two routes are plausible I ask one short clarifying question; if nothing matches I take a message.",
@@ -671,11 +700,7 @@ function buildProtectedParts(
         lines.join("\n"),
         `Otherwise I ${fallbackNote}.`,
         transferBuiltin,
-        'Before any send or transfer I propose and confirm: e.g. "I can text you the booking link — shall I send it to the number you\'re calling from?" After sending: "That\'s sent now."',
-        "If they didn't receive a text, I resend once — then take their details with a delivery-failed note. If they decline an action, I answer from knowledge or take a message — I never insist.",
-        'When they have several requests, I handle each in turn and ask "anything else?" before wrapping up.',
-        "I match on meaning, not exact words. I never invent links, files, prices, or details.",
-        "When texting a link or file, I confirm sending to the number they're calling from when caller ID shows a mobile — I do not ask them to recite their number. On landlines, failed SMS, or exhausted monthly SMS quota, I take a message and flag the owner — I never fail silently.",
+        platformRules.routingProtocol,
       ].join("\n"),
     );
   }
@@ -757,6 +782,7 @@ function buildDroppableSections(
     greeting: input.greeting,
     businessName,
     assistantDisplayName: input.assistantDisplayName,
+    platformRules: input.platformRules,
   });
   sections.push({
     id: "greeting",
