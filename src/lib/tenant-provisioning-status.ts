@@ -1,6 +1,6 @@
 import { parseCallRoutingMode } from "@/lib/call-routing";
 import { isBusinessHoursUnset, parseBusinessHoursBundle } from "@/lib/business-hours";
-import { voiceLegalDisclosure } from "@/lib/voice-greeting";
+import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
 
 export type TenantProvisioningStepId =
   | "invite_sent"
@@ -82,16 +82,6 @@ const GO_LIVE_STEP_IDS: TenantProvisioningStepId[] = [
   "cara_trained",
 ];
 
-function greetingDisclosesAiLite(
-  greeting: string,
-  assistantDisplayName: string,
-): boolean {
-  const trimmed = greeting.trim();
-  if (!trimmed) return false;
-  const legal = voiceLegalDisclosure(assistantDisplayName);
-  return trimmed.includes(legal);
-}
-
 function parseDepartments(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw.map((d) => String(d).trim()).filter(Boolean);
@@ -145,7 +135,7 @@ export function buildTenantProvisioningStatus(
     routingConfigured = routingConfigured && Boolean(fallback);
   }
 
-  const greetingCompliant = greetingDisclosesAiLite(
+  const greetingCompliant = greetingDisclosesAi(
     input.greeting,
     input.assistantDisplayName,
   );

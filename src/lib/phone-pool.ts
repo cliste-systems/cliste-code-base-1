@@ -281,10 +281,6 @@ export async function purchaseIrishDids(count: number): Promise<PurchaseResult> 
   return { ok: true, purchased };
 }
 
-export type PurchaseResult =
-  | { ok: true; purchased: Array<{ e164: string; sid: string }> }
-  | { ok: false; message: string };
-
 function devPlaceholderE164(organizationId: string): string {
   const digits = organizationId.replace(/\D/g, "").slice(0, 7).padEnd(7, "0");
   return `+3531555${digits}`;
@@ -359,6 +355,58 @@ export async function assignFromPool(
   country: "IE" | "US" = "IE",
 ): Promise<AssignFromPoolResult> {
   return assignFromPoolForOrg(createAdminClient(), organizationId, country);
+}
+
+const PHONE_COOLDOWN_DAYS = 30;
+
+/** Release an assigned pool DID back to cooldown inventory. */
+export async function releaseOrganizationPhoneNumber(
+  organizationId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const admin = createAdminClient();
+
+  const { data: assigned, error: readErr } = await admin
+    .from("phone_numbers")
+    .select("id, e164")
+    .eq("organization_id", organizationId)
+    .eq("status", "assigned")
+    .maybeSingle();
+
+  if (readErr) {
+    return { ok: false, message: readErr.message };
+  }
+  if (!assigned?.id) {
+    return { ok: false, message: "No assigned pool number to release." };
+  }
+
+  const cooldownUntil = new Date();
+  cooldownUntil.setDate(cooldownUntil.getDate() + PHONE_COOLDOWN_DAYS);
+
+  const nowIso = new Date().toISOString();
+  const { error: poolErr } = await admin
+    .from("phone_numbers")
+    .update({
+      status: "cooldown",
+      organization_id: null,
+      cooldown_until: cooldownUntil.toISOString(),
+      updated_at: nowIso,
+    })
+    .eq("id", assigned.id)
+    .eq("status", "assigned");
+
+  if (poolErr) {
+    return { ok: false, message: poolErr.message };
+  }
+
+  await admin
+    .from("organizations")
+    .update({
+      phone_number: null,
+      updated_at: nowIso,
+    })
+    .eq("id", organizationId);
+
+  return { ok: true };
 }
 
 /**

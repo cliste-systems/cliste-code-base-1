@@ -168,7 +168,7 @@ describe("syncOrgPhoneNumberCache", () => {
     };
     const mockAdmin = createMockAdmin(state);
 
-    await syncOrgPhoneNumberCache(mockAdmin, orgId, "+353871234567");
+    await syncOrgPhoneNumberCache(mockAdmin as never, orgId, "+353871234567");
 
     assert.equal(state.orgs[0]!.phone_number, "+353871234567");
     assert.equal(mockAdmin.orgUpdates.length, 1);
@@ -183,7 +183,7 @@ describe("syncOrgPhoneNumberCache", () => {
     };
     const mockAdmin = createMockAdmin(state);
 
-    await syncOrgPhoneNumberCache(mockAdmin, orgId, e164);
+    await syncOrgPhoneNumberCache(mockAdmin as never, orgId, e164);
 
     assert.equal(mockAdmin.orgUpdates.length, 0);
   });
@@ -196,7 +196,7 @@ describe("syncOrgPhoneNumberCache", () => {
     };
     const mockAdmin = createMockAdmin(state);
 
-    await syncOrgPhoneNumberCache(mockAdmin, orgId, "+353871234569");
+    await syncOrgPhoneNumberCache(mockAdmin as never, orgId, "+353871234569");
 
     assert.equal(state.orgs[0]!.phone_number, "+353871234569");
   });
@@ -223,7 +223,7 @@ describe("assignFromPoolForOrg", () => {
     };
     const mockAdmin = createMockAdmin(state);
 
-    const result = await assignFromPoolForOrg(mockAdmin, orgId, "IE");
+    const result = await assignFromPoolForOrg(mockAdmin as never, orgId, "IE");
 
     assert.equal(result.ok, true);
     if (result.ok) {
@@ -249,8 +249,8 @@ describe("assignFromPoolForOrg", () => {
     };
     const mockAdmin = createMockAdmin(state);
 
-    const first = await findAssignedNumberForOrg(mockAdmin, orgId);
-    const second = await findAssignedNumberForOrg(mockAdmin, orgId);
+    const first = await findAssignedNumberForOrg(mockAdmin as never, orgId);
+    const second = await findAssignedNumberForOrg(mockAdmin as never, orgId);
 
     assert.ok(first?.ok);
     assert.ok(second?.ok);
@@ -276,7 +276,7 @@ describe("assignFromPoolForOrg", () => {
     };
     const mockAdmin = createMockAdmin(state);
 
-    const result = await findAssignedNumberForOrg(mockAdmin, orgId);
+    const result = await findAssignedNumberForOrg(mockAdmin as never, orgId);
 
     assert.ok(result?.ok);
     assert.equal(state.orgs[0]!.phone_number, e164);

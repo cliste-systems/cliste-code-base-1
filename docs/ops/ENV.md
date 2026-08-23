@@ -58,6 +58,12 @@ npx tsx scripts/verify-twilio-ie1-messaging.ts --fix
 
 Production signups use `email_confirm: false` and email a confirmation link before onboarding.
 
+## Admin provisioning
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `CLISTE_ENABLE_LIVEKIT_US_NUMBERS` | Optional | Set to `1` to show LiveKit US number assignment on non-retail admin org pages |
+
 **Local `.env.local`:** pull Supabase keys from your hosted project (after `supabase login` or with `SUPABASE_ACCESS_TOKEN` set):
 
 ```bash

@@ -25,6 +25,9 @@ import {
 } from "@/lib/support-dashboard-cookie";
 import { LOCAL_DEV_APP_ORIGIN } from "@/lib/booking-site-origin";
 import { geocodeIrelandLocation } from "@/lib/geocode-ireland";
+import { livekitUsNumbersEnabled } from "@/lib/livekit-us-numbers-flag";
+import { loadOrganizationProvisioning } from "@/lib/load-provisioning-pipeline";
+import { TENANT_PROVISIONING_STEP_ORDER } from "@/lib/tenant-provisioning-status";
 import {
   type OrganizationNiche,
   isOrganizationNiche,
@@ -369,7 +372,7 @@ export async function createOrganization(payload: {
       };
     }
 
-    organizationId = orgRow.id;
+    organizationId = orgRow.id as string;
 
     const appOrigin = await getAppOriginForRedirect(payload.clientOrigin);
     const inviteRedirectTo = `${appOrigin}/auth/callback`;
@@ -1141,59 +1144,6 @@ export async function adminReplyToSupportTicket(
   return { ok: true };
 }
 
-export type UpdateTenantAIConfigResult =
-  | { ok: true }
-  | { ok: false; message: string };
-
-export async function updateTenantAIConfig(
-  organizationId: string,
-  formData: FormData
-): Promise<UpdateTenantAIConfigResult> {
-  await assertAdminOperator();
-  const id = organizationId.trim();
-  if (!UUID_RE.test(id)) {
-    return { ok: false, message: "Invalid organization id." };
-  }
-
-  const greeting = String(formData.get("greeting") ?? "").trim();
-  const custom_prompt = String(formData.get("custom_prompt") ?? "").trim();
-
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : "Admin client unavailable.",
-    };
-  }
-
-  const { data, error } = await admin
-    .from("organizations")
-    .update({
-      greeting: greeting || null,
-      custom_prompt: custom_prompt || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select("id");
-
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-  if (!data?.length) {
-    return {
-      ok: false,
-      message:
-        "No row was updated (organization may be missing or id mismatch).",
-    };
-  }
-
-  revalidatePath(`/admin/organizations/${id}`);
-  revalidatePath("/admin");
-  return { ok: true };
-}
-
 export type AssignLivekitUsPhoneResult =
   | { ok: true; e164: string }
   | { ok: false; message: string };
@@ -1232,6 +1182,13 @@ export async function assignLivekitUsPhoneToOrganization(
 
   if (orgErr || !org) {
     return { ok: false, message: orgErr?.message ?? "Organization not found." };
+  }
+  if (!livekitUsNumbersEnabled()) {
+    return {
+      ok: false,
+      message:
+        "LiveKit US numbers are disabled. Set CLISTE_ENABLE_LIVEKIT_US_NUMBERS=1 to enable.",
+    };
   }
   if (parseOrganizationNiche(org.niche) === "retail") {
     return {
@@ -1344,16 +1301,179 @@ export async function assignPoolPhoneToOrganization(
   return { ok: true, e164: result.e164 };
 }
 
+export type ReleasePoolPhoneResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export async function releasePoolPhoneFromOrganization(
+  organizationId: string,
+): Promise<ReleasePoolPhoneResult> {
+  const operator = await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  const { releaseOrganizationPhoneNumber } = await import("@/lib/phone-pool");
+  const result = await releaseOrganizationPhoneNumber(id);
+  if (!result.ok) {
+    return result;
+  }
+
+  revalidatePath(`/admin/organizations/${id}`);
+  revalidatePath("/admin");
+  revalidatePath("/admin/phone-pool");
+  revalidatePath("/admin/onboarding");
+  await recordAdminEvent(operator, {
+    eventType: "admin_phone_released",
+    outcome: "success",
+    metadata: { organization_id: id },
+  });
+  return { ok: true };
+}
+
+export type SendDivertCodesResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export async function sendDivertCodesToOwner(
+  organizationId: string,
+): Promise<SendDivertCodesResult> {
+  const operator = await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("id, name, phone_number, niche")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!org?.phone_number?.trim()) {
+    return {
+      ok: false,
+      message: "Assign a Cliste number before sending divert codes.",
+    };
+  }
+
+  const { data: invite } = await admin
+    .from("admin_invites")
+    .select("email, recipient_name")
+    .eq("organization_id", id)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: ownerProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", id)
+    .eq("role", "admin")
+    .limit(1)
+    .maybeSingle();
+
+  let recipientEmail = invite?.email?.trim() ?? "";
+  if (!recipientEmail && ownerProfile?.id) {
+    const { data: userData } = await admin.auth.admin.getUserById(
+      ownerProfile.id as string,
+    );
+    recipientEmail = userData.user?.email?.trim() ?? "";
+  }
+
+  if (!recipientEmail) {
+    return { ok: false, message: "No owner email on file for this store." };
+  }
+
+  const { sendDivertCodesEmail } = await import("@/lib/divert-codes-email");
+  const sent = await sendDivertCodesEmail({
+    organizationId: id,
+    recipientEmail,
+    recipientName: String(invite?.recipient_name ?? ""),
+    businessName: String(org.name ?? ""),
+    clisteNumber: String(org.phone_number),
+  });
+
+  if (!sent.ok) return sent;
+
+  revalidatePath(`/admin/organizations/${id}`);
+  await recordAdminEvent(operator, {
+    eventType: "admin_divert_codes_sent",
+    outcome: "success",
+    targetEmail: recipientEmail,
+    metadata: { organization_id: id },
+  });
+  return { ok: true };
+}
+
+export async function retryTwilioIe1MessagingRegion(
+  organizationId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  const admin = createAdminClient();
+  const { data: org } = await admin
+    .from("organizations")
+    .select("phone_number")
+    .eq("id", id)
+    .maybeSingle();
+
+  const e164 = org?.phone_number?.trim();
+  if (!e164) {
+    return { ok: false, message: "No Cliste number assigned." };
+  }
+
+  const { ensureTwilioIe1MessagingRegion } = await import(
+    "@/lib/twilio-ie-messaging"
+  );
+  const result = await ensureTwilioIe1MessagingRegion(e164);
+  if (!result.ok) return result;
+
+  revalidatePath(`/admin/organizations/${id}`);
+  return { ok: true };
+}
+
 export type UpdateCallRoutingResult =
   | { ok: true }
   | { ok: false; message: string };
 
 const MAX_TRANSFER_PHONE = 32;
 
+function normalizePhoneDigits(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
+
+function phonesWouldLoop(a: string, b: string): boolean {
+  const da = normalizePhoneDigits(a);
+  const db = normalizePhoneDigits(b);
+  if (!da || !db) return false;
+  return da === db;
+}
+
 /** Sets how the store's own number reaches Cara plus the human transfer target. */
 export async function updateOrganizationCallRouting(
   organizationId: string,
-  payload: { callRoutingMode: CallRoutingMode; transferNumber: string },
+  payload: {
+    callRoutingMode: CallRoutingMode;
+    transferNumber: string;
+    storePublicNumber?: string;
+    divertCarrier?: string;
+  },
 ): Promise<UpdateCallRoutingResult> {
   await assertAdminOperator();
   const id = organizationId.trim();
@@ -1365,8 +1485,24 @@ export async function updateOrganizationCallRouting(
   const transferNumber = callRoutingAllowsHumanTransfer(callRoutingMode)
     ? String(payload?.transferNumber ?? "").trim()
     : "";
+  const storePublicNumber = String(payload?.storePublicNumber ?? "").trim();
+  const divertCarrier = String(payload?.divertCarrier ?? "").trim();
+
   if (transferNumber.length > MAX_TRANSFER_PHONE) {
     return { ok: false, message: "Transfer number looks too long." };
+  }
+
+  if (
+    callRoutingAllowsHumanTransfer(callRoutingMode) &&
+    storePublicNumber &&
+    transferNumber &&
+    phonesWouldLoop(storePublicNumber, transferNumber)
+  ) {
+    return {
+      ok: false,
+      message:
+        "Transfer number must not be the same as the store's public/diverted line — use a manager mobile or a desk extension that is not forwarded to Cara.",
+    };
   }
 
   let admin;
@@ -1384,6 +1520,12 @@ export async function updateOrganizationCallRouting(
     .update({
       call_routing_mode: callRoutingMode,
       fallback_number: transferNumber || null,
+      ...(payload.storePublicNumber !== undefined
+        ? { store_public_number: storePublicNumber || null }
+        : {}),
+      ...(payload.divertCarrier !== undefined
+        ? { divert_carrier: divertCarrier || null }
+        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -1401,6 +1543,77 @@ export async function updateOrganizationCallRouting(
 
   revalidatePath(`/admin/organizations/${id}`);
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+export type SetOrganizationLiveResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+const GO_LIVE_STEP_IDS = [
+  "phone_assigned",
+  "routing_configured",
+  "greeting_compliant",
+  "hours_set",
+  "cara_trained",
+] as const;
+
+export async function setOrganizationLive(
+  organizationId: string,
+  live: boolean,
+): Promise<SetOrganizationLiveResult> {
+  const operator = await assertAdminOperator();
+  const id = organizationId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Invalid organization id." };
+  }
+
+  if (live) {
+    const provisioning = await loadOrganizationProvisioning(id);
+    if (!provisioning) {
+      return { ok: false, message: "Organization not found." };
+    }
+    for (const stepId of GO_LIVE_STEP_IDS) {
+      const step = provisioning.steps.find((s) => s.id === stepId);
+      if (!step?.complete) {
+        const label =
+          TENANT_PROVISIONING_STEP_ORDER.find((s) => s.id === stepId)?.label ??
+          stepId;
+        return {
+          ok: false,
+          message: `Cannot go live — complete “${label}” first.`,
+        };
+      }
+    }
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Admin client unavailable.",
+    };
+  }
+
+  const { error } = await admin
+    .from("organizations")
+    .update({
+      is_active: live,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/admin/organizations/${id}`);
+  revalidatePath("/admin/onboarding");
+  await recordAdminEvent(operator, {
+    eventType: live ? "admin_store_went_live" : "admin_store_taken_offline",
+    outcome: "success",
+    metadata: { organization_id: id, is_active: live },
+  });
   return { ok: true };
 }
 

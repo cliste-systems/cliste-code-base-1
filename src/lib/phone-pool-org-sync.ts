@@ -1,12 +1,6 @@
 type AdminLike = {
-  from(table: string): {
-    select(columns: string): unknown;
-    eq(column: string, value: unknown): unknown;
-    maybeSingle(): Promise<{ data: { phone_number?: string | null } | null; error: { message: string } | null }>;
-    update(payload: Record<string, unknown>): {
-      eq(column: string, value: unknown): Promise<{ error: { message: string } | null }>;
-    };
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from(table: string): any;
 };
 
 /** Keep organizations.phone_number aligned with the assigned pool row. */
@@ -15,10 +9,11 @@ export async function syncOrgPhoneNumberCache(
   organizationId: string,
   e164: string,
 ): Promise<void> {
-  const query = admin.from("organizations").select("phone_number").eq("id", organizationId);
-  const { data: org, error: readErr } = await (query as {
-    maybeSingle(): Promise<{ data: { phone_number?: string | null } | null; error: { message: string } | null }>;
-  }).maybeSingle();
+  const { data: org, error: readErr } = await admin
+    .from("organizations")
+    .select("phone_number")
+    .eq("id", organizationId)
+    .maybeSingle();
 
   if (readErr) {
     console.warn(

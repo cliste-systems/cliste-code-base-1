@@ -5,19 +5,8 @@ export type AssignFromPoolResult =
   | { ok: false; message: string };
 
 type PhoneNumbersAdmin = {
-  from(table: "phone_numbers"): PhoneNumbersQuery;
-};
-
-type PhoneNumbersQuery = {
-  select(columns: string): PhoneNumbersQuery;
-  eq(column: string, value: unknown): PhoneNumbersQuery;
-  order(column: string, opts: { ascending: boolean }): PhoneNumbersQuery;
-  limit(n: number): PhoneNumbersQuery;
-  update(payload: Record<string, unknown>): PhoneNumbersQuery;
-  maybeSingle(): Promise<{
-    data: { id: string; e164: string } | null;
-    error: { message: string; code?: string } | null;
-  }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from(table: "phone_numbers"): any;
 };
 
 function devPreferredPoolE164(): string | null {
