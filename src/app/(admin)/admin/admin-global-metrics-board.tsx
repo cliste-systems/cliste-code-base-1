@@ -202,23 +202,23 @@ export function AdminGlobalMetricsBoard({
             icon={Clock3}
           />
           <HeadlineMetric
-            label="Tickets captured"
+            label={`Actions captured · ${periodLabel.toLowerCase()}`}
             value={formatInt(ticketsCreated)}
             icon={Ticket}
           />
           <HeadlineMetric
-            label="Open inbox"
+            label="Open actions"
             value={formatInt(openInbox)}
             icon={Inbox}
           />
           <HeadlineMetric
-            label="Urgent"
+            label="Urgent actions"
             value={formatInt(urgent)}
             icon={AlertTriangle}
             tone={urgent > 0 ? "urgent" : "default"}
           />
           <HeadlineMetric
-            label="Support"
+            label="Open support"
             value={formatInt(support)}
             icon={LifeBuoy}
             href="/admin/support"
