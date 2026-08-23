@@ -16,7 +16,6 @@ import {
   adminTableTdClass,
   adminTableTdTruncateClass,
   adminTableThActionsClass,
-  adminTableThClass,
   adminTableThWidth,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";

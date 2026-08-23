@@ -17,7 +17,6 @@ import {
   adminTableTdClass,
   adminTableTdTruncateClass,
   adminTableThActionsClass,
-  adminTableThClass,
   adminTableThWidth,
 } from "@/components/admin/admin-table";
 import { createAdminClient } from "@/utils/supabase/admin";

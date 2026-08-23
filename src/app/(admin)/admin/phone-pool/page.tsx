@@ -10,7 +10,6 @@ import {
   adminTableHeadClass,
   adminTableRowClass,
   adminTableTdClass,
-  adminTableThClass,
   adminTableThWidth,
 } from "@/components/admin/admin-table";
 import { poolHealthCheck, twilioIsConfigured } from "@/lib/phone-pool";
