@@ -20,7 +20,7 @@ export async function syncStoreDepartmentsToOrg(
   const { data: departments } = await admin
     .from("store_departments")
     .select(
-      "id, organization_id, name, phone_e164, hours, transfer_enabled, cara_note, sort_order, active, extension, handles_text, is_off_licence, is_an_post",
+      "id, organization_id, name, phone_e164, hours, transfer_enabled, cara_note, sort_order, active, extension, handles_text, contact_email, is_off_licence, is_an_post",
     )
     .eq("organization_id", organizationId)
     .order("sort_order", { ascending: true });

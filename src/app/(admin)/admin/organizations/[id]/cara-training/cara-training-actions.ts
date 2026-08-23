@@ -536,13 +536,17 @@ export async function saveCaraTrainingDepartments(
   const keptIds = new Set<string>();
 
   for (const [index, dept] of departments.entries()) {
+    const hasTransferTarget = Boolean(
+      dept.extension?.trim() || dept.phone_e164?.trim(),
+    );
     const row = {
       organization_id: organizationId,
       name: dept.name.trim(),
       phone_e164: dept.phone_e164?.trim() || null,
       extension: dept.extension?.trim() || null,
+      contact_email: dept.contact_email?.trim() || null,
       hours: dept.hours,
-      transfer_enabled: dept.transfer_enabled,
+      transfer_enabled: hasTransferTarget,
       cara_note: dept.cara_note?.trim() || null,
       handles_text: dept.handles_text?.trim() || null,
       is_off_licence: dept.is_off_licence,

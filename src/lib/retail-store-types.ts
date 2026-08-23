@@ -56,6 +56,7 @@ export type StoreDepartmentRow = {
   transfer_enabled: boolean;
   cara_note: string | null;
   handles_text: string | null;
+  contact_email: string | null;
   is_off_licence: boolean;
   is_an_post: boolean;
   sort_order: number;

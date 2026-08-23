@@ -27,6 +27,7 @@ describe("admin notes prompt boundary", () => {
             phone_e164: null,
             cara_note: null,
             handles_text: null,
+            contact_email: null,
             is_off_licence: false,
             is_an_post: false,
           },

@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useState, useTransition } from "react";
-import { GripVertical, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SUPERVALU_DEPARTMENT_PRESETS } from "@/lib/retail-store-types";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
 import { validateDepartmentExtension } from "@/lib/store-departments";
 
@@ -35,6 +34,7 @@ function emptyDepartment(sortOrder: number): DepartmentDraft {
     transfer_enabled: false,
     cara_note: null,
     handles_text: null,
+    contact_email: null,
     is_off_licence: false,
     is_an_post: false,
     sort_order: sortOrder,
@@ -76,19 +76,6 @@ export function StoreDepartmentsEditor({
     setSaved(false);
   }, [departments, onChange]);
 
-  const seedPresets = useCallback(() => {
-    const existing = new Set(departments.map((d) => d.name.toLowerCase()));
-    const toAdd = SUPERVALU_DEPARTMENT_PRESETS.filter(
-      (name) => !existing.has(name.toLowerCase()),
-    ).map((name, offset) => ({
-      ...emptyDepartment(departments.length + offset),
-      name,
-      transfer_enabled: canTransfer,
-    }));
-    if (toAdd.length > 0) onChange([...departments, ...toAdd]);
-    setSaved(false);
-  }, [canTransfer, departments, onChange]);
-
   const save = useCallback(() => {
     setError(null);
     setSaved(false);
@@ -96,6 +83,11 @@ export function StoreDepartmentsEditor({
       const extErr = validateDepartmentExtension(dept.extension);
       if (extErr) {
         setError(`${dept.name || "Department"}: ${extErr}`);
+        return;
+      }
+      const email = dept.contact_email?.trim() ?? "";
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setError(`${dept.name || "Department"}: Enter a valid email address.`);
         return;
       }
     }
@@ -113,14 +105,14 @@ export function StoreDepartmentsEditor({
     <div className="space-y-4">
       {departments.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No departments yet. Add one or seed common SuperValu departments.
+          No departments yet. Add one for each staffed counter or team.
         </p>
       ) : null}
 
       {!canTransfer ? (
         <p className="text-muted-foreground text-xs">
-          Extension and external numbers can be saved now. Cara will only dial
-          them once transfer hardware is verified and routing allows handoff.
+          Department numbers are saved for routing. Cara will only transfer
+          callers once phone system setup allows it.
         </p>
       ) : null}
 
@@ -130,12 +122,11 @@ export function StoreDepartmentsEditor({
             key={dept.id || `new-${index}`}
             className="rounded-lg border border-slate-200 bg-slate-50/50 p-3"
           >
-            <div className="mb-2 flex items-center gap-2">
-              <GripVertical className="size-4 text-slate-400" aria-hidden />
+            <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-slate-500">
-                #{index + 1}
+                Department {index + 1}
               </span>
-              <label className="ml-auto flex items-center gap-1.5 text-xs">
+              <label className="flex items-center gap-1.5 text-xs">
                 <input
                   type="checkbox"
                   checked={dept.active}
@@ -146,27 +137,17 @@ export function StoreDepartmentsEditor({
               </label>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
+              <div className="space-y-1 sm:col-span-2">
                 <Label className="text-xs">Name</Label>
                 <Input
                   value={dept.name}
                   disabled={disabled}
+                  placeholder="Deli counter"
                   onChange={(e) => update(index, { name: e.target.value })}
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Handles</Label>
-                <Input
-                  value={dept.handles_text ?? ""}
-                  disabled={disabled}
-                  placeholder="e.g. returns, complaints"
-                  onChange={(e) =>
-                    update(index, { handles_text: e.target.value || null })
-                  }
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Extension</Label>
+                <Label className="text-xs">Department number</Label>
                 <Input
                   value={dept.extension ?? ""}
                   disabled={disabled}
@@ -177,7 +158,7 @@ export function StoreDepartmentsEditor({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">External number (E.164)</Label>
+                <Label className="text-xs">Phone</Label>
                 <Input
                   value={dept.phone_e164 ?? ""}
                   disabled={disabled}
@@ -187,57 +168,37 @@ export function StoreDepartmentsEditor({
                   }
                 />
               </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">Email</Label>
+                <Input
+                  type="email"
+                  value={dept.contact_email ?? ""}
+                  disabled={disabled}
+                  placeholder="deli@store.example"
+                  onChange={(e) =>
+                    update(index, { contact_email: e.target.value || null })
+                  }
+                />
+              </div>
             </div>
             <div className="mt-2 space-y-1">
-              <Label className="text-xs">Cara note</Label>
+              <Label className="text-xs">Cara note (optional)</Label>
               <Textarea
                 value={dept.cara_note ?? ""}
                 disabled={disabled}
                 rows={2}
+                placeholder="What this department handles on calls"
                 onChange={(e) =>
                   update(index, { cara_note: e.target.value || null })
                 }
               />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={dept.transfer_enabled}
-                  disabled={disabled || !canTransfer}
-                  onChange={(e) =>
-                    update(index, { transfer_enabled: e.target.checked })
-                  }
-                />
-                Transfer enabled
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={dept.is_off_licence}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    update(index, { is_off_licence: e.target.checked })
-                  }
-                />
-                Off-licence
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={dept.is_an_post}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    update(index, { is_an_post: e.target.checked })
-                  }
-                />
-                An Post
-              </label>
+            <div className="mt-2 flex justify-end">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="ml-auto text-destructive"
+                className="text-destructive"
                 disabled={disabled}
                 onClick={() => remove(index)}
               >
@@ -253,15 +214,6 @@ export function StoreDepartmentsEditor({
         <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={add}>
           <Plus className="size-3.5" aria-hidden />
           Add department
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          onClick={seedPresets}
-        >
-          Seed SuperValu presets
         </Button>
         <Button type="button" size="sm" disabled={disabled || pending} onClick={save}>
           {pending ? "Saving…" : "Save departments"}
