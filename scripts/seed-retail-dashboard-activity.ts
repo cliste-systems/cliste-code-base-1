@@ -73,16 +73,13 @@ function minutesAgoIso(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60_000).toISOString();
 }
 
-function dublinHourTodayIso(hour: number, minute = 0): string {
+/** Today's Dublin calendar at a shop hour — used for demo rows so metrics/charts work before opening. */
+function dublinShopHourTodayIso(hour: number, minute = 0): string {
   const zonedNow = toZonedTime(new Date(), DUBLIN);
   const dayStart = startOfDay(zonedNow);
   const zonedTarget = new Date(dayStart);
   zonedTarget.setHours(hour, minute, 0, 0);
-  const iso = fromZonedTime(zonedTarget, DUBLIN).toISOString();
-  if (new Date(iso) > new Date()) {
-    return minutesAgoIso(90);
-  }
-  return iso;
+  return fromZonedTime(zonedTarget, DUBLIN).toISOString();
 }
 
 function retailDublinHourForIndex(index: number): { hour: number; minute: number } {
@@ -92,11 +89,21 @@ function retailDublinHourForIndex(index: number): { hour: number; minute: number
 }
 
 function callCreatedAt(call: CallSeed, index: number): string {
-  if (call.atDublinHour != null) {
-    return dublinHourTodayIso(call.atDublinHour, call.atDublinMinute ?? 10);
+  const todayStart = dublinTodayStartIso();
+
+  if (call.minutesAgo != null && call.atDublinHour == null) {
+    const recent = minutesAgoIso(call.minutesAgo);
+    if (recent >= todayStart) {
+      return recent;
+    }
   }
+
+  if (call.atDublinHour != null) {
+    return dublinShopHourTodayIso(call.atDublinHour, call.atDublinMinute ?? 10);
+  }
+
   const { hour, minute } = retailDublinHourForIndex(index);
-  return dublinHourTodayIso(hour, minute);
+  return dublinShopHourTodayIso(hour, minute);
 }
 
 function dublinTodayStartIso(now = new Date()): string {

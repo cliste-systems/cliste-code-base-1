@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { getDashboardMetricRangeLowerBoundIso } from "@/lib/dashboard-metric-range";
 
 export {
   DASHBOARD_ACTION_INBOX_SEEN_COOKIE,
@@ -9,9 +10,6 @@ export {
 } from "./dashboard-nav-seen-cookies";
 
 export type DashboardNavBadgeMap = Partial<Record<string, number>>;
-
-/** When no “seen” cookie yet, treat activity since this rolling window as the badge. */
-const SEEN_FALLBACK_MS = 24 * 60 * 60 * 1000;
 
 export type DashboardNavSeenAt = {
   callHistory: Date | null;
@@ -26,13 +24,6 @@ function countHead(
   return res.count ?? 0;
 }
 
-function sinceOrFallback(seen: Date | null): string {
-  if (seen != null && !Number.isNaN(seen.getTime())) {
-    return seen.toISOString();
-  }
-  return new Date(Date.now() - SEEN_FALLBACK_MS).toISOString();
-}
-
 const EMPTY_SEEN_AT: DashboardNavSeenAt = {
   callHistory: null,
   actionInbox: null,
@@ -40,16 +31,15 @@ const EMPTY_SEEN_AT: DashboardNavSeenAt = {
 };
 
 /**
- * Sidebar badges: open Action Inbox + Cara training totals; call history uses
- * “new since last visit” (httpOnly cookies) with a 24h fallback.
+ * Sidebar badges show live totals (open inbox, training gaps, calls today).
+ * Visiting a page does not clear the count.
  */
 export async function fetchDashboardNavBadges(
   supabase: SupabaseClient,
   organizationId: string,
-  seen: DashboardNavSeenAt | null | undefined,
+  _seen: DashboardNavSeenAt | null | undefined,
 ): Promise<DashboardNavBadgeMap> {
-  const s = seen ?? EMPTY_SEEN_AT;
-  const callHistorySince = sinceOrFallback(s.callHistory);
+  const callsTodaySince = getDashboardMetricRangeLowerBoundIso("today");
 
   const [openRes, callHistoryRes, trainingRes] = await Promise.all([
     supabase
@@ -61,7 +51,7 @@ export async function fetchDashboardNavBadges(
       .from("call_logs")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .gt("created_at", callHistorySince),
+      .gte("created_at", callsTodaySince),
     supabase
       .from("cara_training_items")
       .select("id", { count: "exact", head: true })
