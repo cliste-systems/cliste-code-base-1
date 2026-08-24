@@ -142,7 +142,10 @@ export function lastOwnerAnswer(item: CaraTrainingListItem): string | null {
 /** Extra context when it adds detail beyond the topic line — omit when redundant. */
 export function trainingContextSummary(item: CaraTrainingListItem): string | null {
   const topic = trainingTopicLabel(item).toLowerCase();
-  const context = item.caller_context?.replace(/\s+/g, " ").trim();
+  const context = item.caller_context
+    ?.replace(/^__demo__\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (context && context.length > 0) {
     if (!context.toLowerCase().includes(topic) || context.length > topic.length + 24) {
       return context;
@@ -154,6 +157,20 @@ export function trainingContextSummary(item: CaraTrainingListItem): string | nul
   const gapLower = gap.toLowerCase();
   if (gapLower === topic || gapLower.startsWith(topic)) return null;
   return truncateTrainingLabel(gap, 280);
+}
+
+export function trainingQuickAnswerLabel(gapSummary: string): {
+  kind: "offer" | "question";
+  text: string;
+} {
+  const text = gapSummary.trim();
+  const looksLikeQuestion =
+    /^(do|does|can|could|is|are|what|when|where|how|will)\b/i.test(text) ||
+    text.endsWith("?");
+  if (looksLikeQuestion) {
+    return { kind: "question", text };
+  }
+  return { kind: "offer", text };
 }
 
 export function trainingStatusLabel(status: CaraTrainingStatus): string {

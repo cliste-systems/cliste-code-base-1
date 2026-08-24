@@ -24,7 +24,7 @@ export const ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
   lead: "New enquiry",
   complaint: "Complaint",
   unclear: "Needs review",
-  failed: "Missed call",
+  failed: "Call ended",
   follow_up: "Follow-up",
 };
 
@@ -39,7 +39,7 @@ export const ACTION_CATEGORY_SHORT: Record<ActionCategory, string> = {
   lead: "New enquiry",
   complaint: "Complaint",
   unclear: "Needs review",
-  failed: "Missed call",
+  failed: "Call ended",
   follow_up: "Follow-up",
 };
 

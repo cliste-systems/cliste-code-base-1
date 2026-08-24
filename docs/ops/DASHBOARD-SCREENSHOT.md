@@ -32,7 +32,7 @@ Then:
 | Live activity | Recent Real Rewards, Click & Collect, transfer calls |
 | Needs attention | Open deli platter, callback, catering, delivery enquiries |
 | Cara training | 6 knowledge gaps (Real Rewards fuel, turkey pre-order, EV charging, etc.) |
-| Charts | Mixed outcomes, transfer health (3 connected / 1 failed), request types |
+| Charts | Mixed outcomes, Cara performance, **When customers call** (busiest hours) |
 
 All copy is realistic SuperValu Killarney retail wording — **no `[smoke test]` prefix** in the UI.
 

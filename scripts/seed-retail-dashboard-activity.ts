@@ -19,7 +19,6 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { createAdminClient } from "../src/utils/supabase/admin";
 
 const DUBLIN = "Europe/Dublin";
-const DEMO_CONTEXT = "__demo__";
 const ORG_DISPLAY_NAME = "Murphy's SuperValu Killarney";
 const DEFAULT_OWNER_EMAIL = "shop@cliste.test";
 
@@ -42,7 +41,9 @@ type CallSeed = {
   durationSeconds: number;
   outcome: string;
   aiSummary: string;
-  minutesAgo: number;
+  minutesAgo?: number;
+  atDublinHour?: number;
+  atDublinMinute?: number;
   transferConnected?: boolean;
   transferDepartment?: string;
   transferTarget?: string;
@@ -70,6 +71,25 @@ function demoPhone(index: number): string {
 
 function minutesAgoIso(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60_000).toISOString();
+}
+
+function dublinHourTodayIso(hour: number, minute = 0): string {
+  const zonedNow = toZonedTime(new Date(), DUBLIN);
+  const dayStart = startOfDay(zonedNow);
+  const zonedTarget = new Date(dayStart);
+  zonedTarget.setHours(hour, minute, 0, 0);
+  const iso = fromZonedTime(zonedTarget, DUBLIN).toISOString();
+  if (new Date(iso) > new Date()) {
+    return minutesAgoIso(90);
+  }
+  return iso;
+}
+
+function callCreatedAt(call: CallSeed): string {
+  if (call.atDublinHour != null) {
+    return dublinHourTodayIso(call.atDublinHour, call.atDublinMinute ?? 10);
+  }
+  return minutesAgoIso(call.minutesAgo ?? 120);
 }
 
 function dublinTodayStartIso(now = new Date()): string {
@@ -233,18 +253,18 @@ const CALLS: CallSeed[] = [
   { callerNumber: demoPhone(15), callerName: "Sean O'Malley", durationSeconds: 120, outcome: "action_created", aiSummary: "Caller interested in bulk catering for a GAA club dinner — follow-up needed", minutesAgo: 19 },
   { callerNumber: demoPhone(16), callerName: "Rita O'Donnell", durationSeconds: 115, outcome: "callback_requested", aiSummary: "Caller wants a callback about gluten-free bread availability in bakery", minutesAgo: 23 },
   { callerNumber: demoPhone(17), callerName: "Helen Crowley", durationSeconds: 97, outcome: "callback_requested", aiSummary: "Callback requested about party catering platter for 40 people", minutesAgo: 48 },
-  { callerNumber: demoPhone(18), callerName: "Unknown", durationSeconds: 15, outcome: "failed", aiSummary: "Missed call — rang out before Cara answered", minutesAgo: 7 },
-  { callerNumber: demoPhone(19), callerName: "Unknown", durationSeconds: 8, outcome: "voicemail_or_no_speech", aiSummary: "Caller hung up after greeting — no speech detected", minutesAgo: 11 },
+  { callerNumber: demoPhone(18), callerName: "Unknown", durationSeconds: 12, outcome: "voicemail_or_no_speech", aiSummary: "Caller hung up after the greeting — no speech detected", minutesAgo: 7 },
+  { callerNumber: demoPhone(19), callerName: "Unknown", durationSeconds: 8, outcome: "voicemail_or_no_speech", aiSummary: "Silent call — Cara answered but the caller did not speak", minutesAgo: 11 },
   { callerNumber: demoPhone(20), callerName: "Margaret Hayes", durationSeconds: 130, outcome: "answered", aiSummary: "Complaint about a refund on damaged packaging — unhappy with previous visit", minutesAgo: 31 },
-  { callerNumber: demoPhone(21), callerName: "Declan Healy", durationSeconds: 86, outcome: "answered", aiSummary: "Asked about wheelchair access at the Main Street entrance", minutesAgo: 72 },
-  { callerNumber: demoPhone(22), callerName: "Orla McNamara", durationSeconds: 99, outcome: "answered", aiSummary: "Asked if there is EV charging in the car park behind the store", minutesAgo: 95 },
-  { callerNumber: demoPhone(23), callerName: "Paul Brennan", durationSeconds: 103, outcome: "transferred", aiSummary: "Wanted the deli for a party platter quote — transferred to Deli", minutesAgo: 108, transferConnected: true, transferDepartment: "Deli", transferTarget: "+35364123000" },
-  { callerNumber: demoPhone(24), callerName: "Ciara Dunne", durationSeconds: 88, outcome: "answered", aiSummary: "Asked about ATM location inside the store", minutesAgo: 125 },
-  { callerNumber: demoPhone(25), callerName: "Eoin Fitzgerald", durationSeconds: 95, outcome: "answered", aiSummary: "Asked where the National Lottery counter is", minutesAgo: 145 },
-  { callerNumber: demoPhone(26), callerName: "Grainne O'Reilly", durationSeconds: 92, outcome: "answered", aiSummary: "Asked which aisle stocks premium dog food", minutesAgo: 168 },
-  { callerNumber: demoPhone(27), callerName: "Barry Nolan", durationSeconds: 84, outcome: "answered", aiSummary: "Asked about bank holiday opening hours for August", minutesAgo: 195 },
-  { callerNumber: demoPhone(28), callerName: "Mark Sullivan", durationSeconds: 108, outcome: "action_created", aiSummary: "Corporate hamper enquiry for a hotel welcome packs — message captured", minutesAgo: 220 },
-  { callerNumber: demoPhone(29), callerName: "Mairead Flynn", durationSeconds: 91, outcome: "answered", aiSummary: "Asked if the fish counter has fresh salmon today", minutesAgo: 260 },
+  { callerNumber: demoPhone(21), callerName: "Declan Healy", durationSeconds: 86, outcome: "answered", aiSummary: "Asked about wheelchair access at the Main Street entrance", atDublinHour: 9, atDublinMinute: 20 },
+  { callerNumber: demoPhone(22), callerName: "Orla McNamara", durationSeconds: 99, outcome: "answered", aiSummary: "Asked if there is EV charging in the car park behind the store", atDublinHour: 10, atDublinMinute: 45 },
+  { callerNumber: demoPhone(23), callerName: "Paul Brennan", durationSeconds: 103, outcome: "transferred", aiSummary: "Wanted the deli for a party platter quote — transferred to Deli", atDublinHour: 11, atDublinMinute: 30, transferConnected: true, transferDepartment: "Deli", transferTarget: "+35364123000" },
+  { callerNumber: demoPhone(24), callerName: "Ciara Dunne", durationSeconds: 88, outcome: "answered", aiSummary: "Asked about ATM location inside the store", atDublinHour: 12, atDublinMinute: 15 },
+  { callerNumber: demoPhone(25), callerName: "Eoin Fitzgerald", durationSeconds: 95, outcome: "answered", aiSummary: "Asked where the National Lottery counter is", atDublinHour: 13, atDublinMinute: 0 },
+  { callerNumber: demoPhone(26), callerName: "Grainne O'Reilly", durationSeconds: 92, outcome: "answered", aiSummary: "Asked which aisle stocks premium dog food", atDublinHour: 14, atDublinMinute: 20 },
+  { callerNumber: demoPhone(27), callerName: "Barry Nolan", durationSeconds: 84, outcome: "answered", aiSummary: "Asked about bank holiday opening hours for August", atDublinHour: 15, atDublinMinute: 40 },
+  { callerNumber: demoPhone(28), callerName: "Mark Sullivan", durationSeconds: 108, outcome: "action_created", aiSummary: "Corporate hamper enquiry for hotel welcome packs — message captured", atDublinHour: 16, atDublinMinute: 10 },
+  { callerNumber: demoPhone(29), callerName: "Mairead Flynn", durationSeconds: 91, outcome: "answered", aiSummary: "Asked if the fish counter has fresh salmon today", atDublinHour: 17, atDublinMinute: 25 },
   { callerNumber: demoPhone(30), callerName: "Blocked Caller", durationSeconds: 0, outcome: "blocked", aiSummary: "Withheld caller ID — blocked per store policy", minutesAgo: 13 },
   { callerNumber: demoPhone(31), callerName: "Unknown", durationSeconds: 22, outcome: "spam_or_abuse", aiSummary: "Abusive language after opening — call ended", minutesAgo: 35 },
   { callerNumber: demoPhone(32), callerName: "Una Fitzgerald", durationSeconds: 118, outcome: "transferred", aiSummary: "Asked for manager about a delivery complaint — transfer to Customer Service failed", minutesAgo: 42, transferConnected: false, transferDepartment: "Customer Service", transferTarget: "+35364123003" },
@@ -255,7 +275,7 @@ const TICKETS: TicketSeed[] = [
   { callerNumber: demoPhone(1), callerName: "Siobhán Kelly", summary: "Pricing question — how much is the large family deli platter?", status: "open", minutesAgo: 12 },
   { callerNumber: demoPhone(16), callerName: "Rita O'Donnell", summary: "Callback request — ring back about gluten-free sourdough in the bakery", status: "open", minutesAgo: 20 },
   { callerNumber: demoPhone(15), callerName: "Sean O'Malley", summary: "New customer interested in bulk catering for a GAA club dinner", status: "open", minutesAgo: 18 },
-  { callerNumber: demoPhone(10), callerName: "Liam O'Connor", summary: "General enquiry — do ye deliver to Killarney town centre?", status: "open", minutesAgo: 15 },
+  { callerNumber: demoPhone(10), callerName: "Liam O'Connor", summary: "General enquiry — do you deliver to Killarney town centre?", status: "open", minutesAgo: 15 },
   { callerNumber: demoPhone(17), callerName: "Helen Crowley", summary: "Callback needed — party catering platter for 40 people next Saturday", status: "open", minutesAgo: 46 },
   { callerNumber: demoPhone(3), callerName: "Mary Walsh", summary: "Pricing question — cost of a party sandwich platter from the deli", status: "resolved", minutesAgo: 62 },
   { callerNumber: demoPhone(4), callerName: "James Lynch", summary: "Callback needed — butcher to confirm lamb roast availability for Sunday", status: "resolved", minutesAgo: 78 },
@@ -263,7 +283,7 @@ const TICKETS: TicketSeed[] = [
   { callerNumber: demoPhone(6), callerName: "Patrick Doyle", summary: "General enquiry — bank holiday opening hours in August", status: "resolved", minutesAgo: 108 },
   { callerNumber: demoPhone(7), callerName: "Aoife Byrne", summary: "Pricing question — how much for a birthday cake order from the bakery", status: "resolved", minutesAgo: 122 },
   { callerNumber: demoPhone(8), callerName: "Conor Murphy", summary: "Callback request — call me back about the off-licence wine list", status: "resolved", minutesAgo: 138 },
-  { callerNumber: demoPhone(9), callerName: "Emma Walsh", summary: "Product enquiry — do ye stock organic oat milk?", status: "resolved", minutesAgo: 155 },
+  { callerNumber: demoPhone(9), callerName: "Emma Walsh", summary: "Product enquiry — do you stock organic oat milk?", status: "resolved", minutesAgo: 155 },
   { callerNumber: demoPhone(11), callerName: "Sarah Ryan", summary: "General enquiry — lost Real Rewards card replacement", status: "resolved", minutesAgo: 172 },
   { callerNumber: demoPhone(12), callerName: "David Keane", summary: "Pricing question — estimate for a corporate Christmas hamper", status: "resolved", minutesAgo: 188 },
   { callerNumber: demoPhone(28), callerName: "Mark Sullivan", summary: "Product enquiry — interested in a wine tasting evening at the off-licence", status: "resolved", minutesAgo: 215 },
@@ -273,44 +293,44 @@ const TICKETS: TicketSeed[] = [
 const TRAINING: TrainingSeed[] = [
   {
     status: "awaiting_answer",
-    gapSummary: "Do ye take Real Rewards points at fuel partner stations?",
+    gapSummary: "Real Rewards at partner petrol stations",
     caraQuestion: "A caller asked if Real Rewards works at partner petrol stations. What should I tell them?",
-    callerContext: `${DEMO_CONTEXT} Asked about Circle K and Applegreen redemption`,
+    callerContext: "Asked about Circle K and Applegreen redemption",
     minutesAgo: 40,
   },
   {
     status: "awaiting_answer",
-    gapSummary: "Christmas turkey pre-order — deposit and collection dates?",
+    gapSummary: "Christmas turkey pre-orders",
     caraQuestion: "A caller asked about ordering a Christmas turkey. What should I tell them?",
-    callerContext: `${DEMO_CONTEXT} Asked about deposit and collection week`,
+    callerContext: "Asked about deposit and collection dates",
     minutesAgo: 85,
   },
   {
     status: "draft_ready",
-    gapSummary: "Student discount with MTU Kerry student card",
+    gapSummary: "Student discount with MTU Kerry card",
     caraQuestion: "A caller asked about student discounts. What should I tell them?",
-    callerContext: `${DEMO_CONTEXT} Caller mentioned MTU Kerry student card`,
+    callerContext: "Caller mentioned MTU Kerry student card",
     minutesAgo: 130,
   },
   {
     status: "awaiting_answer",
-    gapSummary: "Is there EV charging in the car park?",
+    gapSummary: "EV charging in the car park",
     caraQuestion: "A caller asked about EV charging on site. What should I tell them?",
-    callerContext: `${DEMO_CONTEXT} Asked if chargers are free for shoppers`,
+    callerContext: "Asked if chargers are free for shoppers",
     minutesAgo: 90,
   },
   {
     status: "awaiting_answer",
-    gapSummary: "Can I pre-order a lamb roast from the butcher for Sunday?",
+    gapSummary: "Butcher lamb roast pre-orders",
     caraQuestion: "A caller asked about pre-ordering meat from the butcher. What should I tell them?",
-    callerContext: `${DEMO_CONTEXT} Sunday roast for six people`,
+    callerContext: "Sunday roast for six people",
     minutesAgo: 55,
   },
   {
     status: "awaiting_answer",
-    gapSummary: "Do ye price-match Dunnes on branded groceries?",
+    gapSummary: "Price matching on branded groceries",
     caraQuestion: "A caller asked about price matching competitors. What should I tell them?",
-    callerContext: `${DEMO_CONTEXT} Caller quoted a Dunnes leaflet`,
+    callerContext: "Caller quoted a Dunnes leaflet",
     minutesAgo: 175,
   },
 ];
@@ -351,7 +371,7 @@ async function main() {
     outcome: call.outcome,
     ai_summary: call.aiSummary,
     call_sid: `RT-TEST-${String(index + 1).padStart(4, "0")}`,
-    created_at: minutesAgoIso(call.minutesAgo),
+    created_at: callCreatedAt(call),
     ...(call.outcome === "transferred"
       ? {
           transfer_connected: call.transferConnected ?? false,

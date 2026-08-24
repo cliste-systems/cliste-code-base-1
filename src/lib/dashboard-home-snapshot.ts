@@ -23,7 +23,6 @@ import {
   buildHomeCallOutcomeSegments,
   buildHomeRequestTypeSegments,
   buildHomeUsageSnapshot,
-  buildTransferHealthSnapshot,
   type TransferHealthSnapshot,
 } from "@/lib/dashboard-home-analytics";
 import { buildHomeCaraPerformance } from "@/lib/dashboard-home-cara-performance";
@@ -390,16 +389,7 @@ export async function loadDashboardHomeSnapshot(input: {
   const callOutcomeSegmentsLive = buildHomeCallOutcomeSegments(
     callsForMetricRollups.map((row) => row.outcome),
   );
-  const transferHealthLive =
-    niche === "retail"
-      ? buildTransferHealthSnapshot(
-          callsForMetricRollups.map((row) => ({
-            outcome: row.outcome,
-            transfer_connected: (row as { transfer_connected?: boolean | null })
-              .transfer_connected,
-          })),
-        )
-      : null;
+  const transferHealthLive = null;
   const usageSnapshotLive = buildHomeUsageSnapshot({
     minutesUsed: billingMinutesUsed > 0 ? billingMinutesUsed : minutesUsedLive,
     includedMinutes: plan.includedMinutes,

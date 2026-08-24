@@ -117,7 +117,7 @@ export function DashboardHomeCallTimesCard({
   return (
     <Shell className={dashboardHomeCardShellClassName(embedded, className)}>
       <h2 className="mb-2 shrink-0 text-[14px] font-semibold tracking-tight text-[#0b1220]">
-        Call times
+        When customers call
       </h2>
 
       {peak && showChart ? (

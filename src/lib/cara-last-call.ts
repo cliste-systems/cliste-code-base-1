@@ -55,7 +55,7 @@ export function formatDashboardCallOutcomeLabel(outcome: string | null): string 
     case "voicemail_or_no_speech":
       return "Voicemail";
     case "failed":
-      return "Missed call";
+      return "Caller hung up";
     case "spam_or_abuse":
       return "Spam call";
     case "answered":

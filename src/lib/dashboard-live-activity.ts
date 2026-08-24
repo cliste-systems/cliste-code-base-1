@@ -70,9 +70,9 @@ export function formatLiveActivityCallAction(
     case "action_created":
       return "Follow-up created";
     case "failed":
-      return "Missed call";
+      return "Caller hung up";
     case "voicemail_or_no_speech":
-      return "Voicemail";
+      return "No speech detected";
     case "spam_or_abuse":
       return "Spam call";
     default:

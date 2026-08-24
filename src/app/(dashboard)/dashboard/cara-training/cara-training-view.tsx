@@ -68,6 +68,7 @@ import {
   patchPreviewLines,
   trainingContextSummary,
   trainingDetailMeta,
+  trainingQuickAnswerLabel,
   trainingStatusLabel,
   trainingStatusVariant,
   trainingTopicLabel,
@@ -743,9 +744,20 @@ function TrainingDetailPanelContent({
         {!isApplied && item.status === "awaiting_answer" ? (
           <DetailSection title={isCallGapQuickResolve ? "Quick answer" : "Cara asks"}>
             {isCallGapQuickResolve ? (
-              <p className="text-[14px] leading-relaxed text-slate-700">
-                Do you offer <strong className="text-[#0b1220]">{item.gap_summary}</strong>?
-              </p>
+              (() => {
+                const quick = trainingQuickAnswerLabel(item.gap_summary);
+                return quick.kind === "question" ? (
+                  <p className="text-[14px] leading-relaxed text-slate-700">
+                    A caller asked:{" "}
+                    <strong className="text-[#0b1220]">{quick.text}</strong>
+                  </p>
+                ) : (
+                  <p className="text-[14px] leading-relaxed text-slate-700">
+                    Do you offer{" "}
+                    <strong className="text-[#0b1220]">{quick.text}</strong>?
+                  </p>
+                );
+              })()
             ) : (
               <DetailInset>
                 <p className="text-[14px] leading-relaxed text-[#0b1220]">
