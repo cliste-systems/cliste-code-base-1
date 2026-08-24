@@ -1,3 +1,5 @@
+import { toZonedTime } from "date-fns-tz";
+
 export type HomeCallTimesBucket = {
   id: string;
   label: string;
@@ -8,6 +10,9 @@ export type HomeCallTimesBucket = {
 export const HOME_CALL_TIMES_MIN_CALLS_FOR_CHART = 5;
 export const HOME_CALL_TIMES_MIN_ACTIVE_HOURS_FOR_CHART = 2;
 
+const DUBLIN = "Europe/Dublin";
+
+/** Retail opening window shown on the home chart (Dublin local hours). */
 const HOME_CALL_TIMES_CHART_START_HOUR = 8;
 const HOME_CALL_TIMES_CHART_END_HOUR = 18;
 
@@ -17,21 +22,23 @@ export function buildHomeCallTimesBuckets(
   const counts = new Map<number, number>();
 
   for (const iso of timestamps) {
-    const hour = new Date(iso).getHours();
+    const hour = toZonedTime(new Date(iso), DUBLIN).getHours();
     if (Number.isNaN(hour)) continue;
+    if (
+      hour < HOME_CALL_TIMES_CHART_START_HOUR ||
+      hour > HOME_CALL_TIMES_CHART_END_HOUR
+    ) {
+      continue;
+    }
     counts.set(hour, (counts.get(hour) ?? 0) + 1);
   }
 
-  if (counts.size === 0) return [];
-
-  const sortedHours = [...counts.keys()].sort((a, b) => a - b);
-  const dataStart = sortedHours[0]!;
-  const dataEnd = sortedHours[sortedHours.length - 1]!;
-  const start = Math.min(HOME_CALL_TIMES_CHART_START_HOUR, dataStart);
-  const end = Math.max(HOME_CALL_TIMES_CHART_END_HOUR, dataEnd);
-
   const buckets: HomeCallTimesBucket[] = [];
-  for (let hour = start; hour <= end; hour += 1) {
+  for (
+    let hour = HOME_CALL_TIMES_CHART_START_HOUR;
+    hour <= HOME_CALL_TIMES_CHART_END_HOUR;
+    hour += 1
+  ) {
     buckets.push({
       id: `hour-${hour}`,
       label: formatHourLabel(hour),

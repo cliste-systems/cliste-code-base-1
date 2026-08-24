@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   buildHomeCallTimesBuckets,
   homeCallTimesReadyForChart,
+  homeCallTimesTotal,
 } from "./dashboard-home-call-times";
 
 describe("homeCallTimesReadyForChart", () => {
@@ -30,6 +31,18 @@ describe("homeCallTimesReadyForChart", () => {
     const buckets = buildHomeCallTimesBuckets([
       "2026-06-19T15:00:00.000Z",
     ]);
-    assert.ok(buckets.length > 1);
+    assert.equal(buckets.length, 11);
+    assert.equal(buckets.find((b) => b.label === "4pm")?.value, 1);
+  });
+
+  it("buckets by Dublin local hour and ignores late-night UTC spikes", () => {
+    const buckets = buildHomeCallTimesBuckets([
+      "2026-08-23T23:00:00.000Z",
+      "2026-08-23T08:00:00.000Z",
+      "2026-08-23T09:00:00.000Z",
+    ]);
+    assert.equal(buckets.find((b) => b.label === "9am")?.value, 1);
+    assert.equal(buckets.find((b) => b.label === "10am")?.value, 1);
+    assert.equal(homeCallTimesTotal(buckets), 2);
   });
 });

@@ -40,8 +40,8 @@ const EMPTY_SEEN_AT: DashboardNavSeenAt = {
 };
 
 /**
- * Sidebar counts use “new since last visit” per route (httpOnly cookies), with a
- * 24h fallback if the user has never opened that area.
+ * Sidebar badges: open Action Inbox + Cara training totals; call history uses
+ * “new since last visit” (httpOnly cookies) with a 24h fallback.
  */
 export async function fetchDashboardNavBadges(
   supabase: SupabaseClient,
@@ -49,17 +49,14 @@ export async function fetchDashboardNavBadges(
   seen: DashboardNavSeenAt | null | undefined,
 ): Promise<DashboardNavBadgeMap> {
   const s = seen ?? EMPTY_SEEN_AT;
-  const actionInboxSince = sinceOrFallback(s.actionInbox);
   const callHistorySince = sinceOrFallback(s.callHistory);
-  const caraTrainingSince = sinceOrFallback(s.caraTraining);
 
   const [openRes, callHistoryRes, trainingRes] = await Promise.all([
     supabase
       .from("action_tickets")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("status", "open")
-      .gt("created_at", actionInboxSince),
+      .eq("status", "open"),
     supabase
       .from("call_logs")
       .select("id", { count: "exact", head: true })
@@ -69,8 +66,7 @@ export async function fetchDashboardNavBadges(
       .from("cara_training_items")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .in("status", ["awaiting_answer", "draft_ready"])
-      .gt("updated_at", caraTrainingSince),
+      .in("status", ["awaiting_answer", "draft_ready"]),
   ]);
 
   const callBadge = countHead(callHistoryRes);

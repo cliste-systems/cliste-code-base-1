@@ -85,11 +85,18 @@ function dublinHourTodayIso(hour: number, minute = 0): string {
   return iso;
 }
 
-function callCreatedAt(call: CallSeed): string {
+function retailDublinHourForIndex(index: number): { hour: number; minute: number } {
+  const hour = 9 + (index % 9);
+  const minute = 8 + ((index * 7) % 52);
+  return { hour, minute };
+}
+
+function callCreatedAt(call: CallSeed, index: number): string {
   if (call.atDublinHour != null) {
     return dublinHourTodayIso(call.atDublinHour, call.atDublinMinute ?? 10);
   }
-  return minutesAgoIso(call.minutesAgo ?? 120);
+  const { hour, minute } = retailDublinHourForIndex(index);
+  return dublinHourTodayIso(hour, minute);
 }
 
 function dublinTodayStartIso(now = new Date()): string {
@@ -371,7 +378,7 @@ async function main() {
     outcome: call.outcome,
     ai_summary: call.aiSummary,
     call_sid: `RT-TEST-${String(index + 1).padStart(4, "0")}`,
-    created_at: callCreatedAt(call),
+    created_at: callCreatedAt(call, index),
     ...(call.outcome === "transferred"
       ? {
           transfer_connected: call.transferConnected ?? false,
