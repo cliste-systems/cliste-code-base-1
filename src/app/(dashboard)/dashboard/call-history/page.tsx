@@ -13,9 +13,11 @@ import {
   normalizeCallOutcome,
 } from "@/lib/call-history-types";
 import {
+  CALL_HISTORY_LINK_ROW_LIMIT,
   CALL_HISTORY_OPEN_TICKET_LIMIT,
   CALL_HISTORY_PAGE_SIZE,
 } from "@/lib/dashboard-list-limits";
+import { fetchDashboardCallRangeMetrics } from "@/lib/dashboard-call-range-metrics";
 import {
   dashboardMetricRangeGreetingSubline,
   getDashboardMetricRangeLowerBoundIso,
@@ -30,7 +32,7 @@ import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
 
 import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
 import {
-  buildCallHistoryMetricsFromSummaryRows,
+  buildCallHistoryMetricsFromAggregates,
   type CallFollowUp,
   type CallHistoryListItem,
   callSummaryForDisplay,
@@ -49,11 +51,6 @@ type CallLogListRow = {
   outcome: string;
   ai_summary: string | null;
   created_at: string;
-};
-
-type CallLogMetricsRow = {
-  outcome: string;
-  duration_seconds: number;
 };
 
 type TicketDbRow = {
@@ -150,7 +147,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
   const [
     { count: totalCount, error: countError },
-    { data: metricsData, error: metricsError },
+    metricsAggregate,
     { data: pageData, error: listError },
     { data: linkRows },
     { data: ticketRows },
@@ -162,11 +159,11 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         .select("id", { count: "exact", head: true })
         .eq("organization_id", organizationId),
     ),
-    applyRangeFilters(
-      supabase
-        .from("call_logs")
-        .select("outcome, duration_seconds")
-        .eq("organization_id", organizationId),
+    fetchDashboardCallRangeMetrics(
+      supabase,
+      [organizationId],
+      lowerIso,
+      upperIso,
     ),
     applyRangeFilters(
       supabase
@@ -182,7 +179,9 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       supabase
         .from("call_logs")
         .select("id, caller_number, created_at")
-        .eq("organization_id", organizationId),
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(CALL_HISTORY_LINK_ROW_LIMIT),
     ),
     supabase
       .from("action_tickets")
@@ -197,7 +196,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       .eq("organization_id", organizationId),
   ]);
 
-  const error = countError ?? metricsError ?? listError;
+  const error = countError ?? listError;
 
   const tickets = (ticketRows ?? []) as TicketDbRow[];
   const followUpByCallId = assignOpenTicketsToCalls(
@@ -210,13 +209,12 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const totalPages = Math.max(1, Math.ceil(total / CALL_HISTORY_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
 
-  const metrics = buildCallHistoryMetricsFromSummaryRows(
-    (metricsData ?? []) as CallLogMetricsRow[],
+  const metrics = buildCallHistoryMetricsFromAggregates(
+    total,
+    metricsAggregate?.routedCount ?? 0,
+    metricsAggregate?.avgDurationSeconds ?? 0,
     openTicketCount,
   );
-  if (total > 0) {
-    metrics.totalCalls = total;
-  }
 
   const blockedCallerE164s = (blockedRows ?? []).map(
     (row) => String((row as { caller_e164: string }).caller_e164),

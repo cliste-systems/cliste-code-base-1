@@ -39,6 +39,15 @@ import {
   DASHBOARD_HOME_INBOX_DISPLAY_LIMIT,
   DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT,
 } from "@/lib/dashboard-home-panel-limit";
+import {
+  DASHBOARD_HOME_CARA_PERFORMANCE_SAMPLE_LIMIT,
+  DASHBOARD_HOME_REQUEST_TYPE_SAMPLE_LIMIT,
+} from "@/lib/dashboard-list-limits";
+import {
+  fetchDashboardCallOutcomeCounts,
+  fetchDashboardCallRangeMetrics,
+  type DashboardCallOutcomeCount,
+} from "@/lib/dashboard-call-range-metrics";
 import { buildHomeCallTimesBuckets } from "@/lib/dashboard-home-call-times";
 import { DASHBOARD_HOME_MOCK } from "@/lib/dashboard-home-mock-data";
 import { isDashboardHomeMockEnabled } from "@/lib/dashboard-home-mock";
@@ -48,7 +57,7 @@ import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-
 import { ALL_LOCATIONS_VIEW_COOKIE } from "@/lib/account-locations";
 import { resolveDashboardOrganizationScope } from "@/lib/dashboard-scope";
 import { requireDashboardSession } from "@/lib/dashboard-session";
-import { sumBillableMinutesFromDurations } from "@/lib/billable-minutes";
+import { sumBillableMinutesFromDurations, billableMinutesFromDurationSeconds } from "@/lib/billable-minutes";
 import { cookies } from "next/headers";
 
 type DashboardHomePageProps = {
@@ -112,6 +121,16 @@ function applyOrganizationScope<T>(query: T, organizationIds: string[]): T {
   return scoped.in("organization_id", organizationIds);
 }
 
+function outcomeSamplesFromCounts(counts: DashboardCallOutcomeCount[]): string[] {
+  const outcomes: string[] = [];
+  for (const { outcome, callCount } of counts) {
+    for (let i = 0; i < callCount; i++) {
+      outcomes.push(outcome);
+    }
+  }
+  return outcomes;
+}
+
 function defaultPeriodStart(): string {
   return new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1))
     .toISOString()
@@ -173,9 +192,25 @@ export default async function DashboardHomePage({
       supabase
         .from("call_logs")
         .select("outcome, duration_seconds, ai_summary")
-        .gte("created_at", metricRangeStartIso),
+        .gte("created_at", metricRangeStartIso)
+        .order("created_at", { ascending: false })
+        .limit(DASHBOARD_HOME_CARA_PERFORMANCE_SAMPLE_LIMIT),
       scopedOrgIds,
     ),
+    metricRangeEndExclusiveIso,
+  );
+
+  const callRangeMetricsQuery = fetchDashboardCallRangeMetrics(
+    supabase,
+    scopedOrgIds,
+    metricRangeStartIso,
+    metricRangeEndExclusiveIso,
+  );
+
+  const callOutcomeCountsQuery = fetchDashboardCallOutcomeCounts(
+    supabase,
+    scopedOrgIds,
+    metricRangeStartIso,
     metricRangeEndExclusiveIso,
   );
 
@@ -212,7 +247,9 @@ export default async function DashboardHomePage({
       supabase
         .from("action_tickets")
         .select("summary")
-        .gte("created_at", metricRangeStartIso),
+        .gte("created_at", metricRangeStartIso)
+        .order("created_at", { ascending: false })
+        .limit(DASHBOARD_HOME_REQUEST_TYPE_SAMPLE_LIMIT),
       scopedOrgIds,
     ),
     metricRangeEndExclusiveIso,
@@ -241,6 +278,8 @@ export default async function DashboardHomePage({
     actionsInMetricRangeRes,
     openActionsRes,
     callsForMetricRollupsRes,
+    callRangeMetrics,
+    callOutcomeCounts,
     callsForPanelsRes,
     recentTicketsForPanelsRes,
     openTicketsRes,
@@ -262,6 +301,8 @@ export default async function DashboardHomePage({
       scopedOrgIds,
     ),
     callsForMetricRollupsQuery,
+    callRangeMetricsQuery,
+    callOutcomeCountsQuery,
     callsForPanelsQuery,
     recentTicketsForPanelsQuery,
     applyOrganizationScope(
@@ -312,12 +353,17 @@ export default async function DashboardHomePage({
   const actionsCreatedLive = countExact(actionsInMetricRangeRes);
   const openActionsLive = countExact(openActionsRes);
 
-  const routedCountLive = callsForMetricRollups.filter((row) =>
-    isRoutedCallOutcome(row.outcome),
-  ).length;
-  const minutesUsedLive = sumBillableMinutesFromDurations(
-    callsForMetricRollups.map((row) => row.duration_seconds),
-  );
+  const routedCountLive =
+    callRangeMetrics?.routedCount ??
+    callsForMetricRollups.filter((row) =>
+      isRoutedCallOutcome(row.outcome),
+    ).length;
+  const minutesUsedLive =
+    callRangeMetrics != null
+      ? billableMinutesFromDurationSeconds(callRangeMetrics.totalDurationSeconds)
+      : sumBillableMinutesFromDurations(
+          callsForMetricRollups.map((row) => row.duration_seconds),
+        );
 
   let billingMinutesUsed = 0;
   for (const row of usageRecordsRes.error ? [] : (usageRecordsRes.data ?? [])) {
@@ -389,7 +435,9 @@ export default async function DashboardHomePage({
     ticketSummaries.map((row) => row.summary),
   );
   const callOutcomeSegmentsLive = buildHomeCallOutcomeSegments(
-    callsForMetricRollups.map((row) => row.outcome),
+    callOutcomeCounts.length > 0
+      ? outcomeSamplesFromCounts(callOutcomeCounts)
+      : callsForMetricRollups.map((row) => row.outcome),
   );
   const usageSnapshotLive = buildHomeUsageSnapshot({
     minutesUsed: billingMinutesUsed > 0 ? billingMinutesUsed : minutesUsedLive,

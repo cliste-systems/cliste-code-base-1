@@ -252,6 +252,21 @@ export function buildCallHistoryMetrics(calls: CallHistoryListItem[]): CallHisto
   };
 }
 
+/** Metrics from SQL aggregates plus open follow-up count. */
+export function buildCallHistoryMetricsFromAggregates(
+  totalCalls: number,
+  routedCount: number,
+  avgDurationSeconds: number,
+  openFollowUpCount: number,
+): CallHistoryMetrics {
+  return {
+    totalCalls,
+    routedCount,
+    needsAttentionCount: openFollowUpCount,
+    avgDurationLabel: formatAvgDuration(avgDurationSeconds),
+  };
+}
+
 /** Metrics from lightweight rows (no transcripts) plus open follow-up count. */
 export function buildCallHistoryMetricsFromSummaryRows(
   rows: { outcome: string; duration_seconds: number }[],

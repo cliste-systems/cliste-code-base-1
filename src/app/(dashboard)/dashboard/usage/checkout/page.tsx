@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { StripeEmbeddedCheckout } from "@/components/billing/stripe-embedded-checkout";
+import { LazyStripeEmbeddedCheckout } from "@/components/billing/lazy-stripe-embedded-checkout";
 import {
   DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
@@ -35,7 +35,7 @@ export default async function UsageCheckoutPage() {
 
   return (
     <CheckoutShell>
-      <StripeEmbeddedCheckout clientSecret={result.clientSecret} />
+      <LazyStripeEmbeddedCheckout clientSecret={result.clientSecret} />
     </CheckoutShell>
   );
 }

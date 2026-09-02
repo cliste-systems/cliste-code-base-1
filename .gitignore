@@ -47,6 +47,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Fresha availability spike — captured network dumps may contain PII
+# perf audit artifacts
+/.perf/
+/perf-results/
 spikes/fresha-availability/captured/
 spikes/fresha-availability/node_modules/

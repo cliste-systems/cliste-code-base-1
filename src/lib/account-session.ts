@@ -1,11 +1,13 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import type { AccountBillingRow, AccountLocationRow } from "@/lib/account-locations";
 import { isPlanTier } from "@/lib/cliste-plans";
 
-export async function loadAccountLocations(
+export const loadAccountLocations = cache(async function loadAccountLocations(
   accountId: string,
 ): Promise<AccountLocationRow[]> {
   const admin = createAdminClient();
@@ -29,9 +31,9 @@ export async function loadAccountLocations(
     phoneNumber: (row.phone_number as string | null) ?? null,
     status: (row.status as string | null) ?? null,
   }));
-}
+});
 
-export async function loadAccountBilling(
+export const loadAccountBilling = cache(async function loadAccountBilling(
   accountId: string,
 ): Promise<AccountBillingRow | null> {
   const admin = createAdminClient();
@@ -60,7 +62,7 @@ export async function loadAccountBilling(
     billingInterval: data.billing_interval === "year" ? "year" : "month",
     status: (data.status as string | null) ?? null,
   };
-}
+});
 
 export async function countAccountLocations(accountId: string): Promise<number> {
   const admin = createAdminClient();
