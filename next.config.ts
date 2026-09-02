@@ -1,6 +1,12 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+import bundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const isProd = process.env.NODE_ENV === "production";
 
 /**
@@ -151,6 +157,9 @@ const nextConfig: NextConfig = {
   // removes a fingerprinting datapoint that helps attackers pick exploits.
   poweredByHeader: false,
   serverExternalPackages: ["unpdf"],
+  experimental: {
+    optimizePackageImports: ["lucide-react", "date-fns", "motion"],
+  },
   images: {
     remotePatterns: [
       {
@@ -224,7 +233,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   silent: true,
   disableLogger: true,
 });

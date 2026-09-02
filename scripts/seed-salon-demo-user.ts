@@ -9,6 +9,8 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { randomBytes } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { PLANS } from "../src/lib/cliste-plans.data";
 import { LEGAL_DOCUMENT_VERSIONS } from "../src/lib/legal-documents";
@@ -279,6 +281,14 @@ async function main() {
     console.log("  Cliste #: (none in pool — assign via admin if needed)");
   }
   console.log("\n  After sign-in you should land on /dashboard directly.\n");
+
+  if (process.argv.includes("--write-perf-creds")) {
+    const perfDir = join(process.cwd(), ".perf");
+    mkdirSync(perfDir, { recursive: true });
+    const credPath = join(perfDir, "credentials.json");
+    writeFileSync(credPath, JSON.stringify({ email, password }, null, 2));
+    console.log(`  Perf creds: ${credPath}\n`);
+  }
 }
 
 main().catch((err) => {

@@ -11,7 +11,13 @@
     "knip": "knip",
     "supabase:mcp-reconnect": "tsx scripts/supabase-mcp-reconnect.ts",
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
-    "onboarding:background": "bash scripts/export-onboarding-background.sh"
+    "onboarding:background": "bash scripts/export-onboarding-background.sh",
+    "perf:seed": "tsx scripts/seed-salon-demo-user.ts --write-perf-creds",
+    "perf:auth": "tsx scripts/perf/auth-dashboard.ts",
+    "perf:audit": "tsx scripts/perf/run-lighthouse.ts",
+    "perf:ttfb": "tsx scripts/perf/run-server-timing.ts",
+    "perf:validate": "tsx scripts/perf/validate-harness.ts",
+    "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -41,7 +47,12 @@
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.9",
     "@tailwindcss/postcss": "^4",
+    "chrome-launcher": "^1.1.2",
+    "chrome-remote-interface": "^0.33.3",
+    "lighthouse": "^12.6.0",
+    "playwright": "^1.61.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

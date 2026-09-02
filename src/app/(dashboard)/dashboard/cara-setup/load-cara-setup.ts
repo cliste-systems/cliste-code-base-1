@@ -50,12 +50,16 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
     .eq("id", organizationId)
     .maybeSingle();
 
+  const [businessFiles, serviceCatalog] = await Promise.all([
+    listBusinessFiles(),
+    listServicesForOrg(supabase, organizationId),
+  ]);
+
   const assistant = assistantNameLabel(
     String(org?.assistant_display_name ?? "").trim() ||
       VOICE_ASSISTANT_DEFAULT_NAME,
   );
 
-  const businessFiles = await listBusinessFiles();
   const hoursUnset = isBusinessHoursUnset(org?.business_hours);
   const hoursBundle = hoursUnset
     ? { schedule: emptyWeekSchedule(), meta: {} }
@@ -90,7 +94,6 @@ export async function loadCaraSetupPageData(): Promise<CaraSetupPageData> {
   const promptFromOrg = buildCaraSetupPromptInputFromOrg(org);
 
   const verticalId = verticalIdForNiche(niche);
-  const serviceCatalog = await listServicesForOrg(supabase, organizationId);
   const serviceCatalogSupplement = parseStoredServiceCatalogSupplement(
     org?.agent_service_catalog_supplement,
   );
