@@ -12,7 +12,7 @@ export type CallerNoticeTemplate = {
 const processorName = CLISTE_COMPANY.legalName;
 const processorPrivacyEmail = CLISTE_COMPANY.privacyEmail;
 
-/** Copy-paste templates for salon controllers — replace bracketed placeholders. */
+/** Copy-paste templates for business controllers — replace bracketed placeholders. */
 export const CALLER_NOTICE_TEMPLATES: CallerNoticeTemplate[] = [
   {
     id: "website",
@@ -23,7 +23,7 @@ export const CALLER_NOTICE_TEMPLATES: CallerNoticeTemplate[] = [
   },
   {
     id: "signage",
-    title: "In-salon / reception signage",
+    title: "In-store / reception signage",
     description:
       "Print and display near your phone, reception desk, or waiting area so callers see this before dialling.",
     body: `[Business name] — phone calls

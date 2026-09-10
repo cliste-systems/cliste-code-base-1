@@ -4,6 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CaraTrainingField } from "@/components/admin/cara-training-field";
+import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Textarea } from "@/components/ui/textarea";
 import {
   RETAIL_ALLERGEN_INSTRUCTION,
@@ -132,17 +133,11 @@ export function BoundariesSection({ data, onChange, onSaved }: Props) {
           Reject calls with hidden caller ID
         </label>
       </CaraTrainingField>
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save boundaries"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </SectionCard>
   );
 }

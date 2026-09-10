@@ -6,6 +6,10 @@ import { Volume2 } from "lucide-react";
 import {
   CaraTrainingField,
 } from "@/components/admin/cara-training-field";
+import {
+  CaraTrainingFeedback,
+  CaraTrainingSectionFooter,
+} from "@/components/admin/cara-training-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
@@ -126,9 +130,9 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
               Resolved: {data.resolvedVoiceName}
             </p>
           ) : data.agentVoiceId ? (
-            <p className="text-amber-700 text-xs">
+            <CaraTrainingFeedback tone="warning" variant="block" className="mt-1.5">
               Voice name could not be resolved — check the ID before save.
-            </p>
+            </CaraTrainingFeedback>
           ) : null}
         </CaraTrainingField>
       </div>
@@ -154,11 +158,11 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
         </p>
       </CaraTrainingField>
       {greetingWarning ? (
-        <p className="text-destructive text-sm" role="alert">
+        <CaraTrainingFeedback tone="warning" variant="block">
           Greeting must include AI and recording disclosure.
-        </p>
+        </CaraTrainingFeedback>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save identity & voice"}
         </Button>
@@ -171,13 +175,7 @@ export function IdentityVoiceSection({ data, onChange, onSaved }: Props) {
           <Volume2 className="size-4" aria-hidden />
           {previewPending ? "Playing…" : "Play sample"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </SectionCard>
   );
 }

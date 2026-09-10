@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { PRODUCT_NAME } from "@/lib/company-details";
+import { TEST_LINE_E164 } from "@/lib/call-testing-types";
 import Link from "next/link";
+import { Phone } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -22,6 +24,23 @@ export default function Home() {
           Inbox, routing, and agent setup.
         </p>
       </div>
+
+      <section className="border-border bg-muted/40 max-w-md rounded-xl border px-5 py-4 text-center">
+        <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+          Try Cara live
+        </p>
+        <a
+          href={`tel:${TEST_LINE_E164}`}
+          className="text-foreground inline-flex items-center justify-center gap-2 text-lg font-semibold tracking-tight hover:underline"
+        >
+          <Phone className="size-4 shrink-0" aria-hidden />
+          +353 74 938 9378
+        </a>
+        <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+          Ring the demo line to hear Cara in action. Calls may be recorded and
+          transcribed. You&apos;ll speak to Cara, our AI assistant — not a human.
+        </p>
+      </section>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/dashboard"

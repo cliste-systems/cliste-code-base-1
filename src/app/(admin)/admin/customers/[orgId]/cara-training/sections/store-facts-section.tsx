@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { OpeningHoursEditor } from "@/components/agent-knowledge/opening-hours-editor";
 import { CaraTrainingField, CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
+import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -202,17 +203,11 @@ export function StoreFactsSection({ data, onChange, onSaved }: Props) {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save store facts"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </SectionCard>
   );
 }

@@ -55,6 +55,8 @@ async function uniqueSlug(
   return `${base}-${Date.now().toString(36)}`;
 }
 
+const INTERNAL_QA_LINE_E164 = "+353109307440";
+
 async function assignPoolPhone(
   admin: ReturnType<typeof createAdminClient>,
   organizationId: string,
@@ -62,12 +64,15 @@ async function assignPoolPhone(
   const { data: row } = await admin
     .from("phone_numbers")
     .select("id, e164")
-    .is("organization_id", null)
+    .eq("e164", INTERNAL_QA_LINE_E164)
     .eq("status", "available")
-    .limit(1)
     .maybeSingle();
 
-  if (!row?.e164) return null;
+  if (!row?.e164) {
+    throw new Error(
+      `${INTERNAL_QA_LINE_E164} is not available in phone_numbers — release it or seed the pool first.`,
+    );
+  }
 
   const now = new Date().toISOString();
   await admin

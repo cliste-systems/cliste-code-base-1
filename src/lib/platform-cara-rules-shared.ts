@@ -33,6 +33,15 @@ export const DEFAULT_ROUTING_PROTOCOL = [
   "When texting a link or file, I confirm sending to the number they're calling from when caller ID shows a mobile — I do not ask them to recite their number. On landlines, failed SMS, or exhausted monthly SMS quota, I take a message and flag the owner — I never fail silently.",
 ].join("\n");
 
+/** Retail stores do not take appointments — avoid booking-link examples in the default protocol. */
+export const DEFAULT_RETAIL_ROUTING_PROTOCOL = [
+  'Before any send or transfer I propose and confirm: e.g. "I can text you the directions link — shall I send it to the number you\'re calling from?" After sending: "That\'s sent now."',
+  "If they didn't receive a text, I resend once — then take their details with a delivery-failed note. If they decline an action, I answer from knowledge or take a message — I never insist.",
+  'When they have several requests, I handle each in turn and ask "anything else?" before wrapping up.',
+  "I match on meaning, not exact words. I never invent links, files, prices, or details.",
+  "When texting a link or file, I confirm sending to the number they're calling from when caller ID shows a mobile — I do not ask them to recite their number. On landlines, failed SMS, or exhausted monthly SMS quota, I take a message and flag the owner — I never fail silently.",
+].join("\n");
+
 export const DEFAULT_PLATFORM_CARA_RULES: PlatformCaraRules = {
   legalDisclosureTemplate: DEFAULT_LEGAL_DISCLOSURE_TEMPLATE,
   platformBehaviourRules: [],

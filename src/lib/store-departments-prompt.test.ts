@@ -21,6 +21,7 @@ const dept = {
   phone_e164: null,
   cara_note: null,
   handles_text: "Hot food and deli orders",
+  manager_name: null,
   is_off_licence: false,
   is_an_post: false,
 };
@@ -117,5 +118,13 @@ describe("storeDepartmentsPromptSection", () => {
     assert.match(section, /put you through/i);
     assert.doesNotMatch(section, /102/);
     assert.doesNotMatch(section, /\+353/);
+  });
+
+  it("includes department manager name when set", () => {
+    const section = storeDepartmentsPromptSection({
+      capability: capability(),
+      departments: [{ ...dept, manager_name: "Mark OToole" }],
+    });
+    assert.match(section, /manager: Mark OToole/i);
   });
 });

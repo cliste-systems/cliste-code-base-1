@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CaraTrainingField, CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
+import { CaraTrainingFeedback, CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RETAIL_FAQ_STARTER_PACK } from "@/lib/retail-faq-starter-pack";
@@ -80,9 +81,9 @@ export function FaqsSection({ data, onChange, onSaved }: Props) {
         </Button>
       </div>
       {starterAccepted ? (
-        <p className="text-amber-800 text-xs">
+        <CaraTrainingFeedback tone="warning" variant="block">
           Starter pack inserted as drafts — review each answer before saving.
-        </p>
+        </CaraTrainingFeedback>
       ) : null}
 
       <div className="space-y-3">
@@ -131,17 +132,11 @@ export function FaqsSection({ data, onChange, onSaved }: Props) {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save FAQs"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </SectionCard>
   );
 }

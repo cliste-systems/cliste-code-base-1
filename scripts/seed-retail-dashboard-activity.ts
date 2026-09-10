@@ -41,6 +41,8 @@ type CallSeed = {
   durationSeconds: number;
   outcome: string;
   aiSummary: string;
+  transcript?: string;
+  transcriptReview?: string;
   minutesAgo?: number;
   atDublinHour?: number;
   atDublinMinute?: number;
@@ -276,7 +278,38 @@ const CALLS: CallSeed[] = [
   { callerNumber: demoPhone(24), callerName: "Ciara Dunne", durationSeconds: 88, outcome: "answered", aiSummary: "Asked about ATM location inside the store", atDublinHour: 12, atDublinMinute: 15 },
   { callerNumber: demoPhone(25), callerName: "Eoin Fitzgerald", durationSeconds: 95, outcome: "answered", aiSummary: "Asked where the National Lottery counter is", atDublinHour: 13, atDublinMinute: 0 },
   { callerNumber: demoPhone(26), callerName: "Grainne O'Reilly", durationSeconds: 92, outcome: "answered", aiSummary: "Asked which aisle stocks premium dog food", atDublinHour: 14, atDublinMinute: 20 },
-  { callerNumber: demoPhone(27), callerName: "Barry Nolan", durationSeconds: 84, outcome: "answered", aiSummary: "Asked about bank holiday opening hours for August", atDublinHour: 15, atDublinMinute: 40 },
+  {
+    callerNumber: demoPhone(27),
+    callerName: "Barry Nolan",
+    durationSeconds: 84,
+    outcome: "answered",
+    aiSummary: "Asked about bank holiday opening hours for August",
+    transcriptReview:
+      "Barry called to ask whether Brennan's Provisions is open on the August bank holiday. Cara confirmed the store is closed on bank holidays, including Monday 3 August. Barry asked about Sunday trading before the holiday; Cara gave normal Sunday hours of 9:00–18:00 and regular weekday hours for the rest of the month. No follow-up needed.",
+    transcript: `Cara: You're through to Brennan's Provisions — I'm Cara, the AI assistant. This call may be recorded and transcribed. How can I help you today?
+
+Barry: Hi, yeah, quick one — are ye open on the August bank holiday?
+
+Cara: We're closed on bank holidays, including the August bank holiday on Monday the 3rd of August.
+
+Barry: Right, so the shop is closed on the Monday?
+
+Cara: That's right — closed all day. We reopen Tuesday the 4th at eight o'clock in the morning.
+
+Barry: And what about the Sunday before that?
+
+Cara: Sundays we trade nine till six, as normal — so Sunday the 2nd of August we'll be open nine to six.
+
+Barry: Perfect. And there's no special hours for the rest of August?
+
+Cara: Just our usual hours — Monday to Saturday eight till nine, Sunday nine till six. No other bank holidays in August after the third.
+
+Barry: Lovely, that's all I needed. Thanks a million.
+
+Cara: No problem at all, Barry. Thanks for calling Brennan's Provisions. Have a great day.`,
+    atDublinHour: 15,
+    atDublinMinute: 40,
+  },
   { callerNumber: demoPhone(28), callerName: "Mark Sullivan", durationSeconds: 108, outcome: "action_created", aiSummary: "Corporate hamper enquiry for hotel welcome packs — message captured", atDublinHour: 16, atDublinMinute: 10 },
   { callerNumber: demoPhone(29), callerName: "Mairead Flynn", durationSeconds: 91, outcome: "answered", aiSummary: "Asked if the fish counter has fresh salmon today", atDublinHour: 17, atDublinMinute: 25 },
   { callerNumber: demoPhone(30), callerName: "Blocked Caller", durationSeconds: 0, outcome: "blocked", aiSummary: "Withheld caller ID — blocked per store policy", minutesAgo: 13 },
@@ -384,6 +417,8 @@ async function main() {
     duration_seconds: call.durationSeconds,
     outcome: call.outcome,
     ai_summary: call.aiSummary,
+    ...(call.transcript ? { transcript: call.transcript } : {}),
+    ...(call.transcriptReview ? { transcript_review: call.transcriptReview } : {}),
     call_sid: `RT-TEST-${String(index + 1).padStart(4, "0")}`,
     created_at: callCreatedAt(call, index),
     ...(call.outcome === "transferred"

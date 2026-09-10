@@ -7,6 +7,7 @@ import {
   CaraTrainingField,
   CaraTrainingInternalBanner,
 } from "@/components/admin/cara-training-field";
+import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -435,17 +436,11 @@ export function PhoneSystemSection({ data, onChange, onSaved }: Props) {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" disabled={pending} onClick={save}>
           {pending ? "Saving…" : "Save phone system"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </SectionCard>
   );
 }

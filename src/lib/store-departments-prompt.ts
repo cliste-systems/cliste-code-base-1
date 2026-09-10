@@ -10,6 +10,7 @@ export type StoreDepartmentsPromptInput = {
     | "active"
     | "cara_note"
     | "handles_text"
+    | "manager_name"
     | "is_off_licence"
     | "is_an_post"
   >[];
@@ -32,23 +33,27 @@ export function storeDepartmentsPromptSection(
 
   const lines = departments.map((d) => {
     const name = sanitizePromptFreeText(d.name);
+    const manager = d.manager_name?.trim()
+      ? sanitizePromptFreeText(d.manager_name)
+      : null;
     const handles = d.handles_text?.trim()
       ? sanitizePromptFreeText(d.handles_text)
       : d.cara_note?.trim()
         ? sanitizePromptFreeText(d.cara_note)
         : null;
     const handlesPart = handles ? ` (${handles})` : "";
+    const managerPart = manager ? ` — manager: ${manager}` : "";
     if (d.is_off_licence) {
-      return `• ${name}${handlesPart} — off-licence: I never sell alcohol or take ID details; I send callers to the counter.`;
+      return `• ${name}${handlesPart}${managerPart} — off-licence: I never sell alcohol or take ID details; I send callers to the counter.`;
     }
     if (d.is_an_post) {
-      return `• ${name}${handlesPart} — An Post: I never guess tracking or delivery status; I send them to the counter.`;
+      return `• ${name}${handlesPart}${managerPart} — An Post: I never guess tracking or delivery status; I send them to the counter.`;
     }
     const deptCap = input.capability.perDepartment[d.id];
     if (deptCap?.canTransfer) {
-      return `• ${name}${handlesPart} — I can put you through to ${name}.`;
+      return `• ${name}${handlesPart}${managerPart} — I can put you through to ${name}.`;
     }
-    return `• ${name}${handlesPart} — I take their name, number, and what they need, and pass it to ${name}.`;
+    return `• ${name}${handlesPart}${managerPart} — I take their name, number, and what they need, and pass it to ${name}.`;
   });
 
   const header = input.capability.canTransfer

@@ -233,6 +233,19 @@ describe("compileCaraPrompt budget assembly", () => {
     assert.doesNotMatch(prompt, /Callback-only services/i);
   });
 
+  it("uses retail routing protocol without booking-link examples", () => {
+    const { prompt } = compileCaraPromptWithMeta({
+      businessName: "Murphy's SuperValu Killarney",
+      assistantDisplayName: "Cara",
+      businessType: "Retail & Grocery",
+      niche: "retail",
+      routes: [{ trigger: "directions", action: "text them the directions link" }],
+    });
+
+    assert.match(prompt, /directions link/i);
+    assert.doesNotMatch(prompt, /booking link/i);
+  });
+
   it("escapes quotes in FAQ answers", () => {
     const { prompt } = compileCaraPromptWithMeta({
       businessName: "Shop",

@@ -160,13 +160,15 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       supabase
         .from("call_logs")
         .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId),
+        .eq("organization_id", organizationId)
+        .eq("is_test_call", false),
     ),
     applyRangeFilters(
       supabase
         .from("call_logs")
         .select("outcome, duration_seconds")
-        .eq("organization_id", organizationId),
+        .eq("organization_id", organizationId)
+        .eq("is_test_call", false),
     ),
     applyRangeFilters(
       supabase
@@ -175,6 +177,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
           "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at",
         )
         .eq("organization_id", organizationId)
+        .eq("is_test_call", false)
         .order("created_at", { ascending: false })
         .range(listFrom, listTo),
     ),
@@ -182,7 +185,8 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       supabase
         .from("call_logs")
         .select("id, caller_number, created_at")
-        .eq("organization_id", organizationId),
+        .eq("organization_id", organizationId)
+        .eq("is_test_call", false),
     ),
     supabase
       .from("action_tickets")

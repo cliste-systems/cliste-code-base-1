@@ -14,6 +14,9 @@ import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
 import { ingestCallKnowledgeGaps } from "@/lib/cara-training-ingest";
 import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
+import type { CallCloseDiagnosticsPayload } from "@/lib/call-testing-types";
+import { persistCallTestReport } from "@/lib/call-testing-persist";
+import { resolveTestCallContext } from "@/lib/call-testing-resolve";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { captureObservedError } from "@/lib/observability";
 import { logDisclosureCompliance } from "@/lib/voice-compliance";
@@ -64,6 +67,10 @@ type VoiceCallCompleteBody = {
   ai_summary?: string | null;
   /** When true, worker confirms AI + recording/transcription disclosure was spoken. */
   disclosure_confirmed?: boolean;
+  is_test_call?: boolean;
+  test_profile_id?: string | null;
+  variant_label?: string | null;
+  diagnostics?: CallCloseDiagnosticsPayload | null;
   /** When set, creates a native appointment tied to this call log. */
   booking?: BookingPayload | null;
   /** Optional knowledge gaps Cara could not answer — creates Cara Training items. */
@@ -339,7 +346,7 @@ export async function POST(request: Request) {
     confirmed: body.disclosure_confirmed === true,
     organizationId: orgId,
     calledNumber: calledNumberRaw || undefined,
-    skip: outcome === "blocked",
+    skip: outcome === "blocked" || body.is_test_call === true,
   });
 
   // Server-side redaction.
@@ -381,6 +388,14 @@ export async function POST(request: Request) {
       : null;
   const transferConnected = body.transfer_connected === true;
   const verificationCall = body.verification_call === true;
+  const testCallContext = await resolveTestCallContext({
+    admin,
+    orgId,
+    calledNumberRaw,
+    workerMarkedTest: body.is_test_call === true,
+  });
+  const isTestCall = testCallContext.isTestCall;
+  const persistCalledNumber = testCallContext.effectiveCalledNumber || calledNumberRaw;
 
   const { data: insertedCall, error: callErr } = await admin
     .from("call_logs")
@@ -397,6 +412,8 @@ export async function POST(request: Request) {
       transfer_target: transferTarget,
       transfer_connected: transferConnected,
       verification_call: verificationCall,
+      is_test_call: isTestCall,
+      called_number: persistCalledNumber || null,
       ...(callSid ? { call_sid: callSid } : {}),
       ...(roomName ? { room_name: roomName } : {}),
     })
@@ -437,6 +454,29 @@ export async function POST(request: Request) {
   }
 
   const callLogId = insertedCall.id as string;
+
+  if (isTestCall) {
+    await persistCallTestReport({
+      admin,
+      callLogId,
+      orgId,
+      body: {
+        called_number: persistCalledNumber || undefined,
+        caller_number: callerNumber,
+        call_sid: callSid,
+        room_name: roomName,
+        duration_seconds: durationSeconds,
+        transcript: transcriptRedacted.text,
+        transcript_review: reviewRedacted.text,
+        ai_summary: aiSummaryForInsert,
+        disclosure_confirmed: body.disclosure_confirmed === true,
+        test_profile_id: body.test_profile_id ?? null,
+        variant_label: body.variant_label ?? null,
+        diagnostics: body.diagnostics ?? null,
+        business_name: businessName,
+      },
+    });
+  }
 
   if (
     verificationCall &&
@@ -625,7 +665,7 @@ export async function POST(request: Request) {
     }
   }
 
-  if (shouldRunCallCompleteSideEffects(outcome)) {
+  if (shouldRunCallCompleteSideEffects(outcome) && !isTestCall) {
     after(async () => {
       if (outcome === "action_created") {
       const notifySummary =
@@ -711,7 +751,8 @@ async function respondIdempotentCallComplete(input: {
 
   if (
     shouldRunCallCompleteSideEffects(input.outcome) &&
-    input.knowledgeGaps.length > 0
+    input.knowledgeGaps.length > 0 &&
+    input.body.is_test_call !== true
   ) {
     after(async () => {
       try {
@@ -728,6 +769,51 @@ async function respondIdempotentCallComplete(input: {
           orgId: input.orgId,
         });
       }
+    });
+  }
+
+  const testCallContext = await resolveTestCallContext({
+    admin: input.admin,
+    orgId: input.orgId,
+    calledNumberRaw: input.body.called_number,
+    workerMarkedTest: input.body.is_test_call === true,
+  });
+
+  if (testCallContext.isTestCall) {
+    const persistCalledNumber =
+      testCallContext.effectiveCalledNumber || input.body.called_number;
+    await input.admin
+      .from("call_logs")
+      .update({
+        is_test_call: true,
+        called_number: persistCalledNumber || null,
+      })
+      .eq("id", input.callLogId);
+
+    const { data: orgRow } = await input.admin
+      .from("organizations")
+      .select("name")
+      .eq("id", input.orgId)
+      .maybeSingle();
+    await persistCallTestReport({
+      admin: input.admin,
+      callLogId: input.callLogId,
+      orgId: input.orgId,
+      body: {
+        called_number: persistCalledNumber,
+        caller_number: input.body.caller_number,
+        call_sid: input.body.call_sid ?? null,
+        room_name: input.body.room_name ?? null,
+        duration_seconds: input.body.duration_seconds,
+        transcript: input.body.transcript ?? null,
+        transcript_review: input.body.transcript_review ?? null,
+        ai_summary: input.body.ai_summary ?? null,
+        disclosure_confirmed: input.body.disclosure_confirmed === true,
+        test_profile_id: input.body.test_profile_id ?? null,
+        variant_label: input.body.variant_label ?? null,
+        diagnostics: input.body.diagnostics ?? null,
+        business_name: orgRow?.name as string | null,
+      },
     });
   }
 
@@ -748,4 +834,5 @@ function revalidateAfterWrite() {
   revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/contacts");
   revalidatePath("/dashboard/cara-training");
+  revalidatePath("/admin/call-testing");
 }

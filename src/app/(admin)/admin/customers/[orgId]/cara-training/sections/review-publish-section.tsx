@@ -10,6 +10,10 @@ import {
   type CaraTrainingData,
 } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
 import { CaraTrainingField } from "@/components/admin/cara-training-field";
+import {
+  CaraTrainingFeedback,
+  CaraTrainingSectionFooter,
+} from "@/components/admin/cara-training-feedback";
 
 import { SectionCard } from "./section-card";
 
@@ -58,18 +62,19 @@ export function ReviewPublishSection({ data, onChange, onSaved }: Props) {
           placeholder="Provisioning notes, hardware quirks, escalation contacts…"
         />
       </CaraTrainingField>
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" variant="outline" disabled={pending} onClick={saveNotes}>
           {pending ? "Saving…" : "Save admin notes"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-      </div>
+      </CaraTrainingSectionFooter>
 
       {warnings.length > 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          <p className="font-medium">Compile warnings</p>
-          <pre className="mt-1 overflow-auto text-xs">{JSON.stringify(warnings, null, 2)}</pre>
-        </div>
+        <CaraTrainingFeedback tone="warning" variant="block">
+          <span className="font-medium">Compile warnings</span>
+          <pre className="mt-1 overflow-auto text-xs font-normal">
+            {JSON.stringify(warnings, null, 2)}
+          </pre>
+        </CaraTrainingFeedback>
       ) : null}
 
       <CaraTrainingField
@@ -82,11 +87,6 @@ export function ReviewPublishSection({ data, onChange, onSaved }: Props) {
         </pre>
       </CaraTrainingField>
 
-      {error ? (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
-      ) : null}
     </SectionCard>
   );
 }

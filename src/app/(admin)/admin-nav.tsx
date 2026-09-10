@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
+  FlaskConical,
   LayoutGrid,
   LifeBuoy,
   Phone,
@@ -30,6 +31,12 @@ const baseNav = [
     href: "/admin/phone-pool",
     label: "Phone pool",
     icon: Phone,
+    exact: false,
+  },
+  {
+    href: "/admin/call-testing",
+    label: "Call testing",
+    icon: FlaskConical,
     exact: false,
   },
   { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },

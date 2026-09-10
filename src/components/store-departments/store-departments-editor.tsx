@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CaraTrainingFieldLabel } from "@/components/admin/cara-training-field";
+import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { StoreDepartmentRow } from "@/lib/retail-store-types";
@@ -186,7 +187,7 @@ export function StoreDepartmentsEditor({
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={add}>
           <Plus className="size-3.5" aria-hidden />
           Add department
@@ -194,13 +195,7 @@ export function StoreDepartmentsEditor({
         <Button type="button" size="sm" disabled={disabled || pending} onClick={save}>
           {pending ? "Saving…" : "Save departments"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </div>
   );
 }

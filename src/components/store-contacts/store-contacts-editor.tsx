@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CaraTrainingFieldLabel, CaraTrainingInternalBanner } from "@/components/admin/cara-training-field";
+import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
 import { Input } from "@/components/ui/input";
 import {
   STORE_CONTACT_ROLES,
@@ -165,7 +166,7 @@ export function StoreContactsEditor({
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <CaraTrainingSectionFooter saved={saved} error={error}>
         <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={add}>
           <Plus className="size-3.5" aria-hidden />
           Add contact
@@ -173,13 +174,7 @@ export function StoreContactsEditor({
         <Button type="button" size="sm" disabled={disabled || pending} onClick={save}>
           {pending ? "Saving…" : "Save contacts"}
         </Button>
-        {saved ? <span className="text-sm text-emerald-700">Saved.</span> : null}
-        {error ? (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      </CaraTrainingSectionFooter>
     </div>
   );
 }

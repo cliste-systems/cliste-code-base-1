@@ -89,6 +89,7 @@ import {
 import { resolveBusinessRuleForPrompt } from "@/lib/business-rule-presets";
 import { verticalPackForNiche } from "@/lib/verticals";
 import {
+  DEFAULT_RETAIL_ROUTING_PROTOCOL,
   resolvePlatformCaraRules,
   type PlatformCaraRules,
 } from "@/lib/platform-cara-rules-shared";
@@ -115,9 +116,9 @@ export type CaraSetupPromptInput = {
   serviceAreaExclusions?: string;
   servicesOffered?: string;
   servicesNotOffered?: string;
-  /** Structured salon service menu (when catalog is in use). */
+  /** Structured service menu (when catalog is in use). */
   serviceCatalog?: ServiceCatalogItem[];
-  /** Net-new services and policy notes from owner own-words (salon + catalog). */
+  /** Net-new services and policy notes from owner own-words (catalog verticals). */
   serviceCatalogSupplement?: ServiceCatalogSupplement;
   detailsToCollect?: string;
   detailsCollectMode?: DetailsCollectMode;
@@ -165,7 +166,9 @@ export type CaraCompileResult = {
 
 export type { BusinessFileListItem };
 
-export const MAX_PROMPT_CHARS = 24000;
+/** Owner knowledge budget — reserve ~6000 chars for worker live-call wrapper. */
+export const WORKER_PROMPT_RESERVE_CHARS = 6000;
+export const MAX_PROMPT_CHARS = 24000 - WORKER_PROMPT_RESERVE_CHARS;
 export const PROMPT_BUDGET_WARN_RATIO = 0.8;
 
 const DEFAULT_FALLBACK_NOTE =
@@ -653,6 +656,16 @@ function routesForPrompt(input: CaraSetupPromptInput): RoutingActionSummary[] {
   });
 }
 
+function routingProtocolForPrompt(
+  input: CaraSetupPromptInput,
+  platformRules: PlatformCaraRules,
+): string {
+  if (verticalPackForNiche(input.niche ?? "").id === "retail") {
+    return DEFAULT_RETAIL_ROUTING_PROTOCOL;
+  }
+  return platformRules.routingProtocol;
+}
+
 function buildProtectedParts(
   input: CaraSetupPromptInput,
   businessName: string,
@@ -700,7 +713,7 @@ function buildProtectedParts(
         lines.join("\n"),
         `Otherwise I ${fallbackNote}.`,
         transferBuiltin,
-        platformRules.routingProtocol,
+        routingProtocolForPrompt(input, platformRules),
       ].join("\n"),
     );
   }
