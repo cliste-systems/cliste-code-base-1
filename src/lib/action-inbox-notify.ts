@@ -86,7 +86,9 @@ export async function notifyActionInboxOwner(
   }
 
   if (phone) {
-    const sms = `${biz}: new Action Inbox item from ${caller}. Open ${PRODUCT_NAME} to review.`;
+    const summarySnippet =
+      summary.length > 120 ? `${summary.slice(0, 117).trimEnd()}…` : summary;
+    const sms = `${biz}: New message from ${caller} — ${summarySnippet} Open ${PRODUCT_NAME} → Action Inbox.`;
     const res = await sendTwilioBookingSms(phone, sms, {
       organizationId,
       purpose: "action_inbox_notify",

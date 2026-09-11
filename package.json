@@ -13,6 +13,9 @@
     "stripe:bootstrap": "tsx scripts/stripe-bootstrap.ts",
     "onboarding:background": "bash scripts/export-onboarding-background.sh",
     "seed:retail-activity": "tsx scripts/seed-retail-dashboard-activity.ts",
+    "seed:kavanaghs": "tsx scripts/seed-kavanaghs-retail-demo.ts",
+    "seed:kavanaghs-activity": "tsx scripts/seed-kavanaghs-dashboard-activity.ts",
+    "rehearse:kavanaghs": "tsx scripts/rehearse-kavanaghs-demo.ts",
     "simulate:retail-calls": "tsx scripts/simulate-retail-live-calls.ts"
   },
   "dependencies": {
