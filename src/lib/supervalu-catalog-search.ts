@@ -7,8 +7,9 @@ import {
 } from "@/lib/supervalu-offers-normalize";
 import type { SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
 import {
-  inferWeeklyOfferFulfilmentFromQuery,
+  inferWeeklyOffersListIntent,
   searchSyncedWeeklyOffersByQuery,
+  RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
   tokenizeSupervaluSearchQuery,
   scoreSupervaluSearchText,
   type WeeklyOfferMatch,
@@ -480,7 +481,7 @@ export async function searchSupervaluCatalogLive(
   if (!trimmed) return [];
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
-  const impliedFulfilment = inferWeeklyOfferFulfilmentFromQuery(trimmed);
+  const listIntent = inferWeeklyOffersListIntent(trimmed);
 
   let syncedMatches: WeeklyOfferMatch[] = [];
   if (options?.supabase && options?.retailBanner) {
@@ -488,8 +489,14 @@ export async function searchSupervaluCatalogLive(
       options.supabase,
       options.retailBanner,
       trimmed,
-      impliedFulfilment ? { fulfilment: impliedFulfilment } : undefined,
+      {
+        limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : undefined,
+      },
     );
+  }
+
+  if (intent === "offer" && listIntent && syncedMatches.length > 0) {
+    return syncedMatches.map(syncedOfferToCatalogMatch);
   }
 
   const gatewayMatches = await searchSupervaluCatalogLiveSingle(trimmed, {

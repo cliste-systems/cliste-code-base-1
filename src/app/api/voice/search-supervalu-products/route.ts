@@ -176,8 +176,8 @@ export async function POST(request: Request) {
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0f50f3" },
     body: JSON.stringify({
       sessionId: "0f50f3",
-      runId: "pre-fix-verify",
-      hypothesisId: "A",
+      runId: "alcohol-fix",
+      hypothesisId: "B",
       location: "search-supervalu-products/route.ts:response",
       message: "catalog lookup response shaping",
       data: {
@@ -186,8 +186,9 @@ export async function POST(request: Request) {
         rawMatchCount: mappedMatches.length,
         responseMatchCount: responseMatches.length,
         clarificationBlocked: Boolean(clarificationHint),
-        topQuote: responseMatches[0]?.quote_text?.slice(0, 120) ?? null,
-        topFulfilment: responseMatches[0]?.fulfilment ?? null,
+        alcoholMatches: responseMatches.filter((m) => m.is_alcohol).length,
+        serviceAreas: [...new Set(responseMatches.map((m) => m.service_area).filter(Boolean))],
+        topProducts: responseMatches.slice(0, 3).map((m) => m.product_name?.slice(0, 40)),
       },
       timestamp: Date.now(),
     }),

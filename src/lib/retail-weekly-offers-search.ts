@@ -24,7 +24,7 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
   if (
-    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|wine|beer) offers\b|\boff[- ]licence offers\b/i.test(
+    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|wine|beer|spirits|alcohol|dairy|ambient) offers\b|\boff[- ]licence offers\b|\b(?:what )?(?:alcohol|wine|beer|spirits|dairy|ambient)\b.*\b(?:on offer|offers?|this week)\b/i.test(
       trimmed,
     )
   ) {
@@ -34,7 +34,9 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
   if (
     tokens.length === 1 &&
-    /^(meat|butcher|deli|offers?|promos?|grocery|wine|beer)$/i.test(tokens[0] ?? "")
+    /^(meat|butcher|deli|offers?|promos?|grocery|wine|beer|alcohol|dairy|ambient|spirits)$/i.test(
+      tokens[0] ?? "",
+    )
   ) {
     return true;
   }
@@ -78,7 +80,15 @@ export function inferWeeklyOffersBrowseCategories(query: string): string[] {
   const fromTokens = tokens.filter((token) => categoryHints.has(token));
   if (fromTokens.length >= 2) return fromTokens.slice(0, 5);
   if (/deli|ham|cooked meat/i.test(trimmed)) return ["ham", "salami"];
-  if (/wine|beer|off[- ]licence|spirits/i.test(trimmed)) return ["wine", "beer"];
+  if (/wine|beer|off[- ]licence|spirits|alcohol|alcoholic|liquor|liqueur|cider/i.test(trimmed)) {
+    return ["wine", "beer", "spirits"];
+  }
+  if (/dairy|milk|yogurt|cheese|butter/i.test(trimmed)) {
+    return ["milk", "yogurt", "cheese", "butter"];
+  }
+  if (/ambient|household|tea|coffee|biscuits/i.test(trimmed)) {
+    return ["tea", "coffee", "biscuits", "household"];
+  }
   if (/butcher|meat counter/i.test(trimmed)) return ["striploin", "rashers", "sausages"];
   if (/confectionery|sweets|candy/.test(trimmed)) return ["chocolate", "sweets"];
   if (inferWeeklyOffersExcludeMeat(trimmed)) {
@@ -98,7 +108,9 @@ export function inferWeeklyOfferServiceAreaFromQuery(
   query: string,
 ): SupervaluServiceArea | null {
   const q = query.toLowerCase();
-  if (/off[- ]licence|wine|beer|spirits|cider/i.test(q)) return "off_licence";
+  if (/off[- ]licence|wine|beer|spirits|cider|alcohol|alcoholic|liquor|liqueur/i.test(q)) {
+    return "off_licence";
+  }
   if (/fish counter|fishmonger|salmon|cod|haddock|seafood|prawn|trout|mackerel|tuna/i.test(q)) {
     return "fish";
   }
@@ -107,6 +119,7 @@ export function inferWeeklyOfferServiceAreaFromQuery(
     return "butcher";
   }
   if (/fruit|veg|vegetable|potato|apple|produce/i.test(q)) return "produce";
+  if (/dairy|ambient|milk|yogurt|cheese|butter/i.test(q)) return "grocery";
   if (/bakery|croissant|scone|baguette/i.test(q)) return "bakery";
   return null;
 }
@@ -160,22 +173,23 @@ export function inferWeeklyOfferChannelFromQuery(
 }
 
 export function resolveWeeklyOfferSearchFilters(
-  _query: string,
+  query: string,
   explicit?: WeeklyOfferSearchFilters,
 ): WeeklyOfferSearchFilters {
   return {
     channel: explicit?.channel ?? null,
-    serviceArea: explicit?.serviceArea ?? null,
-    fulfilment: explicit?.fulfilment ?? null,
+    serviceArea: explicit?.serviceArea ?? inferWeeklyOfferServiceAreaFromQuery(query),
+    fulfilment: explicit?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
   };
 }
 
 function rowMatchesFilters(
   row: RetailWeeklyOfferRow,
   filters: WeeklyOfferSearchFilters,
-  options?: { excludeMeat?: boolean },
+  options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
 ): boolean {
   if (options?.excludeMeat && row.service_area !== "grocery") return false;
+  if (options?.alcoholOnly && row.is_alcohol !== true) return false;
   if (filters.serviceArea && row.service_area !== filters.serviceArea) return false;
   if (filters.fulfilment && row.fulfilment !== filters.fulfilment) return false;
   if (
@@ -188,11 +202,17 @@ function rowMatchesFilters(
   return true;
 }
 
+function inferAlcoholOnlyFromQuery(query: string): boolean {
+  return /\balcohol|alcoholic|wine|beer|spirits|cider|liquor|liqueur|off[- ]licence/i.test(
+    query.toLowerCase(),
+  );
+}
+
 function browseRetailWeeklyOffers(
   rows: RetailWeeklyOfferRow[],
   categories: string[],
   limit: number,
-  options?: { excludeMeat?: boolean; filters?: WeeklyOfferSearchFilters },
+  options?: { excludeMeat?: boolean; filters?: WeeklyOfferSearchFilters; alcoholOnly?: boolean },
 ): WeeklyOfferMatch[] {
   const seen = new Set<string>();
   const matches: WeeklyOfferMatch[] = [];
@@ -228,7 +248,7 @@ function browseRetailWeeklyOffers(
 function sampleRetailWeeklyOffersAcrossDepartments(
   rows: RetailWeeklyOfferRow[],
   limit: number,
-  options?: { excludeMeat?: boolean; filters?: WeeklyOfferSearchFilters },
+  options?: { excludeMeat?: boolean; filters?: WeeklyOfferSearchFilters; alcoholOnly?: boolean },
 ): WeeklyOfferMatch[] {
   const filters = options?.filters ?? {};
   const filtered = rows.filter((row) =>
@@ -525,21 +545,41 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
 export async function loadRetailWeeklyOffersForBanner(
   supabase: SupabaseClient,
   retailBanner: string,
+  options?: { serviceArea?: SupervaluServiceArea | null },
 ): Promise<RetailWeeklyOfferRow[]> {
-  const { data, error } = await supabase
-    .from("retail_weekly_offers")
-    .select("*")
-    .eq("retail_banner", retailBanner)
-    .order("service_area", { ascending: true })
-    .order("department", { ascending: true })
-    .order("product_name", { ascending: true })
-    .limit(5000);
+  const pageSize = 1000;
+  const rows: RetailWeeklyOfferRow[] = [];
+  let from = 0;
 
-  if (error) throw new Error(error.message);
-  return (data ?? []) as RetailWeeklyOfferRow[];
+  while (true) {
+    let query = supabase
+      .from("retail_weekly_offers")
+      .select("*")
+      .eq("retail_banner", retailBanner);
+
+    if (options?.serviceArea) {
+      query = query.eq("service_area", options.serviceArea);
+    }
+
+    query = query
+      .order("service_area", { ascending: true })
+      .order("department", { ascending: true })
+      .order("product_name", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const batch = (data ?? []) as RetailWeeklyOfferRow[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return rows;
 }
 
-/** Product-token search on synced weekly offers — no list/browse sampling. */
+/** Product-token search on synced weekly offers, with category/list browse fallback. */
 export function searchSyncedWeeklyOffersInRows(
   rows: RetailWeeklyOfferRow[],
   query: string,
@@ -548,14 +588,30 @@ export function searchSyncedWeeklyOffersInRows(
   const trimmed = query.trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
+  const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
+  const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
+  const alcoholOnly = inferAlcoholOnlyFromQuery(trimmed);
+  const listIntent = inferWeeklyOffersListIntent(trimmed);
+  const browseCategories = inferWeeklyOffersBrowseCategories(trimmed);
+  const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
+  const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
+  const browseOptions = { excludeMeat, filters, alcoholOnly };
+
+  if (listIntent) {
+    if (browseCategories.length > 0) {
+      return browseRetailWeeklyOffers(rows, browseCategories, listLimit, browseOptions);
+    }
+    if (filters.serviceArea) {
+      return sampleRetailWeeklyOffersAcrossDepartments(rows, listLimit, browseOptions);
+    }
+    return sampleRetailWeeklyOffersAcrossDepartments(rows, listLimit, browseOptions);
+  }
+
   const tokens = queryTokens(trimmed);
   if (tokens.length === 0) return [];
 
-  const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
-  const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
-
   let matches = rows
-    .filter((row) => rowMatchesFilters(row, filters, { excludeMeat }))
+    .filter((row) => rowMatchesFilters(row, filters, { excludeMeat, alcoholOnly }))
     .map((row) => ({
       row,
       score: scoreOfferRow(row, tokens),
@@ -568,8 +624,16 @@ export function searchSyncedWeeklyOffersInRows(
     );
   matches = preferProductNameMatches(matches, tokens);
 
-  const limit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
-  return matches.slice(0, limit).map((entry) => rowToMatch(entry.row, entry.score));
+  if (matches.length === 0) {
+    if (filters.serviceArea) {
+      return sampleRetailWeeklyOffersAcrossDepartments(rows, tokenLimit, browseOptions);
+    }
+    if (browseCategories.length > 0) {
+      return browseRetailWeeklyOffers(rows, browseCategories, tokenLimit, browseOptions);
+    }
+  }
+
+  return matches.slice(0, tokenLimit).map((entry) => rowToMatch(entry.row, entry.score));
 }
 
 export async function searchSyncedWeeklyOffersByQuery(
@@ -578,7 +642,10 @@ export async function searchSyncedWeeklyOffersByQuery(
   query: string,
   options?: WeeklyOfferSearchFilters & { limit?: number },
 ): Promise<WeeklyOfferMatch[]> {
-  const rows = await loadRetailWeeklyOffersForBanner(supabase, retailBanner);
+  const filters = resolveWeeklyOfferSearchFilters(query, options);
+  const rows = await loadRetailWeeklyOffersForBanner(supabase, retailBanner, {
+    serviceArea: filters.serviceArea,
+  });
   return searchSyncedWeeklyOffersInRows(rows, query, options);
 }
 

@@ -4,6 +4,7 @@ import {
 } from "@/lib/supervalu-catalog-search";
 import {
   inferWeeklyOfferFulfilmentFromQuery,
+  inferWeeklyOffersListIntent,
   offerSearchProductTokens,
   tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
@@ -73,6 +74,8 @@ export function filterOfferMatchesByInferredFulfilment<T extends ClarificationMa
     : matches;
   if (narrowed.length === 0) narrowed = matches;
 
+  if (inferWeeklyOffersListIntent(query)) return narrowed;
+
   const productTokens = offerSearchProductTokens(query);
   if (productTokens.length === 0 || narrowed.length <= 1) return narrowed;
 
@@ -120,6 +123,7 @@ export function buildBroadProductClarificationHint(
   query: string,
   matches: ClarificationMatch[],
 ): string | null {
+  if (inferWeeklyOffersListIntent(query)) return null;
   if (inferWeeklyOfferFulfilmentFromQuery(query)) return null;
   if (!isBroadProductQuery(query)) return null;
   if (matches.length < 3) return null;

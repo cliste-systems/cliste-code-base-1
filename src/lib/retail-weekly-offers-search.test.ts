@@ -53,6 +53,11 @@ function mockSupabaseRows(rows: RetailWeeklyOfferRow[]) {
   const chain = {
     order: () => chain,
     limit: async () => ({ data: rows, error: null }),
+    range: async (from: number, to: number) => ({
+      data: rows.slice(from, to + 1),
+      error: null,
+    }),
+    eq: () => chain,
   };
   return {
     from: () => ({
@@ -261,7 +266,7 @@ describe("supervalu offers sync helpers", () => {
     );
   });
 
-  it("does not infer service area from query text alone", () => {
+  it("infers service area from query when no explicit filter is set", () => {
     assert.equal(
       resolveWeeklyOfferSearchFilters("deli offers", { serviceArea: "deli", fulfilment: "counter" })
         .serviceArea,
@@ -269,7 +274,11 @@ describe("supervalu offers sync helpers", () => {
     );
     assert.equal(
       resolveWeeklyOfferSearchFilters("butcher counter", {}).serviceArea,
-      null,
+      "butcher",
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("what alcohol is on offer", {}).serviceArea,
+      "off_licence",
     );
   });
 
@@ -472,8 +481,55 @@ describe("retail weekly offers search", () => {
     assert.equal(inferWeeklyOffersListIntent("milk bread crisps chocolate fruit"), true);
     assert.equal(inferWeeklyOffersListIntent("surprise me with your best one"), true);
     assert.equal(inferWeeklyOffersListIntent("deli offers"), true);
+    assert.equal(inferWeeklyOffersListIntent("what alcohol is on offer"), true);
+    assert.equal(inferWeeklyOffersListIntent("alcohol on offer"), true);
+    assert.equal(inferWeeklyOffersListIntent("dairy on offer"), true);
     assert.equal(inferWeeklyOffersListIntent("ham"), false);
     assert.equal(inferWeeklyOffersListIntent("rashers"), false);
+  });
+
+  it("samples off-licence offers for alcohol category questions", async () => {
+    const alcoholRows: RetailWeeklyOfferRow[] = [
+      mockOfferRow({
+        id: "a1",
+        product_name: "Corona Extra Lager Bottle (620 ml)",
+        department: "Beer",
+        service_area: "off_licence",
+        fulfilment: "prepack",
+        current_price_eur: 3.5,
+        is_alcohol: true,
+        search_text: "corona extra lager beer off licence",
+      }),
+      mockOfferRow({
+        id: "a2",
+        product_name: "Brancott Estate Marlborough Sauvignon Blanc (75 cl)",
+        department: "Wine",
+        service_area: "off_licence",
+        fulfilment: "prepack",
+        current_price_eur: 12,
+        is_alcohol: true,
+        search_text: "brancott estate marlborough sauvignon blanc wine",
+      }),
+      mockOfferRow({
+        id: "a3",
+        product_name: "Brew Dog Punk Alcohol Free IPA Cans 4 Pack (330 ml)",
+        department: "Beer",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 8,
+        is_alcohol: false,
+        search_text: "brew dog punk alcohol free ipa beer",
+      }),
+    ];
+
+    const matches = await searchRetailWeeklyOffers(
+      mockSupabaseRows(alcoholRows) as never,
+      "supervalu",
+      "what alcohol is on offer",
+    );
+    assert.ok(matches.length >= 2);
+    assert.ok(matches.every((match) => match.serviceArea === "off_licence"));
+    assert.ok(matches.every((match) => match.isAlcohol === true));
   });
 
   it("finds meat offers by product tokens", async () => {
