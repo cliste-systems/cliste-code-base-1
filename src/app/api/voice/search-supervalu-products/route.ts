@@ -6,6 +6,7 @@ import {
   inferCatalogSearchIntent,
   searchSupervaluCatalogLive,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
+  type CatalogQuoteIntent,
 } from "@/lib/supervalu-catalog-search";
 import {
   authorizeVoiceWebhook,
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 type SearchSupervaluProductsBody = {
   called_number?: string;
   query?: string;
+  intent?: CatalogQuoteIntent;
 };
 
 /**
@@ -136,8 +138,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const matches = await searchSupervaluCatalogLive(query);
-  const intent = inferCatalogSearchIntent(query);
+  const matches = await searchSupervaluCatalogLive(query, {
+    intent:
+      body.intent === "offer" || body.intent === "price" || body.intent === "stock"
+        ? body.intent
+        : inferCatalogSearchIntent(query),
+  });
+  const intent =
+    body.intent === "offer" || body.intent === "price" || body.intent === "stock"
+      ? body.intent
+      : inferCatalogSearchIntent(query);
 
   // #region agent log
   fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'offer-fix',hypothesisId:'H2',location:'search-supervalu-products/route.ts:POST',message:'catalog search result',data:{query,intent,matchCount:matches.length,promoCount:matches.filter(m=>m.isOnOffer).length,firstMatch:matches[0]?{productName:matches[0].productName,isOnOffer:matches[0].isOnOffer,quotePreview:matches[0].quoteText.slice(0,140)}:null},timestamp:Date.now()})}).catch(()=>{});
