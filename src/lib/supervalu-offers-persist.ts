@@ -28,7 +28,7 @@ export async function persistSupervaluNationalOffers(
     return {
       ok: false,
       message:
-        "SuperValu sync returned no promotional meat offers — the feed may have changed.",
+        "SuperValu sync returned no promotional offers — the feed may have changed or not updated yet.",
     };
   }
 

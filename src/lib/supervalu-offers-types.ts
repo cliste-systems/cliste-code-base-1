@@ -1,4 +1,4 @@
-export type SupervaluOfferChannel = "butcher_counter" | "prepack";
+export type SupervaluOfferChannel = "butcher_counter" | "prepack" | "grocery";
 
 export type RetailWeeklyOfferRow = {
   id: string;
@@ -72,3 +72,20 @@ export const SUPERVALU_MEAT_CATEGORY_SEEDS: {
   { categoryId: "O411335", department: "Butcher" },
   { categoryId: "O300545", department: "Deli" },
 ];
+
+/** Top-level SuperValu storefront categories for full-store promo sync. */
+export const SUPERVALU_FULL_STORE_CATEGORY_SEEDS: {
+  categoryId: string;
+  department: string;
+}[] = [
+  { categoryId: "O100035", department: "Food Cupboard" },
+  { categoryId: "O100045", department: "Frozen Foods" },
+  { categoryId: "O100025", department: "Fresh Fruit & Veg" },
+  { categoryId: "O100015", department: "Dairy & Chilled" },
+  { categoryId: "O100010", department: "Drinks" },
+  { categoryId: "O100020", department: "Household" },
+  { categoryId: "O100030", department: "Health & Beauty" },
+  { categoryId: "O200325", department: "Chocolate & Sweets" },
+];
+
+export const SUPERVALU_MIN_FULL_STORE_OFFER_COUNT = 50;

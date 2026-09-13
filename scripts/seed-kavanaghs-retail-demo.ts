@@ -30,7 +30,7 @@ const ADDRESS = "Quay Street, Donegal Town, Co. Donegal";
 const EIRCODE = "F94 E8N2";
 const PRESENTER_EMAIL = "kavanaghs@cliste.test";
 const PRESENTER_PASSWORD = "KavanaghsDemo2026!";
-const PRESENTER_NAME = "Cliste Demo Presenter";
+const PRESENTER_NAME = "Garreth Ferry";
 const DEFAULT_MANAGER_PHONE = "+353872715938";
 
 const BUSINESS_HOURS = {

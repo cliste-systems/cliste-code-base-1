@@ -33,6 +33,13 @@ describe("dashboardBreadcrumbs", () => {
     ]);
   });
 
+  it("uses Workspace > FAQs for faqs", () => {
+    assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.businessFaqs), [
+      { label: "Workspace", href: DASHBOARD_ROUTES.home },
+      { label: "FAQs" },
+    ]);
+  });
+
   it("uses Business > Files for files", () => {
     assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.businessFiles), [
       { label: "Business", href: DASHBOARD_ROUTES.businessProfile },

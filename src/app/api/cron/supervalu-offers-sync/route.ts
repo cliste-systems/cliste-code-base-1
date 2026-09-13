@@ -5,7 +5,7 @@ import { syncSupervaluNationalOffers } from "@/lib/supervalu-offers-sync";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 async function authorize(request: Request): Promise<boolean> {
   const secret = process.env.CRON_SECRET?.trim();
@@ -19,20 +19,20 @@ async function authorize(request: Request): Promise<boolean> {
 }
 
 /**
- * Weekly cron: sync national SuperValu meat offers into retail_weekly_offers,
+ * Weekly cron: sync national SuperValu offers into retail_weekly_offers,
  * then recompile Cara prompts for SuperValu retail orgs.
  *
- * Scheduled Thursday 06:00 Europe/Dublin via vercel.json (05:00 UTC).
+ * Scheduled Thursday 08:00 Europe/Dublin via vercel.json (07:00 UTC).
  */
 export async function GET(request: Request) {
-  return run(request);
+  return run(request, false);
 }
 
 export async function POST(request: Request) {
-  return run(request);
+  return run(request, false);
 }
 
-async function run(request: Request) {
+async function run(request: Request, retryOnlyIfLowCount: boolean) {
   if (!(await authorize(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -49,7 +49,7 @@ async function run(request: Request) {
   }
 
   try {
-    const result = await syncSupervaluNationalOffers(admin);
+    const result = await syncSupervaluNationalOffers(admin, { retryOnlyIfLowCount });
     if (!result.ok) {
       console.error("[cron] supervalu-offers-sync", result.message);
       return NextResponse.json(result, { status: 502 });
@@ -58,8 +58,10 @@ async function run(request: Request) {
   } catch (err) {
     console.error("[cron] supervalu-offers-sync", err);
     return NextResponse.json(
-      { ok: false, error: "SuperValu offers sync failed." },
+      { ok: false, error: err instanceof Error ? err.message : "Sync failed" },
       { status: 500 },
     );
   }
 }
+
+export { run as runSupervaluOffersSyncCron };

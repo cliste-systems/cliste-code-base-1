@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { resolveOrgElevenLabsVoiceId } from "@/lib/cara-elevenlabs-voice";
-import { synthesizeElevenLabsSpeech } from "@/lib/elevenlabs-voice";
+import { resolveOrgCartesiaVoiceId, resolveLiveKitTtsLanguage, resolveLiveKitTtsModel } from "@/lib/cara-livekit-voice";
+import { synthesizeLiveKitInferenceSpeech } from "@/lib/livekit-inference-voice";
 import {
   getVoiceApiRateLimitStatus,
   recordVoiceApiRequest,
@@ -19,6 +19,7 @@ import {
   sanitizeVoiceGreetingPayload,
 } from "@/lib/voice-greeting-security";
 import { DEFAULT_GREETING_CLOSING } from "@/lib/voice-greeting";
+import { prepareVoicePreviewTtsText } from "@/lib/voice-preview-tts-text";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
@@ -167,17 +168,20 @@ export async function POST(request: Request) {
     agentVoiceId = (orgVoice?.agent_voice_id as string | null) ?? null;
   }
 
-  const voiceId = resolveOrgElevenLabsVoiceId(agentVoiceId);
+  const voiceId = resolveOrgCartesiaVoiceId(agentVoiceId);
+  const ttsText = prepareVoicePreviewTtsText(text);
 
   try {
-    const audio = await synthesizeElevenLabsSpeech({
-      text,
+    const audio = await synthesizeLiveKitInferenceSpeech({
+      text: ttsText,
+      model: resolveLiveKitTtsModel(),
       voiceId,
+      language: resolveLiveKitTtsLanguage(),
     });
-    return new NextResponse(audio, {
+    return new NextResponse(new Uint8Array(audio), {
       status: 200,
       headers: {
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "audio/wav",
         "Cache-Control": "no-store",
       },
     });

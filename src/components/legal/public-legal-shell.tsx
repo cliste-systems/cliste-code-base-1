@@ -19,7 +19,7 @@ export function PublicLegalShell({ children }: Props) {
       <div className="mx-auto flex w-full flex-col px-5 sm:px-8 md:px-12 lg:px-14 xl:px-16">
         <header className="flex items-center justify-between gap-4 border-b border-slate-100 py-4 sm:py-5">
           <Link
-            href="/"
+            href="/authenticate"
             className="flex min-w-0 items-center gap-2.5 rounded-lg text-[#0b1220] transition-opacity hover:opacity-80"
           >
             <ClisteLogoMark size={32} priority />

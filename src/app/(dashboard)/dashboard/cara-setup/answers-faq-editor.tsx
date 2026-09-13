@@ -1,23 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  detectCanonicalQuestion,
-  lintFaqFields,
-  shortenAnswerForSpokenDelivery,
-  type FaqFieldWarning,
-} from "@/lib/answers-boundary";
-import { buildCaraCapabilitiesFromPromptExtras } from "@/lib/call-handling-boundary";
+import { detectCanonicalQuestion } from "@/lib/answers-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
-import { cn } from "@/lib/utils";
 
 import type { AgentFaq } from "../agent-setup/agent-faqs";
 import { CanonicalQuestionBlocked } from "./canonical-question-blocked";
@@ -41,11 +33,6 @@ export function AnswersFaqEditor({
   maxFaqs,
   entries,
   total,
-  routes,
-  transferNumber,
-  openingHours,
-  businessRules,
-  serviceCatalog,
   onUpdate,
   onRemove,
 }: Props) {
@@ -54,28 +41,6 @@ export function AnswersFaqEditor({
     question: string;
     match: NonNullable<ReturnType<typeof detectCanonicalQuestion>>;
   } | null>(null);
-
-  const caps = buildCaraCapabilitiesFromPromptExtras(routes, transferNumber);
-  const smsConfigured = caps.sendLink || caps.sendFile;
-
-  const warningsByIndex = useMemo(() => {
-    const map = new Map<number, FaqFieldWarning[]>();
-    for (let i = 0; i < faqs.length; i++) {
-      map.set(
-        i,
-        lintFaqFields({
-          faqs,
-          index: i,
-          routes,
-          transferNumber,
-          openingHours,
-          businessRules,
-          serviceCatalog,
-        }),
-      );
-    }
-    return map;
-  }, [faqs, routes, transferNumber, openingHours, businessRules, serviceCatalog]);
 
   function handleQuestionBlur(index: number) {
     const faq = faqs[index];
@@ -95,7 +60,6 @@ export function AnswersFaqEditor({
         </p>
         <ul className="space-y-3" role="list" aria-label="Common questions">
           {entries.map(({ faq, index }) => {
-            const warnings = warningsByIndex.get(index) ?? [];
             const questionId = `faq-question-${index}`;
             const answerId = `faq-answer-${index}`;
             return (
@@ -143,34 +107,16 @@ export function AnswersFaqEditor({
                   >
                     Answer
                   </label>
-                    <Textarea
-                      id={answerId}
-                      value={faq.answer}
-                      rows={2}
-                      placeholder="What Cara says out loud"
-                      onChange={(e) =>
-                        onUpdate(index, { answer: e.target.value })
-                      }
-                      className="min-h-[3.25rem] resize-none border-slate-200 bg-slate-50/80 py-2 text-[13px] leading-relaxed text-slate-800"
-                    />
-                  {warnings.length > 0 ? (
-                    <div className="space-y-1 pt-0.5">
-                      {warnings.map((warning) => (
-                        <FaqWarningLine
-                          key={warning.id}
-                          warning={warning}
-                          smsConfigured={smsConfigured}
-                          onConvertToText={() =>
-                            onUpdate(index, {
-                              answer: shortenAnswerForSpokenDelivery(
-                                faq.answer,
-                              ),
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                  <Textarea
+                    id={answerId}
+                    value={faq.answer}
+                    rows={2}
+                    placeholder="What Cara says out loud"
+                    onChange={(e) =>
+                      onUpdate(index, { answer: e.target.value })
+                    }
+                    className="min-h-[3.25rem] resize-none border-slate-200 bg-slate-50/80 py-2 text-[13px] leading-relaxed text-slate-800"
+                  />
                 </div>
               </li>
             );
@@ -198,45 +144,5 @@ export function AnswersFaqEditor({
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function FaqWarningLine({
-  warning,
-  smsConfigured,
-  onConvertToText,
-}: {
-  warning: FaqFieldWarning;
-  smsConfigured: boolean;
-  onConvertToText: () => void;
-}) {
-  return (
-    <p
-      className={cn(
-        "text-[12px] leading-relaxed",
-        warning.kind === "empty_answer" ? "text-amber-900" : "text-amber-800",
-      )}
-    >
-      {warning.message}{" "}
-      {warning.href ? (
-        <Link
-          href={warning.href}
-          className="font-medium underline underline-offset-2"
-        >
-          {warning.kind === "spoken_url" && !smsConfigured
-            ? "Call flow"
-            : "Review"}
-        </Link>
-      ) : null}
-      {warning.kind === "spoken_url" && smsConfigured ? (
-        <button
-          type="button"
-          onClick={onConvertToText}
-          className="ml-1 font-medium text-[#0b1220] underline underline-offset-2"
-        >
-          Shorten for speaking
-        </button>
-      ) : null}
-    </p>
   );
 }

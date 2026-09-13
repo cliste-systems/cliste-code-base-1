@@ -1,4 +1,5 @@
 import {
+  SUPERVALU_FULL_STORE_CATEGORY_SEEDS,
   SUPERVALU_MEAT_CATEGORY_SEEDS,
   SUPERVALU_STOREFRONT_STORE_ID,
 } from "@/lib/supervalu-offers-types";
@@ -20,6 +21,9 @@ const MEAT_SEARCH_QUERIES = [
   "rump steak",
   "lamb chop",
   "pork steak",
+  "rashers",
+  "sausages",
+  "ham",
 ];
 
 export async function fetchSupervaluCategoryOffers(input: {
@@ -57,6 +61,7 @@ export async function fetchSupervaluSearchOffers(input: {
   query: string;
   department?: string;
   storeId?: string;
+  meatOnly?: boolean;
 }): Promise<NormalizedWeeklyOffer[]> {
   const department = input.department ?? "Butcher";
   const items = await fetchSupervaluGatewaySearch({
@@ -67,45 +72,92 @@ export async function fetchSupervaluSearchOffers(input: {
   for (const item of items) {
     const normalized = normalizeSupervaluGatewayProduct(item, department);
     if (!normalized) continue;
-    const altCategory = String(item.attributes?.altCategory ?? "").trim().toLowerCase();
-    if (
-      altCategory &&
-      !/butcher|beef|lamb|pork|poultry|meat|steak|chicken/i.test(altCategory)
-    ) {
-      continue;
+    if (input.meatOnly !== false) {
+      const altCategory = String(item.attributes?.altCategory ?? "").trim().toLowerCase();
+      if (
+        altCategory &&
+        !/butcher|beef|lamb|pork|poultry|meat|steak|chicken|rashers|sausage|pudding|ham|deli/i.test(
+          altCategory,
+        )
+      ) {
+        continue;
+      }
     }
     offers.push(normalized);
   }
   return offers;
 }
 
+function mergeOffers(
+  bySku: Map<string, NormalizedWeeklyOffer>,
+  offers: NormalizedWeeklyOffer[],
+): void {
+  for (const offer of offers) {
+    const key = offer.sku ?? `${offer.productName}:${offer.currentPriceEur}`;
+    if (!bySku.has(key)) bySku.set(key, offer);
+  }
+}
+
+/** Legacy meat-only pilot fetch (kept for tests and fallback). */
 export async function fetchSupervaluMeatPilotOffers(
   storeId = SUPERVALU_STOREFRONT_STORE_ID,
 ): Promise<NormalizedWeeklyOffer[]> {
   const bySku = new Map<string, NormalizedWeeklyOffer>();
 
   for (const seed of SUPERVALU_MEAT_CATEGORY_SEEDS) {
-    const categoryOffers = await fetchSupervaluCategoryOffers({
-      categoryId: seed.categoryId,
-      department: seed.department,
-      storeId,
-    });
-    for (const offer of categoryOffers) {
-      const key = offer.sku ?? `${offer.productName}:${offer.currentPriceEur}`;
-      if (!bySku.has(key)) bySku.set(key, offer);
-    }
+    mergeOffers(
+      bySku,
+      await fetchSupervaluCategoryOffers({
+        categoryId: seed.categoryId,
+        department: seed.department,
+        storeId,
+      }),
+    );
   }
 
   for (const query of MEAT_SEARCH_QUERIES) {
-    const searchOffers = await fetchSupervaluSearchOffers({ query, storeId });
-    for (const offer of searchOffers) {
-      const key = offer.sku ?? `${offer.productName}:${offer.currentPriceEur}`;
-      if (!bySku.has(key)) bySku.set(key, offer);
-    }
+    mergeOffers(
+      bySku,
+      await fetchSupervaluSearchOffers({ query, storeId, meatOnly: true }),
+    );
   }
 
   return [...bySku.values()].sort((a, b) =>
     a.productName.localeCompare(b.productName),
+  );
+}
+
+/** Full-store promotional snapshot — all synced weekly offers for Cara. */
+export async function fetchSupervaluFullStoreOffers(
+  storeId = SUPERVALU_STOREFRONT_STORE_ID,
+): Promise<NormalizedWeeklyOffer[]> {
+  const bySku = new Map<string, NormalizedWeeklyOffer>();
+  const categorySeeds = [
+    ...SUPERVALU_FULL_STORE_CATEGORY_SEEDS,
+    ...SUPERVALU_MEAT_CATEGORY_SEEDS,
+  ];
+
+  for (const seed of categorySeeds) {
+    mergeOffers(
+      bySku,
+      await fetchSupervaluCategoryOffers({
+        categoryId: seed.categoryId,
+        department: seed.department,
+        storeId,
+      }),
+    );
+  }
+
+  for (const query of MEAT_SEARCH_QUERIES) {
+    mergeOffers(
+      bySku,
+      await fetchSupervaluSearchOffers({ query, storeId, meatOnly: true }),
+    );
+  }
+
+  return [...bySku.values()].sort((a, b) =>
+    a.productName.localeCompare(b.productName) ||
+    a.department.localeCompare(b.department),
   );
 }
 

@@ -11,7 +11,6 @@ export type BusinessNavChild = {
 export const BUSINESS_SIDEBAR_CHILDREN: BusinessNavChild[] = [
   { href: DASHBOARD_ROUTES.businessProfile, label: "Profile" },
   { href: DASHBOARD_ROUTES.businessServices, label: "Services" },
-  { href: DASHBOARD_ROUTES.businessFaqs, label: "FAQs" },
   { href: DASHBOARD_ROUTES.businessFiles, label: "Files" },
 ];
 

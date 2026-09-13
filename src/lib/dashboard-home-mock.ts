@@ -1,7 +1,11 @@
+const KAVANAGHS_DEMO_ORG_SLUG = "kavanaghs-supervalu-donegal-town";
+
 /**
- * Home dashboard preview data — opt-in only.
- * Set DASHBOARD_HOME_MOCK=1 locally to preview demo charts.
+ * Overview (/dashboard) preview charts — not used on calls, inbox, etc.
+ * Kavanaghs demo org uses mock overview by default; set DASHBOARD_HOME_MOCK=0 to disable.
  */
-export function isDashboardHomeMockEnabled(): boolean {
-  return process.env.DASHBOARD_HOME_MOCK === "1";
+export function isDashboardHomeMockEnabled(orgSlug?: string | null): boolean {
+  if (process.env.DASHBOARD_HOME_MOCK === "0") return false;
+  if (process.env.DASHBOARD_HOME_MOCK === "1") return true;
+  return orgSlug === KAVANAGHS_DEMO_ORG_SLUG;
 }

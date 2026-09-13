@@ -20,7 +20,6 @@ import {
   type ServiceCatalogDraft,
   type ServiceCatalogItem,
 } from "@/lib/service-catalog-format";
-import { InlineLintHint } from "@/components/cara-knowledge/inline-lint-hint";
 import { ServicePolicyPresetsEditor } from "@/components/agent-knowledge/service-policy-presets-editor";
 import { formatBookingImportSuccessMessage } from "@/lib/booking-menu-import-shared";
 import { cn } from "@/lib/utils";
@@ -31,7 +30,6 @@ import {
   saveServiceCatalog,
   upsertServiceCatalogItem,
 } from "./service-catalog-actions";
-import { useAgentConfigLintOptional } from "./agent-config-lint-context";
 
 type Props = {
   initialServices: ServiceCatalogItem[];
@@ -42,7 +40,6 @@ type Props = {
     primaryPlaceholder?: string;
   };
   onServicesChange?: (services: ServiceCatalogItem[]) => void;
-  onImportError?: (message: string) => void;
 };
 
 const INPUT_CLASS =
@@ -65,9 +62,7 @@ export function ServiceCatalogEditor({
   initialServices,
   servicesCopy,
   onServicesChange,
-  onImportError,
 }: Props) {
-  const lint = useAgentConfigLintOptional();
   const [services, setServices] = useState(initialServices);
   const [importUrl, setImportUrl] = useState("");
   const [importing, startImport] = useTransition();
@@ -101,21 +96,18 @@ export function ServiceCatalogEditor({
       const result = await importBookingMenuForServices(importUrl);
       if (!result.ok) {
         setStatus(result.message);
-        onImportError?.(result.message);
         return;
       }
       if (result.regulated) {
         const message =
           "That link looks like a regulated business — we can't import it. Add services manually.";
         setStatus(message);
-        onImportError?.(message);
         return;
       }
       if (!Array.isArray(result.drafts) || result.drafts.length === 0) {
         const message =
           "We couldn't find any services on that page. Add them manually, or try a different booking link.";
         setStatus(message);
-        onImportError?.(message);
         return;
       }
       setReviewDrafts(result.drafts);
@@ -339,10 +331,7 @@ export function ServiceCatalogEditor({
         </p>
       ) : (
         <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-          {sortedServices.map((service) => {
-            const rowHints =
-              lint?.inlineIssuesFor("serviceCatalog", service.id) ?? [];
-            return (
+          {sortedServices.map((service) => (
             <li
               key={service.id}
               className="px-4 py-3 hover:bg-slate-50"
@@ -374,20 +363,8 @@ export function ServiceCatalogEditor({
                 <Trash2 className="size-4" />
               </button>
               </div>
-              {rowHints.length > 0 ? (
-                <div className="mt-2 space-y-1">
-                  {rowHints.map((issue) => (
-                    <InlineLintHint
-                      key={issue.id}
-                      issue={issue}
-                      onAddFaq={lint?.openAddFaqFromLint}
-                    />
-                  ))}
-                </div>
-              ) : null}
             </li>
-          );
-          })}
+          ))}
         </ul>
       )}
 

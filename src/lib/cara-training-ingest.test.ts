@@ -25,4 +25,20 @@ describe("isRoutineHandoff", () => {
       false,
     );
   });
+
+  it("treats bakery and cake orders as operational handoffs", () => {
+    assert.equal(
+      isRoutineHandoff(
+        "Brendan wants to order a birthday cake for 10 people needed on Monday with the message Happy Birthday, Margaret.",
+      ),
+      true,
+    );
+    assert.equal(
+      isRoutineHandoff(
+        "Mark is ordering a standard birthday cake with pink icing for 10 people for Sunday.",
+      ),
+      true,
+    );
+    assert.equal(isRoutineHandoff("Caller wants to place an order for a celebration cake."), true);
+  });
 });

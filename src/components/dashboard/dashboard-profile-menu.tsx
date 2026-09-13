@@ -15,7 +15,7 @@ export function DashboardProfileMenu({ account }: DashboardProfileMenuProps) {
         size="sm"
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12px] font-semibold text-[#0f172a]">
+        <span className="block line-clamp-2 text-[12px] font-semibold leading-snug text-[#0f172a]">
           {account.displayName}
         </span>
         <span className="mt-0.5 block truncate text-[11px] leading-snug text-[#64748b]">

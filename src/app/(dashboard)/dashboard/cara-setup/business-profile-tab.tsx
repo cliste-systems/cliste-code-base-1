@@ -14,10 +14,22 @@ import { cn } from "@/lib/utils";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 import { useDashboardVertical } from "../dashboard-vertical-context";
 import { ABOUT_PLACEHOLDER } from "@/app/(onboarding)/onboarding/knowledge/train-cara-constants";
+import { formatE164ForDisplay } from "@/lib/call-history-types";
+import { signupSegmentLabel } from "@/lib/signup-segment-label";
 
 export function BusinessProfileTab() {
   const form = useCaraSetupForm();
-  const { copy } = useDashboardVertical();
+  const { copy, vertical } = useDashboardVertical();
+  const isRetail = vertical.id === "retail";
+  const storeNameLabel = isRetail ? "Store name" : "Business name";
+  const businessTypeLabel = signupSegmentLabel({
+    niche: form.niche,
+    businessType: form.businessType,
+  });
+  const clistePhone = form.clistePhoneNumber.trim();
+  const clistePhoneDisplay = clistePhone
+    ? formatE164ForDisplay(clistePhone) || clistePhone
+    : null;
 
   return (
     <DashboardAnimatedStack embedded>
@@ -52,24 +64,64 @@ export function BusinessProfileTab() {
         flat
         icon={Briefcase}
         title={copy.caraSetup.generalBasicsTitle}
-        description="Type, location, and Eircode — the facts callers ask about most."
+        description="Name, type, location, Eircode, and your Cliste line — the facts callers ask about most."
       >
         <Field
-          label="Business type"
-          htmlFor="cara-business-type"
-          hint="Set when you joined — this can't be changed here."
+          label={storeNameLabel}
+          htmlFor="cara-store-name"
+          hint="How Cara introduces your business on calls. Contact support if it needs updating."
         >
           <div
-            id="cara-business-type"
+            id="cara-store-name"
             className={cn(
               "flex min-h-10 items-center rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2 text-[13px]",
-              form.businessType.trim()
+              form.businessName.trim()
                 ? "font-medium text-[#0b1220]"
                 : "text-slate-500",
             )}
             aria-readonly="true"
           >
-            {form.businessType.trim() || "Not set"}
+            {form.businessName.trim() || "Not set"}
+          </div>
+        </Field>
+        <Field
+          label="Business type"
+          htmlFor="cara-business-type"
+          hint="Chosen at signup — Cara uses this to tailor your dashboard. Contact support if it needs updating."
+        >
+          <div
+            id="cara-business-type"
+            className={cn(
+              "flex min-h-10 items-center rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2 text-[13px]",
+              businessTypeLabel.trim()
+                ? "font-medium text-[#0b1220]"
+                : "text-slate-500",
+            )}
+            aria-readonly="true"
+          >
+            {businessTypeLabel.trim() || "Not set"}
+          </div>
+        </Field>
+        <Field
+          label="Cliste number"
+          htmlFor="cara-cliste-number"
+          hint={
+            clistePhoneDisplay
+              ? "Assigned to your account — it can't be changed here. Contact support if you have any questions."
+              : "Assigned after onboarding — it can't be changed here. Contact support if you have any questions."
+          }
+        >
+          <div
+            id="cara-cliste-number"
+            className={cn(
+              "flex min-h-10 items-center rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2 text-[13px] tabular-nums",
+              clistePhoneDisplay
+                ? "font-medium text-[#0b1220]"
+                : "text-slate-500",
+            )}
+            aria-readonly="true"
+          >
+            {clistePhoneDisplay ?? "Not assigned yet"}
           </div>
         </Field>
         <Field

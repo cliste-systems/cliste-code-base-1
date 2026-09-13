@@ -84,9 +84,32 @@ export function ticketCallerLabel(input: {
   caller_name?: string | null;
   caller_number?: string | null;
 }): string {
-  const name = input.caller_name?.trim();
-  if (name) return name;
+  const first = callerFirstName(input);
+  if (first) return first;
   const phone = input.caller_number?.trim();
   if (phone) return formatE164ForDisplay(phone) || phone;
   return "Caller";
+}
+
+/** First name only — Cara asks for first name on retail calls. */
+export function callerFirstName(input: {
+  caller_name?: string | null;
+}): string | null {
+  const name = input.caller_name?.trim();
+  if (!name) return null;
+  return name.split(/\s+/)[0] ?? name;
+}
+
+/** Home Live activity: first name + phone, nothing else. */
+export function callerLiveActivityLabel(input: {
+  caller_name?: string | null;
+  caller_number?: string | null;
+}): { title: string; subtitle?: string } {
+  const first = callerFirstName(input);
+  const phoneRaw = input.caller_number?.trim();
+  const phone = phoneRaw ? formatE164ForDisplay(phoneRaw) || phoneRaw : null;
+  if (first && phone) return { title: first, subtitle: phone };
+  if (first) return { title: first };
+  if (phone) return { title: phone };
+  return { title: "Unknown caller" };
 }

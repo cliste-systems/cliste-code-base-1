@@ -3,7 +3,7 @@ import { MAX_GREETING_SCRIPT_LENGTH } from "@/lib/voice-greeting-security";
 let activeAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 
-function stopVoicePreview() {
+export function stopVoicePreview() {
   if (activeAudio) {
     activeAudio.pause();
     activeAudio = null;
@@ -17,6 +17,7 @@ function stopVoicePreview() {
 export async function speakVoicePreview(
   line: string,
   parts?: { greetingIntro: string; greetingClosing: string },
+  options?: { onEnded?: () => void },
 ): Promise<
   | { ok: true }
   | {
@@ -66,6 +67,10 @@ export async function speakVoicePreview(
     const blob = await response.blob();
     activeObjectUrl = URL.createObjectURL(blob);
     activeAudio = new Audio(activeObjectUrl);
+    activeAudio.onended = () => {
+      stopVoicePreview();
+      options?.onEnded?.();
+    };
     await activeAudio.play();
     return { ok: true };
   } catch {

@@ -35,6 +35,7 @@ export default async function DashboardHomePage({
     viewAllLocations,
     niche: orgRow?.niche,
     agentBusinessType: orgRow?.agent_business_type,
+    organizationSlug: orgRow?.slug,
   });
 
   return (

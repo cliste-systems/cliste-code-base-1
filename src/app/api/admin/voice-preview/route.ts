@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminSessionUser } from "@/lib/admin-session";
-import { synthesizeElevenLabsSpeech } from "@/lib/elevenlabs-voice";
+import {
+  isCartesiaVoiceId,
+  resolveLiveKitTtsLanguage,
+  resolveLiveKitTtsModel,
+  resolveOrgCartesiaVoiceId,
+} from "@/lib/cara-livekit-voice";
+import { synthesizeLiveKitInferenceSpeech } from "@/lib/livekit-inference-voice";
+import { prepareVoicePreviewTtsText } from "@/lib/voice-preview-tts-text";
 import { voiceLegalDisclosure } from "@/lib/voice-greeting";
 
 export const runtime = "nodejs";
@@ -31,17 +38,23 @@ export async function POST(request: Request) {
   const text =
     String(body.text ?? "").trim() ||
     `Hello, ${voiceLegalDisclosure(assistantName)} How can I help you today?`;
-  const voiceId = String(body.voiceId ?? "").trim();
-  if (!voiceId) {
-    return NextResponse.json({ error: "Voice ID is required." }, { status: 400 });
-  }
+  const requestedVoice = String(body.voiceId ?? "").trim();
+  const voiceId = isCartesiaVoiceId(requestedVoice)
+    ? requestedVoice
+    : resolveOrgCartesiaVoiceId(requestedVoice || null);
+  const ttsText = prepareVoicePreviewTtsText(text);
 
   try {
-    const audio = await synthesizeElevenLabsSpeech({ text, voiceId });
-    return new NextResponse(audio, {
+    const audio = await synthesizeLiveKitInferenceSpeech({
+      text: ttsText,
+      model: resolveLiveKitTtsModel(),
+      voiceId,
+      language: resolveLiveKitTtsLanguage(),
+    });
+    return new NextResponse(new Uint8Array(audio), {
       status: 200,
       headers: {
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "audio/wav",
         "Cache-Control": "no-store",
       },
     });

@@ -1,11 +1,9 @@
 /**
- * One-off cleanup: dismiss legacy "routine handoff" training items.
+ * One-off cleanup: dismiss legacy training noise (operational handoffs + hours gaps).
  *
- * These were created from Action Inbox booking/callback tickets before
- * `ingestActionInboxTraining` learned to skip routine handoffs. New calls no
- * longer create them; this clears the backlog already sitting in the table.
- * Genuine gaps (e.g. "asked if we offer extensions") are kept — the same
- * `isRoutineHandoff` rule that gates ingestion decides what's noise.
+ * Action Inbox cake/booking/callback tickets and call_gap opening-hours topics
+ * should never have been in Training. New calls no longer create them; this
+ * clears the backlog already sitting in the table.
  *
  *   npx tsx scripts/dismiss-legacy-training-noise.ts            # dry run (lists matches)
  *   npx tsx scripts/dismiss-legacy-training-noise.ts --apply    # dismiss them
@@ -18,7 +16,10 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { createAdminClient } from "../src/utils/supabase/admin";
-import { isRoutineHandoff } from "../src/lib/cara-training-types";
+import {
+  isRoutineHandoff,
+  isStructuredHoursTopic,
+} from "../src/lib/cara-training-types";
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -31,7 +32,26 @@ function parseArgs() {
   return { apply, org };
 }
 
-type Row = { id: string; organization_id: string; gap_summary: string };
+type Row = {
+  id: string;
+  organization_id: string;
+  gap_summary: string;
+  caller_context: string | null;
+  source: string;
+};
+
+function isTrainingNoise(row: Row): boolean {
+  const combined = [row.gap_summary, row.caller_context ?? ""]
+    .filter(Boolean)
+    .join(" ");
+  if (row.source === "action_inbox" && isRoutineHandoff(row.gap_summary)) {
+    return true;
+  }
+  if (row.source === "call_gap" && isStructuredHoursTopic(combined)) {
+    return true;
+  }
+  return false;
+}
 
 async function main() {
   const { apply, org } = parseArgs();
@@ -39,8 +59,8 @@ async function main() {
 
   let query = admin
     .from("cara_training_items")
-    .select("id, organization_id, gap_summary, source, status")
-    .eq("source", "action_inbox")
+    .select("id, organization_id, gap_summary, caller_context, source, status")
+    .in("source", ["action_inbox", "call_gap"])
     .in("status", ["awaiting_answer", "draft_ready"]);
   if (org) query = query.eq("organization_id", org);
 
@@ -51,14 +71,15 @@ async function main() {
   }
 
   const rows = (data ?? []) as Row[];
-  const noise = rows.filter((r) => isRoutineHandoff(r.gap_summary));
+  const noise = rows.filter(isTrainingNoise);
 
   console.log(
-    `Found ${noise.length} routine-handoff training item(s) to dismiss ` +
-      `(of ${rows.length} open Action Inbox training items).`,
+    `Found ${noise.length} training noise item(s) to dismiss (of ${rows.length} open items).`,
   );
   for (const r of noise) {
-    console.log(`  [${r.organization_id.slice(0, 8)}] ${r.gap_summary.replace(/\s+/g, " ").slice(0, 90)}`);
+    console.log(
+      `  [${r.source}] [${r.organization_id.slice(0, 8)}] ${r.gap_summary.replace(/\s+/g, " ").slice(0, 90)}`,
+    );
   }
 
   if (!apply) {

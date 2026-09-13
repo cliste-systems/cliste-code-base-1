@@ -2,7 +2,6 @@ import type { CallRoutingMode } from "@/lib/call-routing";
 
 export type SettingsInitial = {
   isActive: boolean;
-  businessName: string;
   phoneNumber: string;
   signupSegment: string;
   notificationEmail: string;

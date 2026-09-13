@@ -13,10 +13,6 @@ import { DashboardHomeTransferHealthCard } from "@/components/dashboard/dashboar
 import type { HomeCaraPerformanceSnapshot } from "@/lib/dashboard-home-cara-performance";
 import type { HomeCallTimesBucket } from "@/lib/dashboard-home-call-times";
 import type { HomeCaraTrainingRow, HomeRequestRow } from "@/lib/dashboard-home-requests";
-import {
-  DASHBOARD_HOME_ANALYTICS_ROW_HEIGHT_PX,
-  DASHBOARD_HOME_FIRST_ROW_HEIGHT_PX,
-} from "@/lib/dashboard-home-panel-limit";
 import { cn } from "@/lib/utils";
 
 export function DashboardHomeCardsGrid({
@@ -46,12 +42,12 @@ export function DashboardHomeCardsGrid({
 }) {
   return (
     <DashboardHomeResizeItem
-      className={cn("hidden min-h-0 flex-1 flex-col gap-4 lg:flex", className)}
+      className={cn(
+        "hidden min-h-0 flex-1 flex-col gap-4 lg:grid lg:grid-rows-[minmax(0,1.1fr)_minmax(0,1fr)_auto]",
+        className,
+      )}
     >
-      <DashboardHomeResizeItem
-        className="grid shrink-0 grid-cols-3 items-stretch gap-4"
-        style={{ minHeight: DASHBOARD_HOME_FIRST_ROW_HEIGHT_PX }}
-      >
+      <DashboardHomeResizeItem className="grid min-h-0 grid-cols-3 items-stretch gap-4">
         <DashboardHomeResizeItem className="h-full min-h-0 overflow-hidden">
           <DashboardHomeLiveActivityCard activity={activity} className="h-full" />
         </DashboardHomeResizeItem>
@@ -71,10 +67,7 @@ export function DashboardHomeCardsGrid({
         </DashboardHomeResizeItem>
       </DashboardHomeResizeItem>
 
-      <DashboardHomeResizeItem
-        className="grid shrink-0 grid-cols-4 gap-4"
-        style={{ minHeight: DASHBOARD_HOME_ANALYTICS_ROW_HEIGHT_PX }}
-      >
+      <DashboardHomeResizeItem className="grid min-h-0 grid-cols-4 gap-4">
         <DashboardHomeResizeItem className="h-full min-h-0 overflow-hidden">
           <DashboardHomeRequestTypesCard
             segments={requestTypeSegments}

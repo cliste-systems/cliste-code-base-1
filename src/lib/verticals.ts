@@ -169,7 +169,6 @@ const RETAIL_PACK: VerticalPack = {
   locationNoun: "Store",
   nav: {
     hiddenHrefs: [
-      DASHBOARD_ROUTES.activity,
       DASHBOARD_ROUTES.contacts,
       DASHBOARD_ROUTES.routing,
       DASHBOARD_ROUTES.locations,

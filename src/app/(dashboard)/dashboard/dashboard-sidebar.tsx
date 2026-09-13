@@ -2,10 +2,10 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
-  Bot,
   Building2,
   Gauge,
   GraduationCap,
+  HelpCircle,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
@@ -22,8 +22,6 @@ import { usePathname } from "next/navigation";
 
 import { LocationSwitcher } from "@/components/dashboard/location-switcher";
 import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
-import { CaraSidebarNav } from "@/components/dashboard/cara-sidebar-nav";
-import { BusinessSidebarNav } from "@/components/dashboard/business-sidebar-nav";
 import { DashboardProfileMenu } from "@/components/dashboard/dashboard-profile-menu";
 import type { AccountLocationRow } from "@/lib/account-locations";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
@@ -43,11 +41,8 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/contacts": Users,
   "/dashboard/clients": Users,
   "/dashboard/routing": Share2,
-  "/dashboard/cara": Bot,
-  "/dashboard/cara-setup": Bot,
-  "/dashboard/business": Building2,
-  "/dashboard/agent-setup": Bot,
   "/dashboard/cara-training": GraduationCap,
+  "/dashboard/faqs": HelpCircle,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
   "/dashboard/support": LifeBuoy,
@@ -199,19 +194,6 @@ export function DashboardSidebar({
 
         <nav className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pt-0.5">
           <NavSection label="Workspace" items={coreNav} />
-          <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-          <section className="space-y-1.5">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
-              Cara
-            </p>
-            <CaraSidebarNav />
-          </section>
-          <section className="space-y-1.5">
-            <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
-              Business
-            </p>
-            <BusinessSidebarNav />
-          </section>
           <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
           <section className="space-y-1.5">
             <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">

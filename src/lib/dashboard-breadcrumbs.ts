@@ -26,6 +26,7 @@ const ACCOUNT_SECTION = "Account";
 const WORKSPACE_PAGES: { prefix: string; label: string }[] = [
   { prefix: DASHBOARD_ROUTES.activity, label: "Activity" },
   { prefix: DASHBOARD_ROUTES.caraTraining, label: "Training" },
+  { prefix: DASHBOARD_ROUTES.businessFaqs, label: "FAQs" },
   { prefix: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox" },
   { prefix: DASHBOARD_ROUTES.contacts, label: "Contacts" },
   { prefix: "/dashboard/clients", label: "Contacts" },

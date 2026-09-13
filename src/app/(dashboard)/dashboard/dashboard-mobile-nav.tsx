@@ -4,10 +4,9 @@ import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
-  Bot,
-  Briefcase,
-  GraduationCap,
   Gauge,
+  GraduationCap,
+  HelpCircle,
   Menu,
   Inbox,
   LayoutDashboard,
@@ -23,8 +22,6 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import { CaraSidebarNav } from "@/components/dashboard/cara-sidebar-nav";
-import { BusinessSidebarNav } from "@/components/dashboard/business-sidebar-nav";
 import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
 import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
 
@@ -36,11 +33,8 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/contacts": Users,
   "/dashboard/clients": Users,
   "/dashboard/routing": Share2,
-  "/dashboard/cara": Bot,
-  "/dashboard/cara-setup": Bot,
-  "/dashboard/agent-setup": Bot,
-  "/dashboard/business": Briefcase,
   "/dashboard/cara-training": GraduationCap,
+  "/dashboard/faqs": HelpCircle,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
   "/dashboard/settings": Settings,
@@ -139,8 +133,6 @@ export function DashboardMobileNav({
             );
           })}
           <div className="col-span-2 space-y-2 border-t border-slate-100 pt-2">
-            <CaraSidebarNav />
-            <BusinessSidebarNav />
             <AccountSidebarNav
               items={accountNav.map((item) => ({
                 href: item.href,

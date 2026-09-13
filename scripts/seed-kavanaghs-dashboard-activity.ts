@@ -12,6 +12,12 @@ config({ path: ".env.local" });
 import { startOfDay } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
+import {
+  DASHBOARD_MOCK_CALLER_PREFIX,
+  DASHBOARD_MOCK_REHEARSAL_CALLER_PREFIX,
+  DASHBOARD_MOCK_REHEARSAL_MARKER,
+  DASHBOARD_SEED_TRAINING_GAP_SUMMARIES,
+} from "../src/lib/dashboard-mock-cleanup.js";
 import { createAdminClient } from "../src/utils/supabase/admin";
 
 const DUBLIN = "Europe/Dublin";
@@ -190,14 +196,49 @@ async function cleanupDemoData(
   admin: ReturnType<typeof createAdminClient>,
   orgId: string,
 ): Promise<void> {
-  await admin.from("cara_training_items").delete().eq("organization_id", orgId);
-  await admin.from("action_tickets").delete().eq("organization_id", orgId);
+  await admin
+    .from("call_logs")
+    .delete()
+    .eq("organization_id", orgId)
+    .or(
+      [
+        `caller_number.like.${DASHBOARD_MOCK_CALLER_PREFIX}%`,
+        `caller_number.like.${DASHBOARD_MOCK_REHEARSAL_CALLER_PREFIX}%`,
+        "call_sid.like.KAV-TEST-%",
+        "call_sid.like.RT-TEST-%",
+        `ai_summary.ilike.%${DASHBOARD_MOCK_REHEARSAL_MARKER}%`,
+      ].join(","),
+    );
+
+  await admin
+    .from("action_tickets")
+    .delete()
+    .eq("organization_id", orgId)
+    .or(
+      [
+        `caller_number.like.${DASHBOARD_MOCK_CALLER_PREFIX}%`,
+        `caller_number.like.${DASHBOARD_MOCK_REHEARSAL_CALLER_PREFIX}%`,
+        `summary.ilike.%${DASHBOARD_MOCK_REHEARSAL_MARKER}%`,
+      ].join(","),
+    );
+
+  await admin
+    .from("cara_training_items")
+    .delete()
+    .eq("organization_id", orgId)
+    .ilike("gap_summary", `%${DASHBOARD_MOCK_REHEARSAL_MARKER}%`);
+
+  await admin
+    .from("cara_training_items")
+    .delete()
+    .eq("organization_id", orgId)
+    .in("gap_summary", [...DASHBOARD_SEED_TRAINING_GAP_SUMMARIES]);
+
   await admin
     .from("usage_records")
     .delete()
     .eq("organization_id", orgId)
-    .like("call_sid", "KAV-TEST-%");
-  await admin.from("call_logs").delete().eq("organization_id", orgId);
+    .or("call_sid.like.KAV-TEST-%,call_sid.like.RT-TEST-%");
 }
 
 async function ensurePhoneNumber(

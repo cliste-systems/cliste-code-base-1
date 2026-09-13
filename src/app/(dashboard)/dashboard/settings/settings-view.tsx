@@ -19,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatE164ForDisplay } from "@/lib/call-history-types";
 import {
   CALL_ROUTING_MODES,
   CALL_ROUTING_MODE_META,
@@ -59,12 +58,12 @@ function settingsPageDescription(
 ): string {
   if (verticalId === "retail") {
     return canManageAccount
-      ? "Your profile, sign-in, store details, and notifications."
-      : "Store details, your Cliste number, and notifications.";
+      ? "Your profile, sign-in, and notifications."
+      : "Notifications.";
   }
   return canManageAccount
-    ? "Your profile, sign-in, business details, and notifications."
-    : "Business details, phone line, and notifications.";
+    ? "Your profile, sign-in, phone line, and notifications."
+    : "Phone line and notifications.";
 }
 
 export function SettingsView({
@@ -76,13 +75,10 @@ export function SettingsView({
   isLocalPreview = false,
   className,
 }: SettingsViewProps) {
-  const { copy, vertical } = useDashboardVertical();
-  const isRetail = vertical.id === "retail";
-  const businessNameLabel = isRetail ? "Store name" : "Business name";
+  const { vertical } = useDashboardVertical();
   const showCallRoutingSettings = !(vertical.nav?.hiddenHrefs ?? []).includes(
     DASHBOARD_ROUTES.routing,
   );
-  const [businessName, setBusinessName] = useState(initial.businessName);
   const [notificationEmail, setNotificationEmail] = useState(
     initial.notificationEmail,
   );
@@ -96,11 +92,6 @@ export function SettingsView({
   const [pending, startTransition] = useTransition();
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const profileEditorRef = useRef<DashboardProfileEditorHandle>(null);
-
-  const hasClisteNumber = Boolean(initial.phoneNumber.trim());
-  const phoneDisplay = hasClisteNumber
-    ? formatE164ForDisplay(initial.phoneNumber) || initial.phoneNumber.trim()
-    : null;
 
   const fieldClass = cn(DASHBOARD_INPUT_CLASS, "text-[13px] text-[#0b1220]");
 
@@ -116,7 +107,6 @@ export function SettingsView({
 
       const result = await saveOrganizationSettings({
         isActive: initial.isActive,
-        businessName,
         notificationEmail,
         notificationPhone,
         callRoutingMode,
@@ -191,66 +181,6 @@ export function SettingsView({
             />
           ) : null}
 
-          <SettingsSection title={copy.settings.businessIdentityTitle}>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="business-name">{businessNameLabel}</Label>
-                <Input
-                  id="business-name"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder={isRetail ? "Your store name" : "Your business name"}
-                  className={fieldClass}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="signup-segment">Business type</Label>
-                <Input
-                  id="signup-segment"
-                  readOnly
-                  tabIndex={-1}
-                  value={initial.signupSegment}
-                  className={cn(
-                    fieldClass,
-                    "cursor-default bg-slate-50/80 focus-visible:ring-0",
-                  )}
-                  aria-describedby="signup-segment-hint"
-                />
-                <p
-                  id="signup-segment-hint"
-                  className="text-[12px] leading-relaxed text-slate-500"
-                >
-                  Chosen at signup — Cara uses this to tailor your dashboard.
-                  Contact support if it needs updating.
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cliste-number">Cliste number</Label>
-                <Input
-                  id="cliste-number"
-                  readOnly
-                  tabIndex={-1}
-                  value={phoneDisplay ?? "Not assigned yet"}
-                  className={cn(
-                    fieldClass,
-                    "cursor-default bg-slate-50/80 tabular-nums focus-visible:ring-0",
-                    phoneDisplay ? "text-[#0b1220]" : "text-slate-500",
-                  )}
-                  aria-describedby="cliste-number-hint"
-                />
-                <p
-                  id="cliste-number-hint"
-                  className="text-[12px] leading-relaxed text-slate-500"
-                >
-                  {hasClisteNumber
-                    ? "Assigned to your account — it can't be changed here."
-                    : "Assigned after onboarding — it can't be changed here."}{" "}
-                  Contact support if you have any questions.
-                </p>
-              </div>
-            </div>
-          </SettingsSection>
-
           {showCallRoutingSettings ? (
             <SettingsSection title="Your number & forwarding">
               <CallRoutingControls
@@ -261,22 +191,6 @@ export function SettingsView({
                 clisteNumber={initial.phoneNumber}
                 fieldClass={fieldClass}
               />
-            </SettingsSection>
-          ) : null}
-
-          {isRetail ? (
-            <SettingsSection title="Phone setup & transfers">
-              <p className="text-[13px] leading-relaxed text-slate-600">
-                See which departments Cara can put callers through to, and when
-                your transfer setup was last verified.
-              </p>
-              <Link
-                href={DASHBOARD_ROUTES.phoneSetup}
-                className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
-              >
-                <PhoneForwarded className="size-4" aria-hidden />
-                View phone setup
-              </Link>
             </SettingsSection>
           ) : null}
 

@@ -12,7 +12,7 @@ export const DASHBOARD_ROUTES = {
   caraTraining: "/dashboard/cara-training",
   businessProfile: "/dashboard/business/profile",
   businessServices: "/dashboard/business/services",
-  businessFaqs: "/dashboard/business/faqs",
+  businessFaqs: "/dashboard/faqs",
   businessFiles: "/dashboard/business/files",
   usage: "/dashboard/usage",
   support: "/dashboard/support",
@@ -32,6 +32,7 @@ export const DASHBOARD_ROUTES = {
 export const AGENT_CONFIG_PATH_PREFIXES = [
   "/dashboard/cara/",
   "/dashboard/business/",
+  "/dashboard/faqs",
 ] as const;
 
 export function isAgentConfigPath(href: string): boolean {
@@ -64,6 +65,7 @@ export const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
   "/dashboard/cara-setup/call-handling": DASHBOARD_ROUTES.caraGreeting,
   "/dashboard/cara/call-handling": DASHBOARD_ROUTES.caraGreeting,
   "/dashboard/cara-setup/answers": DASHBOARD_ROUTES.businessFaqs,
+  "/dashboard/business/faqs": DASHBOARD_ROUTES.businessFaqs,
   "/dashboard/cara/rules": DASHBOARD_ROUTES.caraGreeting,
   "/dashboard/business/rules": DASHBOARD_ROUTES.businessProfile,
   "/dashboard/privacy": DASHBOARD_ROUTES.legalDataRequests,

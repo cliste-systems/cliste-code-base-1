@@ -2,6 +2,7 @@ import { formatCallDateTimeLabel } from "@/lib/call-history-types";
 import {
   parseCaraTrainingPatch,
   parseOwnerMessages,
+  isStructuredHoursTopic,
   type CaraTrainingItemRow,
   type CaraTrainingPatch,
   type CaraTrainingSource,
@@ -171,6 +172,36 @@ export function trainingQuickAnswerLabel(gapSummary: string): {
     return { kind: "question", text };
   }
   return { kind: "offer", text };
+}
+
+export type TrainingQuickResolveMode = "service_offer" | "free_text";
+
+function looksLikeServiceOfferTopic(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t || isStructuredHoursTopic(t)) return false;
+  if (/\b(offer|provide|do you do|do we do|service|treatment|menu)\b/.test(t)) {
+    return true;
+  }
+  if (/^(do|does|can|could)\s+(you|we)\s+(offer|do|provide)\b/i.test(text.trim())) {
+    return true;
+  }
+  // Short noun-phrase labels (e.g. "Balayage", "Hair extensions") suit yes/no.
+  const wordCount = t.split(/\s+/).length;
+  return wordCount <= 4 && !/\b(hours|open|closed|holiday|patrick)\b/.test(t);
+}
+
+/** Route call_gap quick actions: yes/no only for clear service-offer topics. */
+export function trainingQuickResolveMode(gapSummary: string): TrainingQuickResolveMode {
+  if (isStructuredHoursTopic(gapSummary)) return "free_text";
+  if (looksLikeServiceOfferTopic(gapSummary)) return "service_offer";
+  return "free_text";
+}
+
+export function trainingAnswerPlaceholder(gapSummary: string): string {
+  if (isStructuredHoursTopic(gapSummary)) {
+    return "e.g. We're closed on St Patrick's Day — we're closed on all bank and public holidays.";
+  }
+  return "e.g. We offer 10% off for first-time clients on weekdays only.";
 }
 
 export function trainingStatusLabel(status: CaraTrainingStatus): string {

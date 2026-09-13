@@ -272,7 +272,38 @@ export function formatCatalogStockNoMatchQuote(query: string): string {
   ].join(" ");
 }
 
-export async function searchSupervaluCatalogLive(
+export function inferCatalogOfferBrowseCategories(query: string): string[] {
+  const trimmed = query.trim().toLowerCase();
+  const tokens = tokenizeSupervaluSearchQuery(trimmed);
+  const categoryHints = new Set([
+    "milk",
+    "bread",
+    "crisps",
+    "chocolate",
+    "fruit",
+    "yogurt",
+    "cheese",
+    "butter",
+    "tea",
+    "coffee",
+    "biscuits",
+    "sweets",
+    "confectionery",
+  ]);
+  const fromTokens = tokens.filter((token) => categoryHints.has(token));
+  if (fromTokens.length >= 2) return fromTokens.slice(0, 5);
+  if (/confectionery|sweets|candy/.test(trimmed)) return ["chocolate", "sweets"];
+  if (
+    /\blist\b|\bfive\b|\b5\b|apart from meat|what.*on offer|sample|best deal|weekly offers/i.test(
+      trimmed,
+    )
+  ) {
+    return ["chocolate", "crisps", "yogurt", "bread", "fruit"];
+  }
+  return [];
+}
+
+async function searchSupervaluCatalogLiveSingle(
   query: string,
   options?: { storeId?: string; intent?: CatalogQuoteIntent },
 ): Promise<SupervaluCatalogMatch[]> {
@@ -328,4 +359,40 @@ export async function searchSupervaluCatalogLive(
   return scored
     .slice(0, SUPERVALU_CATALOG_SEARCH_MAX_RESULTS)
     .map(({ product, score }) => catalogProductToMatch(product, score, intent));
+}
+
+export async function searchSupervaluCatalogLive(
+  query: string,
+  options?: { storeId?: string; intent?: CatalogQuoteIntent },
+): Promise<SupervaluCatalogMatch[]> {
+  const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
+  if (!trimmed) return [];
+
+  const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
+  const browseCategories =
+    intent === "offer" ? inferCatalogOfferBrowseCategories(trimmed) : [];
+
+  if (browseCategories.length >= 2) {
+    const seen = new Set<string>();
+    const matches: SupervaluCatalogMatch[] = [];
+    for (const category of browseCategories) {
+      const categoryMatches = await searchSupervaluCatalogLiveSingle(category, {
+        ...options,
+        intent: "offer",
+      });
+      for (const match of categoryMatches) {
+        if (!match.isOnOffer) continue;
+        const key = match.sku ?? match.productName;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        matches.push(match);
+        if (matches.length >= SUPERVALU_CATALOG_SEARCH_MAX_RESULTS) {
+          return matches;
+        }
+      }
+    }
+    if (matches.length > 0) return matches;
+  }
+
+  return searchSupervaluCatalogLiveSingle(trimmed, options);
 }

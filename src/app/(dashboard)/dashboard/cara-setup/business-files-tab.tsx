@@ -13,7 +13,6 @@ import {
   uploadBusinessFile,
 } from "../agent-setup/business-files-actions";
 import { BusinessFilesSection } from "../agent-setup/business-files-section";
-import { FilesLintNotices } from "./files-lint-notices";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 
 export function BusinessFilesTab() {
@@ -34,7 +33,6 @@ export function BusinessFilesTab() {
         description="Upload documents Cara can read from or send to callers."
         bodyClassName="p-0"
       >
-        <FilesLintNotices />
         <div className="px-5 py-5">
           <BusinessFilesSection
             initialFiles={form.businessFiles}

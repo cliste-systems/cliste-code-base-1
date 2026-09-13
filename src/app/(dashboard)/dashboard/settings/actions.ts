@@ -12,14 +12,12 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 
 export type OrganizationSettingsPayload = {
   isActive: boolean;
-  businessName: string;
   notificationEmail: string;
   notificationPhone: string;
   callRoutingMode: CallRoutingMode;
   transferNumber: string;
 };
 
-const MAX_NAME = 120;
 const MAX_EMAIL = 254;
 const MAX_PHONE = 32;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,7 +27,6 @@ export async function saveOrganizationSettings(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { supabase, organizationId } = await requireDashboardSession();
 
-  const businessName = String(payload?.businessName ?? "").trim();
   const notificationEmail = String(payload?.notificationEmail ?? "").trim();
   const notificationPhone = String(payload?.notificationPhone ?? "").trim();
   const callRoutingMode = parseCallRoutingMode(payload?.callRoutingMode);
@@ -38,12 +35,6 @@ export async function saveOrganizationSettings(
     ? String(payload?.transferNumber ?? "").trim()
     : "";
 
-  if (businessName.length < 2) {
-    return { ok: false, message: "Business name is too short." };
-  }
-  if (businessName.length > MAX_NAME) {
-    return { ok: false, message: "Business name is too long." };
-  }
   if (notificationEmail && (notificationEmail.length > MAX_EMAIL || !EMAIL_RE.test(notificationEmail))) {
     return { ok: false, message: "Notification email looks invalid." };
   }
@@ -58,7 +49,6 @@ export async function saveOrganizationSettings(
     .from("organizations")
     .update({
       is_active: payload.isActive,
-      name: businessName,
       notification_email: notificationEmail || null,
       notification_phone: notificationPhone || null,
       call_routing_mode: callRoutingMode,

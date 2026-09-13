@@ -68,7 +68,9 @@ import {
   patchPreviewLines,
   trainingContextSummary,
   trainingDetailMeta,
+  trainingAnswerPlaceholder,
   trainingQuickAnswerLabel,
+  trainingQuickResolveMode,
   trainingStatusLabel,
   trainingStatusVariant,
   trainingTopicLabel,
@@ -515,12 +517,14 @@ function TrainingListRow({
 function TrainingAnswerComposer({
   answerText,
   pending,
+  placeholder,
   onAnswerTextChange,
   onAnswer,
   onDismiss,
 }: {
   answerText: string;
   pending: boolean;
+  placeholder?: string;
   onAnswerTextChange: (value: string) => void;
   onAnswer: () => void;
   onDismiss: () => void;
@@ -531,7 +535,10 @@ function TrainingAnswerComposer({
         <Textarea
           value={answerText}
           onChange={(event) => onAnswerTextChange(event.target.value)}
-          placeholder="e.g. We offer 10% off for first-time clients on weekdays only."
+          placeholder={
+            placeholder ??
+            "e.g. We offer 10% off for first-time clients on weekdays only."
+          }
           rows={4}
           className={cn(
             DASHBOARD_INPUT_CLASS,
@@ -659,8 +666,15 @@ function TrainingDetailPanelContent({
   onRevert: () => void;
 }) {
   const previewPatch = item.proposed_patch ?? item.applied_patch;
-  const isCallGapQuickResolve =
-    item.source === "call_gap" && item.status === "awaiting_answer";
+  const quickResolveMode =
+    item.source === "call_gap" && item.status === "awaiting_answer"
+      ? trainingQuickResolveMode(item.gap_summary)
+      : null;
+  const isCallGapQuickResolve = quickResolveMode === "service_offer";
+  const showCallGapAnswerComposer =
+    item.source === "call_gap" &&
+    item.status === "awaiting_answer" &&
+    quickResolveMode === "free_text";
   const isApplied = item.status === "applied";
   const isDraft = item.status === "draft_ready";
   const ownerAnswer = lastOwnerAnswer(item);
@@ -772,6 +786,11 @@ function TrainingDetailPanelContent({
           <TrainingAnswerComposer
             answerText={answerText}
             pending={pending}
+            placeholder={
+              showCallGapAnswerComposer
+                ? trainingAnswerPlaceholder(item.gap_summary)
+                : undefined
+            }
             onAnswerTextChange={onAnswerTextChange}
             onAnswer={onAnswer}
             onDismiss={onDismiss}

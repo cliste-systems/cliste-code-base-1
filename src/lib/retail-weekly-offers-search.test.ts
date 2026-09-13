@@ -42,6 +42,17 @@ describe("supervalu offers sync helpers", () => {
     );
   });
 
+  it("classifies grocery promos separately from meat", () => {
+    assert.equal(
+      classifySupervaluOfferChannel({
+        productName: "Cadbury Dairy Milk (110 g)",
+        department: "Chocolate Bars",
+        discountLabel: "Only €2",
+      }),
+      "grocery",
+    );
+  });
+
   it("classifies pre-pack quick fry separately from butcher counter", () => {
     assert.equal(
       classifySupervaluOfferChannel({
@@ -158,7 +169,7 @@ describe("retail weekly offers search", () => {
       syncedAt: "2026-09-10T06:00:00.000Z",
     });
     assert.ok(section);
-    assert.match(section ?? "", /search_weekly_offers/);
+    assert.match(section ?? "", /searchWeeklyOffers/);
     assert.match(section ?? "", /Striploin/);
   });
 
@@ -209,7 +220,8 @@ describe("retail weekly offers search", () => {
 
   it("infers browse/list intent for general offer questions", () => {
     assert.equal(inferWeeklyOffersListIntent("best offers"), true);
-    assert.equal(inferWeeklyOffersListIntent("what meat offers do you have"), true);
+    assert.equal(inferWeeklyOffersListIntent("what offers do you have apart from meat"), true);
+    assert.equal(inferWeeklyOffersListIntent("milk bread crisps chocolate fruit"), true);
     assert.equal(inferWeeklyOffersListIntent("surprise me with your best one"), true);
     assert.equal(inferWeeklyOffersListIntent("ham"), false);
     assert.equal(inferWeeklyOffersListIntent("rashers"), false);

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Ban, CheckCircle2 } from "lucide-react";
 
 import { Field } from "@/components/dashboard/field";
@@ -13,12 +12,10 @@ import { cn } from "@/lib/utils";
 import { CaraWhenUnsureCallout } from "./cara-when-unsure-callout";
 import { ServiceCatalogEditor } from "./service-catalog-editor";
 import { ServicesBoundaryChipEditor } from "./services-boundary-chip-editor";
-import { ServicesLintNotices } from "./services-lint-notices";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 
 export function CaraSetupTabServices() {
   const form = useCaraSetupForm();
-  const [importError, setImportError] = useState<string | null>(null);
   const verticalCopy = dashboardVerticalCopy(form.niche, form.businessType);
   const servicesCopy = verticalCopy.caraSetup.services;
   const isSalon =
@@ -47,8 +44,6 @@ export function CaraSetupTabServices() {
         </div>
       ) : null}
 
-      {isSalon ? <ServicesLintNotices importError={importError} onImportErrorHandled={() => setImportError(null)} /> : null}
-
       {isSalon ? (
         <div className="border-b border-slate-200 px-5 py-5">
           <ServiceCatalogEditor
@@ -63,7 +58,6 @@ export function CaraSetupTabServices() {
               form.setServiceCatalog(services);
               form.setServicesItems(services.map((s) => s.name));
             }}
-            onImportError={setImportError}
           />
         </div>
       ) : (

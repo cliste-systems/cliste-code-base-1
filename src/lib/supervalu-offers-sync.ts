@@ -1,14 +1,21 @@
-import "server-only";
-
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
-import { fetchSupervaluMeatPilotOffers } from "@/lib/supervalu-offers-fetch";
+import {
+  fetchSupervaluFullStoreOffers,
+  fetchSupervaluMeatPilotOffers,
+} from "@/lib/supervalu-offers-fetch";
 import {
   persistSupervaluNationalOffers,
   toSupervaluOffersSyncResult,
 } from "@/lib/supervalu-offers-persist";
-import type { SupervaluOffersSyncResult } from "@/lib/supervalu-offers-types";
+import {
+  buildSupervaluOffersSnapshot,
+  persistSupervaluOffersSnapshot,
+} from "@/lib/supervalu-offers-snapshot";
+import {
+  SUPERVALU_MIN_FULL_STORE_OFFER_COUNT,
+  type SupervaluOffersSyncResult,
+} from "@/lib/supervalu-offers-types";
 
 export {
   currentSupervaluOfferWeek,
@@ -16,16 +23,75 @@ export {
   normalizeSupervaluGatewayProduct,
 } from "@/lib/supervalu-offers-normalize";
 
+export type SyncSupervaluNationalOffersOptions = {
+  storeId?: string;
+  /** When true, skip sync if latest batch already meets the minimum count. */
+  retryOnlyIfLowCount?: boolean;
+  /** Use legacy meat-only fetch instead of full-store snapshot. */
+  meatPilotOnly?: boolean;
+  /** Skip Cara prompt recompile (CLI scripts). */
+  skipPromptRecompile?: boolean;
+};
+
 export async function syncSupervaluNationalOffers(
   supabase: SupabaseClient,
-  options?: { storeId?: string },
+  options?: SyncSupervaluNationalOffersOptions,
 ): Promise<SupervaluOffersSyncResult> {
-  const offers = await fetchSupervaluMeatPilotOffers(options?.storeId);
+  if (options?.retryOnlyIfLowCount) {
+    const meta = await loadLatestSupervaluOfferSyncMeta(supabase);
+    if (
+      meta.syncedAt &&
+      meta.offerCount >= SUPERVALU_MIN_FULL_STORE_OFFER_COUNT
+    ) {
+      return {
+        ok: true,
+        syncBatchId: "skipped-retry",
+        offerCount: meta.offerCount,
+        organizationsUpdated: 0,
+        offerWeekStart: meta.offerWeekStart ?? "",
+        offerWeekEnd: meta.offerWeekEnd ?? "",
+        syncedAt: meta.syncedAt,
+      };
+    }
+  }
+
+  const offers = options?.meatPilotOnly
+    ? await fetchSupervaluMeatPilotOffers(options?.storeId)
+    : await fetchSupervaluFullStoreOffers(options?.storeId);
+
+  if (
+    offers.length > 0 &&
+    offers.length < SUPERVALU_MIN_FULL_STORE_OFFER_COUNT &&
+    !options?.meatPilotOnly
+  ) {
+    console.warn(
+      "[supervalu-offers-sync] low offer count",
+      offers.length,
+      "expected at least",
+      SUPERVALU_MIN_FULL_STORE_OFFER_COUNT,
+    );
+  }
+
   const persisted = await persistSupervaluNationalOffers(supabase, offers);
   if (!persisted.ok) return persisted;
 
-  for (const orgId of persisted.organizationIds) {
-    await regenerateCaraCustomPrompt(supabase, orgId);
+  const snapshot = buildSupervaluOffersSnapshot({
+    syncBatchId: persisted.syncBatchId,
+    syncedAt: persisted.syncedAt,
+    offerWeekStart: persisted.offerWeekStart,
+    offerWeekEnd: persisted.offerWeekEnd,
+    offers,
+  });
+  const snapshotResult = await persistSupervaluOffersSnapshot(supabase, snapshot);
+  if (!snapshotResult.ok) {
+    console.error("[supervalu-offers-sync]", snapshotResult.message);
+  }
+
+  if (!options?.skipPromptRecompile) {
+    const { regenerateCaraCustomPrompt } = await import("@/lib/cara-prompt-from-org");
+    for (const orgId of persisted.organizationIds) {
+      await regenerateCaraCustomPrompt(supabase, orgId);
+    }
   }
 
   return toSupervaluOffersSyncResult(persisted);

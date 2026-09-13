@@ -3,7 +3,7 @@ export const RETAIL_LIVE_STOCK_PRICE_INSTRUCTION =
   "I never confirm live stock levels, shelf prices, or today's specials from memory. I send callers to the shop floor or take a message for the team.";
 
 export const RETAIL_WEEKLY_OFFERS_LOOKUP_INSTRUCTION =
-  "When a caller asks if **meat or butcher** items are on offer or this week's price, I use searchWeeklyOffers — it covers synced meat promotions only (butcher counter and pre-pack meat aisle), not grocery like cereal or mayo. For grocery products, I use searchSuperValuProducts instead. I only quote what the tool returns — never from memory.";
+  "When a caller asks if something is **on offer / this week / on special**, or wants a list of weekly deals, I use searchWeeklyOffers — it covers the synced national SuperValu promotional snapshot (meat, grocery, household, and more). For **stock / do you sell / range** questions without offer intent, I use searchSuperValuProducts instead. I only quote what the tool returns — never from memory.";
 
 export const RETAIL_CATALOG_STOCK_LOOKUP_INSTRUCTION =
   "When a caller asks if we stock, sell, carry, or want the price of something, I use searchSuperValuProducts. If it returns a match with a national range price, I quote that price naturally — but I never guarantee it is on the shelf or that today's in-store price matches. I offer a team callback to confirm availability.";

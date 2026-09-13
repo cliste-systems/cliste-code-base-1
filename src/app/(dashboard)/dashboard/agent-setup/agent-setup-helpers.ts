@@ -40,6 +40,8 @@ export type AgentSetupInitial = {
   baseTown: string;
   locationCounty: string;
   quotePricesOnCalls: boolean;
+  /** E.164 Cliste line assigned to this org (read-only in dashboard). */
+  clistePhoneNumber: string;
 };
 
 export { assistantNameLabel, businessNameLabel };

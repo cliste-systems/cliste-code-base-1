@@ -196,6 +196,6 @@ export function actionInboxTrainingQuestion(summary: string): {
   return {
     gapSummary,
     caraQuestion:
-      "I took a message because I wasn't sure how to handle this. What should I tell callers in this situation?",
+      "A caller asked something not in my setup — what should I tell them in this situation?",
   };
 }

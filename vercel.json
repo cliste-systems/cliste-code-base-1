@@ -27,7 +27,11 @@
     },
     {
       "path": "/api/cron/supervalu-offers-sync",
-      "schedule": "0 5 * * 4"
+      "schedule": "0 7 * * 4"
+    },
+    {
+      "path": "/api/cron/supervalu-offers-sync-retry",
+      "schedule": "0 6 * * 5"
     }
   ]
 }

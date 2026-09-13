@@ -32,18 +32,19 @@ export function buildDashboardAccountSummary(
   user: User,
   account: { name: string | null; slug: string | null } | null,
 ): DashboardAccountSummary {
-  const displayName =
+  const personName =
     profile.name?.trim() ||
     user.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim() ||
     "Account";
   const accountName =
     resolveOrganizationDisplayName(account?.name, account?.slug) ||
     "Your business";
+  const roleLabel = formatDashboardProfileRole(profile.role);
 
   return {
-    initials: initialsFromName(displayName),
-    displayName,
-    subtitle: `${formatDashboardProfileRole(profile.role)} · ${accountName}`,
+    initials: initialsFromName(personName),
+    displayName: accountName,
+    subtitle: `${personName} · ${roleLabel}`,
     avatarUrl: profile.avatarUrl?.trim() || null,
   };
 }

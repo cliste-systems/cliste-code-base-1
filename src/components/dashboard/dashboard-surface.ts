@@ -25,7 +25,7 @@ export const DASHBOARD_PAGE_SHELL_FILL_WHITE =
 
 /** Viewport-fit home column — canonical dashboard gutter (px-8 pt-5 pb-5). */
 export const DASHBOARD_HOME_CONTENT_COLUMN =
-  "mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-4 px-8 pb-6 pt-5";
+  "mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col gap-4 px-8 pb-5 pt-5";
 
 /** Shared column — nav + page content share this wrapper so outer edges align. */
 export const DASHBOARD_CONTENT_COLUMN =

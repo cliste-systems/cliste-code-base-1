@@ -143,11 +143,7 @@ export default async function AdminUnlockPage({
 
             <div className="text-center text-xs text-slate-500">
               <Link href="/authenticate" className="underline-offset-4 hover:underline">
-                Sign-in page
-              </Link>
-              {" · "}
-              <Link href="/" className="underline-offset-4 hover:underline">
-                Home
+                Tenant sign-in
               </Link>
             </div>
           </form>

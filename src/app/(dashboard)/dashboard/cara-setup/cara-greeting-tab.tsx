@@ -7,7 +7,7 @@ import { DashboardAnimatedGroup } from "@/components/dashboard/dashboard-animate
 import { Field } from "@/components/dashboard/field";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { DASHBOARD_INPUT_CLASS } from "@/components/dashboard/dashboard-surface";
-import { speakVoicePreview } from "@/components/onboarding/onboarding-voice-preview";
+import { speakVoicePreview, stopVoicePreview } from "@/components/onboarding/onboarding-voice-preview";
 import { Input } from "@/components/ui/input";
 import {
   DEFAULT_GREETING_CLOSING,
@@ -36,20 +36,29 @@ export function CaraGreetingTab() {
 
   const [playing, setPlaying] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   async function handlePlayToggle() {
     if (playing || previewLoading) {
+      stopVoicePreview();
       setPlaying(false);
       return;
     }
     setPreviewLoading(true);
-    const result = await speakVoicePreview(previewLine, {
-      greetingIntro: form.greetingIntro,
-      greetingClosing: form.greetingClosing,
-    });
+    setPreviewError(null);
+    const result = await speakVoicePreview(
+      previewLine,
+      {
+        greetingIntro: form.greetingIntro,
+        greetingClosing: form.greetingClosing,
+      },
+      { onEnded: () => setPlaying(false) },
+    );
     setPreviewLoading(false);
     if (result.ok) {
       setPlaying(true);
+      return;
     }
+    setPreviewError(result.message);
   }
 
   return (
@@ -119,6 +128,7 @@ export function CaraGreetingTab() {
           line={previewLine}
           playing={playing}
           loading={previewLoading}
+          error={previewError}
           onPlayToggle={() => void handlePlayToggle()}
         />
       </SectionCard>
@@ -130,15 +140,18 @@ function GreetingPreviewRow({
   line,
   playing,
   loading,
+  error,
   onPlayToggle,
 }: {
   line: string;
   playing: boolean;
   loading: boolean;
+  error: string | null;
   onPlayToggle: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 shadow-sm">
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 shadow-sm">
       <p className="min-w-0 flex-1 truncate text-[13px] text-[#0b1220]">
         &ldquo;{line}&rdquo;
       </p>
@@ -161,6 +174,12 @@ function GreetingPreviewRow({
           <Play className="ml-0.5 size-4" aria-hidden />
         )}
       </button>
+      </div>
+      {error ? (
+        <p className="text-[12.5px] leading-relaxed text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

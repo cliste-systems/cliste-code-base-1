@@ -1,19 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 
 import {
   DashboardHomeFirstRowButton,
+  DashboardHomeFirstRowList,
   HOME_FIRST_ROW_COUNT_BADGE,
   HOME_FIRST_ROW_EMPTY,
   HOME_FIRST_ROW_FOOTER,
   HOME_FIRST_ROW_HEADER,
-  HOME_FIRST_ROW_LIST,
-  HOME_FIRST_ROW_LIST_ROW,
-  HOME_FIRST_ROW_LIST_SUBTITLE,
-  HOME_FIRST_ROW_LIST_TIME,
-  HOME_FIRST_ROW_LIST_TITLE,
   HOME_FIRST_ROW_TITLE,
 } from "@/components/dashboard/dashboard-home-first-row";
 import {
@@ -67,21 +62,15 @@ export function DashboardHomeCaraTrainingCard({
 
       {displayRows.length > 0 ? (
         <>
-          <ul className={cn(HOME_FIRST_ROW_LIST, "min-h-0 flex-1 overflow-y-auto overscroll-y-contain")}>
-            {displayRows.map((row) => (
-              <li key={row.id} className="border-b border-slate-100 last:border-b-0">
-                <Link href={row.href} className={HOME_FIRST_ROW_LIST_ROW}>
-                  <span className="min-w-0 flex-1">
-                    <span className={HOME_FIRST_ROW_LIST_TITLE}>{row.title}</span>
-                    <span className={HOME_FIRST_ROW_LIST_SUBTITLE}>
-                      {row.description}
-                    </span>
-                  </span>
-                  <span className={HOME_FIRST_ROW_LIST_TIME}>{row.time}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <DashboardHomeFirstRowList
+            rows={displayRows.map((row) => ({
+              id: row.id,
+              href: row.href,
+              title: row.title,
+              subtitle: row.description,
+              time: row.time,
+            }))}
+          />
 
           <div className={cn(HOME_FIRST_ROW_FOOTER, "mt-auto")}>
             <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.caraTraining}>

@@ -80,7 +80,7 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="Weekly offers sync"
-      description="National SuperValu meat offers — Cara quotes these via search_weekly_offers on calls."
+      description="National SuperValu promotional snapshot — Cara quotes these via searchWeeklyOffers on calls."
     >
       <CaraTrainingField label="Last sync" feed="prompt">
         <p className="text-sm text-slate-700">
@@ -97,7 +97,7 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
       <CaraTrainingField
         label="Search preview"
         feed="prompt"
-        hint="Try striploin, mince, or chicken to verify sync quality."
+        hint="Try Heinz ketchup, weekly offers, or rashers to verify sync quality."
       >
         <div className="flex flex-wrap gap-2">
           <Input
@@ -116,10 +116,17 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
       </CaraTrainingField>
 
       <CaraTrainingSectionFooter saved={Boolean(message)} error={error}>
-        <Button type="button" disabled={pending} onClick={refresh}>
-          <RefreshCw className="mr-1.5 size-3.5" aria-hidden />
-          {pending ? "Syncing…" : "Refresh weekly offers now"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" disabled={pending} onClick={refresh}>
+            <RefreshCw className="mr-1.5 size-3.5" aria-hidden />
+            {pending ? "Syncing…" : "Refresh weekly offers now"}
+          </Button>
+          <Button type="button" variant="outline" asChild>
+            <a href="/api/admin/supervalu-offers-snapshot" download="supervalu-weekly-offers.json">
+              Download JSON snapshot
+            </a>
+          </Button>
+        </div>
         {message ? <span className="text-emerald-700 text-xs">{message}</span> : null}
       </CaraTrainingSectionFooter>
     </SectionCard>

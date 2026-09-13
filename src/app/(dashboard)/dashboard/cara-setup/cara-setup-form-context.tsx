@@ -21,8 +21,6 @@ import {
   DEFAULT_CARA_CONDUCT,
   type CaraConduct,
 } from "@/lib/agent-cara-conduct";
-import { compileCaraOwnerPreview } from "@/lib/compile-cara-owner-preview";
-import type { CaraOwnerPreview } from "@/lib/compile-cara-owner-preview";
 import { weekScheduleHasOpenDay } from "@/lib/business-hours";
 import { dedupeServiceChips } from "@/lib/services-boundary";
 import { syncCaptureFieldsFromDetailLabels } from "@/lib/sync-capture-fields";
@@ -91,6 +89,8 @@ type CaraSetupFormContextValue = {
   setGreetingClosing: (v: string) => void;
   businessType: string;
   setBusinessType: (v: string) => void;
+  /** Read-only — assigned Cliste inbound line. */
+  clistePhoneNumber: string;
   locationAddress: string;
   setLocationAddress: (v: string) => void;
   locationEircode: string;
@@ -141,7 +141,6 @@ type CaraSetupFormContextValue = {
   status: { kind: "ok" | "error"; message: string } | null;
   save: () => void;
   saveAsync: () => Promise<boolean>;
-  compiledPromptPreview: CaraOwnerPreview;
   markSavedBaseline: () => void;
   discardChanges: () => void;
   promptExtras: Pick<
@@ -577,77 +576,6 @@ export function CaraSetupFormProvider({
       await saveAsync();
     });
   }, [saveAsync]);
-  const compiledPromptPreview = useMemo(() => {
-    const hasHours = weekScheduleHasOpenDay(openingHoursSchedule);
-    return compileCaraOwnerPreview({
-      businessName: initial.businessName,
-      assistantDisplayName: assistantDisplayName,
-      businessType,
-      locationAddress,
-      locationEircode,
-      baseTown: baseTown.trim() || undefined,
-      locationCounty: locationCounty.trim() || undefined,
-      greeting: resolveVoiceGreetingPreview(
-        greetingIntro,
-        VOICE_ASSISTANT_DEFAULT_NAME,
-        greetingClosing,
-      ),
-      hoursNeverConfigured,
-      open24_7,
-      hoursNote: hoursNote.trim() || undefined,
-      bankHolidays,
-      openingHoursSchedule,
-      openingHours: open24_7
-        ? "Open 24 hours, 7 days a week"
-        : hasHours
-          ? formatWeekScheduleForAgent(openingHoursSchedule)
-          : hoursNeverConfigured
-            ? undefined
-            : "Closed all week",
-      serviceArea: undefined,
-      serviceAreaExclusions: undefined,
-      servicesOffered: formatAgentKnowledgeList(servicesItems) || undefined,
-      servicesNotOffered:
-        formatAgentKnowledgeList(servicesNotOfferedItems) || undefined,
-      detailsToCollect:
-        formatAgentKnowledgeList(detailsToCollectItems ?? []) || undefined,
-      detailsCollectMode,
-      businessRules: cleanBusinessRules(businessRulesItems),
-      caraConduct,
-      faqs,
-      routes: promptExtras.routes,
-      fallbackNote: promptExtras.fallbackNote,
-      transferNumber: promptExtras.transferNumber,
-      businessFiles: businessFilesState,
-    });
-  }, [
-    promptExtras,
-    businessFilesState,
-    initial.businessName,
-    assistantDisplayName,
-    businessType,
-    locationAddress,
-    locationEircode,
-    baseTown,
-    locationCounty,
-    greetingIntro,
-    greetingClosing,
-    hoursNeverConfigured,
-    open24_7,
-    hoursNote,
-    bankHolidays,
-    openingHoursSchedule,
-    openingHoursLegacy,
-    serviceAreaItems,
-    serviceAreaExclusionItems,
-    servicesItems,
-    servicesNotOfferedItems,
-    detailsToCollectItems,
-    detailsCollectMode,
-    businessRulesItems,
-    caraConduct,
-    faqs,
-  ]);
 
   const value: CaraSetupFormContextValue = {
     businessName: initial.businessName,
@@ -663,6 +591,7 @@ export function CaraSetupFormProvider({
     setGreetingClosing,
     businessType,
     setBusinessType,
+    clistePhoneNumber: initial.clistePhoneNumber,
     locationAddress,
     setLocationAddress,
     locationEircode,
@@ -713,7 +642,6 @@ export function CaraSetupFormProvider({
     status,
     save,
     saveAsync,
-    compiledPromptPreview,
     markSavedBaseline,
     discardChanges,
     promptExtras,

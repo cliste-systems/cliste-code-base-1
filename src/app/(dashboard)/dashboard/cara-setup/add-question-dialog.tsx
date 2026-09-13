@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useId, useEffect, useMemo, useState } from "react";
-
-import { CanonicalQuestionBlocked } from "./canonical-question-blocked";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,10 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   detectCanonicalQuestion,
-  lintFaqFields,
-  shortenAnswerForSpokenDelivery,
 } from "@/lib/answers-boundary";
-import { buildCaraCapabilitiesFromPromptExtras } from "@/lib/call-handling-boundary";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import { formatWeekScheduleForAgent } from "@/lib/agent-knowledge-format";
 import { cleanBusinessRules } from "@/lib/agent-business-rules";
@@ -34,6 +28,7 @@ import { weekScheduleHasOpenDay } from "@/lib/business-hours";
 import { cn } from "@/lib/utils";
 
 import type { AgentFaq } from "../agent-setup/agent-faqs";
+import { CanonicalQuestionBlocked } from "./canonical-question-blocked";
 
 type Props = {
   open: boolean;
@@ -84,44 +79,11 @@ export function AddQuestionDialog({
     }
   }, [open, initialQuestion, initialAnswer]);
 
-  const caps = buildCaraCapabilitiesFromPromptExtras(routes, transferNumber);
-  const smsConfigured = caps.sendLink || caps.sendFile;
-
   const canonicalMatch = useMemo(() => {
     const q = question.trim();
     if (!q) return null;
     return detectCanonicalQuestion(q);
   }, [question]);
-
-  const draftWarnings = useMemo(() => {
-    const q = question.trim();
-    if (!q) return [];
-    const draftFaqs = [...existingFaqs, { question: q, answer: answer.trim() }];
-    return lintFaqFields({
-      faqs: draftFaqs,
-      index: draftFaqs.length - 1,
-      routes,
-      transferNumber,
-      openingHours,
-      businessRules,
-      serviceCatalog,
-    });
-  }, [
-    question,
-    answer,
-    existingFaqs,
-    routes,
-    transferNumber,
-    openingHours,
-    businessRules,
-    serviceCatalog,
-  ]);
-
-  const hasBlockingWarning = draftWarnings.some(
-    (w) =>
-      w.kind === "injection" ||
-      (w.kind === "structured_duplicate" && w.id === "structured-hours"),
-  );
 
   function submit() {
     const q = question.trim();
@@ -202,38 +164,6 @@ export function AddQuestionDialog({
                   className={cn(DASHBOARD_INPUT_CLASS, "min-h-[6rem] resize-none")}
                 />
               </div>
-
-              {draftWarnings.length > 0 ? (
-                <div className="space-y-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2.5">
-                  {draftWarnings.map((warning) => (
-                    <p
-                      key={warning.id}
-                      className="text-[12px] leading-relaxed text-amber-950"
-                    >
-                      {warning.message}{" "}
-                      {warning.href ? (
-                        <Link
-                          href={warning.href}
-                          className="font-medium underline underline-offset-2"
-                        >
-                          Review
-                        </Link>
-                      ) : null}
-                      {warning.kind === "spoken_url" && smsConfigured ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAnswer(shortenAnswerForSpokenDelivery(answer))
-                          }
-                          className="ml-1 font-medium text-[#0b1220] underline underline-offset-2"
-                        >
-                          Shorten for speaking
-                        </button>
-                      ) : null}
-                    </p>
-                  ))}
-                </div>
-              ) : null}
             </div>
 
             <DialogFooter className="mb-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-white px-5 pt-4 pb-5">
@@ -247,7 +177,7 @@ export function AddQuestionDialog({
               </Button>
               <Button
                 type="button"
-                disabled={!question.trim() || hasBlockingWarning}
+                disabled={!question.trim()}
                 onClick={() => submit()}
                 className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS)}
               >

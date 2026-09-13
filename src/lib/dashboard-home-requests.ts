@@ -105,12 +105,11 @@ export function buildHomeTodaysRequestRows(input: {
     )
     .slice(0, limit)
     .map((ticket) => {
-      const category = classifyActionCategory(ticket.summary);
       return {
         id: ticket.id,
         href: `${DASHBOARD_ROUTES.actionInbox}?ticket=${encodeURIComponent(ticket.id)}`,
         title: ticketCallerLabel(ticket),
-        description: homeRequestTitle(category),
+        description: truncateHomePanelDescription(summaryPreview(ticket.summary)),
         time: input.formatTime(ticket.created_at),
       };
     });
@@ -180,8 +179,7 @@ export type HomeCaraTrainingRow = {
   time: string;
 };
 
-function caraTrainingRowTitle(status: string | null | undefined): string {
-  if (status === "draft_ready") return "Review draft";
+function caraTrainingRowTitle(_status: string | null | undefined): string {
   return "Knowledge gap";
 }
 

@@ -18,7 +18,6 @@ import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { MAX_FAQS } from "../agent-setup/agent-faqs";
 import { AddQuestionDialog } from "./add-question-dialog";
 import { AnswersFaqEditor } from "./answers-faq-editor";
-import { FaqsLintNotices } from "./faqs-lint-notices";
 import { useCaraSetupForm } from "./cara-setup-form-context";
 import { useDashboardVertical } from "../dashboard-vertical-context";
 
@@ -149,7 +148,6 @@ export function CaraSetupTabAnswers() {
           </Button>
         }
       >
-        <FaqsLintNotices />
         <div className="space-y-4 px-5 py-5">
         {atFaqCap ? (
           <p className="mb-3 text-[12.5px] text-[#35443f]">

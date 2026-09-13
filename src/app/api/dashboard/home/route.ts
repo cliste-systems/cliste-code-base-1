@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     viewAllLocations,
     niche: orgRow?.niche,
     agentBusinessType: orgRow?.agent_business_type,
+    organizationSlug: orgRow?.slug,
   });
 
   return NextResponse.json(snapshot);

@@ -7,13 +7,20 @@ import { redactCallText } from "@/lib/transcript-redaction";
 
 import { actionInboxTrainingQuestion } from "./cara-training-draft";
 import { createTrainingItem } from "./cara-training";
-import { isRoutineHandoff, type KnowledgeGapPayload } from "./cara-training-types";
+import { isRoutineHandoff, isStructuredHoursTopic, type KnowledgeGapPayload } from "./cara-training-types";
 
 function defaultQuestionForGap(gap: KnowledgeGapPayload): string {
   const q = gap.cara_question?.trim();
   if (q) return q;
   const topic = gap.topic.trim();
   return `A caller asked about ${topic}. What should I tell them?`;
+}
+
+function orgHasStructuredBusinessHours(raw: unknown): boolean {
+  if (raw == null) return false;
+  if (typeof raw === "string") return raw.trim().length > 0;
+  if (typeof raw === "object") return Object.keys(raw as object).length > 0;
+  return false;
 }
 
 /**
@@ -25,11 +32,26 @@ export async function ingestCallKnowledgeGaps(
   callLogId: string,
   gaps: KnowledgeGapPayload[],
 ): Promise<void> {
+  if (gaps.length === 0) return;
+
+  const { data: org } = await admin
+    .from("organizations")
+    .select("business_hours")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  const hasStructuredHours = orgHasStructuredBusinessHours(org?.business_hours);
+
   for (const gap of gaps) {
     const topic = String(gap.topic ?? "").trim();
     if (!topic) continue;
 
     const callerContextRaw = String(gap.caller_context ?? "").trim();
+    const combined = [topic, callerContextRaw].filter(Boolean).join(" ");
+    if (hasStructuredHours && isStructuredHoursTopic(combined)) {
+      continue;
+    }
+
     const callerContext = callerContextRaw
       ? redactCallText(callerContextRaw).text
       : null;

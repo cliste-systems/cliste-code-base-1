@@ -8,7 +8,7 @@ import type {
 } from "@/lib/dashboard-home-requests";
 import { formatMinutes } from "@/app/(dashboard)/dashboard/billing/usage-helpers";
 import { loadAccountBilling } from "@/lib/account-session";
-import { buildDashboardActivityFeed } from "@/lib/dashboard-activity-feed";
+import { buildHomeLiveActivityFeed } from "@/lib/dashboard-activity-feed";
 import { sumBillableMinutesFromDurations } from "@/lib/billable-minutes";
 import { PLANS } from "@/lib/cliste-plans";
 import { buildCaraLastCallSnapshot } from "@/lib/cara-last-call";
@@ -139,9 +139,16 @@ export async function loadDashboardHomeSnapshot(input: {
   viewAllLocations: boolean;
   niche: string | null | undefined;
   agentBusinessType: string | null | undefined;
+  organizationSlug?: string | null;
 }): Promise<DashboardHomeSnapshot> {
-  const { session, metricRange, viewAllLocations, niche, agentBusinessType } =
-    input;
+  const {
+    session,
+    metricRange,
+    viewAllLocations,
+    niche,
+    agentBusinessType,
+    organizationSlug,
+  } = input;
   const { supabase, organizationId, profile, accountId } = session;
   const scope = await resolveDashboardOrganizationScope(session, viewAllLocations);
   const scopedOrgIds = scope.organizationIds;
@@ -372,9 +379,8 @@ export async function loadDashboardHomeSnapshot(input: {
     DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT,
   );
 
-  const activityLive = buildDashboardActivityFeed({
+  const activityLive = buildHomeLiveActivityFeed({
     calls: recentCallsForFeed,
-    tickets: ticketRows,
     formatTime: formatDashboardFeedRelativeTime,
     limit: DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT,
   });
@@ -412,7 +418,7 @@ export async function loadDashboardHomeSnapshot(input: {
       .map((row) => row.created_at),
   );
 
-  const useHomeMock = isDashboardHomeMockEnabled();
+  const useHomeMock = isDashboardHomeMockEnabled(organizationSlug);
 
   const activity = useHomeMock ? [...DASHBOARD_HOME_MOCK.activity] : activityLive;
   const needsAttention = useHomeMock

@@ -1,10 +1,14 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import {
+  callerLiveActivityLabel,
+  formatDashboardFeedRelativeTime,
+  ticketCallerLabel,
+} from "@/lib/dashboard-feed-time";
+import {
   formatLiveActivityCallAction,
   formatLiveActivityTicketAction,
 } from "@/lib/dashboard-live-activity";
-import { ticketCallerLabel } from "@/lib/dashboard-feed-time";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 export type ActivityFeedSourceCall = {
@@ -31,7 +35,35 @@ function callerLabelFor(row: ActivityFeedSourceCall): string {
   return "Unknown caller";
 }
 
-/** Merged feed of what Cara did — calls, deliveries, captured requests. */
+/** Overview Live activity — incoming calls only, first name + number. */
+export function buildHomeLiveActivityFeed(input: {
+  calls: ActivityFeedSourceCall[];
+  formatTime?: (iso: string) => string;
+  limit?: number;
+}): TimelineFeedRow[] {
+  const limit = input.limit ?? 200;
+  const formatTime = input.formatTime ?? formatDashboardFeedRelativeTime;
+
+  return [...input.calls]
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+    .slice(0, limit)
+    .map((row) => {
+      const label = callerLiveActivityLabel(row);
+      return {
+        id: `${row.id}-call`,
+        title: label.title,
+        subtitle: label.subtitle,
+        time: formatTime(row.created_at),
+        href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(row.id)}`,
+        isoDate: row.created_at,
+      };
+    });
+}
+
+/** Full activity page — calls and inbox items with action labels. */
 export function buildDashboardActivityFeed(input: {
   calls: ActivityFeedSourceCall[];
   tickets: ActivityFeedSourceTicket[];

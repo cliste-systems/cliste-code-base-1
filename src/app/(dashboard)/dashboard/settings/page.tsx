@@ -63,7 +63,10 @@ export default async function SettingsPage() {
       canManageAccount={canManageDashboardConfig(profile.role)}
       isLocalPreview={isLocalPreview}
       profileInitial={{
-        name: profile.name?.trim() || accountSummary.displayName,
+        name:
+          profile.name?.trim() ||
+          user.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim() ||
+          "",
         initials: accountSummary.initials,
         avatarUrl: accountSummary.avatarUrl,
         subtitle: accountSummary.subtitle,
@@ -79,7 +82,6 @@ export default async function SettingsPage() {
       }}
       initial={{
         isActive: org.is_active ?? true,
-        businessName: org.name ?? "",
         phoneNumber: org.phone_number ?? "",
         signupSegment: signupSegmentLabel({
           niche: org.niche,

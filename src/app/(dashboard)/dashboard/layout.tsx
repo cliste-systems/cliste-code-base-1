@@ -61,6 +61,7 @@ const navItems: {
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
   { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
   { href: DASHBOARD_ROUTES.caraTraining, label: "Training", section: "core" },
+  { href: DASHBOARD_ROUTES.businessFaqs, label: "FAQs", section: "core" },
   { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
   { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
@@ -228,7 +229,7 @@ export default async function DashboardLayout({
               </div>
             ) : null}
             <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden overscroll-y-none bg-[#f3f6f4]">
-              <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-home]:!overflow-y-auto has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
+              <div className="relative z-[1] mx-auto flex h-full min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-y-auto bg-[#f3f6f4] px-6 py-6 sm:px-8 has-[data-dashboard-fill]:min-h-0 has-[data-dashboard-fill]:overflow-hidden has-[data-dashboard-fill]:p-0 [scrollbar-gutter:stable]">
                 {children}
               </div>
             </main>

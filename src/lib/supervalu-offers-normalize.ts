@@ -52,7 +52,7 @@ const PREPACK_DEPARTMENT_HINTS = [
   "luncheon",
 ];
 
-/** Fresh butcher counter vs packaged meat-aisle promos. */
+/** Fresh butcher counter vs packaged meat-aisle vs grocery promos. */
 export function classifySupervaluOfferChannel(input: {
   productName: string;
   department: string;
@@ -61,6 +61,12 @@ export function classifySupervaluOfferChannel(input: {
   const name = input.productName.trim();
   const dept = input.department.trim().toLowerCase();
   const label = String(input.discountLabel ?? "").trim();
+  const isMeatDept =
+    /butcher|beef|lamb|pork|poultry|chicken|steak|meat|deli|rashers|sausage|pudding|ham/i.test(
+      dept,
+    );
+
+  if (!isMeatDept) return "grocery";
 
   if (/^\d+\s+for\s+/i.test(label)) return "butcher_counter";
   if (dept === "butcher" && !PREPACK_NAME_PATTERNS.some((pattern) => pattern.test(name))) {

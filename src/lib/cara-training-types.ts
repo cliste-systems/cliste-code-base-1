@@ -78,16 +78,62 @@ export function normalizeTrainingTopic(topic: string): string {
 }
 
 /**
- * A routine booking/callback handoff is NOT a teachable knowledge gap — it is
- * already handled by the Action Inbox, and any genuine gap inside it is caught
- * by the smarter postprocess `knowledge_gaps` path. Keeping these out of Teach
- * Cara stops routine bookings appearing as "I wasn't sure how to handle this".
+ * A routine booking/callback/order handoff is NOT a teachable knowledge gap — it
+ * is already handled by the Action Inbox. Keeping these out of Training stops
+ * operational tickets appearing as "I wasn't sure how to handle this".
  */
 export function isRoutineHandoff(summary: string): boolean {
   const s = String(summary ?? "").toLowerCase();
-  return /\b(book|booking|booked|appointment|appt|slot|reschedul|cancel|patch test|call ?back|callbacks?|ring (them|him|her|me) back)\b/.test(
-    s,
-  );
+  if (
+    /\b(book|booking|booked|appointment|appt|slot|reschedul|cancel|patch test|call ?back|callbacks?|ring (them|him|her|me) back)\b/.test(
+      s,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(cake|bakery|birthday cake|celebration cake|custom cake|cake order)\b/.test(
+      s,
+    )
+  ) {
+    return true;
+  }
+  if (/\b(wants to order|ordering|place an order|order for)\b/.test(s)) {
+    return true;
+  }
+  return false;
+}
+
+/** Alias for clarity at ingestion sites. */
+export const isOperationalHandoff = isRoutineHandoff;
+
+/**
+ * Opening-hours and bank-holiday topics are answered programmatically for retail
+ * orgs with structured business_hours — not teachable service-offer gaps.
+ */
+export function isStructuredHoursTopic(text: string): boolean {
+  const t = String(text ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return false;
+  if (
+    /\b(opening hours|opening hour|open hours|what time.*open|when.*open|are you open|you open|closing time|close at|hours on|open on|open tomorrow|open today)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(st patrick|saint patrick|paddy'?s day|paddys day|bank holiday|public holiday|good friday|easter monday|christmas day|st stephen|boxing day|new year'?s day)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
