@@ -8,6 +8,7 @@ import {
   inferCatalogOfferBrowseCategories,
   inferCatalogSearchIntent,
   normalizeSupervaluCatalogProduct,
+  stripCatalogPackagingNoise,
   stripCatalogSearchBoilerplate,
 } from "./supervalu-catalog-search";
 
@@ -113,6 +114,20 @@ describe("supervalu catalog search", () => {
     const queries = expandSupervaluCatalogSearchQueries("Hellmann's Sriracha");
     assert.ok(queries.includes("Hellmann's chilli"));
     assert.ok(queries.some((q) => /chilli/i.test(q)));
+  });
+
+  it("strips packaging noise and searches core product term first", () => {
+    assert.equal(stripCatalogPackagingNoise("turkey packets"), "turkey");
+    assert.equal(stripCatalogPackagingNoise("pre-pack turkey"), "turkey");
+    const queries = expandSupervaluCatalogSearchQueries("turkey packets");
+    assert.equal(queries[0], "turkey");
+    assert.ok(queries.includes("turkey packets"));
+  });
+
+  it("expands brand plus product queries without hardcoding brands", () => {
+    const queries = expandSupervaluCatalogSearchQueries("greenfarm turkey");
+    assert.ok(queries.includes("greenfarm turkey"));
+    assert.ok(queries.includes("greenfarm"));
   });
 
   it("does not claim stock on no match", () => {

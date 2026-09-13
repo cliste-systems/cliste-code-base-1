@@ -51,26 +51,55 @@ export function stripCatalogSearchBoilerplate(query: string): string {
     .trim();
 }
 
+/** Strip packaging / aisle phrasing callers use — not product names on the gateway. */
+export function stripCatalogPackagingNoise(query: string): string {
+  return query
+    .replace(
+      /\b(packets?|packs?|pre\s*-?\s*pack(?:ed|s)?|packaged|chilled|aisle|tray|fridge|shelf|counter|loose|fresh sliced)\b/gi,
+      " ",
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Expand caller phrasing into gateway queries that actually return results. */
 export function expandSupervaluCatalogSearchQueries(query: string): string[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const queries = new Set<string>([trimmed]);
+  const boilerplate = stripCatalogSearchBoilerplate(trimmed) || trimmed;
+  const core = stripCatalogPackagingNoise(boilerplate) || boilerplate;
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    ordered.push(normalized);
+  };
+
+  if (core !== boilerplate && core !== trimmed) add(core);
+  if (boilerplate !== trimmed) add(boilerplate);
+  add(trimmed);
+
+  const tokens = tokenizeSupervaluSearchQuery(core);
+  if (tokens.length >= 2) {
+    add(tokens.slice(0, 2).join(" "));
+    add(tokens[0]!);
+  } else if (tokens.length === 1) {
+    add(tokens[0]!);
+  }
 
   if (/sriracha/i.test(trimmed)) {
-    queries.add(trimmed.replace(/sriracha/gi, "chilli"));
+    add(trimmed.replace(/sriracha/gi, "chilli"));
     if (/hellmann/i.test(trimmed)) {
-      queries.add("Hellmann's chilli");
+      add("Hellmann's chilli");
     }
   }
 
-  const tokens = tokenizeSupervaluSearchQuery(trimmed);
-  if (tokens.length >= 2 && tokens[0]) {
-    queries.add(tokens.slice(0, 2).join(" "));
-  }
-
-  return [...queries];
+  return ordered;
 }
 
 export type SupervaluCatalogProduct = {
@@ -303,28 +332,11 @@ export function inferCatalogOfferBrowseCategories(query: string): string[] {
   return [];
 }
 
-async function searchSupervaluCatalogLiveSingle(
-  query: string,
-  options?: { storeId?: string; intent?: CatalogQuoteIntent },
-): Promise<SupervaluCatalogMatch[]> {
-  const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
-  if (!trimmed) return [];
-
-  const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
-  const productQuery = stripCatalogSearchBoilerplate(trimmed) || trimmed;
-  const tokens = tokenizeSupervaluSearchQuery(productQuery);
-  if (tokens.length === 0) return [];
-
-  let items: Awaited<ReturnType<typeof fetchSupervaluGatewaySearch>> = [];
-  for (const candidate of expandSupervaluCatalogSearchQueries(productQuery)) {
-    items = await fetchSupervaluGatewaySearch({
-      query: candidate,
-      storeId: options?.storeId,
-    });
-    if (items.length > 0) break;
-  }
-
-  const scored = items
+function scoreGatewayItems(
+  items: Awaited<ReturnType<typeof fetchSupervaluGatewaySearch>>,
+  tokens: string[],
+): { product: SupervaluCatalogProduct; score: number }[] {
+  return items
     .map((item) => {
       const product = normalizeSupervaluCatalogProduct(item);
       if (!product) return null;
@@ -342,6 +354,58 @@ async function searchSupervaluCatalogLiveSingle(
         b.score - a.score ||
         a.product.productName.localeCompare(b.product.productName),
     );
+}
+
+function isStrongCatalogMatch(
+  scored: { score: number }[],
+  tokens: string[],
+): boolean {
+  if (scored.length === 0) return false;
+  if (tokens.length <= 1) return scored[0]!.score >= 0.5;
+  return scored[0]!.score > 0.5;
+}
+
+async function searchSupervaluCatalogLiveSingle(
+  query: string,
+  options?: { storeId?: string; intent?: CatalogQuoteIntent },
+): Promise<SupervaluCatalogMatch[]> {
+  const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
+  if (!trimmed) return [];
+
+  const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
+  const productQuery = stripCatalogSearchBoilerplate(trimmed) || trimmed;
+  const coreQuery = stripCatalogPackagingNoise(productQuery) || productQuery;
+  const tokens = tokenizeSupervaluSearchQuery(coreQuery);
+  if (tokens.length === 0) return [];
+
+  const candidates = expandSupervaluCatalogSearchQueries(trimmed);
+  let bestScored: { product: SupervaluCatalogProduct; score: number }[] = [];
+
+  for (const candidate of candidates) {
+    const items = await fetchSupervaluGatewaySearch({
+      query: candidate,
+      storeId: options?.storeId,
+    });
+    const scored = scoreGatewayItems(items, tokens);
+    // #region agent log
+    fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'pre-fix',hypothesisId:'A',location:'supervalu-catalog-search.ts:gateway-candidate',message:'catalog gateway candidate',data:{trimmed,candidate,coreQuery,tokens,gatewayCount:items.length,topHit:scored[0]?.product.productName??null,topScore:scored[0]?.score??null,topDept:scored[0]?.product.department??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    if (scored.length === 0) continue;
+    if (
+      !bestScored[0] ||
+      scored[0]!.score > bestScored[0]!.score ||
+      (scored[0]!.score === bestScored[0]!.score &&
+        scored.length > bestScored.length)
+    ) {
+      bestScored = scored;
+    }
+    if (isStrongCatalogMatch(scored, tokens)) break;
+  }
+
+  const scored = bestScored;
+  // #region agent log
+  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'pre-fix',hypothesisId:'C',location:'supervalu-catalog-search.ts:final-scored',message:'catalog search final matches',data:{trimmed,coreQuery,matchCount:scored.length,topHits:scored.slice(0,3).map((entry)=>({name:entry.product.productName,dept:entry.product.department,score:entry.score}))},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (scored.length === 0) return [];
 
