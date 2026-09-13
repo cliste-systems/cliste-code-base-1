@@ -147,16 +147,13 @@ export function inferWeeklyOfferChannelFromQuery(
 }
 
 export function resolveWeeklyOfferSearchFilters(
-  query: string,
+  _query: string,
   explicit?: WeeklyOfferSearchFilters,
 ): WeeklyOfferSearchFilters {
-  const channel =
-    explicit?.channel ??
-    inferWeeklyOfferChannelFromQuery(query);
   return {
-    channel,
-    serviceArea: explicit?.serviceArea ?? inferWeeklyOfferServiceAreaFromQuery(query),
-    fulfilment: explicit?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
+    channel: explicit?.channel ?? null,
+    serviceArea: explicit?.serviceArea ?? null,
+    fulfilment: explicit?.fulfilment ?? null,
   };
 }
 
@@ -168,7 +165,11 @@ function rowMatchesFilters(
   if (options?.excludeMeat && row.service_area !== "grocery") return false;
   if (filters.serviceArea && row.service_area !== filters.serviceArea) return false;
   if (filters.fulfilment && row.fulfilment !== filters.fulfilment) return false;
-  if (filters.channel && (row.offer_channel ?? "prepack") !== filters.channel) {
+  if (
+    !filters.serviceArea &&
+    filters.channel &&
+    (row.offer_channel ?? "prepack") !== filters.channel
+  ) {
     return false;
   }
   return true;
@@ -486,6 +487,9 @@ export async function searchRetailWeeklyOffers(
     listIntent ? inferWeeklyOffersBrowseCategories(trimmed) : [];
 
   if (listIntent) {
+    if (filters.serviceArea || filters.fulfilment) {
+      return listRetailWeeklyOffers(rows, filters, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
+    }
     if (browseCategories.length >= 2) {
       const browseMatches = browseRetailWeeklyOffers(
         rows,

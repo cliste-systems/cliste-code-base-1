@@ -8,6 +8,7 @@ import {
   inferWeeklyOfferFulfilmentFromQuery,
   inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
+  resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
@@ -162,19 +163,15 @@ describe("supervalu offers sync helpers", () => {
     );
   });
 
-  it("infers service area and fulfilment from caller phrasing", () => {
+  it("does not infer service area from query text alone", () => {
     assert.equal(
-      inferWeeklyOfferServiceAreaFromQuery("what hams are on offer in the deli"),
+      resolveWeeklyOfferSearchFilters("deli offers", { serviceArea: "deli", fulfilment: "counter" })
+        .serviceArea,
       "deli",
     );
     assert.equal(
-      inferWeeklyOfferFulfilmentFromQuery("steaks on offer at the butcher counter"),
-      "counter",
-    );
-    assert.equal(inferWeeklyOfferChannelFromQuery("pre-pack chicken"), "prepack");
-    assert.equal(
-      inferWeeklyOfferServiceAreaFromQuery("any wine offers this week"),
-      "off_licence",
+      resolveWeeklyOfferSearchFilters("butcher counter", {}).serviceArea,
+      null,
     );
   });
 
@@ -297,10 +294,78 @@ describe("retail weekly offers search", () => {
     const counterMatches = await searchRetailWeeklyOffers(
       mockSupabaseRows(mixedRows) as never,
       "supervalu",
-      "steak at the butcher counter",
+      "steak",
+      { serviceArea: "butcher", fulfilment: "counter" },
     );
     assert.equal(counterMatches.length, 1);
     assert.equal(counterMatches[0]?.fulfilment, "counter");
+  });
+
+  it("keeps deli counter ham out of butcher counter filters", async () => {
+    const mixedRows: RetailWeeklyOfferRow[] = [
+      ...rows,
+      mockOfferRow({
+        id: "4",
+        product_name: "Carroll's of Tullamore Crumbed Ham (1 kg)",
+        department: "Ham",
+        offer_channel: "butcher_counter",
+        service_area: "deli",
+        fulfilment: "counter",
+        current_price_eur: 24.99,
+        search_text: "carrolls crumbed ham deli counter",
+      }),
+    ];
+
+    const butcherMatches = await searchRetailWeeklyOffers(
+      mockSupabaseRows(mixedRows) as never,
+      "supervalu",
+      "weekly offers",
+      { serviceArea: "butcher", fulfilment: "counter" },
+    );
+    assert.ok(butcherMatches.every((match) => match.serviceArea === "butcher"));
+
+    const deliMatches = await searchRetailWeeklyOffers(
+      mockSupabaseRows(mixedRows) as never,
+      "supervalu",
+      "weekly offers",
+      { serviceArea: "deli", fulfilment: "counter" },
+    );
+    assert.equal(deliMatches.length, 1);
+    assert.match(deliMatches[0]?.productName ?? "", /Carroll/i);
+  });
+
+  it("lists deli counter offers without returning grocery when area is set", async () => {
+    const mixedRows: RetailWeeklyOfferRow[] = [
+      mockOfferRow({
+        id: "5",
+        product_name: "Activia Gut Health Cereals 4 Pack (115 g)",
+        department: "Active Health",
+        offer_channel: "prepack",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 2.99,
+        search_text: "activia gut health cereals",
+      }),
+      mockOfferRow({
+        id: "6",
+        product_name: "SuperValu Traditional Cooked Ham (1 kg)",
+        department: "Ham",
+        offer_channel: "butcher_counter",
+        service_area: "deli",
+        fulfilment: "counter",
+        current_price_eur: 22,
+        search_text: "traditional cooked ham deli counter",
+      }),
+    ];
+
+    const matches = await searchRetailWeeklyOffers(
+      mockSupabaseRows(mixedRows) as never,
+      "supervalu",
+      "weekly offers",
+      { serviceArea: "deli", fulfilment: "counter" },
+    );
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Ham/i);
   });
 
   it("infers browse/list intent for general offer questions", () => {

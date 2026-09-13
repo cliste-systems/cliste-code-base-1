@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
   inferWeeklyOffersListIntent,
-  inferWeeklyOfferChannelFromQuery,
   RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS,
   searchRetailWeeklyOffers,
 } from "@/lib/retail-weekly-offers-search";
@@ -148,7 +147,7 @@ export async function POST(request: Request) {
   const channel =
     body.channel === "butcher_counter" || body.channel === "prepack"
       ? body.channel
-      : inferWeeklyOfferChannelFromQuery(query);
+      : undefined;
 
   const serviceArea =
     body.service_area === "butcher" ||
