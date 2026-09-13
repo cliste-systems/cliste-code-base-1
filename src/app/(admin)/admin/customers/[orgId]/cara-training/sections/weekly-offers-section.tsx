@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 import { RefreshCw } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CaraTrainingField } from "@/components/admin/cara-training-field";
 import { CaraTrainingSectionFooter } from "@/components/admin/cara-training-feedback";
@@ -124,11 +124,13 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
             <RefreshCw className="mr-1.5 size-3.5" aria-hidden />
             {pending ? "Syncing…" : "Refresh weekly offers now"}
           </Button>
-          <Button type="button" variant="outline" asChild>
-            <a href="/api/admin/supervalu-offers-snapshot" download="supervalu-weekly-offers.json">
-              Download JSON snapshot
-            </a>
-          </Button>
+          <a
+            href="/api/admin/supervalu-offers-snapshot"
+            download="supervalu-weekly-offers.json"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Download JSON snapshot
+          </a>
         </div>
         {message ? <span className="text-emerald-700 text-xs">{message}</span> : null}
       </CaraTrainingSectionFooter>
