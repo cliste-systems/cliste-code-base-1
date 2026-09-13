@@ -3,8 +3,8 @@
  * pronunciation rules so the preview matches live calls.
  */
 const PRONUNCIATION_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
-  [/\bHello Cara\b/gi, "Hello Kara"],
-  [/\bCara\b/g, "Kara"],
+  [/\bHello Cara\b/gi, "Hello Car-ah"],
+  [/\bCara\b/g, "Car-ah"],
   [/\bKavanaghs\b/gi, "Kavanahs"],
   [/\bDonegal Town\b/gi, "Doneygall Town"],
   [/\bDonegal\b/gi, "Doneygall"],

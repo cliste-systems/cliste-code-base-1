@@ -10,7 +10,7 @@ describe("voice-preview-tts-text", () => {
     );
     assert.match(out, /Kavanahs/);
     assert.match(out, /Doneygall Town/);
-    assert.match(out, /I'm Kara,/);
+    assert.match(out, /I'm Car-ah,/);
     assert.doesNotMatch(out, /\bCara\b/);
   });
 });
