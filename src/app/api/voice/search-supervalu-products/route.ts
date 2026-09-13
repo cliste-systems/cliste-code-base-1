@@ -137,12 +137,19 @@ export async function POST(request: Request) {
 
   const matches = await searchSupervaluCatalogLive(query);
 
+  // #region agent log
+  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'post-fix',hypothesisId:'H1',location:'search-supervalu-products/route.ts:POST',message:'catalog search result',data:{query,matchCount:matches.length,firstMatch:matches[0]?{productName:matches[0].productName,currentPriceEur:matches[0].currentPriceEur,quotePreview:matches[0].quoteText.slice(0,120)}:null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   return NextResponse.json({
     ok: true,
     matches: matches.map((match) => ({
       product_name: match.productName,
       department: match.department,
       sku: match.sku,
+      current_price_eur: match.currentPriceEur,
+      was_price_eur: match.wasPriceEur,
+      discount_label: match.discountLabel,
       score: match.score,
       quote_text: match.quoteText,
     })),

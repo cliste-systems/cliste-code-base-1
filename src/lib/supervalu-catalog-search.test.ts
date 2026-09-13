@@ -21,15 +21,29 @@ describe("supervalu catalog search", () => {
     assert.match(product?.searchText ?? "", /ketchup/);
   });
 
-  it("formats a professional stock quote with callback offer", () => {
+  it("formats a professional stock quote with national range price", () => {
+    const quote = formatCatalogStockQuote({
+      productName: "Weetabix 24 Pack (430 g)",
+      department: "Cereals",
+      currentPriceEur: 4.79,
+      pricePerUnit: "€11.14/kg",
+    });
+    assert.match(quote, /listed at €4\.79/i);
+    assert.match(quote, /SuperValu national range/i);
+    assert.match(quote, /can't confirm today's shelf price/i);
+    assert.match(quote, /call you back/i);
+  });
+
+  it("formats promotional catalog prices with was price", () => {
     const quote = formatCatalogStockQuote({
       productName: "Heinz Tomato Ketchup 570g",
       department: "Grocery",
+      currentPriceEur: 3.5,
+      wasPriceEur: 4.5,
+      discountLabel: "Only €3.50",
     });
-    assert.match(quote, /as far as I'm aware/i);
-    assert.match(quote, /SuperValu range/i);
-    assert.match(quote, /can't confirm it's on the shelf/i);
-    assert.match(quote, /call you back/i);
+    assert.match(quote, /on offer at €3\.50/i);
+    assert.match(quote, /was €4\.50/i);
   });
 
   it("expands sriracha queries to gateway-friendly chilli search", () => {

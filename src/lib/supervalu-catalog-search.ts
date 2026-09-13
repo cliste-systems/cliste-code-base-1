@@ -37,15 +37,32 @@ export type SupervaluCatalogProduct = {
   sku: string | null;
   sourceUrl: string | null;
   searchText: string;
+  currentPriceEur: number | null;
+  wasPriceEur: number | null;
+  discountLabel: string | null;
+  pricePerUnit: string | null;
 };
 
 export type SupervaluCatalogMatch = {
   productName: string;
   department: string;
   sku: string | null;
+  currentPriceEur: number | null;
+  wasPriceEur: number | null;
+  discountLabel: string | null;
   score: number;
   quoteText: string;
 };
+
+function parseGatewayPriceEur(product: SupervaluGatewayProduct): number | null {
+  const current = Number(product.priceNumeric ?? product.wholePrice ?? 0);
+  if (Number.isFinite(current) && current > 0) return current;
+  const fromLabel = String(product.price ?? "")
+    .replace(/[^\d.,]/g, "")
+    .replace(",", ".");
+  const parsed = Number(fromLabel);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
 
 export function normalizeSupervaluCatalogProduct(
   product: SupervaluGatewayProduct,
@@ -56,6 +73,14 @@ export function normalizeSupervaluCatalogProduct(
   const sku = String(product.sku ?? product.productId ?? "").trim() || null;
   const department =
     String(product.attributes?.altCategory ?? "").trim() || "Grocery";
+  const currentPriceEur = parseGatewayPriceEur(product);
+  const wasRaw = Number(product.wasPriceNumeric ?? 0);
+  const wasPriceEur =
+    currentPriceEur != null &&
+    Number.isFinite(wasRaw) &&
+    wasRaw > currentPriceEur
+      ? wasRaw
+      : null;
 
   return {
     productName,
@@ -65,22 +90,58 @@ export function normalizeSupervaluCatalogProduct(
     searchText: normalizeSearchText(
       [productName, department, sku ?? ""].filter(Boolean).join(" "),
     ),
+    currentPriceEur,
+    wasPriceEur,
+    discountLabel: String(product.priceLabel ?? "").trim() || null,
+    pricePerUnit: String(product.pricePerUnit ?? "").trim() || null,
   };
 }
 
 export function formatCatalogStockQuote(input: {
   productName: string;
   department?: string | null;
+  currentPriceEur?: number | null;
+  wasPriceEur?: number | null;
+  discountLabel?: string | null;
+  pricePerUnit?: string | null;
 }): string {
   const dept =
     input.department && input.department !== "Grocery"
       ? ` (${input.department})`
       : "";
-  return [
-    `As far as I'm aware, yes — we carry ${input.productName}${dept} as part of the SuperValu range.`,
-    "I can't confirm it's on the shelf at this exact moment.",
+  const parts: string[] = [];
+
+  if (input.currentPriceEur != null) {
+    const price = `€${input.currentPriceEur.toFixed(2)}`;
+    if (input.wasPriceEur != null && input.wasPriceEur > input.currentPriceEur) {
+      parts.push(
+        `${input.productName}${dept} is on offer at ${price} (was €${input.wasPriceEur.toFixed(2)}) on the SuperValu national range.`,
+      );
+      if (input.discountLabel) {
+        parts[parts.length - 1] += ` — ${input.discountLabel}`;
+      }
+    } else {
+      parts.push(
+        `${input.productName}${dept} is listed at ${price} on the SuperValu national range.`,
+      );
+    }
+    if (input.pricePerUnit) {
+      parts.push(`Unit price: ${input.pricePerUnit}.`);
+    }
+  } else {
+    parts.push(
+      `As far as I'm aware, yes — we carry ${input.productName}${dept} as part of the SuperValu range.`,
+    );
+  }
+
+  parts.push(
+    "I can't confirm today's shelf price or that it's in stock at this exact moment.",
+  );
+  parts.push(
     "I can ask a team member to call you back to confirm availability — would that suit you?",
-  ].join(" ");
+  );
+
+  return parts.join(" ");
 }
 
 export function formatCatalogStockNoMatchQuote(query: string): string {
@@ -133,10 +194,17 @@ export async function searchSupervaluCatalogLive(
     productName: product.productName,
     department: product.department,
     sku: product.sku,
+    currentPriceEur: product.currentPriceEur,
+    wasPriceEur: product.wasPriceEur,
+    discountLabel: product.discountLabel,
     score,
     quoteText: formatCatalogStockQuote({
       productName: product.productName,
       department: product.department,
+      currentPriceEur: product.currentPriceEur,
+      wasPriceEur: product.wasPriceEur,
+      discountLabel: product.discountLabel,
+      pricePerUnit: product.pricePerUnit,
     }),
   }));
 }
