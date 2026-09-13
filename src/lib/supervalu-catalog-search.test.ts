@@ -7,6 +7,7 @@ import {
   formatCatalogStockQuote,
   inferCatalogSearchIntent,
   normalizeSupervaluCatalogProduct,
+  stripCatalogSearchBoilerplate,
 } from "./supervalu-catalog-search";
 
 describe("supervalu catalog search", () => {
@@ -73,6 +74,17 @@ describe("supervalu catalog search", () => {
     });
     assert.match(quote, /on offer this week at two euro fifty/i);
     assert.match(quote, /was three euro nineteen/i);
+  });
+
+  it("strips offer phrasing before product search", () => {
+    assert.equal(
+      stripCatalogSearchBoilerplate("is Weetabix on offer this week"),
+      "Weetabix",
+    );
+    assert.equal(
+      stripCatalogSearchBoilerplate("how much is Cadbury Snack Shortcake 5-pack"),
+      "Cadbury Snack Shortcake 5-pack",
+    );
   });
 
   it("infers offer intent from caller phrasing", () => {

@@ -39,6 +39,18 @@ export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
   return "stock";
 }
 
+/** Strip offer/price phrasing so gateway search matches product names. */
+export function stripCatalogSearchBoilerplate(query: string): string {
+  return query
+    .replace(
+      /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
+      " ",
+    )
+    .replace(/^(?:is|are|the|a|an)\b\s*/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Expand caller phrasing into gateway queries that actually return results. */
 export function expandSupervaluCatalogSearchQueries(query: string): string[] {
   const trimmed = query.trim();
@@ -268,11 +280,12 @@ export async function searchSupervaluCatalogLive(
   if (!trimmed) return [];
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
-  const tokens = tokenizeSupervaluSearchQuery(trimmed);
+  const productQuery = stripCatalogSearchBoilerplate(trimmed) || trimmed;
+  const tokens = tokenizeSupervaluSearchQuery(productQuery);
   if (tokens.length === 0) return [];
 
   let items: Awaited<ReturnType<typeof fetchSupervaluGatewaySearch>> = [];
-  for (const candidate of expandSupervaluCatalogSearchQueries(trimmed)) {
+  for (const candidate of expandSupervaluCatalogSearchQueries(productQuery)) {
     items = await fetchSupervaluGatewaySearch({
       query: candidate,
       storeId: options?.storeId,
