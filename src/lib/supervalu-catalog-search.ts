@@ -1,5 +1,8 @@
 import { fetchSupervaluGatewaySearch } from "@/lib/supervalu-gateway";
-import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
+import {
+  isPromotionalSupervaluProduct,
+  normalizeSearchText,
+} from "@/lib/supervalu-offers-normalize";
 import type { SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
 import {
   tokenizeSupervaluSearchQuery,
@@ -13,6 +16,28 @@ import {
 
 export const SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS = 120;
 export const SUPERVALU_CATALOG_SEARCH_MAX_RESULTS = 5;
+
+export type CatalogQuoteIntent = "offer" | "price" | "stock";
+
+/** Infer whether the caller wants offer status, a price, or stock/range info. */
+export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
+  const q = query.toLowerCase();
+  if (
+    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
+      q,
+    )
+  ) {
+    return "offer";
+  }
+  if (
+    /\bhow much\b|\bprice\b|\bcost\b|\bwhat'?s the price\b|\bhow much is\b|\bwhat is the price\b/i.test(
+      q,
+    )
+  ) {
+    return "price";
+  }
+  return "stock";
+}
 
 /** Expand caller phrasing into gateway queries that actually return results. */
 export function expandSupervaluCatalogSearchQueries(query: string): string[] {
@@ -46,6 +71,7 @@ export type SupervaluCatalogProduct = {
   wasPriceEur: number | null;
   discountLabel: string | null;
   pricePerUnit: string | null;
+  isOnOffer: boolean;
 };
 
 export type SupervaluCatalogMatch = {
@@ -55,6 +81,7 @@ export type SupervaluCatalogMatch = {
   currentPriceEur: number | null;
   wasPriceEur: number | null;
   discountLabel: string | null;
+  isOnOffer: boolean;
   score: number;
   quoteText: string;
 };
@@ -99,6 +126,34 @@ export function normalizeSupervaluCatalogProduct(
     wasPriceEur,
     discountLabel: String(product.priceLabel ?? "").trim() || null,
     pricePerUnit: String(product.pricePerUnit ?? "").trim() || null,
+    isOnOffer: isPromotionalSupervaluProduct(product),
+  };
+}
+
+function catalogProductToMatch(
+  product: SupervaluCatalogProduct,
+  score: number,
+  intent: CatalogQuoteIntent,
+): SupervaluCatalogMatch {
+  return {
+    productName: product.productName,
+    department: product.department,
+    sku: product.sku,
+    currentPriceEur: product.currentPriceEur,
+    wasPriceEur: product.wasPriceEur,
+    discountLabel: product.discountLabel,
+    isOnOffer: product.isOnOffer,
+    score,
+    quoteText: formatCatalogStockQuote({
+      productName: product.productName,
+      department: product.department,
+      currentPriceEur: product.currentPriceEur,
+      wasPriceEur: product.wasPriceEur,
+      discountLabel: product.discountLabel,
+      pricePerUnit: product.pricePerUnit,
+      isOnOffer: product.isOnOffer,
+      intent,
+    }),
   };
 }
 
@@ -109,19 +164,33 @@ export function formatCatalogStockQuote(input: {
   wasPriceEur?: number | null;
   discountLabel?: string | null;
   pricePerUnit?: string | null;
+  isOnOffer?: boolean;
+  intent?: CatalogQuoteIntent;
 }): string {
   const dept =
     input.department && input.department !== "Grocery"
       ? ` (${input.department})`
       : "";
+  const intent = input.intent ?? "stock";
+  const onOffer =
+    input.isOnOffer ??
+    ((input.wasPriceEur != null &&
+      input.currentPriceEur != null &&
+      input.wasPriceEur > input.currentPriceEur) ||
+      Boolean(input.discountLabel?.trim()));
   const parts: string[] = [];
 
-  if (input.currentPriceEur != null) {
-    const price = formatSpokenEurAmount(input.currentPriceEur);
-    if (input.wasPriceEur != null && input.wasPriceEur > input.currentPriceEur) {
-      const wasPrice = formatSpokenEurAmount(input.wasPriceEur);
+  if (intent === "offer") {
+    if (onOffer && input.currentPriceEur != null) {
+      const price = formatSpokenEurAmount(input.currentPriceEur);
+      const wasPrice =
+        input.wasPriceEur != null
+          ? formatSpokenEurAmount(input.wasPriceEur)
+          : null;
       parts.push(
-        `${input.productName}${dept} is on offer at ${price} — was ${wasPrice} — on the SuperValu national range.`,
+        wasPrice
+          ? `${input.productName}${dept} is on offer this week at ${price} — was ${wasPrice} — on the SuperValu national range.`
+          : `${input.productName}${dept} is on offer this week at ${price} on the SuperValu national range.`,
       );
       const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
       if (spokenLabel) {
@@ -129,7 +198,38 @@ export function formatCatalogStockQuote(input: {
       }
     } else {
       parts.push(
-        `${input.productName}${dept} is listed at ${price} on the SuperValu national range.`,
+        `${input.productName}${dept} is not showing as on offer this week on the national range I checked.`,
+      );
+    }
+    parts.push(
+      "I can't confirm in-store shelf promos — a team member can double-check if you'd like.",
+    );
+    return parts.join(" ");
+  }
+
+  if (input.currentPriceEur != null) {
+    const price = formatSpokenEurAmount(input.currentPriceEur);
+    if (onOffer) {
+      const wasPrice =
+        input.wasPriceEur != null
+          ? formatSpokenEurAmount(input.wasPriceEur)
+          : null;
+      parts.push(
+        wasPrice
+          ? `${input.productName}${dept} is on offer at ${price} — was ${wasPrice} — on the SuperValu national range.`
+          : `${input.productName}${dept} is on offer at ${price} on the SuperValu national range.`,
+      );
+      const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
+      if (spokenLabel) {
+        parts[parts.length - 1] += ` Offer label: ${spokenLabel}.`;
+      }
+    } else if (intent === "price") {
+      parts.push(
+        `${input.productName}${dept} is ${price} — that's the regular price; it's not on offer this week on the range I checked.`,
+      );
+    } else {
+      parts.push(
+        `${input.productName}${dept} is listed at ${price} on the SuperValu national range — not on offer this week.`,
       );
     }
     if (input.pricePerUnit) {
@@ -144,9 +244,11 @@ export function formatCatalogStockQuote(input: {
   parts.push(
     "I can't confirm today's shelf price or that it's in stock at this exact moment.",
   );
-  parts.push(
-    "I can ask a team member to call you back to confirm availability — would that suit you?",
-  );
+  if (intent !== "price") {
+    parts.push(
+      "I can ask a team member to call you back to confirm availability — would that suit you?",
+    );
+  }
 
   return parts.join(" ");
 }
@@ -160,11 +262,12 @@ export function formatCatalogStockNoMatchQuote(query: string): string {
 
 export async function searchSupervaluCatalogLive(
   query: string,
-  options?: { storeId?: string },
+  options?: { storeId?: string; intent?: CatalogQuoteIntent },
 ): Promise<SupervaluCatalogMatch[]> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
+  const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
   const tokens = tokenizeSupervaluSearchQuery(trimmed);
   if (tokens.length === 0) return [];
 
@@ -194,24 +297,22 @@ export async function searchSupervaluCatalogLive(
       (a, b) =>
         b.score - a.score ||
         a.product.productName.localeCompare(b.product.productName),
-    )
-    .slice(0, SUPERVALU_CATALOG_SEARCH_MAX_RESULTS);
+    );
 
-  return scored.map(({ product, score }) => ({
-    productName: product.productName,
-    department: product.department,
-    sku: product.sku,
-    currentPriceEur: product.currentPriceEur,
-    wasPriceEur: product.wasPriceEur,
-    discountLabel: product.discountLabel,
-    score,
-    quoteText: formatCatalogStockQuote({
-      productName: product.productName,
-      department: product.department,
-      currentPriceEur: product.currentPriceEur,
-      wasPriceEur: product.wasPriceEur,
-      discountLabel: product.discountLabel,
-      pricePerUnit: product.pricePerUnit,
-    }),
-  }));
+  if (scored.length === 0) return [];
+
+  if (intent === "offer") {
+    const promoMatches = scored.filter(({ product }) => product.isOnOffer);
+    if (promoMatches.length === 0) {
+      const best = scored[0]!;
+      return [catalogProductToMatch(best.product, best.score, intent)];
+    }
+    return promoMatches
+      .slice(0, SUPERVALU_CATALOG_SEARCH_MAX_RESULTS)
+      .map(({ product, score }) => catalogProductToMatch(product, score, intent));
+  }
+
+  return scored
+    .slice(0, SUPERVALU_CATALOG_SEARCH_MAX_RESULTS)
+    .map(({ product, score }) => catalogProductToMatch(product, score, intent));
 }
