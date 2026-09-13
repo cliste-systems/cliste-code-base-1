@@ -414,12 +414,6 @@ export function formatWeeklyOfferQuote(input: {
     parts.push(speakEmbeddedEurAmounts(input.pricePerUnit.trim()));
   }
 
-  if (input.isAlcohol) {
-    parts.push(
-      "You'll need to visit the off-licence counter to buy — I can't take payment on the phone",
-    );
-  }
-
   return parts.join(" — ");
 }
 
