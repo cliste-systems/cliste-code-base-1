@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  expandSupervaluCatalogSearchQueries,
   formatCatalogStockNoMatchQuote,
   formatCatalogStockQuote,
   normalizeSupervaluCatalogProduct,
@@ -29,6 +30,12 @@ describe("supervalu catalog search", () => {
     assert.match(quote, /SuperValu range/i);
     assert.match(quote, /can't confirm it's on the shelf/i);
     assert.match(quote, /call you back/i);
+  });
+
+  it("expands sriracha queries to gateway-friendly chilli search", () => {
+    const queries = expandSupervaluCatalogSearchQueries("Hellmann's Sriracha");
+    assert.ok(queries.includes("Hellmann's chilli"));
+    assert.ok(queries.some((q) => /chilli/i.test(q)));
   });
 
   it("does not claim stock on no match", () => {

@@ -9,6 +9,28 @@ import {
 export const SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS = 120;
 export const SUPERVALU_CATALOG_SEARCH_MAX_RESULTS = 5;
 
+/** Expand caller phrasing into gateway queries that actually return results. */
+export function expandSupervaluCatalogSearchQueries(query: string): string[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const queries = new Set<string>([trimmed]);
+
+  if (/sriracha/i.test(trimmed)) {
+    queries.add(trimmed.replace(/sriracha/gi, "chilli"));
+    if (/hellmann/i.test(trimmed)) {
+      queries.add("Hellmann's chilli");
+    }
+  }
+
+  const tokens = tokenizeSupervaluSearchQuery(trimmed);
+  if (tokens.length >= 2 && tokens[0]) {
+    queries.add(tokens.slice(0, 2).join(" "));
+  }
+
+  return [...queries];
+}
+
 export type SupervaluCatalogProduct = {
   productName: string;
   department: string;
@@ -78,10 +100,14 @@ export async function searchSupervaluCatalogLive(
   const tokens = tokenizeSupervaluSearchQuery(trimmed);
   if (tokens.length === 0) return [];
 
-  const items = await fetchSupervaluGatewaySearch({
-    query: trimmed,
-    storeId: options?.storeId,
-  });
+  let items: Awaited<ReturnType<typeof fetchSupervaluGatewaySearch>> = [];
+  for (const candidate of expandSupervaluCatalogSearchQueries(trimmed)) {
+    items = await fetchSupervaluGatewaySearch({
+      query: candidate,
+      storeId: options?.storeId,
+    });
+    if (items.length > 0) break;
+  }
 
   const scored = items
     .map((item) => {
