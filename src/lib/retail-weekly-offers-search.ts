@@ -384,11 +384,21 @@ function preferProductNameMatches<
 >(matches: T[], tokens: string[]): T[] {
   const productTokens = tokens.filter((token) => !FULFILMENT_QUERY_TOKENS.has(token));
   if (productTokens.length === 0 || matches.length <= 1) return matches;
+
+  const nameIncludesToken = (productName: string, token: string) => {
+    const stem = token.replace(/s$/, "");
+    return normalizeSearchText(productName).includes(stem);
+  };
+
+  if (productTokens.length >= 2) {
+    const strictMatches = matches.filter((entry) =>
+      productTokens.every((token) => nameIncludesToken(entry.row.product_name, token)),
+    );
+    if (strictMatches.length > 0) return strictMatches;
+  }
+
   const nameMatches = matches.filter((entry) =>
-    productTokens.some((token) => {
-      const stem = token.replace(/s$/, "");
-      return normalizeSearchText(entry.row.product_name).includes(stem);
-    }),
+    productTokens.some((token) => nameIncludesToken(entry.row.product_name, token)),
   );
   return nameMatches.length > 0 ? nameMatches : matches;
 }
@@ -463,7 +473,7 @@ export function formatWeeklyOfferQuote(input: {
   } else if (serviceArea === "deli" && fulfilment === "counter") {
     channelPrefix = "At the deli counter this week — ";
   } else if (serviceArea === "deli" && fulfilment === "prepack") {
-    channelPrefix = "In the chilled aisle this week — ";
+    channelPrefix = "At the deli counter this week — ";
   } else if (serviceArea === "fish" && fulfilment === "counter") {
     channelPrefix = "At the fish counter this week — ";
   } else if (serviceArea === "fish" && fulfilment === "prepack") {

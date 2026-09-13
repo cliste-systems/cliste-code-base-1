@@ -36,7 +36,7 @@ describe("retail product clarification", () => {
   });
 
   it("prefers fulfilment clarification over brand clarification", () => {
-    const hint = buildProductClarificationHint("salmon darnes on offer", [
+    const hint = buildProductClarificationHint("salmon on offer", [
       {
         product_name: "Loose Side of Salmon (700 g)",
         service_area: "fish",
@@ -105,6 +105,42 @@ describe("retail product clarification", () => {
     assert.match(hint ?? "", /clarifying question/i);
     assert.match(hint ?? "", /Chestnut|Button|Porcini/i);
     assert.doesNotMatch(hint ?? "", /€/);
+  });
+
+  it("does not clarify counter vs pre-pack across different service areas", () => {
+    const hint = buildOfferFulfilmentClarificationHint([
+      {
+        product_name: "Horgans Sliced Corned Beef (120 g)",
+        service_area: "deli",
+        fulfilment: "prepack",
+      },
+      {
+        product_name: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        service_area: "butcher",
+        fulfilment: "counter",
+      },
+    ]);
+    assert.equal(hint, null);
+  });
+
+  it("returns Horgans corned beef without blocking clarification", () => {
+    const response = resolveProductSearchResponse("corned beef", [
+      {
+        product_name: "Horgans Sliced Corned Beef (120 g)",
+        service_area: "deli",
+        fulfilment: "prepack",
+        quote_text: "At the deli counter this week — Horgans Sliced Corned Beef (120 g) is on offer this week at three euro",
+      },
+      {
+        product_name: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        service_area: "butcher",
+        fulfilment: "counter",
+        quote_text: "At the butcher counter this week — sirloin",
+      },
+    ]);
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 1);
+    assert.match(response.matches[0]?.product_name ?? "", /Horgans/i);
   });
 
   it("does not clarify specific brand queries", () => {

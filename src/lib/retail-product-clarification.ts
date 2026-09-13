@@ -81,6 +81,12 @@ export function filterOfferMatchesByInferredFulfilment<T extends ClarificationMa
 
   const byProductName = narrowed.filter((match) => {
     const name = String(match.productName ?? match.product_name ?? "").toLowerCase();
+    if (productTokens.length >= 2) {
+      return productTokens.every((token) => {
+        const stem = token.replace(/s$/, "");
+        return name.includes(stem);
+      });
+    }
     return productTokens.some((token) => {
       const stem = token.replace(/s$/, "");
       return name.includes(stem);
@@ -94,6 +100,11 @@ export function buildOfferFulfilmentClarificationHint(
   matches: ClarificationMatch[],
 ): string | null {
   if (matches.length < 2) return null;
+
+  const areas = new Set(
+    matches.map((match) => matchServiceArea(match)).filter(Boolean),
+  );
+  if (areas.size !== 1) return null;
 
   const fulfilments = new Set(matches.map((match) => matchFulfilment(match)).filter(Boolean));
   if (!fulfilments.has("counter") || !fulfilments.has("prepack")) return null;

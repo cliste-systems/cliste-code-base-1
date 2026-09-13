@@ -595,4 +595,45 @@ describe("retail weekly offers search", () => {
     assert.equal(butcherSteaks.length, 1);
     assert.match(butcherSteaks[0]?.productName ?? "", /Quick Fry Steak/i);
   });
+
+  it("finds corned beef without pulling unrelated beef offers", async () => {
+    const cornedRows: RetailWeeklyOfferRow[] = [
+      mockOfferRow({
+        id: "c1",
+        product_name: "Horgans Sliced Corned Beef (120 g)",
+        department: "Beef & Lucheon Meats",
+        service_area: "deli",
+        fulfilment: "prepack",
+        current_price_eur: 3,
+        search_text: "horgans sliced corned beef deli",
+      }),
+      mockOfferRow({
+        id: "c2",
+        product_name: "SuperValu Beef Meatballs Promo (770 g)",
+        department: "Beef",
+        service_area: "butcher",
+        fulfilment: "prepack",
+        current_price_eur: 4,
+        search_text: "supervalu beef meatballs promo",
+      }),
+      mockOfferRow({
+        id: "c3",
+        product_name: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        department: "Beef Steaks",
+        service_area: "butcher",
+        fulfilment: "counter",
+        current_price_eur: 16.74,
+        search_text: "supervalu fresh irish beef sirloin steak",
+      }),
+    ];
+
+    const matches = await searchRetailWeeklyOffers(
+      mockSupabaseRows(cornedRows) as never,
+      "supervalu",
+      "corned beef",
+    );
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Horgans Sliced Corned Beef/i);
+    assert.match(matches[0]?.quoteText ?? "", /deli counter/i);
+  });
 });
