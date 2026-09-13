@@ -146,7 +146,8 @@ describe("retail weekly offers search", () => {
       discountLabel: "Only €12.99",
     });
     assert.match(quote, /Irish Striploin Steak/);
-    assert.match(quote, /€12\.99/);
+    assert.match(quote, /twelve euro ninety nine/i);
+    assert.match(quote, /was sixteen euro ninety nine/i);
     assert.doesNotMatch(quote, /local shop may vary/i);
   });
 

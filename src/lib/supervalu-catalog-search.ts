@@ -5,6 +5,11 @@ import {
   tokenizeSupervaluSearchQuery,
   scoreSupervaluSearchText,
 } from "@/lib/retail-weekly-offers-search";
+import {
+  formatSpokenDiscountLabel,
+  formatSpokenEurAmount,
+  speakEmbeddedEurAmounts,
+} from "@/lib/spoken-eur-price";
 
 export const SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS = 120;
 export const SUPERVALU_CATALOG_SEARCH_MAX_RESULTS = 5;
@@ -112,13 +117,15 @@ export function formatCatalogStockQuote(input: {
   const parts: string[] = [];
 
   if (input.currentPriceEur != null) {
-    const price = `€${input.currentPriceEur.toFixed(2)}`;
+    const price = formatSpokenEurAmount(input.currentPriceEur);
     if (input.wasPriceEur != null && input.wasPriceEur > input.currentPriceEur) {
+      const wasPrice = formatSpokenEurAmount(input.wasPriceEur);
       parts.push(
-        `${input.productName}${dept} is on offer at ${price} (was €${input.wasPriceEur.toFixed(2)}) on the SuperValu national range.`,
+        `${input.productName}${dept} is on offer at ${price} — was ${wasPrice} — on the SuperValu national range.`,
       );
-      if (input.discountLabel) {
-        parts[parts.length - 1] += ` — ${input.discountLabel}`;
+      const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
+      if (spokenLabel) {
+        parts[parts.length - 1] += ` Offer label: ${spokenLabel}.`;
       }
     } else {
       parts.push(
@@ -126,7 +133,7 @@ export function formatCatalogStockQuote(input: {
       );
     }
     if (input.pricePerUnit) {
-      parts.push(`Unit price: ${input.pricePerUnit}.`);
+      parts.push(`Unit price: ${speakEmbeddedEurAmounts(input.pricePerUnit)}.`);
     }
   } else {
     parts.push(

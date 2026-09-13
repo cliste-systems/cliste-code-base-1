@@ -4,6 +4,11 @@ import type {
   RetailWeeklyOfferRow,
   SupervaluOfferChannel,
 } from "@/lib/supervalu-offers-types";
+import {
+  formatSpokenDiscountLabel,
+  formatSpokenEurAmount,
+  speakEmbeddedEurAmounts,
+} from "@/lib/spoken-eur-price";
 
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS = 120;
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS = 5;
@@ -138,7 +143,7 @@ export function formatWeeklyOfferQuote(input: {
   discountLabel?: string | null;
   pricePerUnit?: string | null;
 }): string {
-  const price = `€${input.currentPriceEur.toFixed(2)}`;
+  const price = formatSpokenEurAmount(input.currentPriceEur);
   const channelPrefix =
     input.offerChannel === "prepack"
       ? "In the pre-pack meat aisle this week — "
@@ -147,13 +152,14 @@ export function formatWeeklyOfferQuote(input: {
         : "";
   const parts = [`${channelPrefix}${input.productName} is on offer this week at ${price}`];
   if (input.wasPriceEur && input.wasPriceEur > input.currentPriceEur) {
-    parts.push(`was €${input.wasPriceEur.toFixed(2)}`);
+    parts.push(`was ${formatSpokenEurAmount(input.wasPriceEur)}`);
   }
-  if (input.discountLabel?.trim()) {
-    parts.push(input.discountLabel.trim());
+  const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
+  if (spokenLabel) {
+    parts.push(spokenLabel);
   }
   if (input.pricePerUnit?.trim()) {
-    parts.push(input.pricePerUnit.trim());
+    parts.push(speakEmbeddedEurAmounts(input.pricePerUnit.trim()));
   }
   return parts.join(" — ");
 }
@@ -247,12 +253,14 @@ export function buildRetailWeeklyOffersPromptSection(input: {
   const lines = input.offers
     .slice(0, RETAIL_WEEKLY_OFFERS_PROMPT_MAX_ITEMS)
     .map((offer) => {
-      const price = `€${Number(offer.current_price_eur).toFixed(2)}`;
+      const price = formatSpokenEurAmount(Number(offer.current_price_eur));
       const was =
         offer.was_price_eur != null
-          ? ` (was €${Number(offer.was_price_eur).toFixed(2)})`
+          ? ` (was ${formatSpokenEurAmount(Number(offer.was_price_eur))})`
           : "";
-      const label = offer.discount_label ? ` — ${offer.discount_label}` : "";
+      const label = offer.discount_label
+        ? ` — ${formatSpokenDiscountLabel(offer.discount_label) ?? offer.discount_label}`
+        : "";
       return `• ${offer.product_name} (${offer.department}): ${price}${was}${label}`;
     });
 
