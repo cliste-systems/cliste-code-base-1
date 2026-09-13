@@ -1,5 +1,15 @@
 export type SupervaluOfferChannel = "butcher_counter" | "prepack" | "grocery";
 
+export type SupervaluServiceArea =
+  | "butcher"
+  | "deli"
+  | "produce"
+  | "bakery"
+  | "off_licence"
+  | "grocery";
+
+export type SupervaluFulfilment = "counter" | "prepack";
+
 export type RetailWeeklyOfferRow = {
   id: string;
   organization_id: string | null;
@@ -8,10 +18,17 @@ export type RetailWeeklyOfferRow = {
   product_name: string;
   department: string;
   offer_channel: SupervaluOfferChannel;
+  service_area: SupervaluServiceArea;
+  fulfilment: SupervaluFulfilment;
   current_price_eur: number;
   was_price_eur: number | null;
   discount_label: string | null;
   price_per_unit: string | null;
+  category_breadcrumb: string | null;
+  sell_by: string | null;
+  price_unit_type: string | null;
+  is_alcohol: boolean;
+  brand: string | null;
   sku: string | null;
   offer_week_start: string;
   offer_week_end: string;
@@ -20,10 +37,18 @@ export type RetailWeeklyOfferRow = {
   synced_at: string;
 };
 
+export type SupervaluGatewayCategoryRef = {
+  categoryId?: string;
+  retailerId?: string;
+  category?: string;
+  categoryBreadcrumb?: string;
+};
+
 export type SupervaluGatewayProduct = {
   productId?: string;
   sku?: string;
   name?: string;
+  brand?: string;
   price?: string;
   priceNumeric?: number;
   wholePrice?: number;
@@ -32,8 +57,18 @@ export type SupervaluGatewayProduct = {
   priceLabel?: string;
   pricePerUnit?: string;
   priceSource?: string;
+  sellBy?: string;
+  unitOfPrice?: { type?: string; label?: string };
+  unitOfMeasure?: { type?: string };
+  weightIncrement?: unknown;
+  categories?: SupervaluGatewayCategoryRef[];
+  defaultCategory?: SupervaluGatewayCategoryRef[];
   attributes?: Record<string, unknown> & {
     altCategory?: string;
+    "Alcohol Restricted"?: boolean;
+    "loose fresh"?: boolean;
+    "fresh commodity"?: boolean;
+    "SV packaged"?: boolean;
   };
   url?: string;
 };
@@ -46,6 +81,7 @@ export type SupervaluOffersSyncResult = {
   offerWeekStart: string;
   offerWeekEnd: string;
   syncedAt: string;
+  serviceAreaCounts?: Record<string, number>;
 } | {
   ok: false;
   message: string;
@@ -73,7 +109,7 @@ export const SUPERVALU_MEAT_CATEGORY_SEEDS: {
   { categoryId: "O300545", department: "Deli" },
 ];
 
-/** Top-level SuperValu storefront categories for full-store promo sync. */
+/** @deprecated Use SUPERVALU_PROMO_CATEGORY_SEEDS from supervalu-promo-category-map.ts */
 export const SUPERVALU_FULL_STORE_CATEGORY_SEEDS: {
   categoryId: string;
   department: string;
@@ -82,10 +118,29 @@ export const SUPERVALU_FULL_STORE_CATEGORY_SEEDS: {
   { categoryId: "O100045", department: "Frozen Foods" },
   { categoryId: "O100025", department: "Fresh Fruit & Veg" },
   { categoryId: "O100015", department: "Dairy & Chilled" },
-  { categoryId: "O100010", department: "Drinks" },
-  { categoryId: "O100020", department: "Household" },
-  { categoryId: "O100030", department: "Health & Beauty" },
+  { categoryId: "O100010", department: "Bakery" },
+  { categoryId: "O100050", department: "Household" },
+  { categoryId: "O100055", department: "Health & Beauty" },
   { categoryId: "O200325", department: "Chocolate & Sweets" },
 ];
 
-export const SUPERVALU_MIN_FULL_STORE_OFFER_COUNT = 50;
+export const SUPERVALU_MIN_FULL_STORE_OFFER_COUNT = 350;
+
+export function mapServiceAreaToOfferChannel(input: {
+  serviceArea: SupervaluServiceArea;
+  fulfilment: SupervaluFulfilment;
+}): SupervaluOfferChannel {
+  if (input.serviceArea === "butcher" && input.fulfilment === "counter") {
+    return "butcher_counter";
+  }
+  if (input.serviceArea === "butcher" && input.fulfilment === "prepack") {
+    return "prepack";
+  }
+  if (input.serviceArea === "deli" && input.fulfilment === "counter") {
+    return "butcher_counter";
+  }
+  if (input.serviceArea === "deli" && input.fulfilment === "prepack") {
+    return "prepack";
+  }
+  return "grocery";
+}

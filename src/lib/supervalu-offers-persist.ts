@@ -21,6 +21,7 @@ export async function persistSupervaluNationalOffers(
       offerWeekStart: string;
       offerWeekEnd: string;
       syncedAt: string;
+      serviceAreaCounts: Record<string, number>;
     }
   | { ok: false; message: string }
 > {
@@ -35,25 +36,37 @@ export async function persistSupervaluNationalOffers(
   const syncedAt = new Date().toISOString();
   const syncBatchId = crypto.randomUUID();
   const week = currentSupervaluOfferWeek(new Date());
+  const serviceAreaCounts: Record<string, number> = {};
 
-  const rows = offers.map((offer) => ({
-    organization_id: null,
-    retail_banner: "supervalu",
-    sync_batch_id: syncBatchId,
-    product_name: offer.productName,
-    department: offer.department,
-    offer_channel: offer.offerChannel,
-    current_price_eur: offer.currentPriceEur,
-    was_price_eur: offer.wasPriceEur,
-    discount_label: offer.discountLabel,
-    price_per_unit: offer.pricePerUnit,
-    sku: offer.sku,
-    offer_week_start: week.start,
-    offer_week_end: week.end,
-    source_url: offer.sourceUrl,
-    search_text: offer.searchText,
-    synced_at: syncedAt,
-  }));
+  const rows = offers.map((offer) => {
+    serviceAreaCounts[offer.serviceArea] =
+      (serviceAreaCounts[offer.serviceArea] ?? 0) + 1;
+    return {
+      organization_id: null,
+      retail_banner: "supervalu",
+      sync_batch_id: syncBatchId,
+      product_name: offer.productName,
+      department: offer.department,
+      offer_channel: offer.offerChannel,
+      service_area: offer.serviceArea,
+      fulfilment: offer.fulfilment,
+      current_price_eur: offer.currentPriceEur,
+      was_price_eur: offer.wasPriceEur,
+      discount_label: offer.discountLabel,
+      price_per_unit: offer.pricePerUnit,
+      category_breadcrumb: offer.categoryBreadcrumb,
+      sell_by: offer.sellBy,
+      price_unit_type: offer.priceUnitType,
+      is_alcohol: offer.isAlcohol,
+      brand: offer.brand,
+      sku: offer.sku,
+      offer_week_start: week.start,
+      offer_week_end: week.end,
+      source_url: offer.sourceUrl,
+      search_text: offer.searchText,
+      synced_at: syncedAt,
+    };
+  });
 
   const { error: insertError } = await supabase
     .from("retail_weekly_offers")
@@ -103,6 +116,7 @@ export async function persistSupervaluNationalOffers(
     offerWeekStart: week.start,
     offerWeekEnd: week.end,
     syncedAt,
+    serviceAreaCounts,
   };
 }
 
@@ -120,5 +134,6 @@ export function toSupervaluOffersSyncResult(
     offerWeekStart: persisted.offerWeekStart,
     offerWeekEnd: persisted.offerWeekEnd,
     syncedAt: persisted.syncedAt,
+    serviceAreaCounts: persisted.serviceAreaCounts,
   };
 }

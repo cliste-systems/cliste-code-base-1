@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   fetchSupervaluFullStoreOffers,
   fetchSupervaluMeatPilotOffers,
+  countOffersByServiceArea,
 } from "@/lib/supervalu-offers-fetch";
 import {
   persistSupervaluNationalOffers,
@@ -12,6 +13,7 @@ import {
   buildSupervaluOffersSnapshot,
   persistSupervaluOffersSnapshot,
 } from "@/lib/supervalu-offers-snapshot";
+import { SUPERVALU_SERVICE_AREA_MIN_COUNTS } from "@/lib/supervalu-promo-category-map";
 import {
   SUPERVALU_MIN_FULL_STORE_OFFER_COUNT,
   type SupervaluOffersSyncResult,
@@ -70,6 +72,20 @@ export async function syncSupervaluNationalOffers(
       "expected at least",
       SUPERVALU_MIN_FULL_STORE_OFFER_COUNT,
     );
+  }
+
+  const areaCounts = countOffersByServiceArea(offers);
+  for (const [area, min] of Object.entries(SUPERVALU_SERVICE_AREA_MIN_COUNTS)) {
+    const count = areaCounts[area] ?? 0;
+    if (count < min && !options?.meatPilotOnly) {
+      console.warn(
+        "[supervalu-offers-sync] low service_area count",
+        area,
+        count,
+        "expected at least",
+        min,
+      );
+    }
   }
 
   const persisted = await persistSupervaluNationalOffers(supabase, offers);

@@ -38,7 +38,10 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
         return;
       }
       setMessage(
-        `Synced ${result.offerCount} offers for ${result.organizationsUpdated} SuperValu store(s).`,
+        `Synced ${result.offerCount} offers for ${result.organizationsUpdated} SuperValu store(s).` +
+          (result.serviceAreaCounts
+            ? ` Butcher ${result.serviceAreaCounts.butcher ?? 0}, deli ${result.serviceAreaCounts.deli ?? 0}, produce ${result.serviceAreaCounts.produce ?? 0}, off-licence ${result.serviceAreaCounts.off_licence ?? 0}.`
+            : ""),
       );
       onChange({
         offersSyncedAt: result.syncedAt,
@@ -80,7 +83,7 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="Weekly offers sync"
-      description="National SuperValu promotional snapshot — Cara quotes these via searchWeeklyOffers on calls."
+      description="National SuperValu promotional snapshot — butcher, deli, produce, off-licence, and grocery. Cara quotes these via searchWeeklyOffers on calls."
     >
       <CaraTrainingField label="Last sync" feed="prompt">
         <p className="text-sm text-slate-700">

@@ -7,7 +7,11 @@ import {
   RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS,
   searchRetailWeeklyOffers,
 } from "@/lib/retail-weekly-offers-search";
-import type { SupervaluOfferChannel } from "@/lib/supervalu-offers-types";
+import type {
+  SupervaluFulfilment,
+  SupervaluOfferChannel,
+  SupervaluServiceArea,
+} from "@/lib/supervalu-offers-types";
 import {
   authorizeVoiceWebhook,
   voiceWebhookNoSecretResponse,
@@ -21,6 +25,8 @@ type SearchWeeklyOffersBody = {
   called_number?: string;
   query?: string;
   channel?: SupervaluOfferChannel;
+  service_area?: SupervaluServiceArea;
+  fulfilment?: SupervaluFulfilment;
 };
 
 /**
@@ -144,19 +150,41 @@ export async function POST(request: Request) {
       ? body.channel
       : inferWeeklyOfferChannelFromQuery(query);
 
+  const serviceArea =
+    body.service_area === "butcher" ||
+    body.service_area === "deli" ||
+    body.service_area === "produce" ||
+    body.service_area === "bakery" ||
+    body.service_area === "off_licence" ||
+    body.service_area === "grocery"
+      ? body.service_area
+      : undefined;
+
+  const fulfilment =
+    body.fulfilment === "counter" || body.fulfilment === "prepack"
+      ? body.fulfilment
+      : undefined;
+
   const matches = await searchRetailWeeklyOffers(admin, retailBanner, query, {
     channel,
+    serviceArea,
+    fulfilment,
   });
 
   return NextResponse.json({
     ok: true,
     channel: channel ?? null,
+    service_area: serviceArea ?? null,
+    fulfilment: fulfilment ?? null,
     list: inferWeeklyOffersListIntent(query),
     matches: matches.map((match) => ({
       id: match.id,
       product_name: match.productName,
       department: match.department,
       offer_channel: match.offerChannel,
+      service_area: match.serviceArea,
+      fulfilment: match.fulfilment,
+      is_alcohol: match.isAlcohol,
       current_price_eur: match.currentPriceEur,
       was_price_eur: match.wasPriceEur,
       discount_label: match.discountLabel,

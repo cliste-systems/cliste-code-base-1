@@ -5,16 +5,62 @@ import {
   buildRetailWeeklyOffersPromptSection,
   formatWeeklyOfferQuote,
   inferWeeklyOfferChannelFromQuery,
+  inferWeeklyOfferFulfilmentFromQuery,
+  inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
   searchRetailWeeklyOffers,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
 import {
   classifySupervaluOfferChannel,
+  classifySupervaluOfferServiceArea,
   currentSupervaluOfferWeek,
   isPromotionalSupervaluProduct,
   normalizeSupervaluGatewayProduct,
 } from "./supervalu-offers-normalize";
+
+function mockOfferRow(
+  partial: Partial<RetailWeeklyOfferRow> & Pick<RetailWeeklyOfferRow, "id" | "product_name" | "search_text">,
+): RetailWeeklyOfferRow {
+  return {
+    organization_id: null,
+    retail_banner: "supervalu",
+    sync_batch_id: "batch",
+    department: "Butcher",
+    offer_channel: "butcher_counter",
+    service_area: "butcher",
+    fulfilment: "counter",
+    current_price_eur: 0,
+    was_price_eur: null,
+    discount_label: null,
+    price_per_unit: null,
+    category_breadcrumb: null,
+    sell_by: null,
+    price_unit_type: null,
+    is_alcohol: false,
+    brand: null,
+    sku: null,
+    offer_week_start: "2026-09-04",
+    offer_week_end: "2026-09-10",
+    source_url: null,
+    synced_at: "2026-09-10T06:00:00.000Z",
+    ...partial,
+  };
+}
+
+function mockSupabaseRows(rows: RetailWeeklyOfferRow[]) {
+  const chain = {
+    order: () => chain,
+    limit: async () => ({ data: rows, error: null }),
+  };
+  return {
+    from: () => ({
+      select: () => ({
+        eq: () => chain,
+      }),
+    }),
+  };
+}
 
 describe("supervalu offers sync helpers", () => {
   it("detects promotional gateway products", () => {
@@ -53,6 +99,50 @@ describe("supervalu offers sync helpers", () => {
     );
   });
 
+  it("classifies Carroll's deli counter ham separately from pre-pack chilled ham", () => {
+    const counter = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Carroll's of Tullamore Crumbed Ham (1 kg)",
+        priceNumeric: 24.99,
+        wasPriceNumeric: 29.99,
+        priceLabel: "Only €24.99",
+        pricePerUnit: "€24.99/kg",
+        sellBy: "Unit",
+        unitOfPrice: { type: "kilogram" },
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Deli Counter/Cooked Meats/Ham",
+          },
+        ],
+        attributes: { altCategory: "Ham" },
+      },
+      productName: "Carroll's of Tullamore Crumbed Ham (1 kg)",
+      department: "Ham",
+      discountLabel: "Only €24.99",
+    });
+    assert.equal(counter.serviceArea, "deli");
+    assert.equal(counter.fulfilment, "counter");
+
+    const prepack = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Carrolls of Tullamore Wafer Thin Traditional Ham (200 g)",
+        priceNumeric: 3.5,
+        pricePerUnit: "€17.50/kg",
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Chilled Food/Sliced Cooked Meats/Ham",
+          },
+        ],
+        attributes: { altCategory: "Ham" },
+      },
+      productName: "Carrolls of Tullamore Wafer Thin Traditional Ham (200 g)",
+      department: "Ham",
+    });
+    assert.equal(prepack.serviceArea, "deli");
+    assert.equal(prepack.fulfilment, "prepack");
+  });
+
   it("classifies pre-pack quick fry separately from butcher counter", () => {
     assert.equal(
       classifySupervaluOfferChannel({
@@ -72,12 +162,20 @@ describe("supervalu offers sync helpers", () => {
     );
   });
 
-  it("infers butcher counter channel from caller phrasing", () => {
+  it("infers service area and fulfilment from caller phrasing", () => {
     assert.equal(
-      inferWeeklyOfferChannelFromQuery("steaks on offer at the butcher counter"),
-      "butcher_counter",
+      inferWeeklyOfferServiceAreaFromQuery("what hams are on offer in the deli"),
+      "deli",
+    );
+    assert.equal(
+      inferWeeklyOfferFulfilmentFromQuery("steaks on offer at the butcher counter"),
+      "counter",
     );
     assert.equal(inferWeeklyOfferChannelFromQuery("pre-pack chicken"), "prepack");
+    assert.equal(
+      inferWeeklyOfferServiceAreaFromQuery("any wine offers this week"),
+      "off_licence",
+    );
   });
 
   it("normalizes gateway products into offer rows", () => {
@@ -89,16 +187,35 @@ describe("supervalu offers sync helpers", () => {
         wasPriceNumeric: 16.99,
         priceLabel: "Only €12.99",
         pricePerUnit: "€12.99/kg",
+        sellBy: "Unit",
+        unitOfPrice: { type: "kilogram" },
         url: "https://shop.supervalu.ie/example",
+        defaultCategory: [{ categoryBreadcrumb: "Grocery/Butcher/Beef Steaks" }],
         attributes: { altCategory: "Butcher" },
       },
       "Butcher",
     );
     assert.ok(offer);
     assert.equal(offer?.productName, "Irish Striploin Steak");
-    assert.equal(offer?.offerChannel, "butcher_counter");
+    assert.equal(offer?.serviceArea, "butcher");
+    assert.equal(offer?.fulfilment, "counter");
     assert.equal(offer?.currentPriceEur, 12.99);
     assert.match(offer?.searchText ?? "", /striploin/);
+  });
+
+  it("formats deli counter ham quotes per kilo", () => {
+    const quote = formatWeeklyOfferQuote({
+      productName: "Carroll's Crumbed Ham",
+      serviceArea: "deli",
+      fulfilment: "counter",
+      currentPriceEur: 24.99,
+      wasPriceEur: 29.99,
+      priceUnitType: "kilogram",
+      sellBy: "Unit",
+    });
+    assert.match(quote, /deli counter/i);
+    assert.match(quote, /per kilo/i);
+    assert.match(quote, /twenty four euro ninety nine/i);
   });
 
   it("computes Thursday-start offer weeks in Dublin time", () => {
@@ -110,52 +227,42 @@ describe("supervalu offers sync helpers", () => {
 
 describe("retail weekly offers search", () => {
   const rows: RetailWeeklyOfferRow[] = [
-    {
+    mockOfferRow({
       id: "1",
-      organization_id: null,
-      retail_banner: "supervalu",
-      sync_batch_id: "batch",
       product_name: "Irish Striploin Steak",
       department: "Butcher",
       offer_channel: "butcher_counter",
+      service_area: "butcher",
+      fulfilment: "counter",
       current_price_eur: 12.99,
       was_price_eur: 16.99,
       discount_label: "Only €12.99",
       price_per_unit: "€12.99/kg",
       sku: "123",
-      offer_week_start: "2026-09-04",
-      offer_week_end: "2026-09-10",
-      source_url: null,
       search_text: "irish striploin steak butcher 123",
-      synced_at: "2026-09-10T06:00:00.000Z",
-    },
-    {
+    }),
+    mockOfferRow({
       id: "2",
-      organization_id: null,
-      retail_banner: "supervalu",
-      sync_batch_id: "batch",
       product_name: "Chicken Fillets",
       department: "Butcher",
       offer_channel: "butcher_counter",
+      service_area: "butcher",
+      fulfilment: "counter",
       current_price_eur: 5,
-      was_price_eur: null,
-      discount_label: null,
-      price_per_unit: null,
       sku: "456",
-      offer_week_start: "2026-09-04",
-      offer_week_end: "2026-09-10",
-      source_url: null,
       search_text: "chicken fillets butcher 456",
-      synced_at: "2026-09-10T06:00:00.000Z",
-    },
+    }),
   ];
 
   it("formats quote text without disclaimer", () => {
     const quote = formatWeeklyOfferQuote({
       productName: "Irish Striploin Steak",
+      serviceArea: "butcher",
+      fulfilment: "counter",
       currentPriceEur: 12.99,
       wasPriceEur: 16.99,
       discountLabel: "Only €12.99",
+      priceUnitType: "kilogram",
     });
     assert.match(quote, /Irish Striploin Steak/);
     assert.match(quote, /twelve euro ninety nine/i);
@@ -176,46 +283,24 @@ describe("retail weekly offers search", () => {
   it("filters butcher counter queries away from pre-pack rows", async () => {
     const mixedRows: RetailWeeklyOfferRow[] = [
       ...rows,
-      {
-        ...rows[0]!,
+      mockOfferRow({
         id: "3",
         product_name: "SuperValu Quick Fry Steak (280 g)",
         department: "Beef Steaks",
         offer_channel: "prepack",
+        service_area: "butcher",
+        fulfilment: "prepack",
         search_text: "supervalu quick fry steak beef steaks",
-      },
+      }),
     ];
-    const supabase = {
-      from() {
-        return {
-          select() {
-            return {
-              eq() {
-                return {
-                  order() {
-                    return {
-                      order() {
-                        return {
-                          limit: async () => ({ data: mixedRows, error: null }),
-                        };
-                      },
-                    };
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-    };
 
     const counterMatches = await searchRetailWeeklyOffers(
-      supabase as never,
+      mockSupabaseRows(mixedRows) as never,
       "supervalu",
       "steak at the butcher counter",
     );
     assert.equal(counterMatches.length, 1);
-    assert.equal(counterMatches[0]?.offerChannel, "butcher_counter");
+    assert.equal(counterMatches[0]?.fulfilment, "counter");
   });
 
   it("infers browse/list intent for general offer questions", () => {
@@ -223,37 +308,14 @@ describe("retail weekly offers search", () => {
     assert.equal(inferWeeklyOffersListIntent("what offers do you have apart from meat"), true);
     assert.equal(inferWeeklyOffersListIntent("milk bread crisps chocolate fruit"), true);
     assert.equal(inferWeeklyOffersListIntent("surprise me with your best one"), true);
+    assert.equal(inferWeeklyOffersListIntent("deli offers"), true);
     assert.equal(inferWeeklyOffersListIntent("ham"), false);
     assert.equal(inferWeeklyOffersListIntent("rashers"), false);
   });
 
   it("lists synced offers when caller asks generally", async () => {
-    const supabase = {
-      from() {
-        return {
-          select() {
-            return {
-              eq() {
-                return {
-                  order() {
-                    return {
-                      order() {
-                        return {
-                          limit: async () => ({ data: rows, error: null }),
-                        };
-                      },
-                    };
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-    };
-
     const matches = await searchRetailWeeklyOffers(
-      supabase as never,
+      mockSupabaseRows(rows) as never,
       "supervalu",
       "weekly meat offers",
     );
@@ -261,32 +323,8 @@ describe("retail weekly offers search", () => {
   });
 
   it("scores striploin queries highest", async () => {
-    const supabase = {
-      from() {
-        return {
-          select() {
-            return {
-              eq() {
-                return {
-                  order() {
-                    return {
-                      order() {
-                        return {
-                          limit: async () => ({ data: rows, error: null }),
-                        };
-                      },
-                    };
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-    };
-
     const matches = await searchRetailWeeklyOffers(
-      supabase as never,
+      mockSupabaseRows(rows) as never,
       "supervalu",
       "is striploin steak on offer",
     );

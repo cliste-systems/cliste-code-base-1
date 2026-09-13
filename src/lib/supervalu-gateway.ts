@@ -11,6 +11,7 @@ export const SUPERVALU_GATEWAY_PAGE_SIZE = 100;
 export type SupervaluGatewaySearchResponse = {
   total?: number;
   count?: number;
+  categoryName?: string;
   items?: SupervaluGatewayProduct[];
 };
 
@@ -34,12 +35,16 @@ export async function fetchSupervaluGatewaySearch(input: {
   query: string;
   storeId?: string;
   take?: number;
+  skip?: number;
+  promotionsOnly?: boolean;
 }): Promise<SupervaluGatewayProduct[]> {
   const storeId = input.storeId ?? SUPERVALU_STOREFRONT_STORE_ID;
   const take = input.take ?? SUPERVALU_GATEWAY_PAGE_SIZE;
+  const skip = input.skip ?? 0;
+  const promoPart = input.promotionsOnly ? "&sort=ppfreq&fpromotions=True" : "";
   const url =
     `${SUPERVALU_GATEWAY_BASE}/stores/${encodeURIComponent(storeId)}/search` +
-    `?q=${encodeURIComponent(input.query)}&take=${take}`;
+    `?q=${encodeURIComponent(input.query)}&take=${take}&skip=${skip}${promoPart}`;
   const payload = await fetchSupervaluGatewayJson(url);
   return payload.items ?? [];
 }

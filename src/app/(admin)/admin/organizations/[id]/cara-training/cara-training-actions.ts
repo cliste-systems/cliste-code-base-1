@@ -1051,6 +1051,7 @@ export async function refreshSupervaluWeeklyOffers(): Promise<
       syncedAt: string;
       offerWeekStart: string;
       offerWeekEnd: string;
+      serviceAreaCounts?: Record<string, number>;
     }
   | { ok: false; message: string }
 > {
@@ -1076,6 +1077,7 @@ export async function refreshSupervaluWeeklyOffers(): Promise<
     syncedAt: result.syncedAt,
     offerWeekStart: result.offerWeekStart,
     offerWeekEnd: result.offerWeekEnd,
+    serviceAreaCounts: result.serviceAreaCounts,
   };
 }
 

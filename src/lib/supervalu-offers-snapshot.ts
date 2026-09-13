@@ -16,18 +16,32 @@ export type SupervaluOffersSnapshot = {
   offerWeekStart: string;
   offerWeekEnd: string;
   offerCount: number;
+  serviceAreaCounts: Record<string, number>;
   offers: Array<{
     productName: string;
     department: string;
     offerChannel: string;
+    serviceArea: string;
+    fulfilment: string;
     currentPriceEur: number;
     wasPriceEur: number | null;
     discountLabel: string | null;
     pricePerUnit: string | null;
+    categoryBreadcrumb: string | null;
+    isAlcohol: boolean;
+    brand: string | null;
     sku: string | null;
     quoteText: string;
   }>;
 };
+
+function countServiceAreas(offers: NormalizedWeeklyOffer[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const offer of offers) {
+    counts[offer.serviceArea] = (counts[offer.serviceArea] ?? 0) + 1;
+  }
+  return counts;
+}
 
 export function buildSupervaluOffersSnapshot(input: {
   syncBatchId: string;
@@ -43,22 +57,33 @@ export function buildSupervaluOffersSnapshot(input: {
     offerWeekStart: input.offerWeekStart,
     offerWeekEnd: input.offerWeekEnd,
     offerCount: input.offers.length,
+    serviceAreaCounts: countServiceAreas(input.offers),
     offers: input.offers.map((offer) => ({
       productName: offer.productName,
       department: offer.department,
       offerChannel: offer.offerChannel,
+      serviceArea: offer.serviceArea,
+      fulfilment: offer.fulfilment,
       currentPriceEur: offer.currentPriceEur,
       wasPriceEur: offer.wasPriceEur,
       discountLabel: offer.discountLabel,
       pricePerUnit: offer.pricePerUnit,
+      categoryBreadcrumb: offer.categoryBreadcrumb,
+      isAlcohol: offer.isAlcohol,
+      brand: offer.brand,
       sku: offer.sku,
       quoteText: formatWeeklyOfferQuote({
         productName: offer.productName,
         offerChannel: offer.offerChannel,
+        serviceArea: offer.serviceArea,
+        fulfilment: offer.fulfilment,
         currentPriceEur: offer.currentPriceEur,
         wasPriceEur: offer.wasPriceEur,
         discountLabel: offer.discountLabel,
         pricePerUnit: offer.pricePerUnit,
+        priceUnitType: offer.priceUnitType,
+        sellBy: offer.sellBy,
+        isAlcohol: offer.isAlcohol,
       }),
     })),
   };
@@ -71,23 +96,31 @@ export function buildSupervaluOffersSnapshotFromRows(input: {
   offerWeekEnd: string;
   rows: RetailWeeklyOfferRow[];
 }): SupervaluOffersSnapshot {
+  const offers: NormalizedWeeklyOffer[] = input.rows.map((row) => ({
+    productName: row.product_name,
+    department: row.department,
+    offerChannel: row.offer_channel,
+    serviceArea: row.service_area,
+    fulfilment: row.fulfilment,
+    currentPriceEur: Number(row.current_price_eur),
+    wasPriceEur: row.was_price_eur == null ? null : Number(row.was_price_eur),
+    discountLabel: row.discount_label,
+    pricePerUnit: row.price_per_unit,
+    categoryBreadcrumb: row.category_breadcrumb,
+    sellBy: row.sell_by,
+    priceUnitType: row.price_unit_type,
+    isAlcohol: row.is_alcohol,
+    brand: row.brand,
+    sku: row.sku,
+    sourceUrl: row.source_url,
+    searchText: row.search_text,
+  }));
   return buildSupervaluOffersSnapshot({
     syncBatchId: input.syncBatchId,
     syncedAt: input.syncedAt,
     offerWeekStart: input.offerWeekStart,
     offerWeekEnd: input.offerWeekEnd,
-    offers: input.rows.map((row) => ({
-      productName: row.product_name,
-      department: row.department,
-      offerChannel: row.offer_channel,
-      currentPriceEur: Number(row.current_price_eur),
-      wasPriceEur: row.was_price_eur == null ? null : Number(row.was_price_eur),
-      discountLabel: row.discount_label,
-      pricePerUnit: row.price_per_unit,
-      sku: row.sku,
-      sourceUrl: row.source_url,
-      searchText: row.search_text,
-    })),
+    offers,
   });
 }
 
