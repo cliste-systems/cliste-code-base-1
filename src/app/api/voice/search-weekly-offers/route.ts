@@ -6,6 +6,7 @@ import {
   RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS,
   searchRetailWeeklyOffers,
 } from "@/lib/retail-weekly-offers-search";
+import { buildBroadProductClarificationHint } from "@/lib/retail-product-clarification";
 import type {
   SupervaluFulfilment,
   SupervaluOfferChannel,
@@ -170,26 +171,33 @@ export async function POST(request: Request) {
     fulfilment,
   });
 
+  const mappedMatches = matches.map((match) => ({
+    id: match.id,
+    product_name: match.productName,
+    department: match.department,
+    offer_channel: match.offerChannel,
+    service_area: match.serviceArea,
+    fulfilment: match.fulfilment,
+    is_alcohol: match.isAlcohol,
+    current_price_eur: match.currentPriceEur,
+    was_price_eur: match.wasPriceEur,
+    discount_label: match.discountLabel,
+    price_per_unit: match.pricePerUnit,
+    score: match.score,
+    quote_text: match.quoteText,
+  }));
+  const clarificationHint = buildBroadProductClarificationHint(query, mappedMatches);
+  // #region agent log
+  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'clarify',hypothesisId:'BROAD',location:'search-weekly-offers/route.ts',message:'offers clarification decision',data:{query,matchCount:mappedMatches.length,clarificationHint:clarificationHint??null,topNames:mappedMatches.slice(0,4).map((m)=>m.product_name)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   return NextResponse.json({
     ok: true,
     channel: channel ?? null,
     service_area: serviceArea ?? null,
     fulfilment: fulfilment ?? null,
     list: inferWeeklyOffersListIntent(query),
-    matches: matches.map((match) => ({
-      id: match.id,
-      product_name: match.productName,
-      department: match.department,
-      offer_channel: match.offerChannel,
-      service_area: match.serviceArea,
-      fulfilment: match.fulfilment,
-      is_alcohol: match.isAlcohol,
-      current_price_eur: match.currentPriceEur,
-      was_price_eur: match.wasPriceEur,
-      discount_label: match.discountLabel,
-      price_per_unit: match.pricePerUnit,
-      score: match.score,
-      quote_text: match.quoteText,
-    })),
+    clarification_hint: clarificationHint,
+    matches: clarificationHint ? [] : mappedMatches,
   });
 }

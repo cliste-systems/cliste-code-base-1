@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
+  buildBroadProductClarificationHint,
+} from "@/lib/retail-product-clarification";
+import {
   formatCatalogStockNoMatchQuote,
   inferCatalogOfferBrowseCategories,
   inferCatalogSearchIntent,
@@ -151,22 +154,29 @@ export async function POST(request: Request) {
       : inferCatalogSearchIntent(query);
   const browseCategories =
     intent === "offer" ? inferCatalogOfferBrowseCategories(query) : [];
+  const mappedMatches = matches.map((match) => ({
+    product_name: match.productName,
+    department: match.department,
+    sku: match.sku,
+    current_price_eur: match.currentPriceEur,
+    was_price_eur: match.wasPriceEur,
+    discount_label: match.discountLabel,
+    is_on_offer: match.isOnOffer,
+    score: match.score,
+    quote_text: match.quoteText,
+  }));
+  const clarificationHint = buildBroadProductClarificationHint(query, mappedMatches);
+  // #region agent log
+  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'clarify',hypothesisId:'BROAD',location:'search-supervalu-products/route.ts',message:'catalog clarification decision',data:{query,matchCount:mappedMatches.length,clarificationHint:clarificationHint??null,topNames:mappedMatches.slice(0,4).map((m)=>m.product_name)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return NextResponse.json({
     ok: true,
     intent,
     browse_categories: browseCategories.length > 0 ? browseCategories : null,
-    matches: matches.map((match) => ({
-      product_name: match.productName,
-      department: match.department,
-      sku: match.sku,
-      current_price_eur: match.currentPriceEur,
-      was_price_eur: match.wasPriceEur,
-      discount_label: match.discountLabel,
-      is_on_offer: match.isOnOffer,
-      score: match.score,
-      quote_text: match.quoteText,
-    })),
-    no_match_quote: matches.length === 0 ? formatCatalogStockNoMatchQuote(query) : null,
+    clarification_hint: clarificationHint,
+    matches: clarificationHint ? [] : mappedMatches,
+    no_match_quote:
+      mappedMatches.length === 0 ? formatCatalogStockNoMatchQuote(query) : null,
   });
 }
