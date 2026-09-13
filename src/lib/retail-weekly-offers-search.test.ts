@@ -5,6 +5,7 @@ import {
   buildRetailWeeklyOffersPromptSection,
   formatWeeklyOfferQuote,
   inferWeeklyOfferChannelFromQuery,
+  inferWeeklyOffersListIntent,
   searchRetailWeeklyOffers,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
@@ -204,6 +205,47 @@ describe("retail weekly offers search", () => {
     );
     assert.equal(counterMatches.length, 1);
     assert.equal(counterMatches[0]?.offerChannel, "butcher_counter");
+  });
+
+  it("infers browse/list intent for general offer questions", () => {
+    assert.equal(inferWeeklyOffersListIntent("best offers"), true);
+    assert.equal(inferWeeklyOffersListIntent("what meat offers do you have"), true);
+    assert.equal(inferWeeklyOffersListIntent("surprise me with your best one"), true);
+    assert.equal(inferWeeklyOffersListIntent("ham"), false);
+    assert.equal(inferWeeklyOffersListIntent("rashers"), false);
+  });
+
+  it("lists synced offers when caller asks generally", async () => {
+    const supabase = {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  order() {
+                    return {
+                      order() {
+                        return {
+                          limit: async () => ({ data: rows, error: null }),
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    const matches = await searchRetailWeeklyOffers(
+      supabase as never,
+      "supervalu",
+      "weekly meat offers",
+    );
+    assert.ok(matches.length >= 2);
   });
 
   it("scores striploin queries highest", async () => {

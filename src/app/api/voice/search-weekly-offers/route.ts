@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
+  inferWeeklyOffersListIntent,
   inferWeeklyOfferChannelFromQuery,
   RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS,
   searchRetailWeeklyOffers,
@@ -150,6 +151,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     channel: channel ?? null,
+    list: inferWeeklyOffersListIntent(query),
     matches: matches.map((match) => ({
       id: match.id,
       product_name: match.productName,

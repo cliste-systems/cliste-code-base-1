@@ -10,8 +10,42 @@ import {
   speakEmbeddedEurAmounts,
 } from "@/lib/spoken-eur-price";
 
+/** Caller wants a rundown of synced offers, not one specific product. */
+export function inferWeeklyOffersListIntent(query: string): boolean {
+  const trimmed = query.trim();
+  if (!trimmed) return true;
+  if (
+    /\bweekly offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher) offers\b|\bbest offer|\blist offers\b|\bany offers\b|\boffers (?:this week|do you have|you have|on)\b|\bsurprise me\b|\bhighlights\b|\bwhat'?s on offer\b|\bwhats on offer\b|\btell me (?:the|your) offers\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  const tokens = queryTokens(trimmed);
+  if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
+  if (
+    tokens.length === 1 &&
+    /^(meat|butcher|deli|offers?|promos?)$/i.test(tokens[0] ?? "")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function listRetailWeeklyOffers(
+  rows: RetailWeeklyOfferRow[],
+  channel: SupervaluOfferChannel | null | undefined,
+  limit: number,
+): WeeklyOfferMatch[] {
+  return rows
+    .filter((row) => !channel || (row.offer_channel ?? "prepack") === channel)
+    .slice(0, limit)
+    .map((row, index) => rowToMatch(row, 1 - index * 0.01));
+}
+
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS = 120;
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS = 5;
+export const RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS = 8;
 export const RETAIL_WEEKLY_OFFERS_PROMPT_MAX_ITEMS = 12;
 
 const STOPWORDS = new Set([
@@ -219,6 +253,14 @@ export async function searchRetailWeeklyOffers(
   if (tokens.length === 0) return [];
 
   const channel = options?.channel ?? inferWeeklyOfferChannelFromQuery(trimmed);
+
+  if (inferWeeklyOffersListIntent(trimmed)) {
+    return listRetailWeeklyOffers(
+      rows,
+      channel,
+      RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
+    );
+  }
 
   return rows
     .filter((row) => !channel || (row.offer_channel ?? "prepack") === channel)
