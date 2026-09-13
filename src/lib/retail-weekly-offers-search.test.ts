@@ -396,4 +396,48 @@ describe("retail weekly offers search", () => {
     assert.equal(matches.length, 1);
     assert.equal(matches[0]?.productName, "Irish Striploin Steak");
   });
+
+  it("finds pre-pack steak offers and drops breadcrumb-only steak matches", async () => {
+    const steakRows: RetailWeeklyOfferRow[] = [
+      mockOfferRow({
+        id: "10",
+        product_name: "SuperValu Salt & Chilli Beef Quick Fry Steak (280 g)",
+        department: "Beef Steaks",
+        offer_channel: "prepack",
+        service_area: "butcher",
+        fulfilment: "prepack",
+        current_price_eur: 4,
+        search_text:
+          "supervalu salt chilli beef quick fry steak 280 g beef steaks pre pack",
+      }),
+      mockOfferRow({
+        id: "11",
+        product_name: "Donegal Catch Chip Shop Battered Fish Goujons (400 g)",
+        department: "Breaded Fillets & Steaks",
+        offer_channel: "prepack",
+        service_area: "butcher",
+        fulfilment: "prepack",
+        current_price_eur: 4.5,
+        search_text:
+          "donegal catch chip shop battered fish goujons breaded fillets steaks frozen fish",
+      }),
+    ];
+
+    const counterOnly = await searchRetailWeeklyOffers(
+      mockSupabaseRows(steakRows) as never,
+      "supervalu",
+      "steaks",
+      { serviceArea: "butcher", fulfilment: "counter" },
+    );
+    assert.equal(counterOnly.length, 0);
+
+    const butcherSteaks = await searchRetailWeeklyOffers(
+      mockSupabaseRows(steakRows) as never,
+      "supervalu",
+      "steaks",
+      { serviceArea: "butcher" },
+    );
+    assert.equal(butcherSteaks.length, 1);
+    assert.match(butcherSteaks[0]?.productName ?? "", /Quick Fry Steak/i);
+  });
 });

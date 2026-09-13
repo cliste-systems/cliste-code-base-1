@@ -6,6 +6,7 @@ import type {
   SupervaluOfferChannel,
   SupervaluServiceArea,
 } from "@/lib/supervalu-offers-types";
+import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
 import {
   formatSpokenDiscountLabel,
   formatSpokenEurAmount,
@@ -310,6 +311,29 @@ function scoreOffer(
   return scoreSupervaluSearchText(searchText, tokens, department);
 }
 
+function scoreOfferRow(row: RetailWeeklyOfferRow, tokens: string[]): number {
+  const textScore = scoreOffer(row.search_text, tokens, row.department);
+  const nameScore = scoreOffer(
+    normalizeSearchText(row.product_name),
+    tokens,
+    row.department,
+  );
+  return Math.max(textScore, nameScore);
+}
+
+function preferProductNameMatches<
+  T extends { row: RetailWeeklyOfferRow; score: number },
+>(matches: T[], tokens: string[]): T[] {
+  if (tokens.length === 0 || matches.length <= 1) return matches;
+  const nameMatches = matches.filter((entry) =>
+    tokens.some((token) => {
+      const stem = token.replace(/s$/, "");
+      return normalizeSearchText(entry.row.product_name).includes(stem);
+    }),
+  );
+  return nameMatches.length > 0 ? nameMatches : matches;
+}
+
 export type WeeklyOfferMatch = {
   id: string;
   productName: string;
@@ -512,11 +536,11 @@ export async function searchRetailWeeklyOffers(
   const tokens = queryTokens(trimmed);
   if (tokens.length === 0) return [];
 
-  const matches = rows
+  let matches = rows
     .filter((row) => rowMatchesFilters(row, filters, { excludeMeat }))
     .map((row) => ({
       row,
-      score: scoreOffer(row.search_text, tokens, row.department),
+      score: scoreOfferRow(row, tokens),
     }))
     .filter((entry) => entry.score >= 0.5)
     .sort(
@@ -524,6 +548,7 @@ export async function searchRetailWeeklyOffers(
         b.score - a.score ||
         a.row.product_name.localeCompare(b.row.product_name),
     );
+  matches = preferProductNameMatches(matches, tokens);
 
   const hasCounter = matches.some((m) => m.row.fulfilment === "counter");
   const hasPrepack = matches.some((m) => m.row.fulfilment === "prepack");
