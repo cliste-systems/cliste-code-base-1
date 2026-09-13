@@ -3,6 +3,7 @@ export type SupervaluOfferChannel = "butcher_counter" | "prepack" | "grocery";
 export type SupervaluServiceArea =
   | "butcher"
   | "deli"
+  | "fish"
   | "produce"
   | "bakery"
   | "off_licence"
@@ -71,6 +72,18 @@ export type SupervaluGatewayProduct = {
     "SV packaged"?: boolean;
   };
   url?: string;
+  tprPrice?: Array<{
+    markdown?: number;
+    label?: string;
+    wholePrice?: number;
+    active?: boolean;
+  }>;
+  promotions?: Array<{
+    name?: string;
+    description?: string;
+    promotionType?: string;
+  }>;
+  promotionInfo?: unknown[];
 };
 
 export type SupervaluOffersSyncResult = {
@@ -140,6 +153,12 @@ export function mapServiceAreaToOfferChannel(input: {
     return "butcher_counter";
   }
   if (input.serviceArea === "deli" && input.fulfilment === "prepack") {
+    return "prepack";
+  }
+  if (input.serviceArea === "fish" && input.fulfilment === "counter") {
+    return "butcher_counter";
+  }
+  if (input.serviceArea === "fish" && input.fulfilment === "prepack") {
     return "prepack";
   }
   return "grocery";

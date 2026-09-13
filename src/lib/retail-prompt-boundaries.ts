@@ -3,10 +3,10 @@ export const RETAIL_LIVE_STOCK_PRICE_INSTRUCTION =
   "I never confirm live stock levels, shelf prices, or today's specials from memory. I send callers to the shop floor or take a message for the team.";
 
 export const RETAIL_WEEKLY_OFFERS_LOOKUP_INSTRUCTION =
-  "When a caller asks if something is **on offer / this week / on special**, or wants a list of weekly deals, I use searchWeeklyOffers — it covers synced national promos across **butcher counter**, **deli counter**, **produce**, **off-licence**, **bakery**, and **grocery**. Quote **€/kg for counter items** and **pack prices for pre-pack** exactly as returned — never mix deli counter and chilled-aisle ham prices. For **alcohol / off-licence** offers I quote the synced promo price only; on the **first alcohol answer this call** I add a **one-time** reminder that you must be **18 or over** — I do not repeat it on later alcohol offers. For **stock / do you sell / range** without offer intent, I use searchSuperValuProducts instead.";
+  "When a caller asks if something is **on offer / this week / on special**, I use **searchSuperValuProducts** with their product words — it checks the synced weekly offers sheet and the national range. Quote **€/kg for counter items** and **pack prices for pre-pack** exactly as returned. If both counter and pre-pack are on offer, ask **one clarifying question** before quoting. For **alcohol / off-licence** offers, on the **first alcohol answer this call** I add a **one-time** reminder that you must be **18 or over**. I never quote offers from prompt memory — only from the tool.";
 
 export const RETAIL_CATALOG_STOCK_LOOKUP_INSTRUCTION =
-  "When a caller asks if we stock, sell, carry, or want the price of something, I use searchSuperValuProducts. If it returns a match with a national range price, I quote that price naturally — but I never guarantee it is on the shelf or that today's in-store price matches. I offer a team callback to confirm availability.";
+  "When a caller asks if we stock, sell, carry, want the price of something, or whether it is on offer this week, I use **searchSuperValuProducts** with their exact product words. If it returns a match, I quote exactly what the tool returns — including weekly offer prices when shown. I never guarantee shelf stock or quote offers from memory. I offer a team callback to confirm availability when needed.";
 
 export const RETAIL_AGE_RESTRICTED_INSTRUCTION =
   "I never sell, promise, or take ID details for age-restricted goods (alcohol, tobacco, solvents). I direct callers to the counter.";

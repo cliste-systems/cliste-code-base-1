@@ -99,6 +99,9 @@ export function inferWeeklyOfferServiceAreaFromQuery(
 ): SupervaluServiceArea | null {
   const q = query.toLowerCase();
   if (/off[- ]licence|wine|beer|spirits|cider/i.test(q)) return "off_licence";
+  if (/fish counter|fishmonger|salmon|cod|haddock|seafood|prawn|trout|mackerel|tuna/i.test(q)) {
+    return "fish";
+  }
   if (/deli|carrolls|sliced ham|cooked meat|salami|charcuterie/i.test(q)) return "deli";
   if (/butcher|meat counter|striploin|sirloin|steak|rashers|sausages/i.test(q)) {
     return "butcher";
@@ -115,7 +118,14 @@ export function inferWeeklyOfferFulfilmentFromQuery(
   if (/pre\s*-?\s*pack|packaged|quick fry|meat aisle|chilled aisle|pack\b/i.test(q)) {
     return "prepack";
   }
-  if (/butcher counter|deli counter|the counter|fresh sliced|per kilo|per kg|loose/i.test(q)) {
+  if (
+    /butcher counter|deli counter|fish counter|the counter|fresh sliced|per kilo|per kg|by weight|loose/i.test(
+      q,
+    )
+  ) {
+    return "counter";
+  }
+  if (/\bcounter\b/i.test(q) && !/pre\s*-?\s*pack|packaged/i.test(q)) {
     return "counter";
   }
   if (/fruit|veg|produce/i.test(q) && /fresh counter|loose/i.test(q)) {
@@ -136,6 +146,8 @@ export function inferWeeklyOfferChannelFromQuery(
   const fulfilment = inferWeeklyOfferFulfilmentFromQuery(query);
   if (serviceArea === "butcher" && fulfilment === "counter") return "butcher_counter";
   if (serviceArea === "butcher" && fulfilment === "prepack") return "prepack";
+  if (serviceArea === "fish" && fulfilment === "counter") return "butcher_counter";
+  if (serviceArea === "fish" && fulfilment === "prepack") return "prepack";
   if (serviceArea === "deli" && fulfilment === "counter") return "butcher_counter";
   if (serviceArea === "deli" && fulfilment === "prepack") return "prepack";
   if (/butcher|meat counter|the counter|butchers/i.test(query.toLowerCase())) {
@@ -321,12 +333,39 @@ function scoreOfferRow(row: RetailWeeklyOfferRow, tokens: string[]): number {
   return Math.max(textScore, nameScore);
 }
 
+const FULFILMENT_QUERY_TOKENS = new Set([
+  "loose",
+  "counter",
+  "weight",
+  "kilo",
+  "kg",
+  "by",
+  "per",
+  "fish",
+  "butcher",
+  "deli",
+  "prepack",
+  "packaged",
+  "aisle",
+  "fresh",
+  "sliced",
+  "fishmonger",
+  "fishcounter",
+]);
+
+export function offerSearchProductTokens(query: string): string[] {
+  return tokenizeSupervaluSearchQuery(query).filter(
+    (token) => !FULFILMENT_QUERY_TOKENS.has(token),
+  );
+}
+
 function preferProductNameMatches<
   T extends { row: RetailWeeklyOfferRow; score: number },
 >(matches: T[], tokens: string[]): T[] {
-  if (tokens.length === 0 || matches.length <= 1) return matches;
+  const productTokens = tokens.filter((token) => !FULFILMENT_QUERY_TOKENS.has(token));
+  if (productTokens.length === 0 || matches.length <= 1) return matches;
   const nameMatches = matches.filter((entry) =>
-    tokens.some((token) => {
+    productTokens.some((token) => {
       const stem = token.replace(/s$/, "");
       return normalizeSearchText(entry.row.product_name).includes(stem);
     }),
@@ -368,7 +407,9 @@ function quoteUsesPerKilo(input: {
     return true;
   }
   if (
-    (input.serviceArea === "butcher" || input.serviceArea === "deli") &&
+    (input.serviceArea === "butcher" ||
+      input.serviceArea === "deli" ||
+      input.serviceArea === "fish") &&
     input.fulfilment === "counter"
   ) {
     return true;
@@ -403,6 +444,10 @@ export function formatWeeklyOfferQuote(input: {
     channelPrefix = "At the deli counter this week — ";
   } else if (serviceArea === "deli" && fulfilment === "prepack") {
     channelPrefix = "In the chilled aisle this week — ";
+  } else if (serviceArea === "fish" && fulfilment === "counter") {
+    channelPrefix = "At the fish counter this week — ";
+  } else if (serviceArea === "fish" && fulfilment === "prepack") {
+    channelPrefix = "In the pre-pack fish aisle this week — ";
   } else if (serviceArea === "produce" && fulfilment === "counter") {
     channelPrefix = "At the fruit and veg counter this week — ";
   } else if (serviceArea === "bakery" && fulfilment === "counter") {
@@ -494,47 +539,20 @@ export async function loadRetailWeeklyOffersForBanner(
   return (data ?? []) as RetailWeeklyOfferRow[];
 }
 
-export async function searchRetailWeeklyOffers(
-  supabase: SupabaseClient,
-  retailBanner: string,
+/** Product-token search on synced weekly offers — no list/browse sampling. */
+export function searchSyncedWeeklyOffersInRows(
+  rows: RetailWeeklyOfferRow[],
   query: string,
-  options?: WeeklyOfferSearchFilters,
-): Promise<WeeklyOfferMatch[]> {
+  options?: WeeklyOfferSearchFilters & { limit?: number },
+): WeeklyOfferMatch[] {
   const trimmed = query.trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
-  const rows = await loadRetailWeeklyOffersForBanner(supabase, retailBanner);
-  const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
-  const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
-  const listIntent = inferWeeklyOffersListIntent(trimmed);
-  const browseCategories =
-    listIntent ? inferWeeklyOffersBrowseCategories(trimmed) : [];
-
-  if (listIntent) {
-    if (filters.serviceArea || filters.fulfilment) {
-      return listRetailWeeklyOffers(rows, filters, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
-    }
-    if (browseCategories.length >= 2) {
-      const browseMatches = browseRetailWeeklyOffers(
-        rows,
-        browseCategories,
-        RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
-        { excludeMeat, filters },
-      );
-      if (browseMatches.length > 0) return browseMatches;
-    }
-    if (excludeMeat) {
-      return sampleRetailWeeklyOffersAcrossDepartments(
-        rows,
-        RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
-        { excludeMeat: true, filters },
-      );
-    }
-    return listRetailWeeklyOffers(rows, filters, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
-  }
-
   const tokens = queryTokens(trimmed);
   if (tokens.length === 0) return [];
+
+  const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
+  const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
 
   let matches = rows
     .filter((row) => rowMatchesFilters(row, filters, { excludeMeat }))
@@ -550,20 +568,27 @@ export async function searchRetailWeeklyOffers(
     );
   matches = preferProductNameMatches(matches, tokens);
 
-  const hasCounter = matches.some((m) => m.row.fulfilment === "counter");
-  const hasPrepack = matches.some((m) => m.row.fulfilment === "prepack");
-  const ambiguousHam =
-    !filters.fulfilment &&
-    !filters.serviceArea &&
-    /ham|steak|meat/i.test(trimmed) &&
-    hasCounter &&
-    hasPrepack;
-
-  const limit = ambiguousHam
-    ? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS + 2
-    : RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
-
+  const limit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   return matches.slice(0, limit).map((entry) => rowToMatch(entry.row, entry.score));
+}
+
+export async function searchSyncedWeeklyOffersByQuery(
+  supabase: SupabaseClient,
+  retailBanner: string,
+  query: string,
+  options?: WeeklyOfferSearchFilters & { limit?: number },
+): Promise<WeeklyOfferMatch[]> {
+  const rows = await loadRetailWeeklyOffersForBanner(supabase, retailBanner);
+  return searchSyncedWeeklyOffersInRows(rows, query, options);
+}
+
+export async function searchRetailWeeklyOffers(
+  supabase: SupabaseClient,
+  retailBanner: string,
+  query: string,
+  options?: WeeklyOfferSearchFilters,
+): Promise<WeeklyOfferMatch[]> {
+  return searchSyncedWeeklyOffersByQuery(supabase, retailBanner, query, options);
 }
 
 export function buildRetailWeeklyOffersPromptSection(input: {
@@ -619,6 +644,6 @@ export function buildRetailWeeklyOffersPromptSection(input: {
       (areaCounts.grocery ?? 0) +
       "):",
     ...lines,
-    "Use searchWeeklyOffers for offer/price questions — quote only what it returns.",
+    "Use searchSuperValuProducts for offer/price questions — quote only what it returns.",
   ].join("\n");
 }

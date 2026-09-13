@@ -82,11 +82,109 @@ describe("supervalu offers sync helpers", () => {
     );
     assert.equal(
       isPromotionalSupervaluProduct({
+        priceNumeric: 16.74,
+        wasPriceNumeric: 24.99,
+        priceSource: "promotion",
+        promotions: [{ name: "Save 33%" }],
+      }),
+      true,
+    );
+    assert.equal(
+      isPromotionalSupervaluProduct({
         priceNumeric: 5,
         priceSource: "regular",
       }),
       false,
     );
+  });
+
+  it("normalizes butcher counter sirloin percentage promotions", () => {
+    const offer = normalizeSupervaluGatewayProduct(
+      {
+        sku: "1019164002",
+        name: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        priceNumeric: 16.7433,
+        wasPriceNumeric: 24.99,
+        priceSource: "promotion",
+        pricePerUnit: "€16.74/kg",
+        sellBy: "Unit",
+        unitOfPrice: { type: "kilogram" },
+        promotions: [{ name: "Save 33%", description: "Save 33%" }],
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Meat & Poultry/Beef/Butcher/Beef Steaks",
+          },
+        ],
+        attributes: { altCategory: "Beef Steaks" },
+      },
+      "Butcher",
+    );
+    assert.ok(offer);
+    assert.equal(offer?.serviceArea, "butcher");
+    assert.equal(offer?.fulfilment, "counter");
+    assert.equal(offer?.currentPriceEur, 16.7433);
+    assert.equal(offer?.wasPriceEur, 24.99);
+    assert.equal(offer?.discountLabel, "Save 33%");
+  });
+
+  it("classifies fish counter and pre-pack fish separately", () => {
+    const counter = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Loose Side of Salmon (700 g)",
+        priceNumeric: 15.99,
+        wasPriceNumeric: 18.49,
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Fish & Seafood/Fish Counter",
+          },
+        ],
+        attributes: { altCategory: "Fish Counter" },
+      },
+      productName: "Loose Side of Salmon (700 g)",
+      department: "Fish Counter",
+    });
+    assert.equal(counter.serviceArea, "fish");
+    assert.equal(counter.fulfilment, "counter");
+
+    const prepack = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Keohane's Salmon Fillets (480 g)",
+        priceNumeric: 9,
+        wasPriceNumeric: 10.99,
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Fish & Seafood/Prepack Fresh Fish",
+          },
+        ],
+        attributes: { altCategory: "Prepack Fresh Fish" },
+      },
+      productName: "Keohane's Salmon Fillets (480 g)",
+      department: "Prepack Fresh Fish",
+    });
+    assert.equal(prepack.serviceArea, "fish");
+    assert.equal(prepack.fulfilment, "prepack");
+
+    const frozen = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Birds Eye Battered 2 Fish Fillets (200 g)",
+        priceNumeric: 2.5,
+        wasPriceNumeric: 4.99,
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb:
+              "Grocery/Frozen Foods/Frozen Fish & Seafood/Battered Fillets & Steaks",
+          },
+        ],
+        attributes: { altCategory: "Battered Fillets & Steaks" },
+      },
+      productName: "Birds Eye Battered 2 Fish Fillets (200 g)",
+      department: "Battered Fillets & Steaks",
+    });
+    assert.equal(frozen.serviceArea, "fish");
+    assert.equal(frozen.fulfilment, "prepack");
   });
 
   it("classifies grocery promos separately from meat", () => {
@@ -273,7 +371,7 @@ describe("retail weekly offers search", () => {
       syncedAt: "2026-09-10T06:00:00.000Z",
     });
     assert.ok(section);
-    assert.match(section ?? "", /searchWeeklyOffers/);
+    assert.match(section ?? "", /searchSuperValuProducts/);
     assert.match(section ?? "", /Striploin/);
   });
 
@@ -319,7 +417,7 @@ describe("retail weekly offers search", () => {
     const butcherMatches = await searchRetailWeeklyOffers(
       mockSupabaseRows(mixedRows) as never,
       "supervalu",
-      "weekly offers",
+      "steak",
       { serviceArea: "butcher", fulfilment: "counter" },
     );
     assert.ok(butcherMatches.every((match) => match.serviceArea === "butcher"));
@@ -327,7 +425,7 @@ describe("retail weekly offers search", () => {
     const deliMatches = await searchRetailWeeklyOffers(
       mockSupabaseRows(mixedRows) as never,
       "supervalu",
-      "weekly offers",
+      "ham",
       { serviceArea: "deli", fulfilment: "counter" },
     );
     assert.equal(deliMatches.length, 1);
@@ -361,7 +459,7 @@ describe("retail weekly offers search", () => {
     const matches = await searchRetailWeeklyOffers(
       mockSupabaseRows(mixedRows) as never,
       "supervalu",
-      "weekly offers",
+      "ham",
       { serviceArea: "deli", fulfilment: "counter" },
     );
     assert.equal(matches.length, 1);
@@ -378,13 +476,14 @@ describe("retail weekly offers search", () => {
     assert.equal(inferWeeklyOffersListIntent("rashers"), false);
   });
 
-  it("lists synced offers when caller asks generally", async () => {
+  it("finds meat offers by product tokens", async () => {
     const matches = await searchRetailWeeklyOffers(
       mockSupabaseRows(rows) as never,
       "supervalu",
-      "weekly meat offers",
+      "steak",
     );
-    assert.ok(matches.length >= 2);
+    assert.ok(matches.length >= 1);
+    assert.match(matches[0]?.productName ?? "", /Striploin/i);
   });
 
   it("scores striploin queries highest", async () => {

@@ -83,7 +83,7 @@ export function WeeklyOffersSection({ data, onChange, onSaved }: Props) {
   return (
     <SectionCard
       title="Weekly offers sync"
-      description="National SuperValu promotional snapshot — butcher, deli, produce, off-licence, and grocery. Cara quotes these via searchWeeklyOffers on calls."
+      description="National SuperValu promotional snapshot — butcher, deli, fish, produce, off-licence, and grocery. Cara quotes these via searchSuperValuProducts on calls."
     >
       <CaraTrainingField label="Last sync" feed="prompt">
         <p className="text-sm text-slate-700">

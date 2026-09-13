@@ -95,19 +95,9 @@ describe("supervalu catalog search", () => {
     assert.equal(inferCatalogSearchIntent("do you stock Weetabix"), "stock");
   });
 
-  it("splits multi-category offer browse queries into per-category searches", () => {
-    assert.deepEqual(
-      inferCatalogOfferBrowseCategories("milk bread crisps chocolate fruit"),
-      ["milk", "bread", "crisps", "chocolate", "fruit"],
-    );
-    assert.deepEqual(inferCatalogOfferBrowseCategories("confectionery"), [
-      "chocolate",
-      "sweets",
-    ]);
-    assert.deepEqual(
-      inferCatalogOfferBrowseCategories("list 5 offers apart from meat"),
-      ["chocolate", "crisps", "yogurt", "bread", "fruit"],
-    );
+  it("returns no browse categories — product-token search only", () => {
+    assert.deepEqual(inferCatalogOfferBrowseCategories("weekly offers"), []);
+    assert.deepEqual(inferCatalogOfferBrowseCategories("milk bread crisps"), []);
   });
 
   it("expands sriracha queries to gateway-friendly chilli search", () => {

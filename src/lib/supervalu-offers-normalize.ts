@@ -31,8 +31,10 @@ export type NormalizedWeeklyOffer = {
   searchText: string;
 };
 
+const WEIGHT_IN_PARENS_PATTERN = /\(\s*\d+(\.\d+)?\s*(g|kg|ml|l)\s*\)/i;
+
 const PREPACK_NAME_PATTERNS = [
-  /\(\s*\d+(\.\d+)?\s*(g|kg|ml|l)\s*\)/i,
+  WEIGHT_IN_PARENS_PATTERN,
   /quick fry/i,
   /burger box/i,
   /goujon/i,
@@ -95,6 +97,16 @@ function isWeightSold(product: SupervaluGatewayProduct): boolean {
   );
 }
 
+function matchesButcherPrepackName(name: string, product: SupervaluGatewayProduct): boolean {
+  return PREPACK_NAME_PATTERNS.some((pattern) => {
+    // Counter butcher steaks often show "(1 kg)" while still sold by weight at the counter.
+    if (pattern.source === WEIGHT_IN_PARENS_PATTERN.source && isWeightSold(product)) {
+      return false;
+    }
+    return pattern.test(name);
+  });
+}
+
 /** Classify service area + counter vs prepack from gateway breadcrumbs and attributes. */
 export function classifySupervaluOfferServiceArea(input: {
   product: SupervaluGatewayProduct;
@@ -110,6 +122,23 @@ export function classifySupervaluOfferServiceArea(input: {
 
   if (isAlcoholProduct(product)) {
     return { serviceArea: "off_licence", fulfilment: "prepack" };
+  }
+
+  if (
+    crumb.includes("fish & seafood") ||
+    crumb.includes("fish counter") ||
+    crumb.includes("prepack fresh fish") ||
+    crumb.includes("frozen fish & seafood") ||
+    crumb.includes("prepared by our fishmonger")
+  ) {
+    if (
+      crumb.includes("fish counter") ||
+      crumb.includes("prepared by our fishmonger") ||
+      /^loose /i.test(name)
+    ) {
+      return { serviceArea: "fish", fulfilment: "counter" };
+    }
+    return { serviceArea: "fish", fulfilment: "prepack" };
   }
 
   if (crumb.includes("deli counter")) {
@@ -133,11 +162,11 @@ export function classifySupervaluOfferServiceArea(input: {
     }
     if (
       PREPACK_DEPARTMENT_HINTS.some((hint) => dept.includes(hint)) ||
-      PREPACK_NAME_PATTERNS.some((pattern) => pattern.test(name))
+      matchesButcherPrepackName(name, product)
     ) {
       return { serviceArea: "butcher", fulfilment: "prepack" };
     }
-    if (isWeightSold(product) && !PREPACK_NAME_PATTERNS.some((p) => p.test(name))) {
+    if (isWeightSold(product) && !matchesButcherPrepackName(name, product)) {
       return { serviceArea: "butcher", fulfilment: "counter" };
     }
     return { serviceArea: "butcher", fulfilment: "prepack" };
@@ -236,12 +265,64 @@ export function currentSupervaluOfferWeek(reference = new Date()): {
 export function isPromotionalSupervaluProduct(
   product: SupervaluGatewayProduct,
 ): boolean {
+  if (product.priceSource === "promotion" || product.priceSource === "tpr") {
+    return true;
+  }
+  if ((product.tprPrice?.length ?? 0) > 0) return true;
+  if ((product.promotions?.length ?? 0) > 0) {
+    const current = Number(product.priceNumeric ?? product.wholePrice ?? 0);
+    const was = Number(product.wasPriceNumeric ?? 0);
+    if (was > 0 && was > current) return true;
+    if (product.priceSource === "promotion") return true;
+  }
   const current = Number(product.priceNumeric ?? product.wholePrice ?? 0);
   const was = Number(product.wasPriceNumeric ?? 0);
-  if (product.priceSource === "tpr") return true;
   if (was > 0 && was > current) return true;
   if (String(product.priceLabel ?? "").trim()) return true;
   return false;
+}
+
+function resolvePromotionalPricing(product: SupervaluGatewayProduct): {
+  currentPriceEur: number;
+  wasPriceEur: number | null;
+  discountLabel: string | null;
+} | null {
+  const tpr = product.tprPrice?.[0];
+  if (tpr && Number(tpr.markdown ?? 0) > 0) {
+    const currentPriceEur = Number(tpr.markdown);
+    const wasRaw = Number(product.wasPriceNumeric ?? 0);
+    return {
+      currentPriceEur,
+      wasPriceEur:
+        Number.isFinite(wasRaw) && wasRaw > currentPriceEur ? wasRaw : null,
+      discountLabel:
+        String(tpr.label ?? product.priceLabel ?? "").trim() ||
+        String(product.promotions?.[0]?.name ?? "").trim() ||
+        null,
+    };
+  }
+
+  const currentPriceEur = Number(product.priceNumeric ?? product.wholePrice ?? 0);
+  if (!Number.isFinite(currentPriceEur) || currentPriceEur <= 0) return null;
+
+  const wasRaw = Number(product.wasPriceNumeric ?? 0);
+  const wasPriceEur =
+    Number.isFinite(wasRaw) && wasRaw > currentPriceEur ? wasRaw : null;
+  const promoLabel =
+    String(product.priceLabel ?? "").trim() ||
+    String(product.promotions?.[0]?.name ?? product.promotions?.[0]?.description ?? "").trim() ||
+    null;
+
+  if (
+    product.priceSource === "promotion" ||
+    product.priceSource === "tpr" ||
+    wasPriceEur != null ||
+    promoLabel
+  ) {
+    return { currentPriceEur, wasPriceEur, discountLabel: promoLabel };
+  }
+
+  return null;
 }
 
 export function normalizeSupervaluGatewayProduct(
@@ -250,18 +331,15 @@ export function normalizeSupervaluGatewayProduct(
 ): NormalizedWeeklyOffer | null {
   const productName = String(product.name ?? "").trim();
   if (!productName) return null;
-
-  const currentPriceEur = Number(product.priceNumeric ?? product.wholePrice ?? 0);
-  if (!Number.isFinite(currentPriceEur) || currentPriceEur <= 0) return null;
   if (!isPromotionalSupervaluProduct(product)) return null;
 
-  const wasRaw = Number(product.wasPriceNumeric ?? 0);
-  const wasPriceEur =
-    Number.isFinite(wasRaw) && wasRaw > currentPriceEur ? wasRaw : null;
+  const pricing = resolvePromotionalPricing(product);
+  if (!pricing) return null;
+
+  const { currentPriceEur, wasPriceEur, discountLabel } = pricing;
   const sku = String(product.sku ?? product.productId ?? "").trim() || null;
   const altCategory = String(product.attributes?.altCategory ?? "").trim();
   const resolvedDepartment = altCategory || department;
-  const discountLabel = String(product.priceLabel ?? "").trim() || null;
   const brand = String(product.brand ?? "").trim() || null;
   const categoryBreadcrumb = primaryBreadcrumb(product) || null;
   const sellBy = String(product.sellBy ?? "").trim() || null;

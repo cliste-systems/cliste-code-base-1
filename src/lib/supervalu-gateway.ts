@@ -8,6 +8,16 @@ export const SUPERVALU_GATEWAY_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 export const SUPERVALU_GATEWAY_PAGE_SIZE = 100;
 
+/** Required for SuperValu to return weekly promotion prices (butcher counter % off, etc.). */
+export const SUPERVALU_GATEWAY_STOREFRONT_HEADERS: Record<string, string> = {
+  Accept: "application/json",
+  "User-Agent": SUPERVALU_GATEWAY_USER_AGENT,
+  Origin: "https://shop.supervalu.ie",
+  Referer: "https://shop.supervalu.ie",
+  "X-Site-Host": "https://shop.supervalu.ie",
+  "X-Shopping-Mode": "22222222-2222-2222-2222-222222222222",
+};
+
 export type SupervaluGatewaySearchResponse = {
   total?: number;
   count?: number;
@@ -19,10 +29,7 @@ export async function fetchSupervaluGatewayJson(
   url: string,
 ): Promise<SupervaluGatewaySearchResponse> {
   const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": SUPERVALU_GATEWAY_USER_AGENT,
-    },
+    headers: SUPERVALU_GATEWAY_STOREFRONT_HEADERS,
     cache: "no-store",
   });
   if (!response.ok) {

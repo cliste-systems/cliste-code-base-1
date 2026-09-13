@@ -50,10 +50,6 @@ import {
   loadStorePhoneSystem,
 } from "@/lib/load-store-phone-system";
 import {
-  buildRetailWeeklyOffersPromptSection,
-  loadRetailWeeklyOffersForBanner,
-} from "@/lib/retail-weekly-offers-search";
-import {
   loadActiveBusinessHoursOverride,
   mergeHoursOverrideIntoBundle,
 } from "@/lib/business-hours-overrides";
@@ -284,7 +280,6 @@ export async function regenerateCaraCustomPrompt(
   let retailExtras: ReturnType<typeof buildRetailPromptExtras> | null = null;
   let retailPhoneSystem: Awaited<ReturnType<typeof loadStorePhoneSystem>> | null =
     null;
-  let weeklyOffersSection: string | undefined;
   const hoursOverride = await loadActiveBusinessHoursOverride(
     supabase,
     organizationId,
@@ -300,12 +295,9 @@ export async function regenerateCaraCustomPrompt(
     : (org as PromptOrgRow | null);
   if (isRetail) {
     const retailBanner = String((org as PromptOrgRow | null)?.retail_banner ?? "");
-    const [phoneSystem, departments, weeklyOffers] = await Promise.all([
+    const [phoneSystem, departments] = await Promise.all([
       loadStorePhoneSystem(supabase, organizationId),
       loadStoreDepartments(supabase, organizationId),
-      retailBanner === "supervalu"
-        ? loadRetailWeeklyOffersForBanner(supabase, "supervalu")
-        : Promise.resolve([]),
     ]);
     retailPhoneSystem = phoneSystem;
     retailExtras = buildRetailPromptExtras({
@@ -313,29 +305,9 @@ export async function regenerateCaraCustomPrompt(
       phoneSystem,
       departments,
       retailBanner,
-      weeklyOffersEnabled: weeklyOffers.length > 0,
+      weeklyOffersEnabled: Boolean((org as PromptOrgRow | null)?.offers_synced_at),
       catalogStockLookupEnabled: retailBanner === "supervalu",
     });
-    if (weeklyOffers.length > 0) {
-      const syncedAt =
-        String((org as PromptOrgRow | null)?.offers_synced_at ?? "") ||
-        weeklyOffers[0]?.synced_at ||
-        null;
-      const sortedOffers = [...weeklyOffers].sort((a, b) => {
-        const aMeat = /butcher|meat|beef|steak|striploin/i.test(a.department)
-          ? 0
-          : 1;
-        const bMeat = /butcher|meat|beef|steak|striploin/i.test(b.department)
-          ? 0
-          : 1;
-        return aMeat - bMeat || a.product_name.localeCompare(b.product_name);
-      });
-      weeklyOffersSection =
-        buildRetailWeeklyOffersPromptSection({
-          offers: sortedOffers,
-          syncedAt,
-        }) ?? undefined;
-    }
   }
 
   const adminNotes = String((org as PromptOrgRow | null)?.admin_notes ?? "").trim();
@@ -350,7 +322,6 @@ export async function regenerateCaraCustomPrompt(
     canTransfer: retailExtras?.canTransfer ?? true,
     storeDepartmentsSection: retailExtras?.storeDepartmentsSection,
     retailBoundaryLines: retailExtras?.retailBoundaryLines,
-    weeklyOffersSection,
     adminNotes: adminNotes || undefined,
     platformRules,
   });

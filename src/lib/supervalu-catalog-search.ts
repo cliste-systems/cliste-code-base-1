@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { fetchSupervaluGatewaySearch } from "@/lib/supervalu-gateway";
 import {
   isPromotionalSupervaluProduct,
@@ -5,8 +7,11 @@ import {
 } from "@/lib/supervalu-offers-normalize";
 import type { SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
 import {
+  inferWeeklyOfferFulfilmentFromQuery,
+  searchSyncedWeeklyOffersByQuery,
   tokenizeSupervaluSearchQuery,
   scoreSupervaluSearchText,
+  type WeeklyOfferMatch,
 } from "@/lib/retail-weekly-offers-search";
 import {
   formatSpokenDiscountLabel,
@@ -125,6 +130,10 @@ export type SupervaluCatalogMatch = {
   isOnOffer: boolean;
   score: number;
   quoteText: string;
+  serviceArea?: string;
+  fulfilment?: string;
+  isAlcohol?: boolean;
+  source?: "synced" | "gateway";
 };
 
 function parseGatewayPriceEur(product: SupervaluGatewayProduct): number | null {
@@ -195,6 +204,7 @@ function catalogProductToMatch(
       isOnOffer: product.isOnOffer,
       intent,
     }),
+    source: "gateway",
   };
 }
 
@@ -301,34 +311,72 @@ export function formatCatalogStockNoMatchQuote(query: string): string {
   ].join(" ");
 }
 
-export function inferCatalogOfferBrowseCategories(query: string): string[] {
-  const trimmed = query.trim().toLowerCase();
-  const tokens = tokenizeSupervaluSearchQuery(trimmed);
-  const categoryHints = new Set([
-    "milk",
-    "bread",
-    "crisps",
-    "chocolate",
-    "fruit",
-    "yogurt",
-    "cheese",
-    "butter",
-    "tea",
-    "coffee",
-    "biscuits",
-    "sweets",
-    "confectionery",
-  ]);
-  const fromTokens = tokens.filter((token) => categoryHints.has(token));
-  if (fromTokens.length >= 2) return fromTokens.slice(0, 5);
-  if (/confectionery|sweets|candy/.test(trimmed)) return ["chocolate", "sweets"];
-  if (
-    /\blist\b|\bfive\b|\b5\b|apart from meat|what.*on offer|sample|best deal|weekly offers/i.test(
-      trimmed,
-    )
-  ) {
-    return ["chocolate", "crisps", "yogurt", "bread", "fruit"];
+function catalogSearchCoreQuery(query: string): string {
+  const trimmed = query.trim();
+  const productQuery = stripCatalogSearchBoilerplate(trimmed) || trimmed;
+  return stripCatalogPackagingNoise(productQuery) || productQuery;
+}
+
+function syncedOfferToCatalogMatch(offer: WeeklyOfferMatch): SupervaluCatalogMatch {
+  return {
+    productName: offer.productName,
+    department: offer.department,
+    sku: null,
+    currentPriceEur: offer.currentPriceEur,
+    wasPriceEur: offer.wasPriceEur,
+    discountLabel: offer.discountLabel,
+    isOnOffer: true,
+    score: offer.score,
+    quoteText: offer.quoteText,
+    serviceArea: offer.serviceArea,
+    fulfilment: offer.fulfilment,
+    isAlcohol: offer.isAlcohol,
+    source: "synced",
+  };
+}
+
+function normalizeProductKey(value: string): string {
+  return normalizeSearchText(value);
+}
+
+function mergeGatewayWithSyncedOffers(
+  gatewayMatches: SupervaluCatalogMatch[],
+  syncedMatches: WeeklyOfferMatch[],
+  intent: CatalogQuoteIntent,
+): SupervaluCatalogMatch[] {
+  if (syncedMatches.length === 0) return gatewayMatches;
+
+  const syncedCatalog = syncedMatches.map(syncedOfferToCatalogMatch);
+  if (intent === "offer") {
+    if (gatewayMatches.length === 0) return syncedCatalog;
+    const seen = new Set(
+      syncedCatalog.map((match) => normalizeProductKey(match.productName)),
+    );
+    const extras = gatewayMatches.filter(
+      (match) =>
+        match.isOnOffer &&
+        !seen.has(normalizeProductKey(match.productName)),
+    );
+    return [...syncedCatalog, ...extras].slice(0, SUPERVALU_CATALOG_SEARCH_MAX_RESULTS);
   }
+
+  const syncedByName = new Map<string, WeeklyOfferMatch>();
+  for (const offer of syncedMatches) {
+    syncedByName.set(normalizeProductKey(offer.productName), offer);
+  }
+
+  const merged = gatewayMatches.map((match) => {
+    const synced = syncedByName.get(normalizeProductKey(match.productName));
+    if (!synced) return match;
+    return syncedOfferToCatalogMatch(synced);
+  });
+
+  if (merged.some((match) => match.isOnOffer)) return merged;
+  return merged;
+}
+
+/** @deprecated Browse sampling removed — use product-token search via searchSupervaluCatalogLive. */
+export function inferCatalogOfferBrowseCategories(_query: string): string[] {
   return [];
 }
 
@@ -387,9 +435,6 @@ async function searchSupervaluCatalogLiveSingle(
       storeId: options?.storeId,
     });
     const scored = scoreGatewayItems(items, tokens);
-    // #region agent log
-    fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'pre-fix',hypothesisId:'A',location:'supervalu-catalog-search.ts:gateway-candidate',message:'catalog gateway candidate',data:{trimmed,candidate,coreQuery,tokens,gatewayCount:items.length,topHit:scored[0]?.product.productName??null,topScore:scored[0]?.score??null,topDept:scored[0]?.product.department??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (scored.length === 0) continue;
     if (
       !bestScored[0] ||
@@ -403,9 +448,6 @@ async function searchSupervaluCatalogLiveSingle(
   }
 
   const scored = bestScored;
-  // #region agent log
-  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'pre-fix',hypothesisId:'C',location:'supervalu-catalog-search.ts:final-scored',message:'catalog search final matches',data:{trimmed,coreQuery,matchCount:scored.length,topHits:scored.slice(0,3).map((entry)=>({name:entry.product.productName,dept:entry.product.department,score:entry.score}))},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   if (scored.length === 0) return [];
 
@@ -427,36 +469,33 @@ async function searchSupervaluCatalogLiveSingle(
 
 export async function searchSupervaluCatalogLive(
   query: string,
-  options?: { storeId?: string; intent?: CatalogQuoteIntent },
+  options?: {
+    storeId?: string;
+    intent?: CatalogQuoteIntent;
+    supabase?: SupabaseClient;
+    retailBanner?: string;
+  },
 ): Promise<SupervaluCatalogMatch[]> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
-  const browseCategories =
-    intent === "offer" ? inferCatalogOfferBrowseCategories(trimmed) : [];
+  const impliedFulfilment = inferWeeklyOfferFulfilmentFromQuery(trimmed);
 
-  if (browseCategories.length >= 2) {
-    const seen = new Set<string>();
-    const matches: SupervaluCatalogMatch[] = [];
-    for (const category of browseCategories) {
-      const categoryMatches = await searchSupervaluCatalogLiveSingle(category, {
-        ...options,
-        intent: "offer",
-      });
-      for (const match of categoryMatches) {
-        if (!match.isOnOffer) continue;
-        const key = match.sku ?? match.productName;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        matches.push(match);
-        if (matches.length >= SUPERVALU_CATALOG_SEARCH_MAX_RESULTS) {
-          return matches;
-        }
-      }
-    }
-    if (matches.length > 0) return matches;
+  let syncedMatches: WeeklyOfferMatch[] = [];
+  if (options?.supabase && options?.retailBanner) {
+    syncedMatches = await searchSyncedWeeklyOffersByQuery(
+      options.supabase,
+      options.retailBanner,
+      trimmed,
+      impliedFulfilment ? { fulfilment: impliedFulfilment } : undefined,
+    );
   }
 
-  return searchSupervaluCatalogLiveSingle(trimmed, options);
+  const gatewayMatches = await searchSupervaluCatalogLiveSingle(trimmed, {
+    storeId: options?.storeId,
+    intent,
+  });
+
+  return mergeGatewayWithSyncedOffers(gatewayMatches, syncedMatches, intent);
 }

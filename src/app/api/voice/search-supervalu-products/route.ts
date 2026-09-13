@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
-import {
-  buildBroadProductClarificationHint,
-} from "@/lib/retail-product-clarification";
+import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
 import {
   formatCatalogStockNoMatchQuote,
-  inferCatalogOfferBrowseCategories,
   inferCatalogSearchIntent,
   searchSupervaluCatalogLive,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
@@ -28,7 +25,7 @@ type SearchSupervaluProductsBody = {
 };
 
 /**
- * Voice worker: live SuperValu catalog search for stock/range questions.
+ * Voice worker: SuperValu product lookup — stock, price, and synced weekly offers.
  */
 export async function POST(request: Request) {
   const auth = await authorizeVoiceWebhook(request);
@@ -142,18 +139,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const matches = await searchSupervaluCatalogLive(query, {
-    intent:
-      body.intent === "offer" || body.intent === "price" || body.intent === "stock"
-        ? body.intent
-        : inferCatalogSearchIntent(query),
-  });
   const intent =
     body.intent === "offer" || body.intent === "price" || body.intent === "stock"
       ? body.intent
       : inferCatalogSearchIntent(query);
-  const browseCategories =
-    intent === "offer" ? inferCatalogOfferBrowseCategories(query) : [];
+
+  const matches = await searchSupervaluCatalogLive(query, {
+    intent,
+    supabase: admin,
+    retailBanner,
+  });
+
   const mappedMatches = matches.map((match) => ({
     product_name: match.productName,
     department: match.department,
@@ -162,20 +158,47 @@ export async function POST(request: Request) {
     was_price_eur: match.wasPriceEur,
     discount_label: match.discountLabel,
     is_on_offer: match.isOnOffer,
+    service_area: match.serviceArea ?? null,
+    fulfilment: match.fulfilment ?? null,
+    is_alcohol: match.isAlcohol === true,
     score: match.score,
     quote_text: match.quoteText,
+    source: match.source ?? null,
   }));
-  const clarificationHint = buildBroadProductClarificationHint(query, mappedMatches);
+  const { clarificationHint, matches: responseMatches } = resolveProductSearchResponse(
+    query,
+    mappedMatches,
+  );
+
   // #region agent log
-  fetch('http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0f50f3'},body:JSON.stringify({sessionId:'0f50f3',runId:'clarify',hypothesisId:'BROAD',location:'search-supervalu-products/route.ts',message:'catalog clarification decision',data:{query,matchCount:mappedMatches.length,clarificationHint:clarificationHint??null,topNames:mappedMatches.slice(0,4).map((m)=>m.product_name)},timestamp:Date.now()})}).catch(()=>{});
+  fetch("http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0f50f3" },
+    body: JSON.stringify({
+      sessionId: "0f50f3",
+      runId: "pre-fix-verify",
+      hypothesisId: "A",
+      location: "search-supervalu-products/route.ts:response",
+      message: "catalog lookup response shaping",
+      data: {
+        query,
+        intent,
+        rawMatchCount: mappedMatches.length,
+        responseMatchCount: responseMatches.length,
+        clarificationBlocked: Boolean(clarificationHint),
+        topQuote: responseMatches[0]?.quote_text?.slice(0, 120) ?? null,
+        topFulfilment: responseMatches[0]?.fulfilment ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
   // #endregion
 
   return NextResponse.json({
     ok: true,
     intent,
-    browse_categories: browseCategories.length > 0 ? browseCategories : null,
     clarification_hint: clarificationHint,
-    matches: clarificationHint ? [] : mappedMatches,
+    matches: responseMatches,
     no_match_quote:
       mappedMatches.length === 0 ? formatCatalogStockNoMatchQuote(query) : null,
   });

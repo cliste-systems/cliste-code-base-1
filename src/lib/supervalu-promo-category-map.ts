@@ -25,6 +25,10 @@ export const SUPERVALU_PROMO_CATEGORY_SEEDS: SupervaluPromoCategorySeed[] = [
   { categoryId: "O100035", department: "Food Cupboard", breadcrumbHint: "Grocery/Food Cupboard" },
   { categoryId: "O100040", department: "Drinks", breadcrumbHint: "Grocery/Drinks" },
   { categoryId: "O100045", department: "Frozen Foods", breadcrumbHint: "Grocery/Frozen Foods" },
+  { categoryId: "O100017", department: "Fish & Seafood", breadcrumbHint: "Grocery/Fish & Seafood" },
+  { categoryId: "O200105", department: "Fish Counter", breadcrumbHint: "Grocery/Fish & Seafood/Fish Counter" },
+  { categoryId: "O200115", department: "Prepack Fresh Fish", breadcrumbHint: "Grocery/Fish & Seafood/Prepack Fresh Fish" },
+  { categoryId: "O200350", department: "Frozen Fish & Seafood", breadcrumbHint: "Grocery/Frozen Foods/Frozen Fish & Seafood" },
   { categoryId: "O100050", department: "Household", breadcrumbHint: "Grocery/Household" },
   { categoryId: "O100055", department: "Health & Beauty", breadcrumbHint: "Grocery/Health & Beauty" },
   { categoryId: "O200325", department: "Chocolate & Sweets", breadcrumbHint: "Grocery/Chocolate & Sweets" },
@@ -197,11 +201,16 @@ export const SUPERVALU_PROMO_SEARCH_SUPPLEMENTS: {
   { query: "spirits", department: "Spirits", promotionsOnly: true, alcoholOnly: true },
   { query: "apples", department: "Fresh Fruit & Veg", promotionsOnly: true },
   { query: "potatoes", department: "Fresh Fruit & Veg", promotionsOnly: true },
+  { query: "fish counter", department: "Fish Counter", promotionsOnly: true },
+  { query: "salmon", department: "Fish & Seafood", promotionsOnly: true },
+  { query: "cod", department: "Fish & Seafood", promotionsOnly: true },
+  { query: "prawns", department: "Fish Counter", promotionsOnly: true },
 ];
 
 export const SUPERVALU_SERVICE_AREA_MIN_COUNTS: Record<string, number> = {
   butcher: 5,
   deli: 3,
+  fish: 3,
   produce: 3,
   bakery: 0,
   off_licence: 1,
