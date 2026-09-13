@@ -59,7 +59,7 @@ Irish retail stores forward landlines via carrier portal or feature codes — no
 - `targetType: "phone"` is a first-class transfer action
 - Report `outcome: "transferred"` when caller is connected to a human
 - On no-answer / busy / closed department → Action Inbox, never drop caller
-- Retail hard rules: never confirm stock, never quote prices (unless flag on), never take payment, off-licence hours are department hours
+- Retail hard rules: never confirm live shelf stock from memory; SuperValu weekly offers may be quoted only via synced `search_weekly_offers`; stock/range questions use live `search_supervalu_products`; never take payment; off-licence hours are department hours
 
 ## 7. Dashboard trim (retail vertical)
 

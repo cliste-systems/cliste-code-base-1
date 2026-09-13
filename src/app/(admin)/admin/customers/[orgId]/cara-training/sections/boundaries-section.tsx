@@ -9,8 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   RETAIL_ALLERGEN_INSTRUCTION,
   RETAIL_AGE_RESTRICTED_INSTRUCTION,
+  RETAIL_CATALOG_STOCK_LOOKUP_INSTRUCTION,
   RETAIL_LIVE_STOCK_PRICE_INSTRUCTION,
   RETAIL_NO_MEDICAL_LEGAL_FINANCIAL_INSTRUCTION,
+  RETAIL_WEEKLY_OFFERS_LOOKUP_INSTRUCTION,
 } from "@/lib/retail-prompt-boundaries";
 
 import {
@@ -65,6 +67,12 @@ export function BoundariesSection({ data, onChange, onSaved }: Props) {
       >
         <ul className="space-y-1 text-xs text-slate-700">
           <li>{RETAIL_LIVE_STOCK_PRICE_INSTRUCTION}</li>
+          {data.retailBanner === "supervalu" ? (
+            <li>{RETAIL_CATALOG_STOCK_LOOKUP_INSTRUCTION}</li>
+          ) : null}
+          {data.retailBanner === "supervalu" && data.offersOfferCount > 0 ? (
+            <li>{RETAIL_WEEKLY_OFFERS_LOOKUP_INSTRUCTION}</li>
+          ) : null}
           <li>{RETAIL_AGE_RESTRICTED_INSTRUCTION}</li>
           <li>{RETAIL_ALLERGEN_INSTRUCTION}</li>
           <li>{RETAIL_NO_MEDICAL_LEGAL_FINANCIAL_INSTRUCTION}</li>

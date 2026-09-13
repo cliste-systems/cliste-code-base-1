@@ -140,6 +140,8 @@ export type CaraSetupPromptInput = {
   storeDepartmentsSection?: string;
   /** Universal retail boundary lines (stock, age-restricted, etc.). */
   retailBoundaryLines?: string[];
+  /** Compact synced weekly offers summary for SuperValu retail orgs. */
+  weeklyOffersSection?: string;
   /** Internal admin notes — must never be compiled. */
   adminNotes?: string;
   businessFiles?: BusinessFileListItem[];
@@ -760,6 +762,13 @@ function buildDroppableSections(
     sections.push({
       id: "retailBoundaries",
       parts: [retailLines.join("\n")],
+    });
+  }
+
+  if (input.weeklyOffersSection?.trim()) {
+    sections.push({
+      id: "weeklyOffers",
+      parts: [input.weeklyOffersSection.trim()],
     });
   }
 

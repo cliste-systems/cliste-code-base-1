@@ -12,6 +12,7 @@ import type { CaraTrainingData } from "@/app/(admin)/admin/organizations/[id]/ca
 import { reloadCaraTrainingPrompt } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
 
 import { BoundariesSection } from "./sections/boundaries-section";
+import { WeeklyOffersSection } from "./sections/weekly-offers-section";
 import { FallbackCaptureSection } from "./sections/fallback-capture-section";
 import { FaqsSection } from "./sections/faqs-section";
 import { FilesLinkSection } from "./sections/files-link-section";
@@ -101,6 +102,7 @@ export function CaraTrainingShell({ initial }: Props) {
         <PeopleEscalationSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <PhoneSystemSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <BoundariesSection data={data} onChange={patch} onSaved={refreshPrompt} />
+        <WeeklyOffersSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <FaqsSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <FallbackCaptureSection data={data} onChange={patch} onSaved={refreshPrompt} />
         <KnowledgeGapsSection gaps={data.trainingGaps} organizationId={data.organizationId} />

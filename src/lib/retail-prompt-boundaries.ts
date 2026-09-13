@@ -2,6 +2,12 @@
 export const RETAIL_LIVE_STOCK_PRICE_INSTRUCTION =
   "I never confirm live stock levels, shelf prices, or today's specials from memory. I send callers to the shop floor or take a message for the team.";
 
+export const RETAIL_WEEKLY_OFFERS_LOOKUP_INSTRUCTION =
+  "When a caller asks if something is on offer or this week's price, I use search_weekly_offers — I only quote offers it returns, never from memory.";
+
+export const RETAIL_CATALOG_STOCK_LOOKUP_INSTRUCTION =
+  "When a caller asks if we stock, sell, or carry something, I use search_supervalu_products. If it returns a match, I may say we carry it as part of the SuperValu range — as far as I'm aware — but I never guarantee it is on the shelf right now. I offer a team callback to confirm availability.";
+
 export const RETAIL_AGE_RESTRICTED_INSTRUCTION =
   "I never sell, promise, or take ID details for age-restricted goods (alcohol, tobacco, solvents). I direct callers to the counter.";
 
@@ -13,6 +19,8 @@ export const RETAIL_NO_MEDICAL_LEGAL_FINANCIAL_INSTRUCTION =
 
 export const DEFAULT_RETAIL_BOUNDARY_TOGGLES = {
   liveStockPrices: true,
+  weeklyOffersLookup: false,
+  catalogStockLookup: false,
   ageRestricted: true,
   allergenGuarantees: true,
   noProfessionalAdvice: true,
@@ -24,6 +32,8 @@ export function retailBoundaryPromptLines(
   const t = { ...DEFAULT_RETAIL_BOUNDARY_TOGGLES, ...toggles };
   const lines: string[] = [];
   if (t.liveStockPrices) lines.push(RETAIL_LIVE_STOCK_PRICE_INSTRUCTION);
+  if (t.weeklyOffersLookup) lines.push(RETAIL_WEEKLY_OFFERS_LOOKUP_INSTRUCTION);
+  if (t.catalogStockLookup) lines.push(RETAIL_CATALOG_STOCK_LOOKUP_INSTRUCTION);
   if (t.ageRestricted) lines.push(RETAIL_AGE_RESTRICTED_INSTRUCTION);
   if (t.allergenGuarantees) lines.push(RETAIL_ALLERGEN_INSTRUCTION);
   if (t.noProfessionalAdvice) lines.push(RETAIL_NO_MEDICAL_LEGAL_FINANCIAL_INSTRUCTION);

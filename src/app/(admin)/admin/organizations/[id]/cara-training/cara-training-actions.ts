@@ -57,6 +57,11 @@ import {
   setStoreTransferVerificationPending,
 } from "@/lib/transfer-verification-db";
 import { requireAdminSessionUser } from "@/lib/admin-session";
+import { searchRetailWeeklyOffers } from "@/lib/retail-weekly-offers-search";
+import {
+  loadLatestSupervaluOfferSyncMeta,
+  syncSupervaluNationalOffers,
+} from "@/lib/supervalu-offers-sync";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { AGENT_CONFIG_REVALIDATE_PATHS } from "@/lib/dashboard-routes";
 import { parseAgentKnowledgeList } from "@/lib/agent-knowledge-format";
@@ -124,6 +129,12 @@ export type CaraTrainingData = {
   customPrompt: string;
   promptCompileWarnings: unknown[];
   sectionChecks: ReturnType<typeof adminCaraTrainingSectionChecks>;
+  retailBanner: string;
+  offersSyncedAt: string | null;
+  offersOfferCount: number;
+  offersWeekStart: string | null;
+  offersWeekEnd: string | null;
+  previewOfferQuery: string;
 };
 
 function revalidateAll(orgId: string) {
@@ -178,7 +189,7 @@ export async function loadCaraTrainingData(
   const admin = await adminClient();
 
   const ORG_SELECT_FULL =
-    "id, name, greeting, custom_prompt, prompt_compile_warnings, assistant_display_name, agent_voice_id, agent_business_type, business_knowledge_summary, agent_extra_notes, agent_location_address, agent_location_eircode, agent_location_county, agent_base_town, agent_services_not_offered, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, quote_prices_on_calls, block_anonymous_callers, business_hours, call_routing_mode, agent_details_to_collect, agent_details_collect_mode, admin_notes";
+    "id, name, greeting, custom_prompt, prompt_compile_warnings, assistant_display_name, agent_voice_id, agent_business_type, business_knowledge_summary, agent_extra_notes, agent_location_address, agent_location_eircode, agent_location_county, agent_base_town, agent_services_not_offered, agent_business_rules, agent_cara_rules, agent_cara_conduct, agent_faqs, quote_prices_on_calls, block_anonymous_callers, business_hours, call_routing_mode, agent_details_to_collect, agent_details_collect_mode, admin_notes, retail_banner, offers_synced_at";
   const ORG_SELECT_LEGACY = ORG_SELECT_FULL.replace(", admin_notes", "");
 
   let orgResult = await admin
@@ -246,10 +257,23 @@ export async function loadCaraTrainingData(
   ]);
 
   const callRoutingMode = parseCallRoutingMode(org.call_routing_mode);
+  const retailBanner = String(org.retail_banner ?? "").trim();
+  const offersMeta =
+    retailBanner === "supervalu"
+      ? await loadLatestSupervaluOfferSyncMeta(admin)
+      : {
+          syncedAt: null,
+          offerCount: 0,
+          offerWeekStart: null,
+          offerWeekEnd: null,
+        };
   const retailExtras = buildRetailPromptExtras({
     callRoutingMode,
     phoneSystem,
     departments,
+    retailBanner,
+    weeklyOffersEnabled: offersMeta.offerCount > 0,
+    catalogStockLookupEnabled: retailBanner === "supervalu",
   });
 
   const hoursUnset = isBusinessHoursUnset(org.business_hours);
@@ -357,6 +381,13 @@ export async function loadCaraTrainingData(
       ? org.prompt_compile_warnings
       : [],
     sectionChecks: [],
+    retailBanner,
+    offersSyncedAt:
+      String(org.offers_synced_at ?? "").trim() || offersMeta.syncedAt,
+    offersOfferCount: offersMeta.offerCount,
+    offersWeekStart: offersMeta.offerWeekStart,
+    offersWeekEnd: offersMeta.offerWeekEnd,
+    previewOfferQuery: "striploin steak",
   };
 
   data.sectionChecks = adminCaraTrainingSectionChecks(readinessInputFromData(data));
@@ -1010,6 +1041,70 @@ export async function saveCaraTraining(
   if (!boundaries.ok) return boundaries;
 
   return saveCaraTrainingFaqs(organizationId, payload.agentFaqs);
+}
+
+export async function refreshSupervaluWeeklyOffers(): Promise<
+  | {
+      ok: true;
+      offerCount: number;
+      organizationsUpdated: number;
+      syncedAt: string;
+      offerWeekStart: string;
+      offerWeekEnd: string;
+    }
+  | { ok: false; message: string }
+> {
+  await requireAdminSessionUser();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Admin client unavailable",
+    };
+  }
+
+  const result = await syncSupervaluNationalOffers(admin);
+  if (!result.ok) return { ok: false, message: result.message };
+
+  revalidatePath("/admin/customers");
+  return {
+    ok: true,
+    offerCount: result.offerCount,
+    organizationsUpdated: result.organizationsUpdated,
+    syncedAt: result.syncedAt,
+    offerWeekStart: result.offerWeekStart,
+    offerWeekEnd: result.offerWeekEnd,
+  };
+}
+
+export async function previewSupervaluWeeklyOfferSearch(
+  query: string,
+): Promise<
+  | {
+      ok: true;
+      matches: Array<{ quoteText: string; productName: string }>;
+    }
+  | { ok: false; message: string }
+> {
+  await requireAdminSessionUser();
+  const admin = await adminClient();
+  try {
+    const matches = await searchRetailWeeklyOffers(admin, "supervalu", query);
+    return {
+      ok: true,
+      matches: matches.map((match) => ({
+        quoteText: match.quoteText,
+        productName: match.productName,
+      })),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Search failed",
+    };
+  }
 }
 
 export { parseAgentKnowledgeList };

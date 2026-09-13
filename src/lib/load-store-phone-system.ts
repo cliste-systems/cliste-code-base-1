@@ -160,6 +160,9 @@ export function buildRetailPromptExtras(input: {
   callRoutingMode: unknown;
   phoneSystem: StorePhoneSystemRow | null;
   departments: StoreDepartmentRow[];
+  retailBanner?: string | null;
+  weeklyOffersEnabled?: boolean;
+  catalogStockLookupEnabled?: boolean;
 }): {
   canTransfer: boolean;
   capability: TransferCapability;
@@ -171,6 +174,14 @@ export function buildRetailPromptExtras(input: {
     phoneSystem: input.phoneSystem,
     departments: input.departments,
   });
+  const weeklyOffersEnabled =
+    input.weeklyOffersEnabled === true ||
+    (input.weeklyOffersEnabled !== false &&
+      String(input.retailBanner ?? "").trim() === "supervalu");
+  const catalogStockLookupEnabled =
+    input.catalogStockLookupEnabled === true ||
+    (input.catalogStockLookupEnabled !== false &&
+      String(input.retailBanner ?? "").trim() === "supervalu");
 
   return {
     canTransfer: capability.canTransfer,
@@ -179,7 +190,10 @@ export function buildRetailPromptExtras(input: {
       capability,
       departments: input.departments,
     }),
-    retailBoundaryLines: retailBoundaryPromptLines({}),
+    retailBoundaryLines: retailBoundaryPromptLines({
+      weeklyOffersLookup: weeklyOffersEnabled,
+      catalogStockLookup: catalogStockLookupEnabled,
+    }),
   };
 }
 

@@ -34,8 +34,10 @@ import {
   loadStorePhoneSystem,
 } from "@/lib/load-store-phone-system";
 import { mergeRetailRoutingLinks } from "@/lib/sync-department-routes";
-import { requireAdminSessionUser } from "@/lib/admin-session";
-import { createAdminClient } from "@/utils/supabase/admin";
+import {
+  loadLatestSupervaluOfferSyncMeta,
+  syncSupervaluNationalOffers,
+} from "@/lib/supervalu-offers-sync";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -593,6 +595,53 @@ export async function saveStoreExtraNotes(
   await regenerateCaraCustomPrompt(admin, organizationId);
   revalidateOrg(organizationId);
   return { ok: true };
+}
+
+export async function refreshSupervaluWeeklyOffers(): Promise<
+  | {
+      ok: true;
+      offerCount: number;
+      organizationsUpdated: number;
+      syncedAt: string;
+      offerWeekStart: string;
+      offerWeekEnd: string;
+    }
+  | { ok: false; message: string }
+> {
+  await requireAdminSessionUser();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Admin client unavailable",
+    };
+  }
+
+  const result = await syncSupervaluNationalOffers(admin);
+  if (!result.ok) return { ok: false, message: result.message };
+
+  revalidatePath("/admin/customers");
+  return {
+    ok: true,
+    offerCount: result.offerCount,
+    organizationsUpdated: result.organizationsUpdated,
+    syncedAt: result.syncedAt,
+    offerWeekStart: result.offerWeekStart,
+    offerWeekEnd: result.offerWeekEnd,
+  };
+}
+
+export async function loadSupervaluWeeklyOffersAdminMeta(): Promise<{
+  syncedAt: string | null;
+  offerCount: number;
+  offerWeekStart: string | null;
+  offerWeekEnd: string | null;
+}> {
+  await requireAdminSessionUser();
+  const admin = await adminClient();
+  return loadLatestSupervaluOfferSyncMeta(admin);
 }
 
 export { parseAdminGreetingParts };
