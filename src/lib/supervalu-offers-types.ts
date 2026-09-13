@@ -1,3 +1,5 @@
+export type SupervaluOfferChannel = "butcher_counter" | "prepack";
+
 export type RetailWeeklyOfferRow = {
   id: string;
   organization_id: string | null;
@@ -5,6 +7,7 @@ export type RetailWeeklyOfferRow = {
   sync_batch_id: string;
   product_name: string;
   department: string;
+  offer_channel: SupervaluOfferChannel;
   current_price_eur: number;
   was_price_eur: number | null;
   discount_label: string | null;

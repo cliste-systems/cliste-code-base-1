@@ -42,6 +42,7 @@ export async function persistSupervaluNationalOffers(
     sync_batch_id: syncBatchId,
     product_name: offer.productName,
     department: offer.department,
+    offer_channel: offer.offerChannel,
     current_price_eur: offer.currentPriceEur,
     was_price_eur: offer.wasPriceEur,
     discount_label: offer.discountLabel,

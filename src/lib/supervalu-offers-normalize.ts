@@ -3,6 +3,7 @@ import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import {
   SUPERVALU_MEAT_CATEGORY_SEEDS,
   type SupervaluGatewayProduct,
+  type SupervaluOfferChannel,
 } from "@/lib/supervalu-offers-types";
 
 const DUBLIN = "Europe/Dublin";
@@ -10,6 +11,7 @@ const DUBLIN = "Europe/Dublin";
 export type NormalizedWeeklyOffer = {
   productName: string;
   department: string;
+  offerChannel: SupervaluOfferChannel;
   currentPriceEur: number;
   wasPriceEur: number | null;
   discountLabel: string | null;
@@ -18,6 +20,61 @@ export type NormalizedWeeklyOffer = {
   sourceUrl: string | null;
   searchText: string;
 };
+
+const PREPACK_NAME_PATTERNS = [
+  /\(\s*\d+(\.\d+)?\s*(g|kg|ml|l)\s*\)/i,
+  /quick fry/i,
+  /burger box/i,
+  /goujon/i,
+  /nugget/i,
+  /breaded/i,
+  /\d+\s*pack/i,
+  /sliced corned/i,
+  /meatballs promo/i,
+  /squeezy/i,
+];
+
+const PREPACK_DEPARTMENT_HINTS = [
+  "pre-pack",
+  "rashers",
+  "pudding",
+  "sausages",
+  "crisps",
+  "snacks",
+  "gravy",
+  "stock",
+  "italian sauces",
+  "takeaway",
+  "vegetarian",
+  "vegan",
+  "bbq meats",
+  "burgers",
+  "luncheon",
+];
+
+/** Fresh butcher counter vs packaged meat-aisle promos. */
+export function classifySupervaluOfferChannel(input: {
+  productName: string;
+  department: string;
+  discountLabel?: string | null;
+}): SupervaluOfferChannel {
+  const name = input.productName.trim();
+  const dept = input.department.trim().toLowerCase();
+  const label = String(input.discountLabel ?? "").trim();
+
+  if (/^\d+\s+for\s+/i.test(label)) return "butcher_counter";
+  if (dept === "butcher" && !PREPACK_NAME_PATTERNS.some((pattern) => pattern.test(name))) {
+    return "butcher_counter";
+  }
+  if (PREPACK_DEPARTMENT_HINTS.some((hint) => dept.includes(hint))) {
+    return "prepack";
+  }
+  if (PREPACK_NAME_PATTERNS.some((pattern) => pattern.test(name))) {
+    return "prepack";
+  }
+  if (/beef steaks|organic/i.test(dept)) return "prepack";
+  return "prepack";
+}
 
 export function normalizeSearchText(value: string): string {
   return value
@@ -74,9 +131,16 @@ export function normalizeSupervaluGatewayProduct(
   const altCategory = String(product.attributes?.altCategory ?? "").trim();
   const resolvedDepartment = altCategory || department;
 
+  const offerChannel = classifySupervaluOfferChannel({
+    productName,
+    department: resolvedDepartment,
+    discountLabel: String(product.priceLabel ?? "").trim() || null,
+  });
+
   return {
     productName,
     department: resolvedDepartment,
+    offerChannel,
     currentPriceEur,
     wasPriceEur,
     discountLabel: String(product.priceLabel ?? "").trim() || null,

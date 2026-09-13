@@ -15,14 +15,11 @@ import {
 
 const MEAT_SEARCH_QUERIES = [
   "striploin",
-  "steak",
-  "beef",
-  "mince",
-  "chicken",
-  "lamb",
-  "pork",
-  "sausage",
-  "rashers",
+  "sirloin",
+  "rib eye",
+  "rump steak",
+  "lamb chop",
+  "pork steak",
 ];
 
 export async function fetchSupervaluCategoryOffers(input: {
@@ -69,7 +66,15 @@ export async function fetchSupervaluSearchOffers(input: {
   const offers: NormalizedWeeklyOffer[] = [];
   for (const item of items) {
     const normalized = normalizeSupervaluGatewayProduct(item, department);
-    if (normalized) offers.push(normalized);
+    if (!normalized) continue;
+    const altCategory = String(item.attributes?.altCategory ?? "").trim().toLowerCase();
+    if (
+      altCategory &&
+      !/butcher|beef|lamb|pork|poultry|meat|steak|chicken/i.test(altCategory)
+    ) {
+      continue;
+    }
+    offers.push(normalized);
   }
   return offers;
 }

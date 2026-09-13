@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
+  inferWeeklyOfferChannelFromQuery,
   RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS,
   searchRetailWeeklyOffers,
 } from "@/lib/retail-weekly-offers-search";
+import type { SupervaluOfferChannel } from "@/lib/supervalu-offers-types";
 import {
   authorizeVoiceWebhook,
   voiceWebhookNoSecretResponse,
@@ -17,6 +19,7 @@ export const dynamic = "force-dynamic";
 type SearchWeeklyOffersBody = {
   called_number?: string;
   query?: string;
+  channel?: SupervaluOfferChannel;
 };
 
 /**
@@ -135,14 +138,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const matches = await searchRetailWeeklyOffers(admin, retailBanner, query);
+  const channel =
+    body.channel === "butcher_counter" || body.channel === "prepack"
+      ? body.channel
+      : inferWeeklyOfferChannelFromQuery(query);
+
+  const matches = await searchRetailWeeklyOffers(admin, retailBanner, query, {
+    channel,
+  });
 
   return NextResponse.json({
     ok: true,
+    channel: channel ?? null,
     matches: matches.map((match) => ({
       id: match.id,
       product_name: match.productName,
       department: match.department,
+      offer_channel: match.offerChannel,
       current_price_eur: match.currentPriceEur,
       was_price_eur: match.wasPriceEur,
       discount_label: match.discountLabel,

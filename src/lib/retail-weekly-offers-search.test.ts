@@ -4,10 +4,12 @@ import { describe, it } from "node:test";
 import {
   buildRetailWeeklyOffersPromptSection,
   formatWeeklyOfferQuote,
+  inferWeeklyOfferChannelFromQuery,
   searchRetailWeeklyOffers,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
 import {
+  classifySupervaluOfferChannel,
   currentSupervaluOfferWeek,
   isPromotionalSupervaluProduct,
   normalizeSupervaluGatewayProduct,
@@ -39,6 +41,33 @@ describe("supervalu offers sync helpers", () => {
     );
   });
 
+  it("classifies pre-pack quick fry separately from butcher counter", () => {
+    assert.equal(
+      classifySupervaluOfferChannel({
+        productName: "SuperValu Salt & Chilli Beef Quick Fry Steak (280 g)",
+        department: "Beef Steaks",
+        discountLabel: "Only €4",
+      }),
+      "prepack",
+    );
+    assert.equal(
+      classifySupervaluOfferChannel({
+        productName: "Irish Striploin Steak",
+        department: "Butcher",
+        discountLabel: "3 for €10",
+      }),
+      "butcher_counter",
+    );
+  });
+
+  it("infers butcher counter channel from caller phrasing", () => {
+    assert.equal(
+      inferWeeklyOfferChannelFromQuery("steaks on offer at the butcher counter"),
+      "butcher_counter",
+    );
+    assert.equal(inferWeeklyOfferChannelFromQuery("pre-pack chicken"), "prepack");
+  });
+
   it("normalizes gateway products into offer rows", () => {
     const offer = normalizeSupervaluGatewayProduct(
       {
@@ -55,6 +84,7 @@ describe("supervalu offers sync helpers", () => {
     );
     assert.ok(offer);
     assert.equal(offer?.productName, "Irish Striploin Steak");
+    assert.equal(offer?.offerChannel, "butcher_counter");
     assert.equal(offer?.currentPriceEur, 12.99);
     assert.match(offer?.searchText ?? "", /striploin/);
   });
@@ -75,6 +105,7 @@ describe("retail weekly offers search", () => {
       sync_batch_id: "batch",
       product_name: "Irish Striploin Steak",
       department: "Butcher",
+      offer_channel: "butcher_counter",
       current_price_eur: 12.99,
       was_price_eur: 16.99,
       discount_label: "Only €12.99",
@@ -93,6 +124,7 @@ describe("retail weekly offers search", () => {
       sync_batch_id: "batch",
       product_name: "Chicken Fillets",
       department: "Butcher",
+      offer_channel: "butcher_counter",
       current_price_eur: 5,
       was_price_eur: null,
       discount_label: null,
@@ -126,6 +158,51 @@ describe("retail weekly offers search", () => {
     assert.ok(section);
     assert.match(section ?? "", /search_weekly_offers/);
     assert.match(section ?? "", /Striploin/);
+  });
+
+  it("filters butcher counter queries away from pre-pack rows", async () => {
+    const mixedRows: RetailWeeklyOfferRow[] = [
+      ...rows,
+      {
+        ...rows[0]!,
+        id: "3",
+        product_name: "SuperValu Quick Fry Steak (280 g)",
+        department: "Beef Steaks",
+        offer_channel: "prepack",
+        search_text: "supervalu quick fry steak beef steaks",
+      },
+    ];
+    const supabase = {
+      from() {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  order() {
+                    return {
+                      order() {
+                        return {
+                          limit: async () => ({ data: mixedRows, error: null }),
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    const counterMatches = await searchRetailWeeklyOffers(
+      supabase as never,
+      "supervalu",
+      "steak at the butcher counter",
+    );
+    assert.equal(counterMatches.length, 1);
+    assert.equal(counterMatches[0]?.offerChannel, "butcher_counter");
   });
 
   it("scores striploin queries highest", async () => {

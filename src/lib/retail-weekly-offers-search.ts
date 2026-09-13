@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { RetailWeeklyOfferRow } from "@/lib/supervalu-offers-types";
+import type {
+  RetailWeeklyOfferRow,
+  SupervaluOfferChannel,
+} from "@/lib/supervalu-offers-types";
 
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS = 120;
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS = 5;
@@ -104,6 +107,7 @@ export type WeeklyOfferMatch = {
   id: string;
   productName: string;
   department: string;
+  offerChannel: SupervaluOfferChannel;
   currentPriceEur: number;
   wasPriceEur: number | null;
   discountLabel: string | null;
@@ -112,15 +116,36 @@ export type WeeklyOfferMatch = {
   quoteText: string;
 };
 
+/** Infer whether the caller means the fresh butcher counter or pre-pack aisle. */
+export function inferWeeklyOfferChannelFromQuery(
+  query: string,
+): SupervaluOfferChannel | null {
+  const q = query.toLowerCase();
+  if (/butcher|meat counter|the counter|fresh counter|butchers/i.test(q)) {
+    return "butcher_counter";
+  }
+  if (/pre\s*-?\s*pack|packaged|quick fry|meat aisle|chilled aisle/i.test(q)) {
+    return "prepack";
+  }
+  return null;
+}
+
 export function formatWeeklyOfferQuote(input: {
   productName: string;
+  offerChannel?: SupervaluOfferChannel;
   currentPriceEur: number;
   wasPriceEur?: number | null;
   discountLabel?: string | null;
   pricePerUnit?: string | null;
 }): string {
   const price = `€${input.currentPriceEur.toFixed(2)}`;
-  const parts = [`${input.productName} is on offer this week at ${price}`];
+  const channelPrefix =
+    input.offerChannel === "prepack"
+      ? "In the pre-pack meat aisle this week — "
+      : input.offerChannel === "butcher_counter"
+        ? "At the butcher counter this week — "
+        : "";
+  const parts = [`${channelPrefix}${input.productName} is on offer this week at ${price}`];
   if (input.wasPriceEur && input.wasPriceEur > input.currentPriceEur) {
     parts.push(`was €${input.wasPriceEur.toFixed(2)}`);
   }
@@ -134,10 +159,12 @@ export function formatWeeklyOfferQuote(input: {
 }
 
 function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch {
+  const offerChannel = row.offer_channel ?? "prepack";
   return {
     id: row.id,
     productName: row.product_name,
     department: row.department,
+    offerChannel,
     currentPriceEur: Number(row.current_price_eur),
     wasPriceEur:
       row.was_price_eur == null ? null : Number(row.was_price_eur),
@@ -146,6 +173,7 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
     score,
     quoteText: formatWeeklyOfferQuote({
       productName: row.product_name,
+      offerChannel,
       currentPriceEur: Number(row.current_price_eur),
       wasPriceEur:
         row.was_price_eur == null ? null : Number(row.was_price_eur),
@@ -175,6 +203,7 @@ export async function searchRetailWeeklyOffers(
   supabase: SupabaseClient,
   retailBanner: string,
   query: string,
+  options?: { channel?: SupervaluOfferChannel | null },
 ): Promise<WeeklyOfferMatch[]> {
   const trimmed = query.trim().slice(0, RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS);
   if (!trimmed) return [];
@@ -183,7 +212,10 @@ export async function searchRetailWeeklyOffers(
   const tokens = queryTokens(trimmed);
   if (tokens.length === 0) return [];
 
+  const channel = options?.channel ?? inferWeeklyOfferChannelFromQuery(trimmed);
+
   return rows
+    .filter((row) => !channel || (row.offer_channel ?? "prepack") === channel)
     .map((row) => ({
       row,
       score: scoreOffer(row.search_text, tokens, row.department),
