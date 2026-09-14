@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  shouldSendActionInboxOwnerSms,
-} from "@/lib/action-inbox-notify";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { PRODUCT_NAME } from "@/lib/company-details";
 
@@ -37,31 +34,5 @@ describe("action inbox owner SMS copy", () => {
     assert.match(sms, /Aoife Byrne/);
     assert.match(sms, /Birthday cake for Saturday/);
     assert.match(sms, /Action Inbox/);
-  });
-});
-
-describe("shouldSendActionInboxOwnerSms", () => {
-  it("sends SMS only for management complaints", () => {
-    assert.equal(
-      shouldSendActionInboxOwnerSms({
-        summary: "Birthday cake order\nFor: Jamie\nWhen: Tuesday",
-        departmentSlug: "bakery",
-      }),
-      false,
-    );
-    assert.equal(
-      shouldSendActionInboxOwnerSms({
-        summary: "Complaint — manager callback\nIssue: delivery never arrived",
-        departmentSlug: "management",
-      }),
-      true,
-    );
-    assert.equal(
-      shouldSendActionInboxOwnerSms({
-        summary: "Butcher order — callback\nDetails: 10 sirloin steaks",
-        departmentSlug: "meat-counter",
-      }),
-      false,
-    );
   });
 });

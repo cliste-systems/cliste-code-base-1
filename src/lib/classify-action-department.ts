@@ -48,6 +48,11 @@ export function classifyActionDepartment(
   return "general";
 }
 
+/** Owner SMS is for urgent manager complaints only — not bakery/butcher dashboard tickets. */
+export function shouldNotifyOwnerBySms(input: ClassifyActionDepartmentInput): boolean {
+  return classifyActionDepartment(input) === "management";
+}
+
 /** One-line preview for triage lists. */
 export function actionTicketBriefSummary(summary: string, maxLen = 120): string {
   const cleaned = stripDemoRehearsalMarker(stripRouteSuffixFromSummary(summary));

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { classifyActionDepartment } from "@/lib/classify-action-department";
+import { shouldNotifyOwnerBySms } from "@/lib/classify-action-department";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
@@ -15,16 +15,12 @@ type NotifyInput = {
   departmentSlug?: string | null;
 };
 
-/** Owner SMS is for urgent manager complaints only — not bakery/butcher dashboard tickets. */
+/** @deprecated Use shouldNotifyOwnerBySms from classify-action-department. */
 export function shouldSendActionInboxOwnerSms(input: {
   summary: string;
   departmentSlug?: string | null;
 }): boolean {
-  const department = classifyActionDepartment({
-    summary: input.summary,
-    departmentSlug: input.departmentSlug,
-  });
-  return department === "management";
+  return shouldNotifyOwnerBySms(input);
 }
 
 /**
@@ -99,7 +95,7 @@ export async function notifyActionInboxOwner(
     }
   }
 
-  if (phone && shouldSendActionInboxOwnerSms(input)) {
+  if (phone && shouldNotifyOwnerBySms(input)) {
     const summarySnippet =
       summary.length > 120 ? `${summary.slice(0, 117).trimEnd()}…` : summary;
     const sms = `${biz}: New message from ${caller} — ${summarySnippet} Open ${PRODUCT_NAME} → Action Inbox.`;

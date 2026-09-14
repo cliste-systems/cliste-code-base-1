@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   actionTicketBriefSummary,
   classifyActionDepartment,
+  shouldNotifyOwnerBySms,
 } from "./classify-action-department";
 
 describe("classifyActionDepartment", () => {
@@ -68,6 +69,25 @@ describe("classifyActionDepartment", () => {
         "[demo rehearsal] Callback — striploin steak price at the butcher counter.",
       ),
       "Callback — striploin steak price at the butcher counter.",
+    );
+  });
+});
+
+describe("shouldNotifyOwnerBySms", () => {
+  it("allows SMS only for management complaints", () => {
+    assert.equal(
+      shouldNotifyOwnerBySms({
+        summary: "Birthday cake order\nFor: Jamie",
+        departmentSlug: "bakery",
+      }),
+      false,
+    );
+    assert.equal(
+      shouldNotifyOwnerBySms({
+        summary: "Complaint — manager callback\nIssue: delivery never arrived",
+        departmentSlug: "management",
+      }),
+      true,
     );
   });
 });
