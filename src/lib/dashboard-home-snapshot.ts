@@ -246,7 +246,9 @@ export async function loadDashboardHomeSnapshot(input: {
     applyOrganizationScope(
       supabase
         .from("action_tickets")
-        .select("id, summary, created_at, status, caller_name, caller_number")
+        .select(
+          "id, summary, created_at, status, caller_name, caller_number, department_slug, brief_summary",
+        )
         .eq("status", "open")
         .gte("created_at", metricRangeStartIso)
         .order("created_at", { ascending: false })

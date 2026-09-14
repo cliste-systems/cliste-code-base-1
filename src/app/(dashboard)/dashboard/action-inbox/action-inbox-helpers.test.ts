@@ -5,6 +5,8 @@ import {
   classifyActionCategory,
 } from "./categories";
 import {
+  briefLine,
+  departmentListPreview,
   parseStructuredCaptureSummary,
   sortActionInboxItems,
   type ActionInboxItem,
@@ -25,6 +27,8 @@ function makeItem(
     createdAtLabel: "",
     categoryTitle: "",
     categoryShort: "",
+    departmentSlug: "general",
+    departmentLabel: "General",
     ...partial,
   };
 }
@@ -103,5 +107,50 @@ Preferred day: Saturday (UNCONFIRMED)`;
       sorted.map((i) => i.id),
       ["newer", "older"],
     );
+  });
+
+  it("shows request type in department list previews", () => {
+    const preview = departmentListPreview({
+      summary:
+        "Customer wants the butcher to cut 10 sirloin steaks to be ready for collection after work. They asked about pricing as well.",
+      briefSummary: null,
+    });
+
+    assert.equal(preview, "Order");
+    assert.doesNotMatch(preview, /sirloin/i);
+  });
+
+  it("uses structured capture header for department list preview", () => {
+    const preview = departmentListPreview({
+      summary: `Birthday cake order for Saturday
+
+Name: Sarah
+Phone: +353871234567`,
+      briefSummary: null,
+    });
+
+    assert.equal(preview, "Order");
+  });
+
+  it("labels complaints in department list previews", () => {
+    const preview = departmentListPreview({
+      summary: `Complaint — manager callback
+
+Name: Sarah
+Issue: Delivery never arrived`,
+      briefSummary: null,
+    });
+
+    assert.equal(preview, "Complaint");
+  });
+
+  it("briefLine uses request type even when brief_summary has detail text", () => {
+    const preview = briefLine({
+      summary:
+        "Birthday cake for Brendan for Monday the 14th. Message: 'Happy Birthday Brendan' with pink icing around the side.",
+      briefSummary: "Brendan · Monday the 14th · Happy Birthday Brendan",
+    });
+
+    assert.equal(preview, "Order");
   });
 });

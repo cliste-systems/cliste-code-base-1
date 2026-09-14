@@ -1,5 +1,16 @@
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { isUnknownCallerLabel } from "@/lib/caller-identity";
+import { stripDemoRehearsalMarker } from "@/lib/dashboard-mock-cleanup";
+import {
+  departmentRequestTypeLabel,
+  formatDepartmentListPreview,
+  parseDepartmentRequestSummary,
+  parseStructuredCaptureSummary,
+  type StructuredCaptureField,
+  type StructuredCaptureSummary,
+} from "@/lib/department-request-summary";
+import { retailDepartmentLabel, stripRouteSuffixFromSummary } from "@/lib/retail-department-pack";
+import type { RetailDepartmentSlug } from "@/lib/retail-department-pack";
 
 import type { ActionCategory, ActionCategoryFilter } from "./categories";
 
@@ -19,12 +30,16 @@ export type ActionInboxItem = {
   /** Present only when saved on the client profile or mentioned on the ticket — often null. */
   contactEmail: string | null;
   summary: string;
+  /** One-line triage preview when stored on the ticket. */
+  briefSummary?: string;
   status: ActionTicketStatus;
   createdAt: string;
   createdAtLabel: string;
   category: ActionCategory;
   categoryTitle: string;
   categoryShort: string;
+  departmentSlug: RetailDepartmentSlug;
+  departmentLabel: string;
 };
 
 export type ActionInboxMetrics = {
@@ -112,12 +127,36 @@ export function hasKnownCallerName(
   return true;
 }
 
+/** Customer-facing ticket text — strips internal routing tags like [route: retail-stock]. */
+export function displayActionTicketSummary(
+  summary: string | null | undefined,
+  maxLen?: number,
+): string {
+  const text = stripDemoRehearsalMarker(
+    stripRouteSuffixFromSummary(String(summary ?? "")),
+  );
+  if (!text) return "No details captured yet.";
+  if (typeof maxLen === "number" && text.length > maxLen) {
+    return `${text.slice(0, maxLen).trimEnd()}…`;
+  }
+  return text;
+}
+
 /** One-line preview for the work queue list. */
 export function inboxListSummaryPreview(summary: string, maxLen = 96): string {
-  const text = summary.trim();
-  if (!text) return "No details captured yet.";
-  if (text.length <= maxLen) return text;
-  return `${text.slice(0, maxLen).trimEnd()}…`;
+  return displayActionTicketSummary(summary, maxLen);
+}
+
+/** Brief triage line — request type for list rows (Action Inbox + departments). */
+export function briefLine(
+  item: Pick<ActionInboxItem, "briefSummary" | "summary">,
+  maxLen = 120,
+): string {
+  return departmentListPreview(item, maxLen);
+}
+
+export function departmentLabel(slug: string | null | undefined): string {
+  return retailDepartmentLabel(slug);
 }
 
 function phoneDigitsKey(phone: string): string {
@@ -144,47 +183,14 @@ export function inboxCallerMetaLine(
   return item.createdAtLabel;
 }
 
-export type StructuredCaptureField = {
-  label: string;
-  value: string;
-  unconfirmed: boolean;
-};
-
-export type StructuredCaptureSummary = {
-  header: string;
-  fields: StructuredCaptureField[];
-};
-
-
-export function parseStructuredCaptureSummary(
-  summary: string | null | undefined,
-): StructuredCaptureSummary | null {
-  const raw = String(summary ?? "").trim();
-  if (!raw) return null;
-
-  const lines = raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length < 2) return null;
-
-  const header = lines[0]!;
-  const fields: StructuredCaptureField[] = [];
-
-  for (const line of lines.slice(1)) {
-    const match = line.match(/^([^:]+):\s*(.+)\s*$/i);
-    if (!match) continue;
-    const label = match[1]!.trim();
-    const valueRaw = match[2]!.trim();
-    const unconfirmed = /\(UNCONFIRMED\)/i.test(valueRaw);
-    const value = valueRaw.replace(/\s*\(UNCONFIRMED\)\s*/gi, "").trim();
-    if (!label || !value) continue;
-    fields.push({ label, value, unconfirmed });
-  }
-
-  if (fields.length === 0) return null;
-  return { header, fields };
-}
+export type {
+  StructuredCaptureField,
+  StructuredCaptureSummary,
+} from "@/lib/department-request-summary";
+export {
+  parseDepartmentRequestSummary,
+  parseStructuredCaptureSummary,
+} from "@/lib/department-request-summary";
 
 export function nextStepForCategory(category: ActionCategory): string {
   switch (category) {
@@ -225,6 +231,7 @@ export function matchesActionSearch(item: ActionInboxItem, query: string): boole
     item.summary,
     item.categoryTitle,
     item.categoryShort,
+    item.departmentLabel,
   ]
     .join(" ")
     .toLowerCase();
@@ -233,6 +240,47 @@ export function matchesActionSearch(item: ActionInboxItem, query: string): boole
     return true;
   }
   return false;
+}
+
+export function departmentRequestLine(
+  item: Pick<ActionInboxItem, "briefSummary" | "summary">,
+): string {
+  return departmentListPreview(item);
+}
+
+/** Short list preview for department inbox — not the full ticket text shown in detail. */
+export function departmentListPreview(
+  item: Pick<ActionInboxItem, "briefSummary" | "summary">,
+  maxLen = 120,
+): string {
+  const parsed = parseDepartmentRequestSummary(item.summary);
+  if (parsed) {
+    return formatDepartmentListPreview(parsed, maxLen);
+  }
+
+  const firstLine =
+    item.summary.split(/\n/)[0]?.trim() ||
+    item.briefSummary?.trim().split(/\n/)[0]?.trim() ||
+    "";
+  if (firstLine) {
+    return clipDepartmentPreview(departmentRequestTypeLabel(firstLine), maxLen);
+  }
+
+  return "Request";
+}
+
+function clipDepartmentPreview(text: string, maxLen: number): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "Follow-up needed";
+  if (trimmed.length <= maxLen) return trimmed;
+
+  const slice = trimmed.slice(0, maxLen);
+  const lastSpace = slice.lastIndexOf(" ");
+  const clipped =
+    lastSpace > Math.floor(maxLen * 0.55)
+      ? slice.slice(0, lastSpace)
+      : slice.trimEnd();
+  return `${clipped.trimEnd()}…`;
 }
 
 export function matchesCategoryFilter(
@@ -303,7 +351,7 @@ export function copyDetailsText(item: ActionInboxItem): string {
     item.callerDisplay ? `Phone: ${item.callerDisplay}` : null,
     email ? `Email: ${email}` : "Email: Not on file",
     "",
-    item.summary.trim() || "No additional details available.",
+    displayActionTicketSummary(item.summary) || "No additional details available.",
   ]
     .filter(Boolean)
     .join("\n");

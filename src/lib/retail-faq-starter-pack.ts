@@ -41,7 +41,17 @@ export const RETAIL_FAQ_STARTER_PACK = [
   {
     question: "Do you have a loyalty card?",
     answer:
-      "Describe the loyalty programme from store facts when configured.",
+      "Yes — SuperValu Real Rewards. Sign up in store or on the app. For points, vouchers, or account issues, call the Real Rewards Helpdesk on 0818 220 088. For a replacement card, pick one up at Customer Service and call the Helpdesk to link it.",
+  },
+  {
+    question: "Can I use Real Rewards at partner petrol stations?",
+    answer:
+      "Real Rewards has partner offers from time to time — rules vary by partner. For whether a specific offer applies to their account, direct them to the Real Rewards Helpdesk on 0818 220 088 or webchat at supervalu.ie/rewards. I do not guess.",
+  },
+  {
+    question: "I lost my Real Rewards card — what do I do?",
+    answer:
+      "Pick up a replacement card at the Customer Service desk, then call the Real Rewards Helpdesk on 0818 220 088 so points and vouchers can be moved to the new card.",
   },
   {
     question: "Do you sell gift vouchers?",

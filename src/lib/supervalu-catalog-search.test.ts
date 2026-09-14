@@ -3,10 +3,13 @@ import { describe, it } from "node:test";
 
 import {
   expandSupervaluCatalogSearchQueries,
+  filterCatalogMatchesByQuery,
   formatCatalogStockNoMatchQuote,
   formatCatalogStockQuote,
+  formatOwnBrandFallbackQuote,
   inferCatalogOfferBrowseCategories,
   inferCatalogSearchIntent,
+  normalizeCatalogBrandQuery,
   normalizeSupervaluCatalogProduct,
   stripCatalogPackagingNoise,
   stripCatalogSearchBoilerplate,
@@ -124,5 +127,64 @@ describe("supervalu catalog search", () => {
     const quote = formatCatalogStockNoMatchQuote("unicorn meat");
     assert.match(quote, /couldn't find/i);
     assert.match(quote, /don't want to guess/i);
+  });
+
+  it("normalizes own-brand phrasing for search", () => {
+    assert.equal(
+      normalizeCatalogBrandQuery("SuperValu own brand dried egg noodles"),
+      "SuperValu dried egg noodles",
+    );
+    assert.ok(
+      expandSupervaluCatalogSearchQueries("SuperValu own brand dried egg noodles").some(
+        (q) => q.toLowerCase() === "supervalu egg noodles",
+      ),
+    );
+  });
+
+  it("filters SuperValu fish queries to fish-finger products only", () => {
+    const matches = filterCatalogMatchesByQuery("SuperValu fish fingers", [
+      {
+        productName: "SuperValu Atlantic Crab Meat (140 g)",
+        department: "Fish",
+        sku: null,
+        currentPriceEur: 3,
+        wasPriceEur: null,
+        discountLabel: null,
+        isOnOffer: false,
+        score: 0.66,
+        quoteText: "crab",
+      },
+      {
+        productName: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
+        department: "Fish Fingers",
+        sku: null,
+        currentPriceEur: 2.5,
+        wasPriceEur: null,
+        discountLabel: null,
+        isOnOffer: true,
+        score: 1,
+        quoteText: "fingers",
+      },
+    ]);
+    assert.equal(matches.length, 0);
+  });
+
+  it("formats own-brand fallback without denying the product exists", () => {
+    const quote = formatOwnBrandFallbackQuote("fish fingers", [
+      {
+        productName: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
+        department: "Fish Fingers",
+        sku: null,
+        currentPriceEur: 2.5,
+        wasPriceEur: null,
+        discountLabel: null,
+        isOnOffer: true,
+        score: 1,
+        quoteText: "fingers",
+      },
+    ]);
+    assert.match(quote, /don't see a SuperValu own-label match/i);
+    assert.match(quote, /doesn't mean we never stock it/i);
+    assert.match(quote, /Birds Eye/i);
   });
 });

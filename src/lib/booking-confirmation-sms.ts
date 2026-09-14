@@ -8,17 +8,47 @@ export type TwilioSmsSendOptions = {
   fromE164?: string;
 };
 
+export type TwilioSmsSendResult =
+  | { ok: true; fromE164: string }
+  | { ok: false; message: string };
+
+function platformSmsFromE164(): string | null {
+  return (
+    process.env.TWILIO_SMS_FROM?.trim() ||
+    process.env.TWILIO_PHONE_NUMBER?.trim() ||
+    null
+  );
+}
+
+/** Twilio 21661 — voice DIDs often cannot send SMS until IE1 messaging is enabled. */
+export function isTwilioSmsCapableError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("21661") ||
+    lower.includes("not sms-capable") ||
+    lower.includes("is not a valid, sms-capable")
+  );
+}
+
 /** Best-effort outbound SMS (Action Inbox alerts, link delivery, etc.). */
 export async function sendTwilioBookingSms(
   to: string,
   body: string,
   options?: TwilioSmsSendOptions,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const result = await sendTwilioBookingSmsDetailed(to, body, options);
+  if (result.ok) return { ok: true };
+  return { ok: false, message: result.message };
+}
+
+async function sendTwilioBookingSmsDetailed(
+  to: string,
+  body: string,
+  options?: TwilioSmsSendOptions,
+): Promise<TwilioSmsSendResult> {
   const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const token = process.env.TWILIO_AUTH_TOKEN?.trim();
-  const platformFrom =
-    process.env.TWILIO_SMS_FROM?.trim() ||
-    process.env.TWILIO_PHONE_NUMBER?.trim();
+  const platformFrom = platformSmsFromE164();
   const from = options?.fromE164?.trim() || platformFrom;
   if (!sid || !token || !from) {
     return { ok: false, message: "Twilio not configured" };
@@ -37,11 +67,60 @@ export async function sendTwilioBookingSms(
         options.purpose,
       );
     }
-    return { ok: true };
+    return { ok: true, fromE164: from };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, message: msg };
   }
+}
+
+/**
+ * Caller/customer SMS — prefer the org's assigned DID, fall back to the platform
+ * sender when that line is voice-only on Twilio.
+ */
+export async function sendCallerFacingSms(
+  to: string,
+  body: string,
+  options: {
+    organizationId: string;
+    purpose: string;
+    fromE164: string | null;
+  },
+): Promise<TwilioSmsSendResult> {
+  const preferredFrom = options.fromE164?.trim() || null;
+  const platformFrom = platformSmsFromE164();
+
+  if (preferredFrom) {
+    const primary = await sendTwilioBookingSmsDetailed(to, body, {
+      organizationId: options.organizationId,
+      purpose: options.purpose,
+      fromE164: preferredFrom,
+    });
+    if (primary.ok) return primary;
+    if (
+      !isTwilioSmsCapableError(primary.message) ||
+      !platformFrom ||
+      platformFrom === preferredFrom
+    ) {
+      return primary;
+    }
+    console.warn("[sms] caller_facing_fallback_sender", {
+      organizationId: options.organizationId,
+      preferredFrom,
+      platformFrom,
+      reason: primary.message,
+    });
+  }
+
+  if (!platformFrom) {
+    return { ok: false, message: "Twilio not configured" };
+  }
+
+  return sendTwilioBookingSmsDetailed(to, body, {
+    organizationId: options.organizationId,
+    purpose: options.purpose,
+    fromE164: platformFrom,
+  });
 }
 
 function estimateSmsSegments(body: string): number {

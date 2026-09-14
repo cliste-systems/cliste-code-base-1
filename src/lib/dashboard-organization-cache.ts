@@ -9,6 +9,8 @@ export type DashboardOrganizationRow = {
   slug: string | null;
   niche: string | null;
   agent_business_type: string | null;
+  phone_number: string | null;
+  store_public_number: string | null;
 };
 
 /**
@@ -19,7 +21,9 @@ export const getCachedDashboardOrganizationRow = cache(
     const { supabase, organizationId } = await requireDashboardSession();
     const { data, error } = await supabase
       .from("organizations")
-      .select("tier, status, name, slug, niche, agent_business_type")
+      .select(
+        "tier, status, name, slug, niche, agent_business_type, phone_number, store_public_number",
+      )
       .eq("id", organizationId)
       .maybeSingle();
     if (error) return null;

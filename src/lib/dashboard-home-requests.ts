@@ -11,6 +11,11 @@ import {
 import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { ticketCallerLabel } from "@/lib/dashboard-feed-time";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import {
+  departmentTicketHref,
+  resolveTicketDepartmentSlug,
+} from "@/app/(dashboard)/dashboard/departments/department-helpers";
+import { departmentListPreview } from "@/app/(dashboard)/dashboard/action-inbox/action-inbox-helpers";
 
 /** Max characters for home panel list subtitles (Needs attention, Cara training). */
 export const HOME_PANEL_LIST_DESCRIPTION_MAX = 48;
@@ -32,6 +37,8 @@ export type HomeRequestTicketRow = {
   status: string | null;
   caller_name?: string | null;
   caller_number?: string | null;
+  department_slug?: string | null;
+  brief_summary?: string | null;
 };
 
 export type HomeRequestRow = {
@@ -105,11 +112,20 @@ export function buildHomeTodaysRequestRows(input: {
     )
     .slice(0, limit)
     .map((ticket) => {
+      const departmentSlug = resolveTicketDepartmentSlug({
+        department_slug: ticket.department_slug ?? null,
+        summary: ticket.summary ?? "",
+      });
       return {
         id: ticket.id,
-        href: `${DASHBOARD_ROUTES.actionInbox}?ticket=${encodeURIComponent(ticket.id)}`,
+        href: departmentTicketHref(ticket.id, departmentSlug),
         title: ticketCallerLabel(ticket),
-        description: truncateHomePanelDescription(summaryPreview(ticket.summary)),
+        description: truncateHomePanelDescription(
+          departmentListPreview({
+            summary: ticket.summary ?? "",
+            briefSummary: ticket.brief_summary?.trim() || undefined,
+          }),
+        ),
         time: input.formatTime(ticket.created_at),
       };
     });

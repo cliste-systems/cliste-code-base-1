@@ -3,6 +3,13 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PLANS, type PlanTier } from "@/lib/cliste-plans.data";
+import { sumCallerFacingSmsSegments } from "@/lib/sms-quota-helpers";
+
+export {
+  isCallerFacingSmsPurpose,
+  SMS_PURPOSES_EXCLUDED_FROM_CALLER_QUOTA,
+  sumCallerFacingSmsSegments,
+} from "@/lib/sms-quota-helpers";
 
 export type SmsQuotaStatus = {
   allowed: boolean;
@@ -80,7 +87,7 @@ export async function getCallerSmsQuotaStatus(
 
   const { data: smsRows, error: smsErr } = await admin
     .from("sms_usage_records")
-    .select("segments")
+    .select("segments, purpose")
     .in("organization_id", orgIds)
     .gte("sent_at", `${periodStart}T00:00:00.000Z`);
 
@@ -95,12 +102,7 @@ export async function getCallerSmsQuotaStatus(
     };
   }
 
-  let usedSegments = 0;
-  for (const row of smsRows ?? []) {
-    const segments = row.segments;
-    usedSegments +=
-      typeof segments === "number" ? Math.max(0, segments) : 0;
-  }
+  const usedSegments = sumCallerFacingSmsSegments(smsRows);
 
   const remaining = Math.max(0, includedSms - usedSegments);
   const allowed = includedSms > 0 && usedSegments < includedSms;

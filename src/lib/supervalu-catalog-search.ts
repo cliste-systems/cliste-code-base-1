@@ -23,7 +23,105 @@ import {
 export const SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS = 120;
 export const SUPERVALU_CATALOG_SEARCH_MAX_RESULTS = 5;
 
+const CATALOG_BRAND_QUERY_TOKENS = new Set(["supervalu", "own", "brand"]);
+const CATALOG_PREP_NOISE_TOKENS = new Set(["dried", "fresh", "frozen", "medium", "large", "small"]);
+
 export type CatalogQuoteIntent = "offer" | "price" | "stock";
+
+/** Collapse caller/STT phrasing like "Super Value own brand" into searchable product words. */
+export function normalizeCatalogBrandQuery(query: string): string {
+  return query
+    .replace(/\bsuper\s+value\b/gi, "SuperValu")
+    .replace(/\bown[\s-]?brand\b/gi, " ")
+    .replace(/\b(?:the\s+)?supervalu\s+brand\b/gi, "SuperValu")
+    .replace(/\bbrand\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export function queryRequestsSupervaluOwnLabel(query: string): boolean {
+  const q = query.toLowerCase();
+  return (
+    /\bsupervalu\b/.test(q) ||
+    /\bsuper\s+value\b/.test(q) ||
+    /\bown[\s-]?brand\b/.test(q)
+  );
+}
+
+export function catalogProductTokens(query: string): string[] {
+  const core =
+    stripCatalogPackagingNoise(
+      stripCatalogSearchBoilerplate(normalizeCatalogBrandQuery(query)),
+    ) ||
+    normalizeCatalogBrandQuery(query);
+  return tokenizeSupervaluSearchQuery(core).filter(
+    (token) =>
+      !CATALOG_BRAND_QUERY_TOKENS.has(token) && !CATALOG_PREP_NOISE_TOKENS.has(token),
+  );
+}
+
+function productNameMatchesTokens(productName: string, tokens: string[]): boolean {
+  const normalized = normalizeSearchText(productName);
+  if (tokens.length === 0) return true;
+  if (tokens.length >= 2) {
+    return tokens.every((token) => {
+      const stem = token.replace(/s$/, "");
+      return normalized.includes(stem);
+    });
+  }
+  const stem = tokens[0]!.replace(/s$/, "");
+  return normalized.includes(stem);
+}
+
+/** Drop partial fish/meat matches when the caller asked for a specific product phrase. */
+export function filterCatalogMatchesByQuery(
+  query: string,
+  matches: SupervaluCatalogMatch[],
+): SupervaluCatalogMatch[] {
+  const productTokens = catalogProductTokens(query);
+  if (productTokens.length === 0 || matches.length === 0) return matches;
+
+  const phraseMatches = matches.filter((match) =>
+    productNameMatchesTokens(match.productName, productTokens),
+  );
+  if (phraseMatches.length === 0) return [];
+
+  if (queryRequestsSupervaluOwnLabel(query)) {
+    const ownLabel = phraseMatches.filter((match) =>
+      /\bsupervalu\b/i.test(match.productName),
+    );
+    return ownLabel;
+  }
+
+  return phraseMatches;
+}
+
+function shortCatalogProductLabel(productName: string): string {
+  return productName
+    .replace(/\([^)]*\)\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 5)
+    .join(" ");
+}
+
+export function formatOwnBrandFallbackQuote(
+  productQuery: string,
+  alternatives: SupervaluCatalogMatch[],
+): string {
+  const labels = [
+    ...new Set(alternatives.map((match) => shortCatalogProductLabel(match.productName))),
+  ].slice(0, 3);
+  const examples =
+    labels.length > 0
+      ? ` Other brands on the range include ${labels.join("; ")}.`
+      : "";
+  return [
+    `I don't see a SuperValu own-label match for ${productQuery.trim()} on the national range I checked — that doesn't mean we never stock it on the shelf.${examples}`,
+    "I can't confirm today's shelf stock from here — a team member can double-check the own-label section if you'd like.",
+  ].join(" ");
+}
 
 /** Infer whether the caller wants offer status, a price, or stock/range info. */
 export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
@@ -70,7 +168,7 @@ export function stripCatalogPackagingNoise(query: string): string {
 
 /** Expand caller phrasing into gateway queries that actually return results. */
 export function expandSupervaluCatalogSearchQueries(query: string): string[] {
-  const trimmed = query.trim();
+  const trimmed = normalizeCatalogBrandQuery(query.trim());
   if (!trimmed) return [];
 
   const boilerplate = stripCatalogSearchBoilerplate(trimmed) || trimmed;
@@ -96,6 +194,12 @@ export function expandSupervaluCatalogSearchQueries(query: string): string[] {
     add(tokens[0]!);
   } else if (tokens.length === 1) {
     add(tokens[0]!);
+  }
+
+  const productTokens = catalogProductTokens(trimmed);
+  if (queryRequestsSupervaluOwnLabel(trimmed) && productTokens.length > 0) {
+    add(`SuperValu ${productTokens.join(" ")}`);
+    add(productTokens.join(" "));
   }
 
   if (/sriracha/i.test(trimmed)) {
@@ -468,7 +572,7 @@ async function searchSupervaluCatalogLiveSingle(
     .map(({ product, score }) => catalogProductToMatch(product, score, intent));
 }
 
-export async function searchSupervaluCatalogLive(
+async function searchSupervaluCatalogLiveInternal(
   query: string,
   options?: {
     storeId?: string;
@@ -504,5 +608,60 @@ export async function searchSupervaluCatalogLive(
     intent,
   });
 
-  return mergeGatewayWithSyncedOffers(gatewayMatches, syncedMatches, intent);
+  const merged = mergeGatewayWithSyncedOffers(gatewayMatches, syncedMatches, intent);
+  return filterCatalogMatchesByQuery(trimmed, merged);
+}
+
+export type SupervaluCatalogSearchResult = {
+  matches: SupervaluCatalogMatch[];
+  ownBrandFallbackQuote: string | null;
+};
+
+export async function searchSupervaluCatalogLiveWithFallback(
+  query: string,
+  options?: {
+    storeId?: string;
+    intent?: CatalogQuoteIntent;
+    supabase?: SupabaseClient;
+    retailBanner?: string;
+  },
+): Promise<SupervaluCatalogSearchResult> {
+  const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
+  if (!trimmed) return { matches: [], ownBrandFallbackQuote: null };
+
+  const normalized = normalizeCatalogBrandQuery(trimmed);
+  const searchQuery = normalized || trimmed;
+  let matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
+
+  if (matches.length > 0 || !queryRequestsSupervaluOwnLabel(searchQuery)) {
+    return { matches, ownBrandFallbackQuote: null };
+  }
+
+  const productOnly = catalogProductTokens(searchQuery).join(" ").trim();
+  if (!productOnly || productOnly.toLowerCase() === searchQuery.toLowerCase()) {
+    return { matches: [], ownBrandFallbackQuote: null };
+  }
+
+  const alternatives = await searchSupervaluCatalogLiveInternal(productOnly, options);
+  if (alternatives.length === 0) {
+    return { matches: [], ownBrandFallbackQuote: null };
+  }
+
+  return {
+    matches: [],
+    ownBrandFallbackQuote: formatOwnBrandFallbackQuote(productOnly, alternatives),
+  };
+}
+
+export async function searchSupervaluCatalogLive(
+  query: string,
+  options?: {
+    storeId?: string;
+    intent?: CatalogQuoteIntent;
+    supabase?: SupabaseClient;
+    retailBanner?: string;
+  },
+): Promise<SupervaluCatalogMatch[]> {
+  const result = await searchSupervaluCatalogLiveWithFallback(query, options);
+  return result.matches;
 }

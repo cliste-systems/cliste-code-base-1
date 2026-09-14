@@ -17,6 +17,8 @@ export type DashboardVerticalContextValue = {
   niche: string;
   vertical: VerticalPack;
   copy: DashboardVerticalCopy;
+  businessName: string;
+  storePhoneE164: string;
 };
 
 const DashboardVerticalContext =
@@ -25,10 +27,14 @@ const DashboardVerticalContext =
 export function DashboardVerticalProvider({
   niche,
   businessType,
+  businessName,
+  storePhoneE164,
   children,
 }: {
   niche: string | null | undefined;
   businessType?: string | null;
+  businessName: string;
+  storePhoneE164?: string | null;
   children: ReactNode;
 }) {
   const value = useMemo((): DashboardVerticalContextValue => {
@@ -37,8 +43,10 @@ export function DashboardVerticalProvider({
       niche: copy.niche,
       vertical: copy.vertical,
       copy,
+      businessName: businessName.trim() || "Your business",
+      storePhoneE164: storePhoneE164?.trim() ?? "",
     };
-  }, [niche, businessType]);
+  }, [niche, businessType, businessName, storePhoneE164]);
 
   return (
     <DashboardVerticalContext.Provider value={value}>

@@ -2,6 +2,8 @@
  * Stable v1 call-outcome set. Canonical value on `call_logs.outcome`.
  */
 
+import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
+
 export type CallOutcome =
   | "answered"
   | "link_sent"
@@ -208,7 +210,8 @@ export function mapCallLogToRow(log: {
   created_at: string;
 }): CallHistoryRow {
   const callerId = log.caller_number.trim();
-  const verbatim = log.transcript?.trim() || "";
+  const verbatimRaw = log.transcript?.trim() || "";
+  const verbatim = stripToolLinesFromTranscript(verbatimRaw);
   const outcome = normalizeCallOutcome(log.outcome);
   const summary = log.ai_summary?.trim() ?? null;
   return {
@@ -220,7 +223,7 @@ export function mapCallLogToRow(log: {
     outcome,
     intentLabel: inferCallIntent(summary, outcome),
     transcriptVerbatim: verbatim || "No transcript on file.",
-    transcriptReview: log.transcript_review?.trim() ?? null,
+    transcriptReview: stripToolLinesFromTranscript(log.transcript_review?.trim()) || null,
     aiSummary: summary,
   };
 }

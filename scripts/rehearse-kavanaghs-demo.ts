@@ -4,7 +4,7 @@
  *   npx tsx scripts/rehearse-kavanaghs-demo.ts
  *   npx tsx scripts/rehearse-kavanaghs-demo.ts --manager-phone +35387...
  *   npx tsx scripts/rehearse-kavanaghs-demo.ts --probe-webhooks
- *   npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-four-part
+ *   npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-five-part
  */
 
 import { config } from "dotenv";
@@ -17,51 +17,57 @@ import { classifyActionCategory } from "../src/app/(dashboard)/dashboard/action-
 const ORG_SLUG = "kavanaghs-supervalu-donegal-town";
 const RETAIL_LINE_E164 = "+353749759508";
 const PRESENTER_EMAIL = "kavanaghs@cliste.test";
-const DEMO_TAG = "[demo rehearsal]";
 const DEFAULT_APP_URL = "http://localhost:3001";
+const DEMO_OFFER_QUERY = "quick fry steak on offer this week";
 
 function parseArgs(): {
   managerPhone: string | null;
   probeWebhooks: boolean;
-  simulateFourPart: boolean;
+  simulateFivePart: boolean;
   appUrl: string;
 } {
   const args = process.argv.slice(2);
   let managerPhone = process.env.KAVANAGHS_MANAGER_PHONE?.trim() || null;
   let probeWebhooks = false;
-  let simulateFourPart = false;
+  let simulateFivePart = false;
   let appUrl = process.env.APP_URL?.trim() || DEFAULT_APP_URL;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--manager-phone" && args[i + 1]) managerPhone = args[++i];
     if (args[i] === "--probe-webhooks") probeWebhooks = true;
-    if (args[i] === "--simulate-four-part") simulateFourPart = true;
+    if (args[i] === "--simulate-five-part" || args[i] === "--simulate-four-part") {
+      simulateFivePart = true;
+    }
     if (args[i] === "--app-url" && args[i + 1]) appUrl = args[++i];
   }
-  return { managerPhone, probeWebhooks, simulateFourPart, appUrl };
+  return { managerPhone, probeWebhooks, simulateFivePart, appUrl };
 }
 
-function printFourPartScript(): void {
-  console.log("\n4-part live demo script (call → show screen → repeat):\n");
+function printFivePartScript(): void {
+  console.log("\n5-part live demo script (call → show screen → repeat):\n");
   console.log(`  Line: ${RETAIL_LINE_E164}`);
-  console.log(`  Dashboard: ${PRESENTER_EMAIL}\n`);
+  console.log(`  Dashboard: ${PRESENTER_EMAIL}`);
+  console.log(`  Full card: scripts/kavanaghs-five-part-demo-script.md\n`);
   console.log("  Part 1 — FAQ → Call History");
   console.log('    Say: "What time do you close on Sunday?" / "Where is the bakery?"');
   console.log("    Show: /dashboard/call-history — Answered, no Action Inbox ticket\n");
-  console.log("  Part 2 — Unsure → Action Inbox");
-  console.log(
-    '    Say: "Can I use Real Rewards at Applegreen?" then give your name for callback',
-  );
-  console.log("    Show: /dashboard/action-inbox — Needs review\n");
-  console.log("  Part 3 — Cake → Dashboard home");
+  console.log("  Part 2 — Cake → Bakery department");
   console.log(
     '    Say: birthday cake Saturday, chocolate sponge, 12 servings, icing message, your name',
   );
-  console.log("    Show: /dashboard — Today's requests (Pricing question)\n");
-  console.log("  Part 4 — Manager → Action Inbox + SMS");
+  console.log("    Show: /dashboard/departments/bakery — card Order, detail fields\n");
+  console.log("  Part 3 — Live offer quote → Call History");
+  console.log(`    Say: "${DEMO_OFFER_QUERY}" (national weekly offers via searchSuperValuProducts)`);
+  console.log("    Show: /dashboard/call-history — answered with live offer quote\n");
+  console.log("  Part 4 — Butcher pre-order → Meat counter");
+  console.log(
+    '    Say: "10 sirloin steaks for collection tomorrow evening" + your name; answer one follow-up',
+  );
+  console.log("    Show: /dashboard/departments/meat-counter — Order / When fields\n");
+  console.log("  Part 5 — Manager complaint → Management + SMS (after hang-up)");
   console.log(
     '    Say: "Speak to the store manager — home delivery never arrived yesterday" + your name',
   );
-  console.log("    Show: /dashboard/action-inbox — Complaint/Urgent + Garreth's phone SMS\n");
+  console.log("    Show: /dashboard/departments/management — Complaint + notification_phone SMS\n");
 }
 
 async function probeActionTicketWebhook(
@@ -80,7 +86,7 @@ async function probeActionTicketWebhook(
         called_number: RETAIL_LINE_E164,
         caller_number: "+353861009998",
         caller_name: "Webhook Probe",
-        summary: `${DEMO_TAG} safe to delete — webhook auth probe`,
+        summary: "Webhook auth probe — safe to delete",
       }),
     });
     const body = (await res.json().catch(() => ({}))) as {
@@ -110,7 +116,41 @@ async function probeActionTicketWebhook(
   }
 }
 
-type FourPartScenario = {
+async function probeOfferSearch(appUrl: string, secret: string): Promise<boolean> {
+  const base = appUrl.replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/api/voice/search-supervalu-products`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        called_number: RETAIL_LINE_E164,
+        query: "quick fry steak",
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      matches?: Array<{ is_on_offer?: boolean }>;
+    };
+    if (!res.ok || !body.ok) {
+      console.log(`✗ Offer search probe: HTTP ${res.status}`);
+      return false;
+    }
+    const onOffer = (body.matches ?? []).some((m) => m.is_on_offer === true);
+    console.log(
+      `${onOffer ? "✓" : "⚠"} Offer search probe: ${body.matches?.length ?? 0} matches${onOffer ? " (on-offer hit for quick fry steak)" : " — try quick fry steak phrasing on demo"}`,
+    );
+    return (body.matches?.length ?? 0) > 0;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log(`✗ Offer search probe: ${msg}`);
+    return false;
+  }
+}
+
+type FivePartScenario = {
   part: number;
   label: string;
   callerName: string;
@@ -118,48 +158,70 @@ type FourPartScenario = {
   summary: string;
   expectedCategory: ReturnType<typeof classifyActionCategory> | null;
   outcome: string;
+  departmentSlug?: string;
 };
 
-const FOUR_PART_SCENARIOS: FourPartScenario[] = [
+const FIVE_PART_SCENARIOS: FivePartScenario[] = [
   {
     part: 1,
     label: "FAQ — Sunday hours + bakery",
     callerName: "Demo Caller One",
     callerPhone: "+353861009901",
-    summary: `${DEMO_TAG} Asked Sunday closing time (9–6) and where the bakery is (front beside Customer Service)`,
+    summary:
+      "Asked Sunday closing time (9–6) and where the bakery is (front beside Customer Service)",
     expectedCategory: null,
     outcome: "answered",
   },
   {
     part: 2,
-    label: "Unsure — Real Rewards at Applegreen",
+    label: "Cake — birthday order",
     callerName: "Demo Caller Two",
     callerPhone: "+353861009902",
-    summary: `${DEMO_TAG} Caller asked if Real Rewards works at Applegreen — Cara was not sure and logged it for the team`,
-    expectedCategory: "unclear",
+    summary: `Birthday cake order
+Order: chocolate sponge for 12 people
+When: Saturday
+For: Jamie
+Message: Happy 8th Birthday Jamie`,
+    expectedCategory: "follow_up",
     outcome: "action_created",
+    departmentSlug: "bakery",
   },
   {
     part: 3,
-    label: "Cake — birthday order",
+    label: "Offer — quick fry steak on special",
     callerName: "Demo Caller Three",
     callerPhone: "+353861009903",
-    summary: `${DEMO_TAG} Pricing question — birthday cake for Saturday, chocolate sponge, 12 servings, "Happy 8th Birthday Jamie"`,
-    expectedCategory: "quote",
-    outcome: "action_created",
+    summary:
+      "Asked if quick fry steak is on offer this week — Cara quoted national weekly offer via searchSuperValuProducts",
+    expectedCategory: null,
+    outcome: "answered",
   },
   {
     part: 4,
-    label: "Manager — missed delivery",
+    label: "Butcher — sirloin pre-order",
     callerName: "Demo Caller Four",
     callerPhone: "+353861009904",
-    summary: `${DEMO_TAG} Complaint — caller asked to speak to store manager about a home delivery that never arrived yesterday`,
+    summary: `Butcher order — callback
+Order: 10 sirloin steaks
+When: collection tomorrow evening`,
+    expectedCategory: "callback",
+    outcome: "action_created",
+    departmentSlug: "meat-counter",
+  },
+  {
+    part: 5,
+    label: "Manager — missed delivery + SMS",
+    callerName: "Demo Caller Five",
+    callerPhone: "+353861009905",
+    summary: `Complaint — manager callback
+Issue: home delivery never arrived yesterday`,
     expectedCategory: "complaint",
     outcome: "action_created",
+    departmentSlug: "management",
   },
 ];
 
-async function simulateFourPartDemo(input: {
+async function simulateFivePartDemo(input: {
   admin: ReturnType<typeof createAdminClient>;
   orgId: string;
   appUrl: string;
@@ -169,17 +231,17 @@ async function simulateFourPartDemo(input: {
   const base = input.appUrl.replace(/\/$/, "");
   const now = Date.now();
 
-  for (const scenario of FOUR_PART_SCENARIOS) {
+  for (const scenario of FIVE_PART_SCENARIOS) {
     console.log(`\nSimulating part ${scenario.part}: ${scenario.label}`);
 
-    const callSid = `DEMO-4PART-${scenario.part}-${now}`;
+    const callSid = `DEMO-5PART-${scenario.part}-${now}`;
     const { error: callErr } = await input.admin.from("call_logs").insert({
       organization_id: input.orgId,
       caller_number: scenario.callerPhone,
       caller_name: scenario.callerName,
       duration_seconds: 95 + scenario.part * 5,
       outcome: scenario.outcome,
-      ai_summary: scenario.summary,
+      ai_summary: scenario.summary.replace(/\n/g, " ").slice(0, 500),
       call_sid: callSid,
       called_number: RETAIL_LINE_E164,
     });
@@ -190,7 +252,7 @@ async function simulateFourPartDemo(input: {
     }
     console.log(`  ✓ call_logs (${scenario.outcome})`);
 
-    if (scenario.part === 1) continue;
+    if (scenario.part === 1 || scenario.part === 3) continue;
 
     try {
       const res = await fetch(`${base}/api/voice/action-ticket`, {
@@ -223,8 +285,22 @@ async function simulateFourPartDemo(input: {
       console.log(
         `  ${categoryOk ? "✓" : "✗"} action-ticket (${category}, ticket ${body.action_ticket_id ?? "?"})`,
       );
+      if (scenario.departmentSlug) {
+        const { data: ticket } = await input.admin
+          .from("action_tickets")
+          .select("department_slug")
+          .eq("id", body.action_ticket_id ?? "")
+          .maybeSingle();
+        const deptOk = ticket?.department_slug === scenario.departmentSlug;
+        console.log(
+          `  ${deptOk ? "✓" : "⚠"} department_slug ${ticket?.department_slug ?? "?"} (expected ${scenario.departmentSlug})`,
+        );
+      }
       if (!categoryOk) {
         failures.push(`Part ${scenario.part} category expected ${scenario.expectedCategory}`);
+      }
+      if (scenario.part === 5) {
+        console.log("  ℹ Part 5 should also trigger SMS to notification_phone if Twilio is configured");
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -237,7 +313,7 @@ async function simulateFourPartDemo(input: {
 }
 
 async function main() {
-  const { managerPhone, probeWebhooks, simulateFourPart, appUrl } = parseArgs();
+  const { managerPhone, probeWebhooks, simulateFivePart, appUrl } = parseArgs();
   const admin = createAdminClient();
   const expectedManagerPhone = managerPhone;
   const failures: string[] = [];
@@ -252,7 +328,7 @@ async function main() {
   const { data: org, error } = await admin
     .from("organizations")
     .select(
-      "id, name, slug, phone_number, notification_phone, fallback_number, greeting, custom_prompt, is_active, niche, call_routing_mode",
+      "id, name, slug, phone_number, notification_phone, fallback_number, greeting, custom_prompt, is_active, niche, call_routing_mode, offers_synced_at, retail_banner",
     )
     .eq("slug", ORG_SLUG)
     .maybeSingle();
@@ -263,18 +339,22 @@ async function main() {
 
   const prompt = String(org.custom_prompt ?? "");
   const hasGarreth = prompt.includes("Garreth Ferry");
+  const hasRealRewards = prompt.includes("0818 220 088");
 
   const checks: Array<[string, boolean]> = [
     ["Org name is Kavanaghs", org.name === "Kavanaghs SuperValu Donegal Town"],
     ["Retail niche", org.niche === "retail"],
+    ["SuperValu banner", org.retail_banner === "supervalu"],
     ["Org active", org.is_active === true],
     ["9508 assigned", org.phone_number === RETAIL_LINE_E164],
     ["Custom prompt compiled", prompt.trim().length > 200],
     ["Manager name Garreth Ferry in prompt", hasGarreth],
+    ["Real Rewards Helpdesk in prompt", hasRealRewards],
     ["Greeting mentions Kavanaghs", String(org.greeting ?? "").includes("Kavanaghs")],
     ["Notification phone set", Boolean(String(org.notification_phone ?? "").trim())],
     ["Fallback number set", Boolean(String(org.fallback_number ?? "").trim())],
     ["Call routing mode", org.call_routing_mode === "cliste_number"],
+    ["National offers synced", Boolean(org.offers_synced_at)],
   ];
 
   if (expectedManagerPhone) {
@@ -290,6 +370,13 @@ async function main() {
     if (!ok) failures.push(label);
   }
 
+  const { count: offerCount } = await admin
+    .from("retail_weekly_offers")
+    .select("id", { count: "exact", head: true })
+    .eq("retail_banner", "supervalu");
+  console.log(`${(offerCount ?? 0) >= 100 ? "✓" : "✗"} National weekly offers rows (${offerCount ?? 0})`);
+  if ((offerCount ?? 0) < 100) failures.push("National weekly offers — run SuperValu offers sync");
+
   const { count: deptCount } = await admin
     .from("store_departments")
     .select("id", { count: "exact", head: true })
@@ -298,26 +385,7 @@ async function main() {
   console.log(`${(deptCount ?? 0) >= 3 ? "✓" : "✗"} Store departments (${deptCount ?? 0})`);
   if ((deptCount ?? 0) < 3) failures.push("Store departments");
 
-  const { count: openTickets } = await admin
-    .from("action_tickets")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", org.id)
-    .eq("status", "open");
-  console.log(`${(openTickets ?? 0) >= 3 ? "✓" : "✗"} Open Action Inbox tickets (${openTickets ?? 0})`);
-  if ((openTickets ?? 0) < 3) {
-    failures.push("Open Action Inbox tickets — run seed-kavanaghs-dashboard-activity.ts");
-  }
-
-  const { count: callsToday } = await admin
-    .from("call_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", org.id);
-  console.log(`${(callsToday ?? 0) >= 10 ? "✓" : "✗"} Call history rows (${callsToday ?? 0})`);
-  if ((callsToday ?? 0) < 10) {
-    failures.push("Call history — run seed-kavanaghs-dashboard-activity.ts");
-  }
-
-  if (probeWebhooks || simulateFourPart) {
+  if (probeWebhooks || simulateFivePart) {
     if (!hasWebhookSecret) {
       failures.push("Cannot probe/simulate without CLISTE_VOICE_WEBHOOK_SECRET");
     } else {
@@ -327,6 +395,7 @@ async function main() {
           `Local webhook probe failed (${appUrl}) — start: npm run dev -- -p 3001`,
         );
       }
+      await probeOfferSearch(appUrl, webhookSecret);
       const prodOk = await probeActionTicketWebhook(
         "https://app.hellocara.ie",
         webhookSecret,
@@ -335,20 +404,15 @@ async function main() {
         console.log(
           "⚠ Production app.hellocara.ie webhooks unavailable — use local dashboard + ngrok for live calls",
         );
-        console.log(
-          "  1. npm run dev -- -p 3001",
-        );
-        console.log("  2. ngrok http 3001 → set Railway CLISTE_APP_URL to the https URL");
-        console.log("  3. Railway CLISTE_VOICE_WEBHOOK_SECRET already matches .env.local");
       }
     }
   }
 
-  printFourPartScript();
+  printFivePartScript();
 
-  if (simulateFourPart && hasWebhookSecret) {
-    console.log(`\nRunning 4-part simulation against ${appUrl}…`);
-    const simFailures = await simulateFourPartDemo({
+  if (simulateFivePart && hasWebhookSecret) {
+    console.log(`\nRunning 5-part simulation against ${appUrl}…`);
+    const simFailures = await simulateFivePartDemo({
       admin,
       orgId: org.id,
       appUrl,
@@ -356,17 +420,20 @@ async function main() {
     });
     failures.push(...simFailures);
     if (simFailures.length === 0) {
-      console.log("\n✓ 4-part simulation passed — check dashboard live refresh");
+      console.log("\n✓ 5-part simulation passed — check bakery, meat-counter, management tabs");
     }
-  } else if (simulateFourPart) {
+  } else if (simulateFivePart) {
     console.log("\nSkipped simulation — fix CLISTE_VOICE_WEBHOOK_SECRET first.");
   }
 
   console.log("\nLive demo tips:");
   console.log("  • Top up LiveKit inference credits (429 quota caused silence on last call)");
-  console.log("  • Hang up between each of the 4 calls");
+  console.log("  • Hang up between each of the 5 calls — tickets appear after hang-up on 9508");
   console.log("  • Hard refresh dashboard; wide viewport (≥1024px) for home charts");
-  console.log(`  • Simulate dry-run: npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-four-part --app-url ${appUrl}\n`);
+  console.log("  • Recompile prompt: npx tsx scripts/regenerate-kavanaghs-prompt.ts");
+  console.log(
+    `  • Simulate dry-run: npx tsx scripts/rehearse-kavanaghs-demo.ts --simulate-five-part --app-url ${appUrl}\n`,
+  );
 
   if (failures.length > 0) {
     console.error(`Failed checks: ${failures.join(", ")}`);

@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
+import { revalidateActionTicketSurfaces } from "@/lib/action-ticket-routing";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 
 const UUID_RE =
@@ -15,7 +14,7 @@ export async function markTicketResolved(formData: FormData): Promise<void> {
 
   const { data: row } = await supabase
     .from("action_tickets")
-    .select("id")
+    .select("id, department_slug")
     .eq("id", ticketId)
     .eq("organization_id", organizationId)
     .maybeSingle();
@@ -30,8 +29,9 @@ export async function markTicketResolved(formData: FormData): Promise<void> {
 
   if (error) return;
 
-  revalidatePath("/dashboard/action-inbox");
-  revalidatePath("/dashboard");
+  revalidateActionTicketSurfaces(
+    (row as { department_slug?: string | null }).department_slug,
+  );
 }
 
 export async function markTicketReopen(formData: FormData): Promise<void> {
@@ -42,7 +42,7 @@ export async function markTicketReopen(formData: FormData): Promise<void> {
 
   const { data: row } = await supabase
     .from("action_tickets")
-    .select("id")
+    .select("id, department_slug")
     .eq("id", ticketId)
     .eq("organization_id", organizationId)
     .maybeSingle();
@@ -57,6 +57,7 @@ export async function markTicketReopen(formData: FormData): Promise<void> {
 
   if (error) return;
 
-  revalidatePath("/dashboard/action-inbox");
-  revalidatePath("/dashboard");
+  revalidateActionTicketSurfaces(
+    (row as { department_slug?: string | null }).department_slug,
+  );
 }

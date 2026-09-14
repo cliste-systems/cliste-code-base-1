@@ -4,6 +4,8 @@ export const DASHBOARD_ROUTES = {
   activity: "/dashboard/activity",
   calls: "/dashboard/calls",
   actionInbox: "/dashboard/action-inbox",
+  departments: "/dashboard/departments",
+  department: (slug: string) => `/dashboard/departments/${slug}`,
   contacts: "/dashboard/contacts",
   routing: "/dashboard/routing",
   /** @deprecated Use businessProfile or caraGreeting */

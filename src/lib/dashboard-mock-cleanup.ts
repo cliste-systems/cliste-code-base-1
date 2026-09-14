@@ -32,6 +32,16 @@ export function isDashboardMockText(text: string | null | undefined): boolean {
   return (text ?? "").includes(DASHBOARD_MOCK_REHEARSAL_MARKER);
 }
 
+/** Remove internal demo/rehearsal prefix from staff-facing ticket text. */
+export function stripDemoRehearsalMarker(text: string | null | undefined): string {
+  const marker = DASHBOARD_MOCK_REHEARSAL_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(text ?? "")
+    .replace(new RegExp(`^\\s*${marker}\\s*`, "i"), "")
+    .replace(new RegExp(`\\s*${marker}\\s*`, "gi"), " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function isDashboardSeedTrainingGap(gapSummary: string | null | undefined): boolean {
   const value = (gapSummary ?? "").trim();
   if (!value) return false;

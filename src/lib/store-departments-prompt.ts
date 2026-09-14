@@ -42,7 +42,7 @@ export function storeDepartmentsPromptSection(
         ? sanitizePromptFreeText(d.cara_note)
         : null;
     const handlesPart = handles ? ` (${handles})` : "";
-    const managerPart = manager ? ` — manager: ${manager}` : "";
+    const managerPart = manager ? ` — [internal manager: ${manager}]` : "";
     if (d.is_off_licence) {
       return `• ${name}${handlesPart}${managerPart} — off-licence: I never sell alcohol or take ID details; I send callers to the counter.`;
     }
@@ -60,5 +60,8 @@ export function storeDepartmentsPromptSection(
     ? "Store departments — when transfer is available:"
     : "Store departments — message-taking only:";
 
-  return [header, ...lines].join("\n");
+  const managerSpeechRule =
+    "Manager names marked [internal manager: …] are for your routing only — never say a manager's full name unless the caller explicitly asks who the manager is. Otherwise say 'the store manager' or 'Customer Service'.";
+
+  return [header, ...lines, managerSpeechRule].join("\n");
 }

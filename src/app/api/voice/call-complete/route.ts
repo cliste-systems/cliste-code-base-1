@@ -18,6 +18,7 @@ import type { CallCloseDiagnosticsPayload } from "@/lib/call-testing-types";
 import { persistCallTestReport } from "@/lib/call-testing-persist";
 import { resolveTestCallContext } from "@/lib/call-testing-resolve";
 import { redactCallText } from "@/lib/transcript-redaction";
+import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 import { captureObservedError } from "@/lib/observability";
 import { logDisclosureCompliance } from "@/lib/voice-compliance";
 import { stampStoreTransferVerified } from "@/lib/transfer-verification-db";
@@ -353,8 +354,12 @@ export async function POST(request: Request) {
   // back card / PPS / DOB; this is the belt-and-braces step that runs
   // even if the agent slips. Hits are logged (without the matched text)
   // so we can spot patterns of callers volunteering sensitive data.
-  const transcriptRedacted = redactCallText(body.transcript ?? null);
-  const reviewRedacted = redactCallText(body.transcript_review ?? null);
+  const transcriptRedacted = redactCallText(
+    stripToolLinesFromTranscript(body.transcript ?? null) || null,
+  );
+  const reviewRedacted = redactCallText(
+    stripToolLinesFromTranscript(body.transcript_review ?? null) || null,
+  );
   const summaryRedacted = redactCallText(body.ai_summary ?? null);
   const allHits = [
     ...transcriptRedacted.hits,
@@ -730,7 +735,9 @@ async function respondIdempotentCallComplete(input: {
   existingSummary: string | null;
   knowledgeGaps: KnowledgeGapPayload[];
 }) {
-  const reviewRedacted = redactCallText(input.body.transcript_review ?? null);
+  const reviewRedacted = redactCallText(
+    stripToolLinesFromTranscript(input.body.transcript_review ?? null) || null,
+  );
   const summaryRedacted = redactCallText(input.body.ai_summary ?? null);
   const patch: Record<string, string> = {};
   if (!input.existingReview?.trim() && reviewRedacted.text) {

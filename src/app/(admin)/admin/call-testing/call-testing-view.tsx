@@ -26,6 +26,7 @@ import type {
 } from "@/lib/call-testing-types";
 import { INTERNAL_QA_LINE_E164, TEST_LINE_E164 } from "@/lib/call-testing-types";
 import { cn } from "@/lib/utils";
+import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 
 import { rebuildRecentTestCallReports } from "./actions";
 
@@ -632,12 +633,13 @@ function CallTestingDetail({
 }
 
 function TranscriptLines({ text }: { text: string }) {
-  if (!text) {
+  const cleaned = stripToolLinesFromTranscript(text);
+  if (!cleaned) {
     return <p className="text-sm text-gray-500">No transcript captured.</p>;
   }
   return (
     <div className="space-y-2">
-      {text.split("\n").map((line, i) => {
+      {cleaned.split("\n").map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return null;
         const isCaller = /^Caller:/i.test(trimmed);

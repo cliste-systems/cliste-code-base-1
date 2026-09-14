@@ -24,6 +24,17 @@ export function buildRetailRoutePack(input: {
 
   const routes: RoutingLink[] = [
     link(
+      "retail-loyalty",
+      "real rewards, loyalty card, points, voucher, rewards app",
+      "callback",
+      "Name, phone number, and brief summary of the Real Rewards issue. For account-specific queries, give Helpdesk 0818 220 088 — do not ask for full card numbers.",
+      {
+        presetId: "loyalty",
+        keywords:
+          "real rewards, loyalty, points, voucher, rewards card, rewards app, lost card, register card",
+      },
+    ),
+    link(
       "retail-hours",
       "opening hours, are you open",
       "callback",

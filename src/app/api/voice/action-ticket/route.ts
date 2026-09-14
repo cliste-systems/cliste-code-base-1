@@ -1,7 +1,11 @@
-import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
+import {
+  buildActionTicketBriefSummary,
+  revalidateActionTicketSurfaces,
+  resolveActionTicketDepartment,
+} from "@/lib/action-ticket-routing";
 import { ingestActionInboxTraining } from "@/lib/cara-training-ingest";
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { redactCallText } from "@/lib/transcript-redaction";
@@ -15,6 +19,8 @@ type ActionTicketBody = {
   caller_number: string;
   caller_name?: string | null;
   summary: string;
+  department_slug?: string | null;
+  route_id?: string | null;
 };
 
 function unauthorized() {
@@ -136,8 +142,16 @@ export async function POST(request: Request) {
   }
 
   const summaryRedacted = redactCallText(summaryRaw);
+  const summaryText = summaryRedacted.text ?? summaryRaw;
   const callerName =
     String(body.caller_name ?? "").trim().slice(0, 120) || null;
+
+  const departmentSlug = await resolveActionTicketDepartment({
+    summary: summaryText,
+    departmentSlug: body.department_slug,
+    routeId: body.route_id,
+  });
+  const briefSummary = buildActionTicketBriefSummary(summaryText);
 
   const { data: inserted, error: insertErr } = await admin
     .from("action_tickets")
@@ -145,7 +159,9 @@ export async function POST(request: Request) {
       organization_id: orgId,
       caller_number: callerNumber,
       caller_name: callerName,
-      summary: summaryRedacted.text ?? summaryRaw,
+      summary: summaryText,
+      brief_summary: briefSummary,
+      department_slug: departmentSlug,
       status: "open",
     })
     .select("id")
@@ -161,7 +177,7 @@ export async function POST(request: Request) {
 
   try {
     await notifyActionInboxOwner(admin, orgId, {
-      summary: summaryRedacted.text ?? summaryRaw,
+      summary: summaryText,
       callerNumber,
       callerName,
     });
@@ -174,15 +190,13 @@ export async function POST(request: Request) {
       admin,
       orgId,
       inserted.id as string,
-      summaryRedacted.text ?? summaryRaw,
+      summaryText,
     );
   } catch (e) {
     console.error("[voice/action-ticket] training ingest failed", e);
   }
 
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/action-inbox");
-  revalidatePath("/dashboard/cara-training");
+  revalidateActionTicketSurfaces(departmentSlug);
 
   return NextResponse.json({ ok: true, action_ticket_id: inserted.id });
 }

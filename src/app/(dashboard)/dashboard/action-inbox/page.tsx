@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { GraduationCap, Inbox } from "lucide-react";
+import { Inbox } from "lucide-react";
 
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
 import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import {
@@ -21,6 +19,8 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
 import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 
+import { resolveTicketDepartmentSlug } from "../departments/department-helpers";
+import { retailDepartmentLabel } from "@/lib/retail-department-pack";
 import {
   ACTION_CATEGORY_SHORT,
   classifyActionCategory,
@@ -44,6 +44,8 @@ type TicketRow = {
   caller_number: string;
   caller_name: string | null;
   summary: string;
+  brief_summary: string | null;
+  department_slug: string | null;
   status: string;
   created_at: string;
 };
@@ -111,6 +113,7 @@ function toInboxItem(
   );
 
   const contactEmail = resolveContactEmail(client?.email, row.summary);
+  const departmentSlug = resolveTicketDepartmentSlug(row);
 
   return {
     id: row.id,
@@ -120,12 +123,15 @@ function toInboxItem(
     contactLabel: callerName,
     contactEmail,
     summary: row.summary ?? "",
+    briefSummary: row.brief_summary?.trim() || undefined,
     status: row.status === "resolved" ? "resolved" : "open",
     createdAt: row.created_at,
     createdAtLabel: formatActionDateTimeLabel(row.created_at),
     category,
     categoryTitle: categoryLabels[category],
     categoryShort: ACTION_CATEGORY_SHORT[category],
+    departmentSlug,
+    departmentLabel: retailDepartmentLabel(departmentSlug),
   };
 }
 
@@ -144,12 +150,13 @@ export default async function ActionInboxPage({
     { data: clientData },
     { data: blockedRows },
     orgRow,
-    { count: trainingGapCountRaw },
   ] =
     await Promise.all([
       supabase
         .from("action_tickets")
-        .select("id, caller_number, caller_name, summary, status, created_at")
+        .select(
+          "id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at",
+        )
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
         .limit(ACTION_INBOX_TICKET_LIMIT),
@@ -169,14 +176,7 @@ export default async function ActionInboxPage({
         .select("caller_e164")
         .eq("organization_id", organizationId),
       getCachedDashboardOrganizationRow(),
-      supabase
-        .from("cara_training_items")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .in("status", ["awaiting_answer", "draft_ready"]),
     ]);
-
-  const trainingGapCount = trainingGapCountRaw ?? 0;
 
   const categoryLabels = dashboardVerticalCopy(
     orgRow?.niche,
@@ -205,7 +205,7 @@ export default async function ActionInboxPage({
         tone="inbox"
         icon={Inbox}
         title="Action inbox"
-        description="Callbacks, urgent issues, and follow-ups Cara flagged for you, separate from the full call log."
+        description="Brief triage across departments — open the full follow-up in the right workspace."
         summary={[
           { value: String(metrics.openCount), label: "open" },
           { value: String(metrics.urgentCount), label: "urgent" },
@@ -213,23 +213,6 @@ export default async function ActionInboxPage({
           { value: String(metrics.resolvedCount), label: "resolved" },
         ]}
       />
-
-      {trainingGapCount > 0 ? (
-        <Link
-          href={DASHBOARD_ROUTES.caraTraining}
-          className="flex shrink-0 items-center gap-3 rounded-lg border border-[#cfd9d4] bg-[#fbfcfb] px-4 py-3 text-[#353D42] transition hover:bg-white"
-        >
-          <GraduationCap className="h-5 w-5 shrink-0 text-[#353D42]" aria-hidden />
-          <span className="min-w-0 flex-1 text-[13px] leading-snug">
-            <strong className="font-semibold">
-              {trainingGapCount} {trainingGapCount === 1 ? "thing" : "things"} to teach Cara
-            </strong>
-            {" — "}gaps from calls Cara couldn&apos;t answer. Review and confirm so she handles
-            them next time.
-          </span>
-          <span className="shrink-0 text-[13px] font-medium">Teach Cara →</span>
-        </Link>
-      ) : null}
 
       {error ? (
         <p className="shrink-0 text-[13px] text-red-700">

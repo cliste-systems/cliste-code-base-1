@@ -160,6 +160,7 @@ export function DetailActionButton({
   href,
   disabled,
   type = "button",
+  className,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -167,22 +168,24 @@ export function DetailActionButton({
   disabled?: boolean;
   /** Use "submit" inside a <form action={...}>. */
   type?: "button" | "submit";
+  className?: string;
 }) {
-  const className = cn(
+  const styles = cn(
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#b9c8c1] bg-[#fbfcfb] px-3 text-[13px] font-medium text-[#35443f] transition-colors hover:bg-white",
     disabled && "pointer-events-none opacity-40",
+    className,
   );
 
   if (href) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} className={styles}>
         {children}
       </Link>
     );
   }
 
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={className}>
+    <button type={type} onClick={onClick} disabled={disabled} className={styles}>
       {children}
     </button>
   );

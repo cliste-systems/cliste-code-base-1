@@ -125,6 +125,7 @@ describe("storeDepartmentsPromptSection", () => {
       capability: capability(),
       departments: [{ ...dept, manager_name: "Mark OToole" }],
     });
-    assert.match(section, /manager: Mark OToole/i);
+    assert.match(section, /\[internal manager: Mark OToole\]/i);
+    assert.match(section, /never say a manager's full name/i);
   });
 });

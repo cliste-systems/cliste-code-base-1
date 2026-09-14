@@ -140,6 +140,10 @@ export type CaraSetupPromptInput = {
   storeDepartmentsSection?: string;
   /** Universal retail boundary lines (stock, age-restricted, etc.). */
   retailBoundaryLines?: string[];
+  /** National SuperValu programme facts (Real Rewards, online shopping helpdesks). */
+  supervaluNationalKnowledgeSection?: string;
+  /** Per-store retail facts (loyalty label, facilities, delivery, click & collect). */
+  retailStoreFactsSection?: string;
   /** Compact synced weekly offers summary for SuperValu retail orgs. */
   weeklyOffersSection?: string;
   /** Internal admin notes — must never be compiled. */
@@ -762,6 +766,20 @@ function buildDroppableSections(
     sections.push({
       id: "retailBoundaries",
       parts: [retailLines.join("\n")],
+    });
+  }
+
+  if (input.supervaluNationalKnowledgeSection?.trim()) {
+    sections.push({
+      id: "supervaluNationalKnowledge",
+      parts: [input.supervaluNationalKnowledgeSection.trim()],
+    });
+  }
+
+  if (input.retailStoreFactsSection?.trim()) {
+    sections.push({
+      id: "retailStoreFacts",
+      parts: [input.retailStoreFactsSection.trim()],
     });
   }
 

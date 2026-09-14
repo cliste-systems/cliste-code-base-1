@@ -5,7 +5,7 @@ import { resolveProductSearchResponse } from "@/lib/retail-product-clarification
 import {
   formatCatalogStockNoMatchQuote,
   inferCatalogSearchIntent,
-  searchSupervaluCatalogLive,
+  searchSupervaluCatalogLiveWithFallback,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
   type CatalogQuoteIntent,
 } from "@/lib/supervalu-catalog-search";
@@ -144,11 +144,14 @@ export async function POST(request: Request) {
       ? body.intent
       : inferCatalogSearchIntent(query);
 
-  const matches = await searchSupervaluCatalogLive(query, {
-    intent,
-    supabase: admin,
-    retailBanner,
-  });
+  const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
+    query,
+    {
+      intent,
+      supabase: admin,
+      retailBanner,
+    },
+  );
 
   const mappedMatches = matches.map((match) => ({
     product_name: match.productName,
@@ -201,6 +204,8 @@ export async function POST(request: Request) {
     clarification_hint: clarificationHint,
     matches: responseMatches,
     no_match_quote:
-      mappedMatches.length === 0 ? formatCatalogStockNoMatchQuote(query) : null,
+      mappedMatches.length === 0
+        ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
+        : null,
   });
 }

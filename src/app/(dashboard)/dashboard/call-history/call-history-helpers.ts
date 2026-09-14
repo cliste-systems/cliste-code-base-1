@@ -6,6 +6,7 @@ import {
   type CallOutcome,
 } from "@/lib/call-history-types";
 import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
+import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 export type CallFollowUp = CallFollowUpLink;
 
 export type CallHistoryListItem = {
@@ -43,9 +44,9 @@ export function summaryForDisplay(
     return blockedCallDashboardSummary(options?.businessName ?? "");
   }
   if (item.aiSummary?.trim()) return item.aiSummary.trim();
-  const review = item.transcriptReview?.trim();
+  const review = staffTranscriptText(item.transcriptReview);
   if (review) return truncatePreview(review, 160);
-  const verbatim = item.transcriptVerbatim.trim();
+  const verbatim = staffTranscriptText(item.transcriptVerbatim);
   if (verbatim && verbatim !== "No transcript on file.") {
     return truncatePreview(verbatim, 160);
   }
@@ -86,16 +87,14 @@ export function primaryTranscriptForDisplay(
 export function cleanedTranscriptForDisplay(
   item: CallHistoryListItem,
 ): string | null {
-  const review = item.transcriptReview?.trim();
-  if (review) return review;
-  return null;
+  return staffTranscriptText(item.transcriptReview);
 }
 
 /** Staff-facing transcript — prefers review/summary over raw verbatim STT. */
 export function reviewTranscriptForDisplay(
   item: CallHistoryListItem,
 ): string | null {
-  const review = item.transcriptReview?.trim();
+  const review = staffTranscriptText(item.transcriptReview);
   if (review) return review;
   if (item.aiSummary?.trim()) return item.aiSummary.trim();
   return null;
@@ -103,9 +102,14 @@ export function reviewTranscriptForDisplay(
 
 /** Full verbatim STT text when still retained (up to 30 days). */
 export function fullTranscriptForDisplay(item: CallHistoryListItem): string | null {
-  const verbatim = item.transcriptVerbatim.trim();
+  const verbatim = staffTranscriptText(item.transcriptVerbatim);
   if (!verbatim || verbatim === "No transcript on file.") return null;
   return verbatim;
+}
+
+function staffTranscriptText(text: string | null | undefined): string | null {
+  const stripped = stripToolLinesFromTranscript(text);
+  return stripped || null;
 }
 
 export function hasFullTranscript(item: CallHistoryListItem): boolean {

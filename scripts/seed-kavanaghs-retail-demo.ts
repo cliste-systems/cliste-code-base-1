@@ -303,7 +303,7 @@ async function main() {
         niche: "retail",
         retail_banner: "supervalu",
         store_code: "KAV-DG-001",
-        store_public_number: "+353749612345",
+        store_public_number: "+353749722977",
         agent_business_type: "Retail & Grocery — local supermarket",
         is_active: true,
         onboarding_step: 7,
