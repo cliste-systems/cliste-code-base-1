@@ -150,4 +150,30 @@ describe("retail product clarification", () => {
     ]);
     assert.equal(hint, null);
   });
+
+  it("keeps steak offer matches when broad clarification is needed", () => {
+    const response = resolveProductSearchResponse("steaks", [
+      {
+        product_name: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        service_area: "butcher",
+        fulfilment: "counter",
+        quote_text: "At the butcher counter this week — sirloin steak",
+      },
+      {
+        product_name: "SuperValu Signature Tastes Hereford Beef Irish Striploin Steak (450 g)",
+        service_area: "butcher",
+        fulfilment: "prepack",
+        quote_text: "In the pre-pack meat aisle this week — striploin steak",
+      },
+      {
+        product_name: "SuperValu Salt & Chilli Beef Quick Fry Steaks (380 g)",
+        service_area: "butcher",
+        fulfilment: "prepack",
+        quote_text: "In the pre-pack meat aisle this week — quick fry steaks",
+      },
+    ]);
+    assert.ok(response.clarificationHint);
+    assert.equal(response.matches.length, 3);
+    assert.match(response.matches[0]?.product_name ?? "", /Sirloin/i);
+  });
 });

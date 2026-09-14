@@ -168,8 +168,9 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
   const clarificationHint =
     buildOfferFulfilmentClarificationHint(narrowed) ??
     buildBroadProductClarificationHint(query, narrowed);
+  // Keep matches when clarifying — empty results make Cara say "nothing on offer".
   return {
     clarificationHint,
-    matches: clarificationHint ? [] : narrowed,
+    matches: narrowed,
   };
 }
