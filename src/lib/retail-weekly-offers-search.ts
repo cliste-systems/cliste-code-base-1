@@ -10,6 +10,7 @@ import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
 import {
   formatSpokenDiscountLabel,
   formatSpokenEurAmount,
+  formatSpokenInteger,
   speakEmbeddedEurAmounts,
 } from "@/lib/spoken-eur-price";
 
@@ -447,6 +448,69 @@ function quoteUsesPerKilo(input: {
   return false;
 }
 
+/** Strip pack-size suffixes — price is spoken separately. */
+export function shortProductNameForOfferQuote(productName: string): string {
+  return productName
+    .replace(/\s*\(\d+(?:\.\d+)?\s*(?:g|kg|ml|l|pack|each|unit)[^)]*\)\s*$/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export function formatOfferPercentOff(
+  currentPriceEur: number,
+  wasPriceEur: number | null | undefined,
+): string | null {
+  if (wasPriceEur == null || wasPriceEur <= currentPriceEur || wasPriceEur <= 0) {
+    return null;
+  }
+  const pct = Math.round(((wasPriceEur - currentPriceEur) / wasPriceEur) * 100);
+  if (pct < 5) return null;
+  return `${formatSpokenInteger(pct)} percent off`;
+}
+
+function resolveOfferChannelPrefix(input: {
+  serviceArea?: SupervaluServiceArea;
+  fulfilment?: SupervaluFulfilment;
+  offerChannel?: SupervaluOfferChannel;
+}): string {
+  const serviceArea = input.serviceArea ?? "grocery";
+  const fulfilment = input.fulfilment ?? "prepack";
+  if (serviceArea === "butcher" && fulfilment === "counter") {
+    return "At the butcher counter this week";
+  }
+  if (serviceArea === "butcher" && fulfilment === "prepack") {
+    return "In the pre-pack meat aisle this week";
+  }
+  if (serviceArea === "deli" && fulfilment === "counter") {
+    return "At the deli counter this week";
+  }
+  if (serviceArea === "deli" && fulfilment === "prepack") {
+    return "At the deli counter this week";
+  }
+  if (serviceArea === "fish" && fulfilment === "counter") {
+    return "At the fish counter this week";
+  }
+  if (serviceArea === "fish" && fulfilment === "prepack") {
+    return "In the pre-pack fish aisle this week";
+  }
+  if (serviceArea === "produce" && fulfilment === "counter") {
+    return "At the fruit and veg counter this week";
+  }
+  if (serviceArea === "bakery" && fulfilment === "counter") {
+    return "At the in-store bakery counter this week";
+  }
+  if (serviceArea === "off_licence") {
+    return "On the off-licence range this week";
+  }
+  if (input.offerChannel === "prepack") {
+    return "In the pre-pack meat aisle this week";
+  }
+  if (input.offerChannel === "butcher_counter") {
+    return "At the butcher counter this week";
+  }
+  return "This week on the SuperValu national range";
+}
+
 export function formatWeeklyOfferQuote(input: {
   productName: string;
   offerChannel?: SupervaluOfferChannel;
@@ -460,61 +524,47 @@ export function formatWeeklyOfferQuote(input: {
   sellBy?: string | null;
   isAlcohol?: boolean;
 }): string {
-  const serviceArea = input.serviceArea ?? "grocery";
-  const fulfilment = input.fulfilment ?? "prepack";
   const perKilo = quoteUsesPerKilo(input);
   const price = formatSpokenEurAmount(input.currentPriceEur);
+  const productName = shortProductNameForOfferQuote(input.productName);
+  const channelPrefix = resolveOfferChannelPrefix(input);
+  const sentences = [`${channelPrefix}. ${productName}.`];
 
-  let channelPrefix = "This week on the SuperValu national range — ";
-  if (serviceArea === "butcher" && fulfilment === "counter") {
-    channelPrefix = "At the butcher counter this week — ";
-  } else if (serviceArea === "butcher" && fulfilment === "prepack") {
-    channelPrefix = "In the pre-pack meat aisle this week — ";
-  } else if (serviceArea === "deli" && fulfilment === "counter") {
-    channelPrefix = "At the deli counter this week — ";
-  } else if (serviceArea === "deli" && fulfilment === "prepack") {
-    channelPrefix = "At the deli counter this week — ";
-  } else if (serviceArea === "fish" && fulfilment === "counter") {
-    channelPrefix = "At the fish counter this week — ";
-  } else if (serviceArea === "fish" && fulfilment === "prepack") {
-    channelPrefix = "In the pre-pack fish aisle this week — ";
-  } else if (serviceArea === "produce" && fulfilment === "counter") {
-    channelPrefix = "At the fruit and veg counter this week — ";
-  } else if (serviceArea === "bakery" && fulfilment === "counter") {
-    channelPrefix = "At the in-store bakery counter this week — ";
-  } else if (serviceArea === "off_licence") {
-    channelPrefix = "On the off-licence range this week — ";
-  } else if (input.offerChannel === "prepack") {
-    channelPrefix = "In the pre-pack meat aisle this week — ";
-  } else if (input.offerChannel === "butcher_counter") {
-    channelPrefix = "At the butcher counter this week — ";
+  const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
+  const percentOff = formatOfferPercentOff(
+    input.currentPriceEur,
+    input.wasPriceEur,
+  );
+  if (spokenLabel && /\bfor\b/i.test(spokenLabel)) {
+    sentences.push(`${spokenLabel}.`);
+  } else if (percentOff) {
+    sentences.push(`${percentOff}.`);
+  } else if (spokenLabel && !/^only\b/i.test(spokenLabel.trim())) {
+    sentences.push(`${spokenLabel}.`);
   }
 
-  const pricePhrase = perKilo
-    ? `${input.productName} is on offer at ${price} per kilo`
-    : `${input.productName} is on offer this week at ${price}`;
-
-  const parts = [`${channelPrefix}${pricePhrase}`];
+  sentences.push(perKilo ? `Now ${price} per kilo.` : `Now ${price}.`);
 
   if (input.wasPriceEur && input.wasPriceEur > input.currentPriceEur) {
     const was = formatSpokenEurAmount(input.wasPriceEur);
-    parts.push(perKilo ? `was ${was} per kilo` : `was ${was}`);
+    sentences.push(perKilo ? `Usually ${was} per kilo.` : `Usually ${was}.`);
   }
-
-  const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
-  if (spokenLabel) parts.push(spokenLabel);
 
   if (
     !perKilo &&
     input.pricePerUnit?.trim() &&
     /\/kg/i.test(input.pricePerUnit)
   ) {
-    parts.push(speakEmbeddedEurAmounts(input.pricePerUnit.trim()));
-  } else if (perKilo && input.pricePerUnit?.trim() && !/per kilo/i.test(parts.join(" "))) {
-    parts.push(speakEmbeddedEurAmounts(input.pricePerUnit.trim()));
+    sentences.push(`${speakEmbeddedEurAmounts(input.pricePerUnit.trim())}.`);
+  } else if (
+    perKilo &&
+    input.pricePerUnit?.trim() &&
+    !/per kilo/i.test(sentences.join(" "))
+  ) {
+    sentences.push(`${speakEmbeddedEurAmounts(input.pricePerUnit.trim())}.`);
   }
 
-  return parts.join(" — ");
+  return sentences.join(" ");
 }
 
 function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch {

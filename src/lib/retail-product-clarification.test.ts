@@ -31,7 +31,8 @@ describe("retail product clarification", () => {
       },
     ]);
     assert.ok(hint);
-    assert.match(hint ?? "", /counter and pre-pack/i);
+    assert.match(hint ?? "", /fresh at the fish counter/i);
+    assert.match(hint ?? "", /pre-pack pack in the fish aisle/i);
     assert.match(hint ?? "", /Do not quote a specific price/i);
   });
 
@@ -54,7 +55,8 @@ describe("retail product clarification", () => {
       },
     ]);
     assert.ok(hint);
-    assert.match(hint ?? "", /counter and pre-pack/i);
+    assert.match(hint ?? "", /fresh at the/i);
+    assert.match(hint ?? "", /pre-pack/i);
   });
 
   it("skips fulfilment clarification when caller already chose counter", () => {

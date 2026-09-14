@@ -318,8 +318,41 @@ describe("supervalu offers sync helpers", () => {
       sellBy: "Unit",
     });
     assert.match(quote, /deli counter/i);
-    assert.match(quote, /per kilo/i);
-    assert.match(quote, /twenty four euro ninety nine/i);
+    assert.match(quote, /seventeen percent off/i);
+    assert.match(quote, /Now twenty four euro ninety nine per kilo/i);
+    assert.match(quote, /Usually twenty nine euro ninety nine per kilo/i);
+  });
+
+  it("leads with percent off and uses Usually for was price", () => {
+    const quote = formatWeeklyOfferQuote({
+      productName: "Pork Loin Chops",
+      serviceArea: "butcher",
+      fulfilment: "counter",
+      currentPriceEur: 6.75,
+      wasPriceEur: 13.49,
+      priceUnitType: "kilogram",
+      sellBy: "Unit",
+    });
+    assert.match(quote, /fifty percent off/i);
+    assert.match(quote, /Now six euro seventy five per kilo/i);
+    assert.match(quote, /Usually thirteen euro forty nine per kilo/i);
+    const percentIndex = quote.indexOf("percent off");
+    const nowIndex = quote.indexOf("Now six");
+    assert.ok(percentIndex >= 0 && nowIndex > percentIndex);
+  });
+
+  it("formats pre-pack offers in short clear sentences", () => {
+    const quote = formatWeeklyOfferQuote({
+      productName: "SuperValu Signature Tastes Thick Cut Chops with Pepper Sauce (600 g)",
+      serviceArea: "butcher",
+      fulfilment: "prepack",
+      currentPriceEur: 6,
+      wasPriceEur: 7.69,
+    });
+    assert.match(quote, /pre-pack meat aisle/i);
+    assert.doesNotMatch(quote, /\(600 g\)/);
+    assert.match(quote, /Now six euro\./i);
+    assert.match(quote, /Usually seven euro sixty nine\./i);
   });
 
   it("computes Thursday-start offer weeks in Dublin time", () => {
@@ -369,8 +402,9 @@ describe("retail weekly offers search", () => {
       priceUnitType: "kilogram",
     });
     assert.match(quote, /Irish Striploin Steak/);
-    assert.match(quote, /twelve euro ninety nine/i);
-    assert.match(quote, /was sixteen euro ninety nine/i);
+    assert.match(quote, /twenty four percent off/i);
+    assert.match(quote, /Now twelve euro ninety nine per kilo/i);
+    assert.match(quote, /Usually sixteen euro ninety nine per kilo/i);
     assert.doesNotMatch(quote, /local shop may vary/i);
   });
 

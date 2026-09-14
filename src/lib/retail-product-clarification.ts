@@ -114,18 +114,18 @@ export function buildOfferFulfilmentClarificationHint(
   const counterArea = matchServiceArea(counterExample ?? {});
   const prepackArea = matchServiceArea(prepackExample ?? {});
 
-  let areaHint = "counter (by weight) or pre-pack (packaged)";
+  let areaHint = "fresh at the counter, or the pre-pack pack in the aisle";
   if (counterArea === "fish" || prepackArea === "fish") {
-    areaHint = "fish counter (loose/by weight) or pre-pack fish (packaged)";
+    areaHint = "fresh at the fish counter, or the pre-pack pack in the fish aisle";
   } else if (counterArea === "butcher" || prepackArea === "butcher") {
-    areaHint = "butcher counter (by weight) or pre-pack meat (packaged)";
+    areaHint = "fresh at the butcher counter, or the pre-pack pack in the meat aisle";
   } else if (counterArea === "deli" || prepackArea === "deli") {
-    areaHint = "deli counter (sliced/by weight) or chilled pre-pack";
+    areaHint = "fresh sliced at the deli counter, or the chilled pre-pack pack";
   }
 
   return (
-    "Both counter and pre-pack options are on offer this week — ask ONE short clarifying question: " +
-    `does the caller mean ${areaHint}? Do not quote a specific price until they choose.`
+    "Both fresh counter and pre-pack options are on offer this week — ask ONE short clarifying question, for example: " +
+    `"Do you mean ${areaHint}?" Do not quote a specific price until they choose.`
   );
 }
 
