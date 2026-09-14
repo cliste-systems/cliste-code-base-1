@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { classifyActionDepartment } from "@/lib/classify-action-department";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
@@ -11,10 +12,23 @@ type NotifyInput = {
   summary: string;
   callerNumber: string;
   callerName?: string | null;
+  departmentSlug?: string | null;
 };
 
+/** Owner SMS is for urgent manager complaints only — not bakery/butcher dashboard tickets. */
+export function shouldSendActionInboxOwnerSms(input: {
+  summary: string;
+  departmentSlug?: string | null;
+}): boolean {
+  const department = classifyActionDepartment({
+    summary: input.summary,
+    departmentSlug: input.departmentSlug,
+  });
+  return department === "management";
+}
+
 /**
- * SMS + email when a new Action Inbox item needs the owner. Best-effort:
+ * Email + optional SMS when a new Action Inbox item needs the owner. Best-effort:
  * failures are logged but must not fail the voice webhook.
  */
 export async function notifyActionInboxOwner(
@@ -85,7 +99,7 @@ export async function notifyActionInboxOwner(
     }
   }
 
-  if (phone) {
+  if (phone && shouldSendActionInboxOwnerSms(input)) {
     const summarySnippet =
       summary.length > 120 ? `${summary.slice(0, 117).trimEnd()}…` : summary;
     const sms = `${biz}: New message from ${caller} — ${summarySnippet} Open ${PRODUCT_NAME} → Action Inbox.`;
@@ -96,5 +110,10 @@ export async function notifyActionInboxOwner(
     if (!res.ok) {
       console.error("[action-inbox-notify] sms failed", res.message);
     }
+  } else if (phone) {
+    console.info("[action-inbox-notify] sms skipped — not a manager complaint", {
+      organizationId,
+      departmentSlug: input.departmentSlug ?? null,
+    });
   }
 }

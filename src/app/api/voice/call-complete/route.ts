@@ -12,6 +12,7 @@ import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
+import { classifyActionDepartment } from "@/lib/classify-action-department";
 import { ingestCallKnowledgeGaps } from "@/lib/cara-training-ingest";
 import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
 import type { CallCloseDiagnosticsPayload } from "@/lib/call-testing-types";
@@ -682,6 +683,7 @@ export async function POST(request: Request) {
           summary: notifySummary,
           callerNumber,
           callerName,
+          departmentSlug: classifyActionDepartment({ summary: notifySummary }),
         });
       } catch (e) {
         await captureObservedError(e, {

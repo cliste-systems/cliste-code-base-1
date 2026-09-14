@@ -180,6 +180,7 @@ export async function POST(request: Request) {
       summary: summaryText,
       callerNumber,
       callerName,
+      departmentSlug,
     });
   } catch (e) {
     console.error("[voice/action-ticket] notify failed", e);
