@@ -7,6 +7,7 @@
  * Assigns +353749759508, compiles custom_prompt, and creates presenter login.
  */
 
+import "./mock-server-only.ts";
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
@@ -22,6 +23,7 @@ import {
   VOICE_ASSISTANT_DEFAULT_NAME,
 } from "../src/lib/voice-greeting";
 import { createAdminClient } from "../src/utils/supabase/admin";
+import { regenerateCaraCustomPrompt } from "../src/lib/cara-prompt-from-org";
 
 const SHOP_NAME = "Kavanaghs SuperValu Donegal Town";
 const SHOP_SLUG = "kavanaghs-supervalu-donegal-town";
@@ -31,6 +33,8 @@ const EIRCODE = "F94 E8N2";
 const PRESENTER_EMAIL = "kavanaghs@cliste.test";
 const PRESENTER_PASSWORD = "KavanaghsDemo2026!";
 const PRESENTER_NAME = "Garreth Ferry";
+const STORE_MANAGER_NAME = "Garreth Ferry";
+const FRESH_FOOD_MANAGER_NAME = "Mark O'Toole";
 const DEFAULT_MANAGER_PHONE = "+353872715938";
 
 const BUSINESS_HOURS = {
@@ -48,7 +52,7 @@ const BUSINESS_HOURS = {
 function parseArgs(): { managerPhone: string; managerName: string } {
   const args = process.argv.slice(2);
   let managerPhone = process.env.KAVANAGHS_MANAGER_PHONE?.trim() || DEFAULT_MANAGER_PHONE;
-  let managerName = "Store Manager";
+  let managerName = STORE_MANAGER_NAME;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--manager-phone" && args[i + 1]) managerPhone = args[++i];
     if (args[i] === "--manager-name" && args[i + 1]) managerName = args[++i];
@@ -56,7 +60,10 @@ function parseArgs(): { managerPhone: string; managerName: string } {
   return { managerPhone, managerName };
 }
 
-function buildKavanaghsCustomPrompt(managerName: string): string {
+function buildKavanaghsCustomPrompt(
+  storeManagerName: string,
+  freshFoodManagerName: string,
+): string {
   return [
     "You are Cara, the AI phone assistant for Kavanaghs SuperValu Donegal Town on Quay Street.",
     "Answer opening hours from the structured hours block when callers ask when the shop is open.",
@@ -64,7 +71,8 @@ function buildKavanaghsCustomPrompt(managerName: string): string {
     "",
     "Store departments — message-taking only:",
     `• Bakery (birthday cakes, custom cakes, pick-up times, celebration orders) — I take their name, number, and what they need, and pass it to Bakery.`,
-    `• Customer Service (complaints, speak-to-manager requests, general store enquiries) — manager: ${managerName} — I take their name, number, and what they need, and pass it to Customer Service.`,
+    `• Customer Service (complaints, speak-to-manager requests, general store enquiries) — manager: ${storeManagerName} — I take their name, number, and what they need, and pass it to Customer Service.`,
+    `• Fresh Food (bakery, deli, butcher counters — fresh food manager enquiries) — manager: ${freshFoodManagerName} — I take their name, number, and what they need, and pass it to Fresh Food.`,
     "• Deli (hot food, party platters, deli counter) — I take their name, number, and what they need, and pass it to Deli.",
     "• Butcher (meat orders, Sunday roasts, special cuts) — I take their name, number, and what they need, and pass it to Butcher.",
     "• Off-licence (wine and spirits counter) — off-licence: I never sell alcohol or take ID details; I send callers to the counter.",
@@ -160,7 +168,8 @@ async function assignRetailLine(
 async function upsertDepartments(
   admin: ReturnType<typeof createAdminClient>,
   organizationId: string,
-  managerName: string,
+  storeManagerName: string,
+  freshFoodManagerName: string,
 ): Promise<void> {
   await admin.from("store_departments").delete().eq("organization_id", organizationId);
 
@@ -183,14 +192,25 @@ async function upsertDepartments(
       transfer_enabled: false,
       active: true,
       handles_text: "complaints, speak-to-manager requests, general store enquiries",
-      manager_name: managerName,
+      manager_name: storeManagerName,
+      is_off_licence: false,
+      is_an_post: false,
+    },
+    {
+      organization_id: organizationId,
+      name: "Fresh Food",
+      sort_order: 2,
+      transfer_enabled: false,
+      active: true,
+      handles_text: "fresh food manager enquiries, bakery, deli, and butcher counter oversight",
+      manager_name: freshFoodManagerName,
       is_off_licence: false,
       is_an_post: false,
     },
     {
       organization_id: organizationId,
       name: "Deli",
-      sort_order: 2,
+      sort_order: 3,
       transfer_enabled: false,
       active: true,
       handles_text: "hot food, party platters, deli counter",
@@ -201,7 +221,7 @@ async function upsertDepartments(
     {
       organization_id: organizationId,
       name: "Butcher",
-      sort_order: 3,
+      sort_order: 4,
       transfer_enabled: false,
       active: true,
       handles_text: "meat orders, Sunday roasts, special cuts",
@@ -212,7 +232,7 @@ async function upsertDepartments(
     {
       organization_id: organizationId,
       name: "Off-licence",
-      sort_order: 4,
+      sort_order: 5,
       transfer_enabled: false,
       active: true,
       handles_text: "wine and spirits counter",
@@ -406,15 +426,18 @@ async function main() {
     })
     .eq("id", organizationId);
 
-  await upsertDepartments(admin, organizationId, managerName);
+  await upsertDepartments(
+    admin,
+    organizationId,
+    managerName,
+    FRESH_FOOD_MANAGER_NAME,
+  );
   await assignRetailLine(admin, organizationId);
 
-  const customPrompt = buildKavanaghsCustomPrompt(managerName);
-  const { error: promptErr } = await admin
-    .from("organizations")
-    .update({ custom_prompt: customPrompt, updated_at: now })
-    .eq("id", organizationId);
-  if (promptErr) throw promptErr;
+  const promptResult = await regenerateCaraCustomPrompt(admin, organizationId);
+  if (!promptResult.ok) {
+    throw new Error(promptResult.message);
+  }
 
   console.log("\n✓ Kavanaghs retail demo ready\n");
   console.log(`  Shop:       ${SHOP_NAME}`);

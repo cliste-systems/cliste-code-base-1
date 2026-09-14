@@ -339,6 +339,7 @@ async function main() {
 
   const prompt = String(org.custom_prompt ?? "");
   const hasGarreth = prompt.includes("Garreth Ferry");
+  const hasMark = prompt.includes("Mark O") && prompt.toLowerCase().includes("toole");
   const hasRealRewards = prompt.includes("0818 220 088");
 
   const checks: Array<[string, boolean]> = [
@@ -348,7 +349,8 @@ async function main() {
     ["Org active", org.is_active === true],
     ["9508 assigned", org.phone_number === RETAIL_LINE_E164],
     ["Custom prompt compiled", prompt.trim().length > 200],
-    ["Manager name Garreth Ferry in prompt", hasGarreth],
+    ["Store manager Garreth Ferry in prompt", hasGarreth],
+    ["Fresh food manager Mark O'Toole in prompt", hasMark],
     ["Real Rewards Helpdesk in prompt", hasRealRewards],
     ["Greeting mentions Kavanaghs", String(org.greeting ?? "").includes("Kavanaghs")],
     ["Notification phone set", Boolean(String(org.notification_phone ?? "").trim())],
