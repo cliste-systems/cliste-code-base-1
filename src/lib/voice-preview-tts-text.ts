@@ -8,6 +8,9 @@ const PRONUNCIATION_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
   [/\bKavanaghs\b/gi, "Kavanahs"],
   [/\bDonegal Town\b/gi, "Doneygall Town"],
   [/\bDonegal\b/gi, "Doneygall"],
+  [/\bReal Rewards\b/gi, "Real Re-wards"],
+  [/\bsupervalu\.ie\/rewards\b/gi, "SuperValu dot ie slash rewards"],
+  [/\bsupervalu\.ie\b/gi, "SuperValu dot ie"],
 ];
 
 export function prepareVoicePreviewTtsText(text: string): string {
