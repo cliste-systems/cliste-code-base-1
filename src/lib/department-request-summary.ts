@@ -81,6 +81,7 @@ function normalizeFieldLabel(label: string): string {
   if (lower === "message" || lower === "message on cake") return "Message";
   if (lower === "date" || lower === "date needed") return "Date";
   if (lower === "servings" || lower === "serving") return "Servings";
+  if (lower === "size") return "Size";
   if (lower === "contact number" || lower === "phone") return "Contact";
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
@@ -175,13 +176,17 @@ function parseCakeOrderSummary(text: string): StructuredCaptureSummary | null {
   const date = extractCakeDate(text);
   const message = extractCakeMessage(text);
   const servings = text.match(/\b(\d{1,2})\s+(?:people|servings|serving)\b/i)?.[1];
+  const inchSize = text.match(/\b(\d{1,2})\s*[-]?\s*(?:inch|in)\b/i)?.[1];
+  const wordSize = text.match(/\b(small|medium|large|family(?:\s+size)?)\b/i)?.[1];
   const notes = text.match(/\bwith\s+(.+?)(?:\.|$)/i)?.[1]?.trim();
   const contact = text.match(/contact number:\s*([^;.]+)/i)?.[1]?.trim();
 
   if (name) fields.push(field("For", name));
   if (date) fields.push(field("Date", date));
+  if (inchSize) fields.push(field("Size", `${inchSize}-inch`));
+  else if (servings) fields.push(field("Size", `${servings} people`));
+  else if (wordSize) fields.push(field("Size", wordSize.replace(/\s+size$/i, "").trim()));
   if (message) fields.push(field("Message", message));
-  if (servings) fields.push(field("Servings", servings));
   if (notes) fields.push(field("Notes", notes));
   if (contact) fields.push(field("Contact", contact));
 
