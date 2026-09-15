@@ -28,7 +28,11 @@ import {
   DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
-import type { DashboardMetricRangeKey } from "@/lib/dashboard-metric-range";
+import {
+  formatCallsPageDateParam,
+  isCallsPageToday,
+  parseCallsPageDateParam,
+} from "@/lib/calls-page-date";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -64,7 +68,7 @@ export type CallHistoryPagination = {
   pageSize: number;
   totalCount: number;
   totalPages: number;
-  rangeKey: DashboardMetricRangeKey;
+  selectedDate: string;
 };
 
 type CallHistoryViewProps = {
@@ -83,8 +87,10 @@ function callsPageHref(
   callId?: string | null,
 ): string {
   const params = new URLSearchParams();
-  if (pagination.rangeKey !== "today") {
-    params.set("range", pagination.rangeKey);
+  const now = new Date();
+  const selectedDate = parseCallsPageDateParam(pagination.selectedDate, now);
+  if (!isCallsPageToday(selectedDate, now)) {
+    params.set("date", formatCallsPageDateParam(selectedDate, now));
   }
   if (page > 1) {
     params.set("page", String(page));
@@ -272,7 +278,7 @@ export function CallHistoryView({
               <CallHistoryPaginationBar
                 pagination={pagination}
                 selectedCallId={resolvedSelectedId}
-                rangeFromUrl={searchParams.get("range")}
+                dateFromUrl={searchParams.get("date")}
               />
             ) : null}
           </div>
@@ -362,17 +368,18 @@ function CallListRow({
 function CallHistoryPaginationBar({
   pagination,
   selectedCallId,
-  rangeFromUrl,
+  dateFromUrl,
 }: {
   pagination: CallHistoryPagination;
   selectedCallId: string | null;
-  rangeFromUrl: string | null;
+  dateFromUrl: string | null;
 }) {
-  const rangeKey =
-    rangeFromUrl === "7d" || rangeFromUrl === "4w"
-      ? rangeFromUrl
-      : pagination.rangeKey;
-  const paged: CallHistoryPagination = { ...pagination, rangeKey };
+  const now = new Date();
+  const selectedDate =
+    dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl)
+      ? dateFromUrl
+      : formatCallsPageDateParam(parseCallsPageDateParam(undefined, now), now);
+  const paged: CallHistoryPagination = { ...pagination, selectedDate };
   const { page, totalPages, totalCount, pageSize } = paged;
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, totalCount);

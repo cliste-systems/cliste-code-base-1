@@ -1,30 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  buildCallsPageHref,
-  dashboardMetricRangeForTimestamp,
-} from "./calls-page-href";
+import { buildCallsPageHref } from "./calls-page-href";
 
 const NOW = new Date("2026-09-15T12:00:00.000Z");
 
 describe("calls-page-href", () => {
-  it("maps timestamps to the smallest covering range", () => {
-    assert.equal(
-      dashboardMetricRangeForTimestamp("2026-09-15T10:00:00.000Z", NOW),
-      "today",
-    );
-    assert.equal(
-      dashboardMetricRangeForTimestamp("2026-09-14T17:00:00.000Z", NOW),
-      "7d",
-    );
-    assert.equal(
-      dashboardMetricRangeForTimestamp("2026-08-01T10:00:00.000Z", NOW),
-      "4w",
-    );
-  });
-
-  it("builds href with range for yesterday calls", () => {
+  it("builds href with date for yesterday calls", () => {
     assert.equal(
       buildCallsPageHref(
         {
@@ -33,11 +15,11 @@ describe("calls-page-href", () => {
         },
         NOW,
       ),
-      "/dashboard/calls?call=abc-123&range=7d",
+      "/dashboard/calls?call=abc-123&date=2026-09-14",
     );
   });
 
-  it("omits range param for calls today", () => {
+  it("omits date param for calls today", () => {
     assert.equal(
       buildCallsPageHref(
         {
@@ -47,6 +29,13 @@ describe("calls-page-href", () => {
         NOW,
       ),
       "/dashboard/calls?call=abc-123",
+    );
+  });
+
+  it("supports explicit date without a call id", () => {
+    assert.equal(
+      buildCallsPageHref({ date: "2026-09-10" }, NOW),
+      "/dashboard/calls?date=2026-09-10",
     );
   });
 });

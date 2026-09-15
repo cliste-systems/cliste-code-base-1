@@ -18,22 +18,20 @@ import {
   CALL_HISTORY_PAGE_SIZE,
 } from "@/lib/dashboard-list-limits";
 import {
-  dashboardMetricRangeGreetingSubline,
-  getDashboardMetricRangeLowerBoundIso,
-  getDashboardMetricRangeUpperExclusiveIso,
-  parseDashboardMetricRange,
-} from "@/lib/dashboard-metric-range";
+  callsPageDateForTimestamp,
+  callsPageDateGreetingSubline,
+  formatCallsPageDateParam,
+  getCallsPageDayBoundsIso,
+  parseCallsPageDateParam,
+} from "@/lib/calls-page-date";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
 import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
-import {
-  buildCallsPageHref,
-  dashboardMetricRangeForTimestamp,
-} from "@/lib/calls-page-href";
+import { buildCallsPageHref } from "@/lib/calls-page-href";
 
 import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
 
-import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
+import { CallsDatePicker } from "@/components/dashboard/calls-date-picker";
 import {
   buildCallHistoryMetricsFromSummaryRows,
   type CallFollowUp,
@@ -44,7 +42,7 @@ import type { PostCallStatus } from "@/lib/post-call-processing-types";
 import { CallHistoryView } from "./call-history-view";
 
 type CallHistoryPageProps = {
-  searchParams?: Promise<{ call?: string; range?: string; page?: string }>;
+  searchParams?: Promise<{ call?: string; date?: string; range?: string; page?: string }>;
 };
 
 type CallLogListRow = {
@@ -129,14 +127,17 @@ function toListItem(
 
 export default async function CallHistoryPage({ searchParams }: CallHistoryPageProps) {
   const sp = searchParams ? await searchParams : {};
-  const rangeKey = parseDashboardMetricRange(sp.range);
-  const greetingSubline = dashboardMetricRangeGreetingSubline(rangeKey);
+  const now = new Date();
+  const selectedDate = parseCallsPageDateParam(sp.date, now);
+  const selectedDateParam = formatCallsPageDateParam(selectedDate, now);
+  const greetingSubline = callsPageDateGreetingSubline(selectedDate, now);
   const initialSelectedCallId =
     typeof sp.call === "string" && sp.call.trim() ? sp.call.trim() : null;
   const requestedPage = parsePageParam(sp.page);
 
   const { supabase, organizationId } = await requireDashboardSession();
 
+  let deepLinkedCreatedAt: string | null = null;
   if (initialSelectedCallId) {
     const { data: deepLinkedCall } = await supabase
       .from("call_logs")
@@ -146,38 +147,44 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       .eq("is_test_call", false)
       .maybeSingle();
 
-    const createdAt = String(deepLinkedCall?.created_at ?? "").trim();
-    if (createdAt) {
-      const neededRange = dashboardMetricRangeForTimestamp(createdAt);
-      if (neededRange !== rangeKey) {
-        redirect(
-          buildCallsPageHref({
-            callLogId: initialSelectedCallId,
-            callCreatedAt: createdAt,
-            page: requestedPage > 1 ? requestedPage : undefined,
-          }),
-        );
-      }
+    deepLinkedCreatedAt = String(deepLinkedCall?.created_at ?? "").trim() || null;
+  }
+
+  if (sp.range && !sp.date) {
+    redirect(
+      buildCallsPageHref({
+        callLogId: initialSelectedCallId,
+        callCreatedAt: deepLinkedCreatedAt,
+        page: requestedPage > 1 ? requestedPage : undefined,
+      }),
+    );
+  }
+
+  if (initialSelectedCallId && deepLinkedCreatedAt) {
+    const neededDate = callsPageDateForTimestamp(deepLinkedCreatedAt, now);
+    if (neededDate !== selectedDateParam) {
+      redirect(
+        buildCallsPageHref({
+          callLogId: initialSelectedCallId,
+          callCreatedAt: deepLinkedCreatedAt,
+          page: requestedPage > 1 ? requestedPage : undefined,
+        }),
+      );
     }
   }
 
   const orgRow = await getCachedDashboardOrganizationRow();
   const businessName = String(orgRow?.name ?? "").trim();
 
-  const lowerIso = getDashboardMetricRangeLowerBoundIso(rangeKey);
-  const upperIso = getDashboardMetricRangeUpperExclusiveIso(rangeKey);
+  const { lowerInclusive, upperExclusive } = getCallsPageDayBoundsIso(selectedDate);
 
-  function applyRangeFilters<T extends { gte: (col: string, val: string) => T }>(
-    query: T,
-  ): T {
-    let q = query.gte("created_at", lowerIso);
-    if (upperIso) {
-      q = (q as T & { lt: (col: string, val: string) => T }).lt(
-        "created_at",
-        upperIso,
-      );
-    }
-    return q;
+  function applyDayFilters<T extends {
+    gte: (col: string, val: string) => T;
+    lt: (col: string, val: string) => T;
+  }>(query: T): T {
+    return query
+      .gte("created_at", lowerInclusive)
+      .lt("created_at", upperExclusive);
   }
 
   const listFrom = (requestedPage - 1) * CALL_HISTORY_PAGE_SIZE;
@@ -191,21 +198,21 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     { data: ticketRows },
     { data: blockedRows },
   ] = await Promise.all([
-    applyRangeFilters(
+    applyDayFilters(
       supabase
         .from("call_logs")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", organizationId)
         .eq("is_test_call", false),
     ),
-    applyRangeFilters(
+    applyDayFilters(
       supabase
         .from("call_logs")
         .select("outcome, duration_seconds")
         .eq("organization_id", organizationId)
         .eq("is_test_call", false),
     ),
-    applyRangeFilters(
+    applyDayFilters(
       supabase
         .from("call_logs")
         .select(
@@ -216,7 +223,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         .order("created_at", { ascending: false })
         .range(listFrom, listTo),
     ),
-    applyRangeFilters(
+    applyDayFilters(
       supabase
         .from("call_logs")
         .select("id, caller_number, created_at")
@@ -277,7 +284,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         icon={Phone}
         title="Calls"
         description={greetingSubline}
-        actions={<DashboardHeaderRangeControls />}
+        actions={<CallsDatePicker />}
         summary={
           [
             { value: String(metrics.totalCalls), label: "total calls" },
@@ -305,7 +312,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
             pageSize: CALL_HISTORY_PAGE_SIZE,
             totalCount: total,
             totalPages,
-            rangeKey,
+            selectedDate: selectedDateParam,
           }}
         />
       )}
