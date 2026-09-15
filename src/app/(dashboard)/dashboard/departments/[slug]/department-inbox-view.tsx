@@ -17,7 +17,7 @@ import {
 } from "@/components/dashboard/list-detail";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { buildCallsPageHref } from "@/lib/calls-page-href";
 import { cn } from "@/lib/utils";
 
 import { markTicketReopen, markTicketResolved } from "../../action-inbox/actions";
@@ -330,9 +330,10 @@ function DepartmentDetailContent({
   });
   const requestSummary = parseDepartmentRequestSummary(item.summary);
   const [textBackOpen, setTextBackOpen] = useState(false);
-  const callsHref = item.callLogId
-    ? `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(item.callLogId)}`
-    : DASHBOARD_ROUTES.calls;
+  const callsHref = buildCallsPageHref({
+    callLogId: item.callLogId,
+    callCreatedAt: item.createdAt,
+  });
 
   return (
     <DetailPanelShell surface="embedded">

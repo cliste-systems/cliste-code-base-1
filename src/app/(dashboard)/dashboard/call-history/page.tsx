@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Phone } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
@@ -25,6 +26,10 @@ import {
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
 import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
+import {
+  buildCallsPageHref,
+  dashboardMetricRangeForTimestamp,
+} from "@/lib/calls-page-href";
 
 import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
 
@@ -131,6 +136,31 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   const requestedPage = parsePageParam(sp.page);
 
   const { supabase, organizationId } = await requireDashboardSession();
+
+  if (initialSelectedCallId) {
+    const { data: deepLinkedCall } = await supabase
+      .from("call_logs")
+      .select("created_at")
+      .eq("id", initialSelectedCallId)
+      .eq("organization_id", organizationId)
+      .eq("is_test_call", false)
+      .maybeSingle();
+
+    const createdAt = String(deepLinkedCall?.created_at ?? "").trim();
+    if (createdAt) {
+      const neededRange = dashboardMetricRangeForTimestamp(createdAt);
+      if (neededRange !== rangeKey) {
+        redirect(
+          buildCallsPageHref({
+            callLogId: initialSelectedCallId,
+            callCreatedAt: createdAt,
+            page: requestedPage > 1 ? requestedPage : undefined,
+          }),
+        );
+      }
+    }
+  }
+
   const orgRow = await getCachedDashboardOrganizationRow();
   const businessName = String(orgRow?.name ?? "").trim();
 

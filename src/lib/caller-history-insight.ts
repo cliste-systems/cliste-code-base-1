@@ -28,6 +28,7 @@ export type CallerHistoryTicketInput = {
 
 export type CallerHistoryRecentCall = {
   id: string;
+  createdAt: string;
   dateLabel: string;
   summaryPreview: string | null;
   intentLabel: string;
@@ -183,6 +184,7 @@ export function buildCallerHistoryInsight(input: {
     const summary = call.aiSummary?.trim() || null;
     return {
       id: call.id,
+      createdAt: call.createdAt,
       dateLabel: formatCallerHistoryDateLabel(call.createdAt, now),
       summaryPreview: summaryPreview(summary),
       intentLabel: inferCallIntent(summary, outcome),

@@ -12,7 +12,7 @@ import {
   type CallerHistoryInsight,
   type CallerHistorySecurityFlag,
 } from "@/lib/caller-history-insight";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { buildCallsPageHref } from "@/lib/calls-page-href";
 
 type CallerHistorySectionProps = {
   callerNumber: string;
@@ -136,7 +136,10 @@ export function CallerHistorySection({
       {insight.recentCalls.length > 0 ? (
         <ul className="mt-4 space-y-2">
           {insight.recentCalls.map((recent) => {
-            const href = `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(recent.id)}`;
+            const href = buildCallsPageHref({
+              callLogId: recent.id,
+              callCreatedAt: recent.createdAt,
+            });
             const isCurrent = recent.id === currentCallId;
             return (
               <li key={recent.id}>
