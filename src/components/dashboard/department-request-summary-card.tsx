@@ -1,5 +1,9 @@
 import { cn } from "@/lib/utils";
 import type { StructuredCaptureSummary } from "@/lib/department-request-summary";
+import {
+  departmentRequestFieldLabel,
+  filterDepartmentRequestFieldsForDisplay,
+} from "@/lib/department-request-summary";
 
 type DepartmentRequestSummaryCardProps = {
   summary: StructuredCaptureSummary;
@@ -10,8 +14,6 @@ type DepartmentRequestSummaryCardProps = {
   className?: string;
 };
 
-const CALLER_FIELD_LABELS = new Set(["Name", "Phone", "Contact"]);
-
 export function DepartmentRequestSummaryCard({
   summary,
   callerName,
@@ -20,8 +22,9 @@ export function DepartmentRequestSummaryCard({
   showCallerName = true,
   className,
 }: DepartmentRequestSummaryCardProps) {
-  const requestFields = summary.fields.filter(
-    (field) => !CALLER_FIELD_LABELS.has(field.label),
+  const requestFields = filterDepartmentRequestFieldsForDisplay(
+    summary.fields,
+    showCallerName ? callerName : "",
   );
   const phone = callerDisplay.trim();
 
@@ -44,7 +47,7 @@ export function DepartmentRequestSummaryCard({
       <dl className="divide-y divide-[#e8eeea]">
         <div className="grid gap-1 px-4 py-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0">
           <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Name
+            Caller
           </dt>
           <dd className="text-[15px] font-semibold leading-snug text-[#0b1220]">
             {showCallerName ? callerName.trim() || "Unknown caller" : "Unknown caller"}
@@ -77,7 +80,7 @@ export function DepartmentRequestSummaryCard({
             className="grid gap-1 px-4 py-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0"
           >
             <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              {field.label}
+              {departmentRequestFieldLabel(field.label)}
             </dt>
             <dd
               className={cn(

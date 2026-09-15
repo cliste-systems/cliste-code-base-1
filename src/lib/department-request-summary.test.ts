@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  departmentRequestTypeLabel,
+  filterDepartmentRequestFieldsForDisplay,
   formatDepartmentListPreview,
   parseDepartmentRequestSummary,
+  personNamesMatch,
 } from "./department-request-summary";
 
 describe("parseDepartmentRequestSummary", () => {
@@ -66,5 +69,24 @@ describe("parseDepartmentRequestSummary", () => {
     );
     assert.equal(cakePreview, "Order");
     assert.doesNotMatch(cakePreview, /Brendan/);
+  });
+
+  it("drops collecting when it matches the caller name", () => {
+    const fields = filterDepartmentRequestFieldsForDisplay(
+      [
+        { label: "Order", value: "Birthday cake", unconfirmed: false },
+        { label: "For", value: "Sean", unconfirmed: false },
+        { label: "Collecting", value: "Stephen", unconfirmed: false },
+        { label: "Message", value: "Happy Birthday Sean", unconfirmed: false },
+      ],
+      "Stephen",
+    );
+
+    assert.deepEqual(
+      fields.map((field) => field.label),
+      ["Order", "For", "Message"],
+    );
+    assert.ok(personNamesMatch("Stephen", "Stephen"));
+    assert.ok(!personNamesMatch("Stephen", "Mary"));
   });
 });

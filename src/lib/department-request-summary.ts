@@ -319,3 +319,53 @@ function clipPreview(text: string, maxLen: number): string {
       : slice.trimEnd();
   return `${clipped.trimEnd()}…`;
 }
+
+function normalizePersonName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** True when two names refer to the same person (exact or shared first name). */
+export function personNamesMatch(a: string, b: string): boolean {
+  const left = normalizePersonName(a);
+  const right = normalizePersonName(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+
+  const leftFirst = left.split(/\s+/)[0] ?? "";
+  const rightFirst = right.split(/\s+/)[0] ?? "";
+  return (
+    leftFirst.length >= 2 &&
+    rightFirst.length >= 2 &&
+    leftFirst === rightFirst
+  );
+}
+
+const CALLER_CAPTURE_LABELS = new Set(["name", "phone", "contact"]);
+
+/** Drop caller identity rows and collecting when it duplicates the caller. */
+export function filterDepartmentRequestFieldsForDisplay(
+  fields: StructuredCaptureField[],
+  callerName: string,
+): StructuredCaptureField[] {
+  const caller = callerName.trim();
+  return fields.filter((entry) => {
+    const labelKey = entry.label.trim().toLowerCase();
+    if (CALLER_CAPTURE_LABELS.has(labelKey)) return false;
+    if (
+      labelKey === "collecting" &&
+      caller &&
+      personNamesMatch(entry.value, caller)
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/** Staff-facing label — clearer on bakery/meat tickets. */
+export function departmentRequestFieldLabel(label: string): string {
+  const key = label.trim().toLowerCase();
+  if (key === "collecting") return "Pickup by";
+  if (key === "for") return "Cake for";
+  return label;
+}
