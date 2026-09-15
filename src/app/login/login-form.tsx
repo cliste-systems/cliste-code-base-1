@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 import {
@@ -9,6 +10,7 @@ import {
   OnboardingFieldSurfaceProvider,
 } from "@/components/onboarding/onboarding-form-card";
 import { OnboardingEnter } from "@/components/onboarding/onboarding-enter";
+import { ONBOARDING_EASE } from "@/components/onboarding/onboarding-motion";
 import { OnboardingPrimaryButton } from "@/components/onboarding/onboarding-primary-button";
 import {
   ONBOARDING_FIELD_INPUT,
@@ -20,15 +22,24 @@ import { passwordSignIn } from "./actions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const SIGN_IN_SUCCESS_HOLD_MS = 360;
+const SIGN_IN_EXIT_MS = 520;
+
 type FieldErrors = Partial<Record<"email" | "password" | "captcha", string>>;
 
-export function LoginForm() {
-  const router = useRouter();
+type LoginFormProps = {
+  onTransitionStart?: () => void;
+};
+
+export function LoginForm({ onTransitionStart }: LoginFormProps) {
+  const reduceMotion = useReducedMotion();
+  const transitionStartedRef = useRef(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
+  const [signInSuccess, setSignInSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [requiresCaptcha, setRequiresCaptcha] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -44,8 +55,26 @@ export function LoginForm() {
     });
   }
 
+  function beginSuccessTransition() {
+    if (transitionStartedRef.current) return;
+    transitionStartedRef.current = true;
+    setSignInSuccess(true);
+
+    const holdMs = reduceMotion ? 0 : SIGN_IN_SUCCESS_HOLD_MS;
+    const exitMs = reduceMotion ? 0 : SIGN_IN_EXIT_MS;
+
+    window.setTimeout(() => {
+      onTransitionStart?.();
+    }, holdMs);
+
+    window.setTimeout(() => {
+      window.location.assign("/auth/post-login");
+    }, holdMs + exitMs + 40);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (signInSuccess) return;
     setError(null);
 
     const errors: FieldErrors = {};
@@ -73,6 +102,7 @@ export function LoginForm() {
         turnstileToken: turnstileToken ?? null,
       });
       if (!result.ok) {
+        setPending(false);
         setError(result.message);
         setRequiresCaptcha(result.requiresCaptcha);
         if (result.requiresCaptcha) {
@@ -80,19 +110,31 @@ export function LoginForm() {
         }
         return;
       }
-      // Full navigation so session cookies from the server action are applied
-      // before post-login runs — client router.push can hang on "Signing in…".
-      window.location.assign("/auth/post-login");
+      beginSuccessTransition();
     } catch {
-      setError("Something went wrong signing in. Refresh the page and try again.");
-    } finally {
       setPending(false);
+      setError("Something went wrong signing in. Refresh the page and try again.");
     }
   }
 
+  const fieldsLocked = pending || signInSuccess;
+
   return (
     <OnboardingFieldSurfaceProvider surface="profile">
-      <form onSubmit={handleSubmit} noValidate className="w-full space-y-3">
+      <motion.form
+        onSubmit={handleSubmit}
+        noValidate
+        className="w-full space-y-3"
+        animate={
+          reduceMotion
+            ? undefined
+            : {
+                opacity: pending && !signInSuccess ? 0.9 : 1,
+                y: pending && !signInSuccess ? 2 : 0,
+              }
+        }
+        transition={{ duration: 0.32, ease: ONBOARDING_EASE }}
+      >
         <OnboardingFieldBox
           label="Email address"
           htmlFor="login-email"
@@ -105,12 +147,13 @@ export function LoginForm() {
             autoComplete="email"
             placeholder="you@business.ie"
             value={email}
+            disabled={fieldsLocked}
             aria-invalid={Boolean(fieldErrors.email)}
             onChange={(event) => {
               setEmail(event.target.value);
               clearFieldError("email");
             }}
-            className={ONBOARDING_FIELD_INPUT}
+            className={cn(ONBOARDING_FIELD_INPUT, fieldsLocked && "opacity-80")}
           />
         </OnboardingFieldBox>
 
@@ -127,17 +170,19 @@ export function LoginForm() {
               autoComplete="current-password"
               placeholder="Your password"
               value={password}
+              disabled={fieldsLocked}
               aria-invalid={Boolean(fieldErrors.password)}
               onChange={(event) => {
                 setPassword(event.target.value);
                 clearFieldError("password");
               }}
-              className={cn(ONBOARDING_FIELD_INPUT, "pr-10")}
+              className={cn(ONBOARDING_FIELD_INPUT, "pr-10", fieldsLocked && "opacity-80")}
             />
             <button
               type="button"
+              disabled={fieldsLocked}
               onClick={() => setShowPassword((value) => !value)}
-              className="absolute top-1/2 right-0 -translate-y-1/2 p-1 text-slate-400 transition-colors hover:text-[#0b1220]"
+              className="absolute top-1/2 right-0 -translate-y-1/2 p-1 text-slate-400 transition-colors hover:text-[#0b1220] disabled:opacity-50"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -182,14 +227,19 @@ export function LoginForm() {
         <OnboardingEnter tone="profile" className="flex justify-center pt-2">
           <OnboardingPrimaryButton
             type="submit"
-            pending={pending}
+            pending={pending && !signInSuccess}
+            disabled={signInSuccess}
             className="w-full max-w-none sm:min-w-[14rem]"
           >
-            {pending ? "Signing in…" : "Sign in"}
+            {signInSuccess
+              ? "Opening dashboard…"
+              : pending
+                ? "Signing in…"
+                : "Sign in"}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </OnboardingPrimaryButton>
         </OnboardingEnter>
-      </form>
+      </motion.form>
     </OnboardingFieldSurfaceProvider>
   );
 }

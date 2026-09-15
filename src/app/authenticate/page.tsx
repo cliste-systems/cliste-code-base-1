@@ -2,14 +2,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { PRODUCT_NAME } from "@/lib/company-details";
-import { LoginForm } from "@/app/login/login-form";
-import { AuthMarketingShell } from "@/components/auth/auth-marketing-shell";
 import { describeAuthCallbackError } from "@/lib/auth-error-message";
 import { isPublicSignupEnabled } from "@/lib/public-signup";
-import { PUBLIC_ASSETS } from "@/lib/public-assets";
 import { getAuthUserOrNull } from "@/utils/supabase/server";
 
-import { AuthenticateSignUpLink } from "./authenticate-sign-up-link";
+import { AuthenticateFlow } from "./authenticate-flow";
 import { AuthParamForwarder } from "./auth-param-forwarder";
 
 export const metadata: Metadata = {
@@ -37,14 +34,10 @@ export default async function AuthenticatePage({
   return (
     <>
       <AuthParamForwarder />
-      <AuthMarketingShell
-        title="Sign in"
-        pageBackground={PUBLIC_ASSETS.onboarding.authSignup}
+      <AuthenticateFlow
         urlError={urlError}
-      >
-        <LoginForm />
-        {isPublicSignupEnabled() ? <AuthenticateSignUpLink /> : null}
-      </AuthMarketingShell>
+        showSignUpLink={isPublicSignupEnabled()}
+      />
     </>
   );
 }
