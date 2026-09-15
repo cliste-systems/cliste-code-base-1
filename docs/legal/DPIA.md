@@ -62,7 +62,7 @@ be on behalf of minors (parents booking for children).
 
 ### 2.3 Data categories
 
-- Voice audio (in transit, **not stored**)
+- Voice audio (in transit during the call; **recordings stored up to 30 days**)
 - Caller phone number (E.164)
 - Transcript text (full verbatim plus staff-facing `transcript_review`)
 - AI summary text
@@ -80,7 +80,8 @@ See `/legal/sub-processors` for transfer mechanisms and EU-region options.
 
 | Asset                        | TTL                                       |
 | ---------------------------- | ----------------------------------------- |
-| Voice audio                  | Not stored at rest                        |
+| Voice audio (in transit)     | Not stored beyond the live call           |
+| Call recording (MP3)         | 30 days in Supabase Storage, then deleted |
 | Transcript / review          | 30 days, then nulled by daily cron        |
 | AI summary, caller number    | 13 months, then nulled                    |
 | Appointment row              | 6 years (Revenue), erasable on Art 17     |
@@ -123,11 +124,12 @@ See `/legal/sub-processors` for transfer mechanisms and EU-region options.
 | 7 | Re-identification from anonymised post-13mo `call_logs` rows                                | Low        | Low      | After 13 months, `caller_number` and `ai_summary` are nulled — only org id, duration, outcome, timestamp remain. | Low      |
 | 8 | Service-role key on hosting platform compromised → mass data exfil                          | Low        | High     | Key stored only as hosted env var; rotation runbook; RLS still enforced for all JWT clients; principle of least privilege on service-role usage. | Low-Med  |
 | 9 | Stripe webhook spoof → fraudulent "paid" status                                             | Low        | High     | Stripe signature verified on every webhook; idempotency on conditional update.                       | Low      |
+| 10 | Sensitive PII spoken aloud remains in MP3 recording (unredacted audio)                      | Medium     | Medium   | 30-day recording TTL; spoken disclosure before egress; transcript redaction does not apply to audio; controller erasure + cron delete. | Low-Med  |
 
 ## 5. Residual risk
 
 Residual risk after mitigations: **Low** for items 1, 2, 4, 6, 7, 9;
-**Low-Medium** for items 3 and 8; **Medium** for item 5 (which sits
+**Low-Medium** for items 3, 8, and 10; **Medium** for item 5 (which sits
 with the controller, not the processor, and is addressed in the DPA).
 
 No residual high risks → DPC consultation under Article 36 not
@@ -145,5 +147,7 @@ required.
 - [x] Quarterly review of agent prompt + redaction guidance — **eng** (special-category minimisation in `compile-cara-prompt.ts`, `transcript-redaction.ts`)
 - [ ] Annual sub-processor security review — **privacy lead**
 - [ ] Confirm Twilio call recording is OFF on all numbers — **eng**
+- [ ] Confirm LiveKit egress uploads MP3 to `call-recordings` after disclosure — **eng**
+- [ ] Confirm app rejects `audio_storage_path` when `disclosure_confirmed` is false — **eng**
 - [x] Art 20 portability UI (org-wide JSON/CSV export) — **eng** (`/dashboard/legal/data-requests`)
 - [ ] Re-run DPIA on > 50 active salons — **privacy lead**

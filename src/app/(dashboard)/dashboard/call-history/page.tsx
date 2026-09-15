@@ -51,6 +51,7 @@ type CallLogListRow = {
   ai_summary: string | null;
   created_at: string;
   post_call_status?: string | null;
+  audio_storage_path?: string | null;
 };
 
 type CallLogMetricsRow = {
@@ -110,6 +111,7 @@ function toListItem(
     hasOpenAction: Boolean(followUp),
     followUp,
     postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
+    hasRecording: Boolean(row.audio_storage_path?.trim()),
   };
   item.summaryPreview = callSummaryForDisplay(item, {
     businessName,
@@ -177,7 +179,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       supabase
         .from("call_logs")
         .select(
-          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at, post_call_status",
+          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at, post_call_status, audio_storage_path",
         )
         .eq("organization_id", organizationId)
         .eq("is_test_call", false)

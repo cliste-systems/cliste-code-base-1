@@ -2,6 +2,7 @@ export type GdprPortabilityPayload = {
   format: "cliste-gdpr-portability-v1";
   generated_at: string;
   organization_id: string;
+  call_recordings_note?: string;
   appointments: Record<string, unknown>[];
   call_logs: Record<string, unknown>[];
   action_tickets: Record<string, unknown>[];

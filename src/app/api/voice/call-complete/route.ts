@@ -23,6 +23,7 @@ import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 import { captureObservedError } from "@/lib/observability";
 import { logDisclosureCompliance } from "@/lib/voice-compliance";
 import { stampStoreTransferVerified } from "@/lib/transfer-verification-db";
+import { isValidCallRecordingStoragePath } from "@/lib/call-recordings";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +85,7 @@ type VoiceCallCompleteBody = {
   post_call_status?: "pending" | "complete" | "partial" | "failed";
   post_call_errors?: Array<{ stage: string; message: string; at: string }>;
   post_call_expected_ticket?: boolean;
+  audio_storage_path?: string | null;
 };
 
 function unauthorized() {
@@ -330,7 +332,7 @@ export async function POST(request: Request) {
   if (callSid) {
     const { data: existing } = await admin
       .from("call_logs")
-      .select("id, transcript_review, ai_summary")
+      .select("id, transcript_review, ai_summary, audio_storage_path")
       .eq("call_sid", callSid)
       .maybeSingle();
     if (existing?.id) {
@@ -342,6 +344,7 @@ export async function POST(request: Request) {
         body,
         existingReview: existing.transcript_review as string | null,
         existingSummary: existing.ai_summary as string | null,
+        existingAudioPath: existing.audio_storage_path as string | null,
         knowledgeGaps,
       });
     }
@@ -436,7 +439,7 @@ export async function POST(request: Request) {
     if (callSid && callErr.code === "23505") {
       const { data: existing } = await admin
         .from("call_logs")
-        .select("id, transcript_review, ai_summary")
+        .select("id, transcript_review, ai_summary, audio_storage_path")
         .eq("call_sid", callSid)
         .maybeSingle();
       if (existing?.id) {
@@ -448,6 +451,7 @@ export async function POST(request: Request) {
           body,
           existingReview: existing.transcript_review as string | null,
           existingSummary: existing.ai_summary as string | null,
+          existingAudioPath: existing.audio_storage_path as string | null,
           knowledgeGaps,
         });
       }
@@ -466,6 +470,23 @@ export async function POST(request: Request) {
   }
 
   const callLogId = insertedCall.id as string;
+
+  const audioStoragePath = resolveValidatedAudioStoragePath(
+    body.audio_storage_path,
+    orgId,
+    callLogId,
+    body.disclosure_confirmed === true,
+  );
+  if (audioStoragePath) {
+    const { error: audioPatchErr } = await admin
+      .from("call_logs")
+      .update({ audio_storage_path: audioStoragePath })
+      .eq("id", callLogId)
+      .eq("organization_id", orgId);
+    if (audioPatchErr) {
+      console.warn("[voice/call-complete] audio_storage_path patch", audioPatchErr.message);
+    }
+  }
 
   if (isTestCall) {
     await persistCallTestReport({
@@ -733,6 +754,30 @@ function parseKnowledgeGaps(body: VoiceCallCompleteBody): KnowledgeGapPayload[] 
     : [];
 }
 
+function resolveValidatedAudioStoragePath(
+  raw: unknown,
+  organizationId: string,
+  callLogId: string,
+  disclosureConfirmed: boolean,
+): string | null {
+  if (!disclosureConfirmed) {
+    if (typeof raw === "string" && raw.trim()) {
+      console.warn("[voice/call-complete] rejected audio_storage_path — disclosure not confirmed", {
+        callLogId,
+      });
+    }
+    return null;
+  }
+  if (typeof raw !== "string") return null;
+  const path = raw.trim();
+  if (!isValidCallRecordingStoragePath(path, organizationId)) return null;
+  const fileCallId = path.split("/")[1]?.replace(/\.(mp3|mp4|m4a)$/i, "");
+  if (!fileCallId || fileCallId.toLowerCase() !== callLogId.trim().toLowerCase()) {
+    return null;
+  }
+  return path;
+}
+
 async function respondIdempotentCallComplete(input: {
   admin: ReturnType<typeof createAdminClient>;
   orgId: string;
@@ -741,6 +786,7 @@ async function respondIdempotentCallComplete(input: {
   body: VoiceCallCompleteBody;
   existingReview: string | null;
   existingSummary: string | null;
+  existingAudioPath: string | null;
   knowledgeGaps: KnowledgeGapPayload[];
 }) {
   const reviewRedacted = redactCallText(
@@ -762,6 +808,17 @@ async function respondIdempotentCallComplete(input: {
   }
   if (input.body.post_call_expected_ticket !== undefined) {
     patch.post_call_expected_ticket = input.body.post_call_expected_ticket === true;
+  }
+  if (!input.existingAudioPath?.trim()) {
+    const audioPath = resolveValidatedAudioStoragePath(
+      input.body.audio_storage_path,
+      input.orgId,
+      input.callLogId,
+      input.body.disclosure_confirmed === true,
+    );
+    if (audioPath) {
+      patch.audio_storage_path = audioPath;
+    }
   }
   if (Object.keys(patch).length > 0) {
     const { error: patchErr } = await input.admin

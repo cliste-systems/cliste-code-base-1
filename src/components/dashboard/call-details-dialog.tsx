@@ -17,6 +17,8 @@ import {
   type CallDetailDialogPayload,
 } from "@/app/(dashboard)/dashboard/call-history/actions";
 import { DetailSection } from "@/components/dashboard/list-detail";
+import { CallAudioPlayer } from "@/components/dashboard/call-audio-player";
+import { StaffTranscriptView } from "@/components/dashboard/staff-transcript-view";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import {
   Dialog,
@@ -58,6 +60,7 @@ function toHistoryItem(detail: CallDetailDialogPayload) {
     hasOpenAction: false,
     followUp: null,
     postCallStatus: detail.postCallStatus,
+    hasRecording: detail.hasRecording,
   };
 }
 
@@ -197,6 +200,13 @@ export function CallDetailsDialog({
                 </p>
               </DetailSection>
 
+              <DetailSection title="Recording">
+                <CallAudioPlayer
+                  callLogId={historyItem.id}
+                  hasRecording={historyItem.hasRecording}
+                />
+              </DetailSection>
+
               <DetailSection title="Transcript">
                 {!safeTranscript && !showCleaned ? (
                   <p className="text-[13px] text-slate-500">No transcript available.</p>
@@ -205,9 +215,10 @@ export function CallDetailsDialog({
                     <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
                       Full conversation between Cara and the caller. Stored for 30 days.
                     </p>
-                    <pre className="max-h-[min(42vh,360px)] overflow-y-auto rounded-lg border border-[#d9e2dd] bg-white p-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-slate-700 shadow-inner">
-                      {showCleaned ? cleanedTranscript : safeTranscript}
-                    </pre>
+                    <StaffTranscriptView
+                      text={(showCleaned ? cleanedTranscript : safeTranscript) ?? ""}
+                      scrollable
+                    />
                     {hasCleanedToggle ? (
                       <button
                         type="button"

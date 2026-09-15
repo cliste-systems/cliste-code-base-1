@@ -32,14 +32,14 @@ export default function LegalDataRequestsPage() {
             </li>
             <li>
               <strong className="font-medium text-[#0b1220]">Export</strong> —
-              every appointment, call log (including transcripts and AI summaries
-              where still retained), and action-inbox ticket for that phone number
-              in your account.
+              every appointment, call log (including transcripts, AI summaries,
+              and time-limited call recording playback links where still retained),
+              and action-inbox ticket for that phone number in your account.
             </li>
             <li>
               <strong className="font-medium text-[#0b1220]">Erase</strong> —
-              name, phone, and email are redacted; transcripts and AI summaries
-              are removed.
+              name, phone, and email are redacted; transcripts, AI summaries,
+              and call recordings are removed.
             </li>
             <li>
               Customers can also email{" "}
@@ -83,7 +83,8 @@ export default function LegalDataRequestsPage() {
           <blockquote className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[12px] leading-relaxed text-slate-700">
             When you call [Business name], your call may be answered by our AI
             phone assistant provided by {CLISTE_COMPANY.legalName}. Calls may be recorded and
-            transcribed to handle your request; audio is not kept after the call.
+            transcribed to handle your request; call audio is kept for up to 30 days,
+            then deleted.
             We use {CLISTE_COMPANY.legalName} to process this data on our behalf. For privacy requests,
             contact us directly or email {CLISTE_COMPANY.privacyEmail}.
           </blockquote>

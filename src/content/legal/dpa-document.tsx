@@ -82,7 +82,7 @@ export function DpaDocument() {
             ],
             [
               "Personal data categories",
-              "Name, mobile phone number, email, appointment metadata, voice call audio (transient), call transcripts (30 days), AI summaries (13 months)",
+              "Name, mobile phone number, email, appointment metadata, voice call audio (up to 30 days in private storage), call transcripts (30 days), AI summaries (13 months)",
             ],
             [
               "Special category data",
@@ -176,9 +176,10 @@ export function DpaDocument() {
         <p>
           Cliste Systems Limited has completed a <strong>transfer impact assessment</strong> for
           US transfers under Schrems II, documenting supplementary measures
-          including TLS in transit, no voice-audio retention at rest, transcript
-          redaction, provider zero-data-retention options where available, and
-          automated retention deletion via our daily data-retention cron.
+          including TLS in transit, private EU-hosted storage for call recordings
+          (30-day retention), transcript redaction, provider zero-data-retention
+          options where available, and automated retention deletion via our daily
+          data-retention cron.
         </p>
       </LegalSection>
 

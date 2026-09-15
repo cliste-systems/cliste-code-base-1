@@ -68,9 +68,9 @@ export function PrivacyNoticeDocument() {
             [
               "Voice call data",
               <>
-                Caller number, duration, redacted transcript, AI summary. Audio
-                is <strong>not retained</strong> by Cliste Systems Limited; it is processed live
-                by speech vendors and discarded.
+                Caller number, duration, redacted transcript, AI summary, and call
+                recording (MP3 audio). Recordings are stored in our EU-hosted
+                storage for up to <strong>30 days</strong>, then deleted automatically.
               </>,
               "Calls to your Hello Cara number",
             ],
@@ -141,7 +141,7 @@ export function PrivacyNoticeDocument() {
           <strong>text-to-speech and LLM routing</strong> (ElevenLabs, OpenRouter)
           and transactional email — may still use US-based sub-processors under the
           EU&ndash;US Data Privacy Framework and/or Standard Contractual Clauses.
-          Audio is not retained at rest; see{" "}
+          Audio recordings and transcripts are retained for up to 30 days; see{" "}
           <LegalInlineLink href="/legal/sub-processors">sub-processors</LegalInlineLink>.
         </p>
       </LegalSection>
@@ -187,7 +187,8 @@ export function PrivacyNoticeDocument() {
           encryption). Production database access is restricted and logged.
           Voice calls are transcribed for up to 30 days; transcripts are redacted
           for card numbers, government IDs, and obvious volunteered sensitive
-          phrases before storage. Audio is not retained after the call.
+          phrases before storage. Call recordings are kept for up to 30 days for
+          quality review and dispute handling, then deleted automatically.
         </p>
       </LegalSection>
 
@@ -207,7 +208,11 @@ export function PrivacyNoticeDocument() {
         <LegalTable
           headers={["Data", "Retention", "Why"]}
           rows={[
-            ["Voice call audio", "Not retained", "Streamed to STT/TTS, discarded after the call"],
+            [
+              "Voice call audio (recording)",
+              "30 days, then deleted",
+              "Quality review, dispute handling, staff playback in dashboard",
+            ],
             [
               "Call transcript & review text",
               "30 days, then nulled",

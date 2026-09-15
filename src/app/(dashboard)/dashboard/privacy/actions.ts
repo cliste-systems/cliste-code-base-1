@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
+import {
+  createCallRecordingSignedUrl,
+  deleteCallRecordingObjects,
+} from "@/lib/call-recordings-server";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import type { GdprPortabilityPayload } from "@/lib/gdpr-portability";
 import {
@@ -24,6 +28,7 @@ export type GdprExportPayload = {
   generated_at: string;
   organization_id: string;
   customer_phone_e164: string;
+  call_recordings_note?: string;
   appointments: Record<string, unknown>[];
   call_logs: Record<string, unknown>[];
   action_tickets: Record<string, unknown>[];
@@ -117,6 +122,8 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
       format: "cliste-gdpr-portability-v1",
       generated_at: new Date().toISOString(),
       organization_id: session.organizationId,
+      call_recordings_note:
+        "Call audio recordings are not included in this export. Where a recording exists, it is available in the dashboard for up to 30 days and then deleted automatically.",
       appointments: appts.data ?? [],
       call_logs: calls.data ?? [],
       action_tickets: tickets.data ?? [],
@@ -159,7 +166,7 @@ export async function exportCustomerData(
     sb
       .from("call_logs")
       .select(
-        "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at",
+        "id, caller_number, caller_name, duration_seconds, outcome, transcript, transcript_review, ai_summary, created_at, audio_storage_path",
       )
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
@@ -212,6 +219,32 @@ export async function exportCustomerData(
     console.warn("[gdpr] failed to record export event", err);
   }
 
+  const callLogRows = calls.data ?? [];
+  const enrichedCallLogs = await Promise.all(
+    callLogRows.map(async (row) => {
+      const storagePath = String(row.audio_storage_path ?? "").trim();
+      if (!storagePath) {
+        return {
+          ...row,
+          has_call_recording: false,
+        };
+      }
+      const playbackUrl = await createCallRecordingSignedUrl({
+        organizationId: session.organizationId,
+        callLogId: String(row.id),
+        storagePath,
+      });
+      return {
+        ...row,
+        has_call_recording: true,
+        call_recording_playback_url: playbackUrl,
+        call_recording_url_expires_in_seconds: playbackUrl ? 300 : null,
+        call_recordings_note:
+          "Signed playback URLs expire after five minutes. Recordings are deleted automatically after 30 days.",
+      };
+    }),
+  );
+
   return {
     ok: true,
     phoneE164,
@@ -219,8 +252,10 @@ export async function exportCustomerData(
       generated_at: new Date().toISOString(),
       organization_id: session.organizationId,
       customer_phone_e164: phoneE164,
+      call_recordings_note:
+        "Call audio is included as time-limited playback links where a recording still exists (up to 30 days).",
       appointments: appts.data ?? [],
-      call_logs: calls.data ?? [],
+      call_logs: enrichedCallLogs,
       action_tickets: tickets.data ?? [],
       blocked_callers: blocked.data ?? [],
     },
@@ -234,9 +269,9 @@ export async function exportCustomerData(
  * replaced with redaction markers; the appointment time and price stay
  * for the books.
  *
- * Call transcripts already hold no personal data after our 30-day cron
- * sweep, but we proactively null `caller_number` and `ai_summary` for
- * any log row tied to the same phone so an erasure request takes effect
+ * Call transcripts and call recordings already hold no personal data after our 30-day cron
+ * sweep, but we proactively null `caller_number`, delete matching recordings, and null
+ * `ai_summary` for any log row tied to the same phone so an erasure request takes effect
  * immediately.
  */
 export async function eraseCustomerData(
@@ -264,6 +299,20 @@ export async function eraseCustomerData(
   // use the admin client BUT scope every UPDATE to this org's rows.
   const admin = createAdminClient();
 
+  const { data: recordingRows } = await admin
+    .from("call_logs")
+    .select("audio_storage_path")
+    .eq("organization_id", session.organizationId)
+    .eq("caller_number", phoneE164)
+    .not("audio_storage_path", "is", null);
+
+  const recordingPaths = (recordingRows ?? [])
+    .map((row) => String(row.audio_storage_path ?? "").trim())
+    .filter(Boolean);
+  if (recordingPaths.length > 0) {
+    await deleteCallRecordingObjects(recordingPaths);
+  }
+
   const [apptsRes, callsRes, ticketsRes, blockedRes] = await Promise.all([
     admin
       .from("appointments")
@@ -282,6 +331,7 @@ export async function eraseCustomerData(
         transcript: null,
         transcript_review: null,
         ai_summary: null,
+        audio_storage_path: null,
       })
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)

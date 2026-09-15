@@ -1,7 +1,7 @@
 # GDPR, ePrivacy & AI Act — Cliste voice agents in Ireland
 
 **Status:** Internal compliance reference (engineering + product).  
-**Last updated:** 16 June 2026.  
+**Last updated:** 15 September 2026.  
 **Audience:** Cliste team, salon customers (operators), and technical reviewers.
 
 > **This document is not legal advice.** Irish and EU data-protection law is fact-specific. Use this as a map of how Cliste is designed, what the codebase does today, and where professional review is still required. For binding commitments, rely on `/legal/privacy`, `docs/legal/DPA.md`, and signed customer agreements.
@@ -61,8 +61,8 @@ When the salon has a valid **Article 6** basis (usually **contract** or **legiti
 | Activity | How Cliste supports it |
 | -------- | ---------------------- |
 | Answer **inbound** calls with an AI agent on the salon’s published number | Voice worker + `POST /api/voice/call-complete` → `call_logs` |
-| Stream audio to STT/LLM/TTS **without retaining audio at rest** | Documented in DPA, DPIA, privacy notice; worker must disable Twilio/LiveKit recording |
-| Store **caller ID**, duration, outcome, **redacted** transcript (≤30 days), AI summary (≤13 months) | `src/lib/transcript-redaction.ts`, `src/app/api/cron/data-retention/route.ts` |
+| Stream audio to STT/LLM/TTS; store **MP3 call recordings** for up to 30 days in private EU storage | Documented in DPA, DPIA, privacy notice; Twilio call recording OFF; recording starts only after spoken disclosure |
+| Store **caller ID**, duration, outcome, **redacted** transcript (≤30 days), AI summary (≤13 months), call recording (≤30 days) | `src/lib/transcript-redaction.ts`, `src/lib/call-recordings-server.ts`, `src/app/api/cron/data-retention/route.ts` |
 | Create/update appointments initiated by the agent | `appointments` with `source = ai_call` |
 | Send **transactional** SMS/email (confirmations, reminders, pay links) | Twilio / SendGrid — terms prohibit using Cliste for bulk marketing |
 | Transfer data to **US sub-processors** with **DPF and/or SCCs** | Listed at `/legal/sub-processors` |
@@ -87,7 +87,7 @@ When the salon has a valid **Article 6** basis (usually **contract** or **legiti
 | Rely on **“HIPAA compliant”** vendor marketing as proof of GDPR compliance | US healthcare regime ≠ GDPR |
 | **Outbound cold-call marketing** to Irish **mobile** numbers without prior consent | ePrivacy Reg 13(6); DPC FAQ on mobile marketing |
 | Use Cliste to send **unsolicited marketing** SMS/email | Terms §4 — transactional only |
-| **Record and store call audio** long-term without a clear lawful basis and transparency | GDPR storage limitation + purpose limitation; DPIA assumes audio **not** stored |
+| **Record and store call audio** long-term without a clear lawful basis and transparency | GDPR storage limitation + purpose limitation; recordings retained **30 days** with spoken disclosure before egress |
 | **Solicit** payment card numbers or PPSN on calls and store them in transcripts | PCI + special-category risk; redaction is backup only |
 | **Hide** that the callee is speaking to an AI (after Aug 2026 Art 50 applies) | EU AI Act transparency |
 | Transfer personal data to third countries **without** a valid transfer tool (SCCs, DPF, etc.) | GDPR Chapter V |
@@ -156,7 +156,7 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 | --------- | -------- |
 | **EU–US Data Privacy Framework** | Sub-processor certified |
 | **Standard Contractual Clauses (2021 modules)** | No DPF; processor-to-processor chain documented |
-| **Supplementary measures** | TLS, no audio retention, transcript redaction, short TTL — see DPA Annex II |
+| **Supplementary measures** | TLS, 30-day call recording retention in private EU storage, transcript redaction, short TTL signed URLs — see DPA Annex II |
 
 **Cannot:** assume “EU entity” (e.g. OpenAI Ireland Ltd) means **all** processing stays in EEA — check each sub-processor row in `/legal/sub-processors`.
 
@@ -177,7 +177,7 @@ Cliste uses **EEA hosting** for primary data (Supabase Ireland), dashboard compu
 
 | Asset | TTL |
 | ----- | --- |
-| Voice audio at rest | **Not stored** |
+| Voice audio at rest (MP3 recording) | **30 days** → deleted from Supabase Storage |
 | `call_logs.transcript`, `transcript_review` | **30 days** → nulled |
 | `call_logs.ai_summary`, `caller_number` | **13 months** → nulled |
 | Appointments after erasure | Anonymised identity; time/price kept (**~6 years** tax) |
@@ -252,7 +252,7 @@ sequenceDiagram
   TTS->>Caller: Synthesised speech
   Worker->>App: POST call-complete redacted
   App->>DB: call_logs insert
-  Note over Worker,DB: Audio not stored at rest by Cliste
+  Note over Worker,DB: MP3 recording stored up to 30 days in Supabase Storage
 ```
 
 ---

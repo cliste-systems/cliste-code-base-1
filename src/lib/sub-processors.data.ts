@@ -1,5 +1,5 @@
 /** Sub-processor list version — bump when SUB_PROCESSORS changes; triggers customer email notice. */
-export const SUB_PROCESSOR_LIST_VERSION = "2026-06-12";
+export const SUB_PROCESSOR_LIST_VERSION = "2026-09-15";
 
 /** Sub-processor registry — update here; legal pages import this source. */
 
@@ -20,7 +20,7 @@ export const SUB_PROCESSORS: SubProcessor[] = [
   {
     name: "Supabase (Supabase, Inc.)",
     purpose: "Database, authentication, server-side operations.",
-    data: "Business and caller data (encrypted at rest).",
+    data: "Business and caller data (encrypted at rest), including call recordings in private Storage (30 days).",
     location: "EEA — AWS eu-west-1 (Ireland). Primary data store.",
     transferMechanism: "No third-country transfer for primary database.",
     url: "https://supabase.com/privacy",
@@ -88,7 +88,7 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     name: "LiveKit Cloud (LiveKit, Inc.)",
     purpose:
       "Real-time SIP / WebRTC, in-call speech recognition (LiveKit Agents), and voice agent runtime.",
-    data: "Audio in transit (not retained), call metadata, caller number, transient transcripts.",
+    data: "Audio in transit; call recordings (MP3, up to 30 days in Supabase Storage via egress), call metadata, caller number, transient transcripts.",
     location:
       "Inbound telephony: EU SIP (Frankfurt) via Twilio trunk. WebRTC / agent media: global routing until LiveKit protocol region pinning is enabled.",
     transferMechanism:
@@ -145,7 +145,7 @@ export const SUB_PROCESSORS: SubProcessor[] = [
 export const SUB_PROCESSOR_CATEGORIES_PUBLIC = [
   {
     category: "Cloud database & authentication",
-    purpose: "Store business accounts, caller records, transcripts, and dashboard data.",
+    purpose: "Store business accounts, caller records, transcripts, call recordings, and dashboard data.",
     location: "EEA (Ireland)",
     transfers: "None for primary storage.",
   },
@@ -158,7 +158,7 @@ export const SUB_PROCESSOR_CATEGORIES_PUBLIC = [
   {
     category: "Real-time voice & speech recognition",
     purpose:
-      "Connect phone calls to the AI agent; in-call speech recognition via LiveKit Agents (audio not retained at rest).",
+      "Connect phone calls to the AI agent; in-call speech recognition via LiveKit Agents; call recording egress to Supabase Storage (30 days).",
     location: "EU SIP (Frankfurt) for inbound calls; WebRTC global until pinned",
     transfers: "None on SIP path; SCCs for unpinned WebRTC.",
   },

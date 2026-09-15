@@ -3,7 +3,7 @@
 **Purpose:** Verify production voice pipeline meets GDPR, EU AI Act Art 50, and Irish
 transparency expectations. Run before go-live on each DID and quarterly thereafter.
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-09-15
 
 ---
 
@@ -18,10 +18,13 @@ transparency expectations. Run before go-live on each DID and quarterly thereaft
 
 ## 2. Recording & audio retention
 
-- [ ] Twilio: **Call Recording = OFF** on every Cliste SIP trunk / number.
-- [ ] LiveKit: **Egress recording = OFF**; no S3/GCS egress destinations.
-- [ ] Voice worker: does **not** persist raw audio to disk or object storage.
-- [ ] Confirm Cliste `call_logs` receives transcripts only (redacted server-side).
+**Code implemented (Sep 2026):** worker waits for spoken disclosure playout before egress; dashboard rejects `audio_storage_path` without `disclosure_confirmed`; 30-day cron + GDPR erasure delete Storage objects.
+
+- [ ] Twilio: **Call Recording = OFF** on every Cliste SIP trunk / number (Cliste records via LiveKit egress instead).
+- [ ] LiveKit: **Egress recording = ON** → Supabase `call-recordings` bucket (EU routing).
+- [ ] Voice worker: starts egress **only after** spoken AI/recording disclosure (`disclosure_confirmed: true`).
+- [ ] Confirm `call_logs.audio_storage_path` is set on test calls and playback works in Calls + View call details.
+- [ ] Retention cron deletes recordings after **30 days** (`call_recordings.storage` step).
 
 ## 3. EU data routing (GDPR Chapter V)
 

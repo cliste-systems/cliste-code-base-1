@@ -40,7 +40,7 @@ plus the retention periods set out in `RETENTION.md`.
 | Nature of processing          | Storage, structuring, transmission, transcription, summarisation, retrieval                     |
 | Purpose                       | Operating the salon's appointment book, voice receptionist, and payment notifications           |
 | Data subject categories       | The Controller's customers, their staff users (operators)                                       |
-| Personal data categories      | Name, mobile phone number, email, appointment metadata, voice call audio (transient), call transcripts (30 days), AI summaries (13 months), pseudonymised payment metadata |
+| Personal data categories      | Name, mobile phone number, email, appointment metadata, voice call audio (up to 30 days in private storage), call transcripts (30 days), AI summaries (13 months), pseudonymised payment metadata |
 | Special category data         | None intended. Customers may volunteer health-related context during a call (e.g. "I'm pregnant"). Controller is responsible for not soliciting it. |
 
 ## 4. Controller obligations

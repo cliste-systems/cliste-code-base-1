@@ -31,6 +31,7 @@ export type CallHistoryListItem = {
   hasOpenAction: boolean;
   followUp: CallFollowUp | null;
   postCallStatus: PostCallStatus;
+  hasRecording: boolean;
 };
 
 export function callNeedsPostCallReviewBanner(item: CallHistoryListItem): boolean {
@@ -290,6 +291,7 @@ export function buildCallHistoryMetricsFromSummaryRows(
     hasOpenAction: false,
     followUp: null,
     postCallStatus: "complete",
+    hasRecording: false,
   }));
   const base = buildCallHistoryMetrics(stubItems);
   return {

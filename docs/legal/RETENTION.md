@@ -4,7 +4,7 @@ The authoritative public-facing version of this schedule is at
 `/legal/privacy`. This document is the operational mirror — what the
 system actually does, where, and how often.
 
-Last reviewed: 2026-06-12.
+Last reviewed: 2026-09-15.
 
 ---
 
@@ -14,11 +14,13 @@ Last reviewed: 2026-06-12.
 | ------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
 | `appointments`                              | 6 years (tax)         | Manual erasure via `/dashboard/legal/data-requests` (Art 17). Anonymised — name/phone/email replaced.   |
 | `call_logs.transcript`, `transcript_review` | 30 days              | Daily cron `/api/cron/data-retention` nulls fields                                          |
+| `call_logs.audio_storage_path` + Storage object | 30 days          | Same cron deletes `call-recordings` objects and nulls path                                  |
 | `call_logs.ai_summary`, `caller_number`     | 13 months            | Same cron, longer cutoff                                                                   |
 | `call_logs` row itself                      | Indefinite (org-only) | Kept for ops reporting; contains only org id + duration + outcome after 13 months          |
 | `action_tickets`                            | Tied to parent call   | Erasable via `/dashboard/legal/data-requests`                                                          |
 | `blocked_callers`                           | Until owner unblocks  | Owner-managed blocklist; deleted on Art 17 erasure for that phone number                                |
-| Voice audio (LiveKit / SIP)                 | Not stored at rest   | LiveKit egress recording disabled; Twilio recording disabled                                |
+| Voice audio (LiveKit in transit)            | Not stored at rest   | Real-time only during the call                                                              |
+| Call recordings (Supabase `call-recordings`) | 30 days             | Private bucket; org-scoped paths; deleted by retention cron and GDPR erasure               |
 | `public_booking_otp_challenges` (legacy)    | 30 minutes           | Cron deletes stale rows only — public booking retired; no new writes                        |
 | `public_booking_rate_events` (legacy)       | 14 days              | Same — purge only                                                                          |
 | Outbound SMS / email content                 | Not retained         | We do not log message body server-side after delivery                                      |

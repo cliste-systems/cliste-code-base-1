@@ -93,8 +93,9 @@ Art 50, and Hello Cara's DPA commitments.
    `organizations.greeting`, which always includes the fixed legal segment from
    `voiceLegalDisclosure()` (`src/lib/voice-greeting.ts`). Never skip or paraphrase
    away the AI / recording-transcription notice.
-2. **No audio retention** — Twilio call recording OFF; LiveKit egress recording OFF;
-   do not write raw audio to disk or object storage.
+2. **Call recording** — Twilio call recording OFF; LiveKit egress ON after spoken disclosure;
+   MP3 uploaded to Supabase `call-recordings/{organization_id}/{call_log_id}.mp3`;
+   retained **30 days** then deleted by cron and GDPR erasure.
 3. **EU routing** — Deploy worker in Railway EU West; prefer EU endpoints for
    ElevenLabs (`api.eu.residency.elevenlabs.io`) and OpenRouter (`eu.openrouter.ai`)
    when available. See `SUB_PROCESSOR_EU_MIGRATION_NOTES` in
@@ -150,6 +151,7 @@ worker. If it is unset on the app side the route returns `503` (fail-closed).
 | `transcript_review`  | string \| null  | no       | **Required when `transcript` is sent.** Staff-facing narrative without sensitive echo — shown by default in Calls. |
 | `ai_summary`         | string \| null  | no       | Short operational summary (intent/outcome). Must not repeat health, payment, or ID details. |
 | `disclosure_confirmed` | boolean       | no       | `true` when the AI + recording/transcription disclosure was spoken on the call. Logged for compliance monitoring. |
+| `audio_storage_path` | string \| null  | no       | Private Supabase Storage path (`{organization_id}/{call_log_id}.mp3`) when call recording was stored. Set on insert or idempotent follow-up. |
 | `organization_id`    | string (uuid)   | no       | **Deprecated.** Legacy compat only; if sent it must match the `called_number` lookup or the request is rejected. |
 | `knowledge_gaps`     | array           | no       | Topics Cara could not answer from current training. Each item creates a **Cara Training** queue entry for the owner. See below. |
 

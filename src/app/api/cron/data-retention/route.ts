@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { deleteCallRecordingObjects } from "@/lib/call-recordings-server";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -8,7 +9,8 @@ export const maxDuration = 60;
 
 /**
  * Daily GDPR retention sweep. Implements the schedule in `/legal/privacy`:
- * voice transcripts nulled after 30 days, AI summaries after 13 months,
+ * voice transcripts nulled after 30 days, call recordings deleted after 30 days,
+ * AI summaries after 13 months,
  * security audit logs after 2 years, and (legacy) any remaining rows in
  * retired public-booking security tables.
  */
@@ -85,6 +87,40 @@ async function run(request: Request) {
       .lt("created_at", cutoff)
       .not("transcript", "is", null)
       .select("id");
+    return { count: data?.length ?? 0, error: error?.message };
+  });
+
+  await step("call_recordings.storage", async () => {
+    const cutoff = iso(30 * 24 * 60 * 60 * 1000);
+    const { data: rows, error: selectError } = await admin
+      .from("call_logs")
+      .select("id, audio_storage_path")
+      .lt("created_at", cutoff)
+      .not("audio_storage_path", "is", null);
+
+    if (selectError) {
+      return { count: 0, error: selectError.message };
+    }
+
+    const paths = (rows ?? [])
+      .map((row) => String(row.audio_storage_path ?? "").trim())
+      .filter(Boolean);
+
+    if (paths.length > 0) {
+      await deleteCallRecordingObjects(paths);
+    }
+
+    const ids = (rows ?? []).map((row) => String(row.id));
+    if (ids.length === 0) {
+      return { count: 0 };
+    }
+
+    const { data, error } = await admin
+      .from("call_logs")
+      .update({ audio_storage_path: null })
+      .in("id", ids)
+      .select("id");
+
     return { count: data?.length ?? 0, error: error?.message };
   });
 

@@ -7,6 +7,7 @@ import {
   OUTCOME_LABELS,
 } from "@/lib/call-history-types";
 import { requireDashboardSession } from "@/lib/dashboard-session";
+import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 
 const UUID_RE =
@@ -31,7 +32,45 @@ export type CallDetailDialogPayload = {
   transcriptVerbatim: string;
   transcriptReview: string | null;
   postCallStatus: PostCallStatus;
+  hasRecording: boolean;
 };
+
+export type CallRecordingPlaybackResult =
+  | { ok: true; url: string }
+  | { ok: false; message: string };
+
+export async function fetchCallRecordingPlaybackUrl(
+  callLogId: string,
+): Promise<CallRecordingPlaybackResult> {
+  const id = callLogId.trim();
+  if (!UUID_RE.test(id)) {
+    return { ok: false, message: "Recording not available for this call." };
+  }
+
+  const { supabase, organizationId } = await requireDashboardSession();
+  const { data, error } = await supabase
+    .from("call_logs")
+    .select("audio_storage_path")
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  const storagePath = data?.audio_storage_path?.trim();
+  if (error || !storagePath) {
+    return { ok: false, message: "Recording not available for this call." };
+  }
+
+  const url = await createCallRecordingSignedUrl({
+    organizationId,
+    callLogId: id,
+    storagePath,
+  });
+  if (!url) {
+    return { ok: false, message: "Recording not available for this call." };
+  }
+
+  return { ok: true, url };
+}
 
 /**
  * Loads transcript fields for one call (list queries omit these to reduce egress).
@@ -117,7 +156,7 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
   const { data, error } = await supabase
     .from("call_logs")
     .select(
-      "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status",
+      "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status, audio_storage_path",
     )
     .eq("id", id)
     .eq("organization_id", organizationId)
@@ -153,5 +192,6 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
     transcriptVerbatim: mapped.transcriptVerbatim,
     transcriptReview: mapped.transcriptReview,
     postCallStatus: (data.post_call_status as PostCallStatus) ?? "complete",
+    hasRecording: Boolean(data.audio_storage_path?.trim()),
   };
 }

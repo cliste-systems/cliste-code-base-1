@@ -9,6 +9,8 @@ import { Ban, Check, Copy, Inbox, Phone, PhoneCall, Search, ShieldOff, User } fr
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { CallAudioPlayer } from "@/components/dashboard/call-audio-player";
+import { StaffTranscriptView } from "@/components/dashboard/staff-transcript-view";
 import {
   DetailActionButton,
   DetailPanelBody,
@@ -584,6 +586,10 @@ function CallDetailPanelContent({
           </p>
         </DetailSection>
 
+        <DetailSection title="Recording">
+          <CallAudioPlayer callLogId={call.id} hasRecording={call.hasRecording} />
+        </DetailSection>
+
         <DetailSection title="Transcript">
           {detailLoading ? (
             <p className="text-[13px] text-slate-500">Loading transcript…</p>
@@ -609,9 +615,9 @@ function CallDetailPanelContent({
                 </Link>
                 .
               </p>
-              <pre className="rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] p-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-slate-700 shadow-inner">
-                {showCleaned ? cleanedTranscript : safeTranscript}
-              </pre>
+              <StaffTranscriptView
+                text={(showCleaned ? cleanedTranscript : safeTranscript) ?? ""}
+              />
               <div className="mt-2 flex flex-wrap gap-3">
                 {hasCleanedToggle ? (
                   <button

@@ -5,6 +5,7 @@ import {
   parseGreetingParts,
   voiceLegalDisclosure,
 } from "@/lib/voice-greeting";
+import { greetingDisclosesAi } from "@/lib/greeting-discloses-ai";
 
 export type PlatformCaraRules = {
   legalDisclosureTemplate: string;
@@ -97,10 +98,14 @@ export function validatePlatformCaraRulesInput(
   if (!template.includes("{assistant}")) {
     return "Legal disclosure template must include {assistant}.";
   }
+  let rendered: string;
   try {
-    renderLegalDisclosure(template, "Cara");
+    rendered = renderLegalDisclosure(template, "Cara");
   } catch (e) {
     return e instanceof Error ? e.message : "Invalid legal disclosure template.";
+  }
+  if (!greetingDisclosesAi(rendered, "Cara")) {
+    return "Legal disclosure template must mention AI assistance and that calls may be recorded and transcribed.";
   }
   if (!input.transferWhenEnabled.trim()) {
     return "Transfer behaviour (when enabled) is required.";

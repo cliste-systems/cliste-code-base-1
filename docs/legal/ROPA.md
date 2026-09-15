@@ -75,11 +75,11 @@ salon**. Cliste's processing is governed by the DPA at `docs/legal/DPA.md`.
 
 | Field             | Value                                                                            |
 | ----------------- | -------------------------------------------------------------------------------- |
-| Categories        | Caller phone number, call duration, outcome, raw transcript, staff-facing transcript review, AI summary, call recording (transient via LiveKit; not retained at rest) |
+| Categories        | Caller phone number, call duration, outcome, raw transcript, staff-facing transcript review, AI summary, call recording (MP3 in Supabase Storage, 30 days) |
 | Subjects          | People calling the salon's line                                                   |
 | Recipients        | LiveKit (real-time voice + in-call STT), OpenRouter (LLM routing), ElevenLabs (TTS), Twilio (SIP/SMS) |
 | International     | See DPA Annex III                                                                |
-| Retention         | Transcripts: 30 days. AI summaries + caller numbers: 13 months. (Daily cron.)    |
+| Retention         | Call recordings: 30 days. Transcripts: 30 days. AI summaries + caller numbers: 13 months. (Daily cron.)    |
 
 ### 3.3 Action inbox tickets
 
