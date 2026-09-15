@@ -2,9 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCircle2, Copy, Inbox, MessageSquare, Search } from "lucide-react";
-
-import { CallDetailsDialogButton } from "@/components/dashboard/call-details-dialog";
+import { Check, CheckCircle2, Copy, Inbox, MessageSquare, ScrollText, Search } from "lucide-react";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { CallerTextBackDialog } from "@/components/dashboard/caller-text-back-dialog";
@@ -387,12 +385,10 @@ function DepartmentDetailContent({
         )}
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <CallDetailsDialogButton
-            ticketId={item.id}
-            callLogId={item.callLogId}
-            callerName={item.callerName}
-            callerDisplay={item.callerDisplay}
-          />
+          <DetailActionButton href={callsHref} className="min-h-11 px-4">
+            <ScrollText className="size-4" aria-hidden />
+            Open in Calls
+          </DetailActionButton>
           {isOpen ? (
             <form action={markTicketResolved}>
               <input type="hidden" name="ticketId" value={item.id} />
@@ -423,18 +419,6 @@ function DepartmentDetailContent({
             {copied ? "Copied" : "Copy"}
           </DetailActionButton>
         </div>
-        {hasPhone ? (
-          <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
-            To block this number or listen to the recording,{" "}
-            <a
-              href={callsHref}
-              className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
-            >
-              open the call in Calls
-            </a>
-            .
-          </p>
-        ) : null}
       </div>
 
       {hasPhone ? (
