@@ -2,7 +2,9 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Check, CheckCircle2, Copy, Inbox, MessageSquare, Phone, Search } from "lucide-react";
+import { Ban, Check, CheckCircle2, Copy, Inbox, MessageSquare, Search } from "lucide-react";
+
+import { CallDetailsDialogButton } from "@/components/dashboard/call-details-dialog";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { CallerTextBackDialog } from "@/components/dashboard/caller-text-back-dialog";
@@ -421,15 +423,12 @@ function DepartmentDetailContent({
         )}
 
         <div className="mt-5 flex flex-wrap gap-2">
-          {tel ? (
-            <DetailActionButton
-              href={tel}
-              className="min-h-11 px-5 text-[14px] font-semibold"
-            >
-              <Phone className="size-4" aria-hidden />
-              Call back
-            </DetailActionButton>
-          ) : null}
+          <CallDetailsDialogButton
+            ticketId={item.id}
+            callLogId={item.callLogId}
+            callerName={item.callerName}
+            callerDisplay={item.callerDisplay}
+          />
           {isOpen ? (
             <form action={markTicketResolved}>
               <input type="hidden" name="ticketId" value={item.id} />

@@ -28,6 +28,7 @@ import type { ActionTicketDeliveryStatus } from "@/lib/post-call-processing-type
 
 export type DepartmentTicketRow = {
   id: string;
+  call_log_id?: string | null;
   caller_number: string;
   caller_name: string | null;
   summary: string;
@@ -107,6 +108,7 @@ export function toDepartmentInboxItem(
 
   return {
     id: row.id,
+    callLogId: row.call_log_id ? String(row.call_log_id) : null,
     callerNumber,
     callerDisplay,
     callerName,

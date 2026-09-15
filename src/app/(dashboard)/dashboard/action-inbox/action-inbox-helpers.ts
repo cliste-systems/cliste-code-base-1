@@ -26,6 +26,8 @@ export type ActionTicketStatus = "open" | "resolved";
 
 export type ActionInboxItem = {
   id: string;
+  /** Linked call log when post-call processing attached one. */
+  callLogId: string | null;
   callerNumber: string;
   callerDisplay: string;
   /** Best display name (ticket, client record, or call log). */

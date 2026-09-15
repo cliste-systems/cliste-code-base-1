@@ -43,6 +43,7 @@ type ActionInboxPageProps = {
 
 type TicketRow = {
   id: string;
+  call_log_id?: string | null;
   caller_number: string;
   caller_name: string | null;
   summary: string;
@@ -121,6 +122,7 @@ function toInboxItem(
 
   return {
     id: row.id,
+    callLogId: row.call_log_id ? String(row.call_log_id) : null,
     callerNumber,
     callerDisplay,
     callerName,
@@ -161,7 +163,7 @@ export default async function ActionInboxPage({
       supabase
         .from("action_tickets")
         .select(
-          "id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
+          "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
         )
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })

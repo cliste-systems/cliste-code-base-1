@@ -28,7 +28,6 @@ import {
 } from "@/lib/legal-acceptance-gate";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import {
-  buildRetailDepartmentsSidebarNav,
   fetchDashboardNavBadges,
   type DashboardNavBadgeMap,
 } from "@/lib/dashboard-nav-badges";
@@ -153,31 +152,13 @@ export default async function DashboardLayout({
   const vertical = verticalPackForNiche(orgRow?.niche);
   const resolvedNavItems = navItemsForVertical(navItems, vertical);
 
-  const departmentsNav =
-    vertical.id === "retail"
-      ? buildRetailDepartmentsSidebarNav(navBadges)
-      : undefined;
-
   const coreNav = resolvedNavItems
     .filter((i) => i.section === "core")
     .map((item) => toNavItem(item, navBadges));
   const accountNav = resolvedNavItems
     .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = [
-    ...resolvedNavItems
-      .filter((i) => i.section === "core")
-      .map((item) => toNavItem(item, navBadges)),
-    ...(departmentsNav
-      ? [
-          {
-            href: DASHBOARD_ROUTES.departments,
-            label: "Departments",
-            badge: navBadges[DASHBOARD_ROUTES.departments],
-          },
-        ]
-      : []),
-  ];
+  const mobileNavItems: DashboardSidebarNavItem[] = coreNav;
 
   const accountSummary = buildDashboardAccountSummary(profile, user, {
     name: accountBilling?.name ?? orgRow?.name ?? null,
@@ -217,7 +198,6 @@ export default async function DashboardLayout({
           {!DASHBOARD_REBUILD_SHELL ? (
             <DashboardSidebar
               coreNav={coreNav}
-              departmentsNav={departmentsNav}
               accountNav={accountNav}
               needsPassword={needsPassword}
               account={accountSummary}

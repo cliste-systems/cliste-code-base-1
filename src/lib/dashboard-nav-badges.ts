@@ -108,27 +108,3 @@ export function formatNavBadgeCount(n: number): string {
   if (n > 99) return "99+";
   return String(n);
 }
-
-export function buildRetailDepartmentsSidebarNav(
-  badges: DashboardNavBadgeMap,
-): { href: string; label: string; badge?: number }[] {
-  const overviewBadge = badges[DASHBOARD_ROUTES.departments];
-  return [
-    {
-      href: DASHBOARD_ROUTES.departments,
-      label: "All departments",
-      ...(typeof overviewBadge === "number" && overviewBadge > 0
-        ? { badge: overviewBadge }
-        : {}),
-    },
-    ...retailDepartmentNavItems().map((dept) => {
-      const href = DASHBOARD_ROUTES.department(dept.slug);
-      const badge = badges[href];
-      return {
-        href,
-        label: dept.shortLabel,
-        ...(typeof badge === "number" && badge > 0 ? { badge } : {}),
-      };
-    }),
-  ];
-}

@@ -99,7 +99,7 @@ export default async function DepartmentWorkspacePage({
     supabase
       .from("action_tickets")
       .select(
-        "id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
+        "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
       )
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
@@ -152,7 +152,7 @@ export default async function DepartmentWorkspacePage({
             tone="inbox"
             icon={Store}
             title={departmentPageTitle(slug)}
-            description="Who to call back and what they need — tap a request, then call or mark done."
+            description="Who to call back and what they need — tap a request, review the call, then text back or mark done."
             summary={[
               { value: String(metrics.openCount), label: "to do" },
               { value: String(metrics.callbackCount), label: "callbacks" },

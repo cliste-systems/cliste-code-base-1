@@ -168,6 +168,14 @@ const RETAIL_PACK: VerticalPack = {
   customerNoun: { singular: "customer", plural: "customers" },
   locationNoun: "Store",
   nav: {
+    extraItems: [
+      {
+        href: DASHBOARD_ROUTES.departments,
+        label: "Departments",
+        section: "core",
+        afterHref: DASHBOARD_ROUTES.businessFaqs,
+      },
+    ],
     hiddenHrefs: [
       DASHBOARD_ROUTES.contacts,
       DASHBOARD_ROUTES.routing,

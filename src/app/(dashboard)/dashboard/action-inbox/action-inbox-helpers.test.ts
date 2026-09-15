@@ -17,6 +17,7 @@ function makeItem(
     Partial<ActionInboxItem>,
 ): ActionInboxItem {
   return {
+    callLogId: null,
     callerNumber: "+353871234567",
     callerDisplay: "087 123 4567",
     callerName: "Test",
