@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 
@@ -67,22 +66,28 @@ export function LoginForm() {
 
     setFieldErrors({});
     setPending(true);
-    const result = await passwordSignIn({
-      email: trimmedEmail,
-      password,
-      turnstileToken: turnstileToken ?? null,
-    });
-    setPending(false);
-    if (!result.ok) {
-      setError(result.message);
-      setRequiresCaptcha(result.requiresCaptcha);
-      if (result.requiresCaptcha) {
-        setTurnstileToken(null);
+    try {
+      const result = await passwordSignIn({
+        email: trimmedEmail,
+        password,
+        turnstileToken: turnstileToken ?? null,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        setRequiresCaptcha(result.requiresCaptcha);
+        if (result.requiresCaptcha) {
+          setTurnstileToken(null);
+        }
+        return;
       }
-      return;
+      // Full navigation so session cookies from the server action are applied
+      // before post-login runs — client router.push can hang on "Signing in…".
+      window.location.assign("/auth/post-login");
+    } catch {
+      setError("Something went wrong signing in. Refresh the page and try again.");
+    } finally {
+      setPending(false);
     }
-    router.push("/auth/post-login");
-    router.refresh();
   }
 
   return (
