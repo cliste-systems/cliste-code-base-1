@@ -81,6 +81,9 @@ type VoiceCallCompleteBody = {
   transfer_target?: string | null;
   transfer_connected?: boolean;
   verification_call?: boolean;
+  post_call_status?: "pending" | "complete" | "partial" | "failed";
+  post_call_errors?: Array<{ stage: string; message: string; at: string }>;
+  post_call_expected_ticket?: boolean;
 };
 
 function unauthorized() {
@@ -422,6 +425,9 @@ export async function POST(request: Request) {
       called_number: persistCalledNumber || null,
       ...(callSid ? { call_sid: callSid } : {}),
       ...(roomName ? { room_name: roomName } : {}),
+      post_call_status: body.post_call_status ?? "pending",
+      post_call_errors: body.post_call_errors ?? [],
+      post_call_expected_ticket: body.post_call_expected_ticket === true,
     })
     .select("id")
     .single();
@@ -741,12 +747,21 @@ async function respondIdempotentCallComplete(input: {
     stripToolLinesFromTranscript(input.body.transcript_review ?? null) || null,
   );
   const summaryRedacted = redactCallText(input.body.ai_summary ?? null);
-  const patch: Record<string, string> = {};
+  const patch: Record<string, string | boolean | object> = {};
   if (!input.existingReview?.trim() && reviewRedacted.text) {
     patch.transcript_review = reviewRedacted.text;
   }
   if (!input.existingSummary?.trim() && summaryRedacted.text) {
     patch.ai_summary = summaryRedacted.text;
+  }
+  if (input.body.post_call_status) {
+    patch.post_call_status = input.body.post_call_status;
+  }
+  if (Array.isArray(input.body.post_call_errors)) {
+    patch.post_call_errors = input.body.post_call_errors;
+  }
+  if (input.body.post_call_expected_ticket !== undefined) {
+    patch.post_call_expected_ticket = input.body.post_call_expected_ticket === true;
   }
   if (Object.keys(patch).length > 0) {
     const { error: patchErr } = await input.admin

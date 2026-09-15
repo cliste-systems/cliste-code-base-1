@@ -32,6 +32,8 @@ import {
   displayActionTicketSummary,
   hasKnownCallerName,
   inboxCallerMetaLine,
+  isUnderReviewTicket,
+  actionTicketUnderReviewCopy,
   matchesActionSearch,
   type ActionInboxItem,
   type ActionInboxMetrics,
@@ -336,7 +338,9 @@ function DepartmentDetailContent({
   const hasPhone = item.callerNumber.trim().length > 0;
   const tel = hasPhone ? `tel:${item.callerNumber.replace(/[^\d+]/g, "")}` : null;
   const isOpen = item.status === "open";
-  const summaryText = displayActionTicketSummary(item.summary);
+  const summaryText = displayActionTicketSummary(item.summary, undefined, {
+    underReview: isUnderReviewTicket(item),
+  });
   const requestSummary = parseDepartmentRequestSummary(item.summary);
   const callerE164 = normalizeBlockedCallerE164(item.callerNumber);
   const canBlockAndDismiss =
@@ -373,8 +377,17 @@ function DepartmentDetailContent({
           <StatusPill variant={isOpen ? "brand" : "success"} dot>
             {isOpen ? "To do" : "Done"}
           </StatusPill>
+          {isUnderReviewTicket(item) ? (
+            <StatusPill variant="attention">Under review</StatusPill>
+          ) : null}
           <span className="text-[12px] text-slate-500 tabular-nums">{item.createdAtLabel}</span>
         </div>
+
+        {isUnderReviewTicket(item) ? (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-950">
+            {actionTicketUnderReviewCopy()}
+          </p>
+        ) : null}
 
         {requestSummary ? (
           <DepartmentRequestSummaryCard

@@ -1,5 +1,10 @@
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { isUnknownCallerLabel } from "@/lib/caller-identity";
+import {
+  ACTION_TICKET_UNDER_REVIEW_SUMMARY_PREFIX,
+  isActionTicketUnderReview,
+  type ActionTicketDeliveryStatus,
+} from "@/lib/post-call-processing-types";
 import { stripDemoRehearsalMarker } from "@/lib/dashboard-mock-cleanup";
 import {
   departmentRequestTypeLabel,
@@ -40,6 +45,8 @@ export type ActionInboxItem = {
   categoryShort: string;
   departmentSlug: RetailDepartmentSlug;
   departmentLabel: string;
+  deliveryStatus: ActionTicketDeliveryStatus;
+  underReview: boolean;
 };
 
 export type ActionInboxMetrics = {
@@ -127,14 +134,34 @@ export function hasKnownCallerName(
   return true;
 }
 
+export function actionTicketUnderReviewCopy(): string {
+  return "We received this call — our team is confirming the details. You don't need to do anything yet.";
+}
+
+export function isUnderReviewTicket(
+  item: Pick<ActionInboxItem, "underReview" | "deliveryStatus">,
+): boolean {
+  return item.underReview || isActionTicketUnderReview(item.deliveryStatus);
+}
+
 /** Customer-facing ticket text — strips internal routing tags like [route: retail-stock]. */
 export function displayActionTicketSummary(
   summary: string | null | undefined,
   maxLen?: number,
+  options?: { underReview?: boolean },
 ): string {
+  if (options?.underReview) {
+    return actionTicketUnderReviewCopy();
+  }
   const text = stripDemoRehearsalMarker(
     stripRouteSuffixFromSummary(String(summary ?? "")),
   );
+  if (
+    text.startsWith(ACTION_TICKET_UNDER_REVIEW_SUMMARY_PREFIX) ||
+    text.startsWith("Under review —")
+  ) {
+    return actionTicketUnderReviewCopy();
+  }
   if (!text) return "No details captured yet.";
   if (typeof maxLen === "number" && text.length > maxLen) {
     return `${text.slice(0, maxLen).trimEnd()}…`;

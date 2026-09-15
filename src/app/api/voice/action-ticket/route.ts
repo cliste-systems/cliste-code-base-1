@@ -21,6 +21,8 @@ type ActionTicketBody = {
   summary: string;
   department_slug?: string | null;
   route_id?: string | null;
+  call_log_id?: string | null;
+  delivery_status?: "confirmed" | "pending_review" | "failed";
 };
 
 function unauthorized() {
@@ -152,6 +154,13 @@ export async function POST(request: Request) {
     routeId: body.route_id,
   });
   const briefSummary = buildActionTicketBriefSummary(summaryText);
+  const callLogId = String(body.call_log_id ?? "").trim() || null;
+  const deliveryStatus =
+    body.delivery_status === "pending_review" ||
+    body.delivery_status === "failed" ||
+    body.delivery_status === "confirmed"
+      ? body.delivery_status
+      : "confirmed";
 
   const { data: inserted, error: insertErr } = await admin
     .from("action_tickets")
@@ -163,6 +172,8 @@ export async function POST(request: Request) {
       brief_summary: briefSummary,
       department_slug: departmentSlug,
       status: "open",
+      ...(callLogId ? { call_log_id: callLogId } : {}),
+      delivery_status: deliveryStatus,
     })
     .select("id")
     .single();

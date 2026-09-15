@@ -35,6 +35,7 @@ import {
   type CallHistoryListItem,
   callSummaryForDisplay,
 } from "./call-history-helpers";
+import type { PostCallStatus } from "@/lib/post-call-processing-types";
 import { CallHistoryView } from "./call-history-view";
 
 type CallHistoryPageProps = {
@@ -49,6 +50,7 @@ type CallLogListRow = {
   outcome: string;
   ai_summary: string | null;
   created_at: string;
+  post_call_status?: string | null;
 };
 
 type CallLogMetricsRow = {
@@ -107,6 +109,7 @@ function toListItem(
     aiSummary: mapped.aiSummary,
     hasOpenAction: Boolean(followUp),
     followUp,
+    postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
   };
   item.summaryPreview = callSummaryForDisplay(item, {
     businessName,
@@ -174,7 +177,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       supabase
         .from("call_logs")
         .select(
-          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at",
+          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at, post_call_status",
         )
         .eq("organization_id", organizationId)
         .eq("is_test_call", false)

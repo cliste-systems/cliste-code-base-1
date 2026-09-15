@@ -127,6 +127,7 @@ export type AdminGlobalMetricsBoardProps = {
   periodRangeLabel: string;
   calls: number;
   pipelineIncidents: number;
+  postCallFailures: number;
   authFailures: number;
   support: number;
   organizations: number;
@@ -147,6 +148,7 @@ export function AdminGlobalMetricsBoard({
   periodRangeLabel,
   calls,
   pipelineIncidents,
+  postCallFailures,
   authFailures,
   support,
   organizations,
@@ -187,7 +189,7 @@ export function AdminGlobalMetricsBoard({
           </Suspense>
         </div>
 
-        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5 lg:divide-x lg:divide-y-0">
+        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-6 lg:divide-x lg:divide-y-0">
           <HeadlineMetric
             label={`Calls · ${periodLabel.toLowerCase()}`}
             value={formatInt(calls)}
@@ -204,6 +206,13 @@ export function AdminGlobalMetricsBoard({
             icon={AlertTriangle}
             href="/admin/security?view=pipeline"
             tone={pipelineIncidents > 0 ? "urgent" : "default"}
+          />
+          <HeadlineMetric
+            label="Post-call · 7d"
+            value={formatInt(postCallFailures)}
+            icon={AlertTriangle}
+            href="/admin/post-call-health"
+            tone={postCallFailures > 0 ? "urgent" : "default"}
           />
           <HeadlineMetric
             label="Auth fails · 24h"

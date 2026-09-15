@@ -29,6 +29,8 @@ function makeItem(
     categoryShort: "",
     departmentSlug: "general",
     departmentLabel: "General",
+    deliveryStatus: "confirmed",
+    underReview: false,
     ...partial,
   };
 }

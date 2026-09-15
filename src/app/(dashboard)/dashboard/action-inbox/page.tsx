@@ -29,10 +29,12 @@ import {
 import {
   buildActionInboxMetrics,
   formatActionDateTimeLabel,
+  isUnderReviewTicket,
   resolveContactEmail,
   sortActionInboxItems,
   type ActionInboxItem,
 } from "./action-inbox-helpers";
+import type { ActionTicketDeliveryStatus } from "@/lib/post-call-processing-types";
 import { ActionInboxView } from "./action-inbox-view";
 
 type ActionInboxPageProps = {
@@ -48,6 +50,7 @@ type TicketRow = {
   department_slug: string | null;
   status: string;
   created_at: string;
+  delivery_status?: string | null;
 };
 
 type CallRow = {
@@ -114,6 +117,7 @@ function toInboxItem(
 
   const contactEmail = resolveContactEmail(client?.email, row.summary);
   const departmentSlug = resolveTicketDepartmentSlug(row);
+  const deliveryStatus = (row.delivery_status as ActionTicketDeliveryStatus) ?? "confirmed";
 
   return {
     id: row.id,
@@ -132,6 +136,8 @@ function toInboxItem(
     categoryShort: ACTION_CATEGORY_SHORT[category],
     departmentSlug,
     departmentLabel: retailDepartmentLabel(departmentSlug),
+    deliveryStatus,
+    underReview: isUnderReviewTicket({ underReview: false, deliveryStatus }),
   };
 }
 
@@ -155,7 +161,7 @@ export default async function ActionInboxPage({
       supabase
         .from("action_tickets")
         .select(
-          "id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at",
+          "id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
         )
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })

@@ -9,6 +9,7 @@ import {
   type HomeAttentionTicketRow,
 } from "@/lib/dashboard-home-attention";
 import { normalizeCallOutcome } from "@/lib/call-history-types";
+import { isPostCallAttentionStatus } from "@/lib/post-call-processing-types";
 import { ticketCallerLabel } from "@/lib/dashboard-feed-time";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
@@ -152,6 +153,59 @@ export function buildHomeTodaysRequestStats(input: {
   };
 }
 
+export function buildHomePostCallAttentionRows(input: {
+  calls: HomeAttentionCallRow[];
+  formatTime: (iso: string) => string;
+  limit?: number;
+}): HomeRequestRow[] {
+  const limit = input.limit ?? 5;
+
+  return [...input.calls]
+    .filter((call) => isPostCallAttentionStatus(call.post_call_status))
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+    .slice(0, limit)
+    .map((call) => ({
+      id: `post-call-${call.id}`,
+      href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(call.id)}`,
+      title: ticketCallerLabel(call),
+      description: truncateHomePanelDescription(
+        "Processing issue — the shop order may not be fully synced yet.",
+      ),
+      time: input.formatTime(call.created_at),
+    }));
+}
+
+export function mergeHomeNeedsAttentionRows(input: {
+  tickets: HomeRequestTicketRow[];
+  calls: HomeAttentionCallRow[];
+  formatTime: (iso: string) => string;
+  limit?: number;
+}): HomeRequestRow[] {
+  const limit = input.limit ?? 5;
+  const ticketRows = buildHomeTodaysRequestRows({
+    tickets: input.tickets,
+    formatTime: input.formatTime,
+    limit,
+  });
+  const callRows = buildHomePostCallAttentionRows({
+    calls: input.calls,
+    formatTime: input.formatTime,
+    limit,
+  });
+
+  return [...ticketRows, ...callRows]
+    .sort((a, b) => {
+      const ta = Date.parse(a.time);
+      const tb = Date.parse(b.time);
+      if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return tb - ta;
+      return 0;
+    })
+    .slice(0, limit);
+}
+
 export function buildHomeAttentionCategoryCounts(input: {
   openTickets: HomeAttentionTicketRow[];
   calls: HomeAttentionCallRow[];
@@ -169,8 +223,11 @@ export function buildHomeAttentionCategoryCounts(input: {
 
   for (const call of input.calls) {
     const outcome = normalizeCallOutcome(String(call.outcome ?? ""));
-    if (outcome === "callback_requested") callbackRequests += 1;
-    else if (isCallNeedingHomeAttention(call.outcome)) generalEnquiries += 1;
+    if (isPostCallAttentionStatus(call.post_call_status)) generalEnquiries += 1;
+    else if (outcome === "callback_requested") callbackRequests += 1;
+    else if (isCallNeedingHomeAttention(call.outcome, call.post_call_status)) {
+      generalEnquiries += 1;
+    }
   }
 
   return {

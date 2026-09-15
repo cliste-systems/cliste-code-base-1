@@ -26,6 +26,7 @@ import {
   briefLine,
   hasKnownCallerName,
   inboxCallerMetaLine,
+  isUnderReviewTicket,
   type ActionInboxItem,
   type ActionInboxMetrics,
   matchesActionSearch,
@@ -249,6 +250,14 @@ function TriageListRow({
             >
               {row.categoryShort}
             </StatusPill>
+            {isUnderReviewTicket(row) ? (
+              <StatusPill
+                variant="attention"
+                className="h-5 shrink-0 px-1.5 py-0 text-[10px] font-semibold uppercase leading-none tracking-wide"
+              >
+                Under review
+              </StatusPill>
+            ) : null}
             <span className="min-w-0 truncate text-[13px] font-semibold leading-snug text-[#0b1220]">
               {primary}
             </span>

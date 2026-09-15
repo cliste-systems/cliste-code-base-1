@@ -31,10 +31,11 @@ import { DASHBOARD_HOME_MOCK } from "@/lib/dashboard-home-mock-data";
 import { isDashboardHomeMockEnabled } from "@/lib/dashboard-home-mock";
 import {
   buildHomeCaraTrainingRows,
-  buildHomeTodaysRequestRows,
+  mergeHomeNeedsAttentionRows,
   type HomeCaraTrainingItemRow,
   type HomeRequestTicketRow,
 } from "@/lib/dashboard-home-requests";
+import type { HomeAttentionCallRow } from "@/lib/dashboard-home-attention";
 import {
   DASHBOARD_HOME_ATTENTION_ROW_LIMIT,
   DASHBOARD_HOME_CARA_TRAINING_ROW_LIMIT,
@@ -59,6 +60,7 @@ type CallLogRow = {
   caller_name?: string | null;
   duration_seconds: number | null;
   ai_summary?: string | null;
+  post_call_status?: string | null;
 };
 
 type TicketRow = {
@@ -222,7 +224,7 @@ export async function loadDashboardHomeSnapshot(input: {
         supabase
           .from("call_logs")
           .select(
-            "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary",
+            "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary, post_call_status",
           )
           .gte("created_at", metricRangeStartIso)
           .order("created_at", { ascending: false })
@@ -358,8 +360,9 @@ export async function loadDashboardHomeSnapshot(input: {
     ? []
     : (openTicketsRes.data ?? [])) as HomeRequestTicketRow[];
 
-  const needsAttentionLive = buildHomeTodaysRequestRows({
+  const needsAttentionLive = mergeHomeNeedsAttentionRows({
     tickets: openTicketRows,
+    calls: callsForPanels as HomeAttentionCallRow[],
     formatTime: formatDashboardFeedRelativeTime,
     limit: DASHBOARD_HOME_ATTENTION_ROW_LIMIT,
   });

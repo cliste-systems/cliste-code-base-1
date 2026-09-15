@@ -6,6 +6,9 @@ import {
   type CallOutcome,
 } from "@/lib/call-history-types";
 import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
+import type { PostCallStatus } from "@/lib/post-call-processing-types";
+import { isPostCallAttentionStatus } from "@/lib/post-call-processing-types";
+import { CALL_POST_PROCESSING_BANNER } from "@/lib/post-call-processing-types";
 import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 export type CallFollowUp = CallFollowUpLink;
 
@@ -27,7 +30,14 @@ export type CallHistoryListItem = {
   aiSummary: string | null;
   hasOpenAction: boolean;
   followUp: CallFollowUp | null;
+  postCallStatus: PostCallStatus;
 };
+
+export function callNeedsPostCallReviewBanner(item: CallHistoryListItem): boolean {
+  return isPostCallAttentionStatus(item.postCallStatus);
+}
+
+export { CALL_POST_PROCESSING_BANNER };
 
 export function callDisplayName(
   item: Pick<CallHistoryListItem, "callerName" | "callerDisplay">,
@@ -279,6 +289,7 @@ export function buildCallHistoryMetricsFromSummaryRows(
     aiSummary: null,
     hasOpenAction: false,
     followUp: null,
+    postCallStatus: "complete",
   }));
   const base = buildCallHistoryMetrics(stubItems);
   return {

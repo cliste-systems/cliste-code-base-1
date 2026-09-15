@@ -14,6 +14,7 @@ import { formatMinutes } from "@/app/(dashboard)/dashboard/billing/usage-helpers
 import { AdminGlobalMetricsBoard } from "./admin-global-metrics-board";
 import { AdminTenantsPanel } from "./admin-tenants-panel";
 import { loadProvisioningStagesByOrgId } from "@/lib/load-provisioning-pipeline";
+import { countPostCallHealthIssues } from "@/lib/post-call-health";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   let callsInRange = 0;
   let openSupportTickets = 0;
   let pipelineIncidents7d = 0;
+  let postCallFailures7d = 0;
   let authFailures24h = 0;
   let minutesInRange = 0;
   let callOutcomes = buildHomeCallOutcomeSegments([]);
@@ -121,6 +123,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     callsInRange = callsRes.count ?? 0;
     openSupportTickets = supportRes.error ? 0 : (supportRes.count ?? 0);
     pipelineIncidents7d = pipelineRes.error ? 0 : (pipelineRes.count ?? 0);
+    postCallFailures7d = await countPostCallHealthIssues().catch(() => 0);
     authFailures24h = authFailsRes.error ? 0 : (authFailsRes.count ?? 0);
     organizations = listRes.data ?? [];
 
@@ -207,6 +210,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           periodRangeLabel={periodRangeLabel}
           calls={callsInRange}
           pipelineIncidents={pipelineIncidents7d}
+          postCallFailures={postCallFailures7d}
           authFailures={authFailures24h}
           support={openSupportTickets}
           organizations={orgCount}

@@ -18,11 +18,13 @@ import {
 } from "../action-inbox/categories";
 import {
   formatActionDateTimeLabel,
+  isUnderReviewTicket,
   resolveContactEmail,
   sortActionInboxItems,
   type ActionInboxItem,
   type ActionInboxMetrics,
 } from "../action-inbox/action-inbox-helpers";
+import type { ActionTicketDeliveryStatus } from "@/lib/post-call-processing-types";
 
 export type DepartmentTicketRow = {
   id: string;
@@ -33,6 +35,7 @@ export type DepartmentTicketRow = {
   department_slug: string | null;
   status: string;
   created_at: string;
+  delivery_status?: string | null;
 };
 
 export type DepartmentOverviewCard = {
@@ -90,6 +93,7 @@ export function toDepartmentInboxItem(
 ): ActionInboxItem {
   const departmentSlug = resolveTicketDepartmentSlug(row);
   const category = classifyActionCategory(row.summary);
+  const deliveryStatus = (row.delivery_status as ActionTicketDeliveryStatus) ?? "confirmed";
   const callerNumber = row.caller_number?.trim() ?? "";
   const callerDisplay = formatE164ForDisplay(callerNumber) || "";
   const key = phoneKey(callerNumber);
@@ -120,6 +124,8 @@ export function toDepartmentInboxItem(
     categoryShort: ACTION_CATEGORY_SHORT[category],
     departmentSlug,
     departmentLabel: retailDepartmentLabel(departmentSlug),
+    deliveryStatus,
+    underReview: isUnderReviewTicket({ underReview: false, deliveryStatus }),
   };
 }
 

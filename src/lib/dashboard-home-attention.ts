@@ -1,5 +1,6 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import { normalizeCallOutcome, type CallOutcome } from "@/lib/call-history-types";
+import { isPostCallAttentionStatus } from "@/lib/post-call-processing-types";
 import { ticketCallerLabel } from "@/lib/dashboard-feed-time";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
@@ -15,6 +16,7 @@ export type HomeAttentionCallRow = {
   outcome: string | null;
   caller_number: string | null;
   caller_name?: string | null;
+  post_call_status?: string | null;
 };
 
 export type HomeAttentionTicketRow = {
@@ -32,13 +34,21 @@ export type HomeAttentionTrainingRow = {
   updated_at: string;
 };
 
-export function isCallNeedingHomeAttention(outcome: string | null | undefined): boolean {
+export function isCallNeedingHomeAttention(
+  outcome: string | null | undefined,
+  postCallStatus?: string | null,
+): boolean {
+  if (isPostCallAttentionStatus(postCallStatus)) return true;
   return CALL_ATTENTION_OUTCOMES.includes(
     normalizeCallOutcome(String(outcome ?? "")),
   );
 }
 
-function attentionBadgeForCall(outcome: string | null): string {
+function attentionBadgeForCall(
+  outcome: string | null,
+  postCallStatus?: string | null,
+): string {
+  if (isPostCallAttentionStatus(postCallStatus)) return "Processing issue";
   switch (normalizeCallOutcome(String(outcome ?? ""))) {
     case "callback_requested":
       return "Callback";
@@ -96,17 +106,19 @@ export function buildHomeAttentionItems(input: {
   }
 
   for (const row of input.calls) {
-    if (!isCallNeedingHomeAttention(row.outcome)) continue;
+    if (!isCallNeedingHomeAttention(row.outcome, row.post_call_status)) continue;
     const ts = new Date(row.created_at).getTime();
     if (!Number.isFinite(ts)) continue;
     const who = input.callerLabel(row);
-    const outcomeLabel = input.callOutcomeLabel(row.outcome);
+    const outcomeLabel = isPostCallAttentionStatus(row.post_call_status)
+      ? "Processing issue"
+      : input.callOutcomeLabel(row.outcome);
     items.push({
       id: `call-${row.id}`,
       title: `${who} — ${outcomeLabel}`,
       time: input.formatTime(row.created_at),
       href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(row.id)}`,
-      badge: attentionBadgeForCall(row.outcome),
+      badge: attentionBadgeForCall(row.outcome, row.post_call_status),
       urgent: true,
       timestamp: ts,
     });

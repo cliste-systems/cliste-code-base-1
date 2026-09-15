@@ -49,6 +49,8 @@ import {
   outcomeBadgeVariant,
   primaryTranscriptForDisplay,
   callSummaryForDisplay,
+  CALL_POST_PROCESSING_BANNER,
+  callNeedsPostCallReviewBanner,
   type CallHistoryListItem,
   type CallHistoryMetrics,
   type OutcomeFilterValue,
@@ -348,6 +350,9 @@ function CallListRow({
           {row.hasOpenAction ? (
             <StatusPill variant="attention">Needs attention</StatusPill>
           ) : null}
+          {callNeedsPostCallReviewBanner(row) ? (
+            <StatusPill variant="attention">Processing issue</StatusPill>
+          ) : null}
         </span>
       </button>
     </li>
@@ -559,11 +564,20 @@ function CallDetailPanelContent({
             {call.hasOpenAction ? (
               <StatusPill variant="attention">Needs attention</StatusPill>
             ) : null}
+            {callNeedsPostCallReviewBanner(call) ? (
+              <StatusPill variant="attention">Processing issue</StatusPill>
+            ) : null}
           </>
         }
       />
 
       <DetailPanelBody>
+        {callNeedsPostCallReviewBanner(call) ? (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-950">
+            {CALL_POST_PROCESSING_BANNER}
+          </div>
+        ) : null}
+
         <DetailSection title="Summary">
           <p className="text-[14px] leading-relaxed text-slate-700">
             {summary ?? "No summary available."}
