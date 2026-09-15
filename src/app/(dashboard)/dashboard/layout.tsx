@@ -62,7 +62,6 @@ const navItems: {
   { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
   { href: DASHBOARD_ROUTES.caraTraining, label: "Training", section: "core" },
   { href: DASHBOARD_ROUTES.businessFaqs, label: "FAQs", section: "core" },
-  { href: DASHBOARD_ROUTES.contacts, label: "Contacts", section: "core" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
   { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
   { href: DASHBOARD_ROUTES.support, label: "Support", section: "account" },

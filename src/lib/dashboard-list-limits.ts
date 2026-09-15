@@ -14,13 +14,6 @@ export const ACTION_INBOX_CALL_LIMIT = 500;
 /** Client rows joined for inbox caller names. */
 export const ACTION_INBOX_CLIENT_LIMIT = 500;
 
-/** Contacts page: calls used to build the contact list. */
-export const CONTACTS_CALL_LIMIT = 500;
-
-export const CONTACTS_TICKET_LIMIT = 500;
-
-export const CONTACTS_CLIENT_LIMIT = 500;
-
 /** Open tickets for call-history follow-up badges (not full ticket history). */
 export const CALL_HISTORY_OPEN_TICKET_LIMIT = 500;
 

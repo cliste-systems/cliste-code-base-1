@@ -28,8 +28,6 @@ const WORKSPACE_PAGES: { prefix: string; label: string }[] = [
   { prefix: DASHBOARD_ROUTES.caraTraining, label: "Training" },
   { prefix: DASHBOARD_ROUTES.businessFaqs, label: "FAQs" },
   { prefix: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox" },
-  { prefix: DASHBOARD_ROUTES.contacts, label: "Contacts" },
-  { prefix: "/dashboard/clients", label: "Contacts" },
   { prefix: DASHBOARD_ROUTES.routing, label: "Call flow" },
   { prefix: DASHBOARD_ROUTES.calls, label: "Calls" },
   { prefix: "/dashboard/call-history", label: "Calls" },

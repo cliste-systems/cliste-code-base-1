@@ -6,7 +6,6 @@ export const DASHBOARD_ROUTES = {
   actionInbox: "/dashboard/action-inbox",
   departments: "/dashboard/departments",
   department: (slug: string) => `/dashboard/departments/${slug}`,
-  contacts: "/dashboard/contacts",
   routing: "/dashboard/routing",
   /** @deprecated Use businessProfile or caraGreeting */
   caraSetup: "/dashboard/cara-setup",
@@ -58,7 +57,8 @@ export const AGENT_CONFIG_REVALIDATE_PATHS = [
 export const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
   "/dashboard/legal/accept": DASHBOARD_ROUTES.legalAccept,
   "/dashboard/call-history": DASHBOARD_ROUTES.calls,
-  "/dashboard/clients": DASHBOARD_ROUTES.contacts,
+  "/dashboard/contacts": DASHBOARD_ROUTES.calls,
+  "/dashboard/clients": DASHBOARD_ROUTES.calls,
   "/dashboard/billing": DASHBOARD_ROUTES.usage,
   "/dashboard/agent-setup": DASHBOARD_ROUTES.businessProfile,
   "/dashboard/cara-setup": DASHBOARD_ROUTES.businessProfile,

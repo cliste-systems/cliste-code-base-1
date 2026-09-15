@@ -136,11 +136,6 @@ const SALON_BEAUTY_PACK: VerticalPack = {
   packVersion: "1.0",
   customerNoun: { singular: "client", plural: "clients" },
   locationNoun: "Location",
-  nav: {
-    labelOverrides: {
-      [DASHBOARD_ROUTES.contacts]: "Clients",
-    },
-  },
   capabilities: SALON_CAPABILITIES,
   onboarding: {
     profileHeaderTitle: "Tell us about your salon",
@@ -177,7 +172,6 @@ const RETAIL_PACK: VerticalPack = {
       },
     ],
     hiddenHrefs: [
-      DASHBOARD_ROUTES.contacts,
       DASHBOARD_ROUTES.routing,
       DASHBOARD_ROUTES.locations,
       DASHBOARD_ROUTES.usage,

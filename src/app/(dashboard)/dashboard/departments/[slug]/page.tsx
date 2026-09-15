@@ -93,7 +93,6 @@ export default async function DepartmentWorkspacePage({
     { data: ticketData, error },
     { data: callData },
     { data: clientData },
-    { data: blockedRows },
     orgRow,
   ] = await Promise.all([
     supabase
@@ -115,10 +114,6 @@ export default async function DepartmentWorkspacePage({
       .select("phone_e164, name, email")
       .eq("organization_id", organizationId)
       .limit(ACTION_INBOX_CLIENT_LIMIT),
-    supabase
-      .from("blocked_callers")
-      .select("caller_e164")
-      .eq("organization_id", organizationId),
     getCachedDashboardOrganizationRow(),
   ]);
 
@@ -140,9 +135,6 @@ export default async function DepartmentWorkspacePage({
     allItems.filter((item) => departmentTicketMatchesWorkspace(item.departmentSlug, slug)),
   );
   const metrics = buildDepartmentInboxMetrics(items);
-  const blockedCallerE164s = (blockedRows ?? []).map(
-    (row) => String((row as { caller_e164: string }).caller_e164),
-  );
 
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
@@ -169,7 +161,6 @@ export default async function DepartmentWorkspacePage({
               items={items}
               metrics={metrics}
               initialSelectedTicketId={initialSelectedTicketId}
-              blockedCallerE164s={blockedCallerE164s}
             />
           )}
         </DashboardAnimatedPageSections>

@@ -6,6 +6,14 @@ import {
   normalizeCallOutcome,
   OUTCOME_LABELS,
 } from "@/lib/call-history-types";
+import {
+  buildCallerHistoryInsight,
+  type CallerHistoryInsight,
+} from "@/lib/caller-history-insight";
+import {
+  ANONYMOUS_CALLER_E164,
+  normalizeBlockedCallerE164,
+} from "@/lib/blocked-callers";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
@@ -38,6 +46,65 @@ export type CallDetailDialogPayload = {
 export type CallRecordingPlaybackResult =
   | { ok: true; url: string }
   | { ok: false; message: string };
+
+const CALLER_HISTORY_CALL_LIMIT = 30;
+
+export async function fetchCallerHistoryInsight(input: {
+  callerNumber: string;
+  excludeCallId?: string;
+}): Promise<CallerHistoryInsight> {
+  const callerNumber = String(input.callerNumber ?? "").trim();
+  if (!callerNumber || callerNumber === ANONYMOUS_CALLER_E164) {
+    return { kind: "anonymous" };
+  }
+
+  const callerE164 = normalizeBlockedCallerE164(callerNumber);
+  if (!callerE164) {
+    return { kind: "anonymous" };
+  }
+
+  const { supabase, organizationId } = await requireDashboardSession();
+
+  const [{ data: callRows }, { data: ticketRows }, { data: blockedRow }] = await Promise.all([
+    supabase
+      .from("call_logs")
+      .select("id, caller_name, outcome, ai_summary, created_at")
+      .eq("organization_id", organizationId)
+      .eq("caller_number", callerE164)
+      .order("created_at", { ascending: false })
+      .limit(CALLER_HISTORY_CALL_LIMIT),
+    supabase
+      .from("action_tickets")
+      .select("status, summary, department_slug")
+      .eq("organization_id", organizationId)
+      .eq("caller_number", callerE164)
+      .order("created_at", { ascending: false })
+      .limit(CALLER_HISTORY_CALL_LIMIT),
+    supabase
+      .from("blocked_callers")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("caller_e164", callerE164)
+      .maybeSingle(),
+  ]);
+
+  return buildCallerHistoryInsight({
+    callerNumber: callerE164,
+    calls: (callRows ?? []).map((row) => ({
+      id: String(row.id),
+      createdAt: String(row.created_at ?? ""),
+      callerName: row.caller_name?.trim() || null,
+      outcome: String(row.outcome ?? ""),
+      aiSummary: row.ai_summary?.trim() || null,
+    })),
+    openTickets: (ticketRows ?? []).map((row) => ({
+      status: String(row.status ?? ""),
+      summary: String(row.summary ?? ""),
+      departmentSlug: row.department_slug?.trim() || null,
+    })),
+    isBlocked: Boolean(blockedRow),
+  });
+}
 
 export async function fetchCallRecordingPlaybackUrl(
   callLogId: string,

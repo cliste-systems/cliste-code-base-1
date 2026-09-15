@@ -9,7 +9,6 @@ import {
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
 import { StatusPill } from "@/components/dashboard/status-pill";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
   ACTION_INBOX_TICKET_LIMIT,
 } from "@/lib/dashboard-list-limits";
@@ -92,17 +91,6 @@ export default async function DepartmentsOverviewPage() {
               ))}
             </div>
           )}
-
-          <p className="text-[12px] text-slate-500">
-            Use{" "}
-            <Link
-              href={DASHBOARD_ROUTES.actionInbox}
-              className="font-medium text-[#353D42] underline-offset-2 hover:underline"
-            >
-              Action Inbox
-            </Link>{" "}
-            for a quick triage list across all departments.
-          </p>
         </DashboardAnimatedPageSections>
       </div>
     </div>

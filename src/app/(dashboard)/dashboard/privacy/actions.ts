@@ -387,7 +387,6 @@ export async function eraseCustomerData(
     console.warn("[gdpr] failed to record erasure event", err);
   }
 
-  revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/calls");
   revalidatePath("/dashboard/settings");
 

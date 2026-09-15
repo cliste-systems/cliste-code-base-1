@@ -912,8 +912,6 @@ function revalidateAfterWrite() {
   revalidatePath("/dashboard/calls");
   revalidatePath("/dashboard/call-history");
   revalidatePath("/dashboard/action-inbox");
-  revalidatePath("/dashboard/clients");
-  revalidatePath("/dashboard/contacts");
   revalidatePath("/dashboard/cara-training");
   revalidatePath("/admin/call-testing");
 }

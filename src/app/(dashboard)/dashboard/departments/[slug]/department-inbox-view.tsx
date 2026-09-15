@@ -1,14 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Check, CheckCircle2, Copy, Inbox, MessageSquare, Search } from "lucide-react";
+import { Check, CheckCircle2, Copy, Inbox, MessageSquare, Search } from "lucide-react";
 
 import { CallDetailsDialogButton } from "@/components/dashboard/call-details-dialog";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { CallerTextBackDialog } from "@/components/dashboard/caller-text-back-dialog";
-import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import {
   DASHBOARD_CARD_SURFACE,
   DASHBOARD_SELECT_CLASS,
@@ -20,13 +19,9 @@ import {
 } from "@/components/dashboard/list-detail";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { cn } from "@/lib/utils";
-import {
-  ANONYMOUS_CALLER_E164,
-  normalizeBlockedCallerE164,
-} from "@/lib/blocked-callers";
 
-import { blockCallerAndDismissTicket } from "../../settings/blocked-numbers-actions";
 import { markTicketReopen, markTicketResolved } from "../../action-inbox/actions";
 import {
   copyDetailsText,
@@ -51,7 +46,6 @@ type DepartmentInboxViewProps = {
   items: ActionInboxItem[];
   metrics: ActionInboxMetrics;
   initialSelectedTicketId?: string | null;
-  blockedCallerE164s: string[];
   className?: string;
 };
 
@@ -59,7 +53,6 @@ export function DepartmentInboxView({
   items,
   metrics: _metrics,
   initialSelectedTicketId = null,
-  blockedCallerE164s,
   className,
 }: DepartmentInboxViewProps) {
   const router = useRouter();
@@ -227,7 +220,6 @@ export function DepartmentInboxView({
               item={selected}
               copied={copied}
               onCopyDetails={copyDetails}
-              blockedCallerE164s={blockedCallerE164s}
               onRefresh={() => router.refresh()}
             />
           }
@@ -288,13 +280,11 @@ function DepartmentDetailPanel({
   item,
   copied,
   onCopyDetails,
-  blockedCallerE164s,
   onRefresh,
 }: {
   item: ActionInboxItem | null;
   copied: boolean;
   onCopyDetails: () => void;
-  blockedCallerE164s: string[];
   onRefresh: () => void;
 }) {
   if (!item) {
@@ -318,7 +308,6 @@ function DepartmentDetailPanel({
       item={item}
       copied={copied}
       onCopyDetails={onCopyDetails}
-      blockedCallerE164s={blockedCallerE164s}
       onRefresh={onRefresh}
     />
   );
@@ -328,13 +317,11 @@ function DepartmentDetailContent({
   item,
   copied,
   onCopyDetails,
-  blockedCallerE164s,
-  onRefresh,
+  onRefresh: _onRefresh,
 }: {
   item: ActionInboxItem;
   copied: boolean;
   onCopyDetails: () => void;
-  blockedCallerE164s: string[];
   onRefresh: () => void;
 }) {
   const hasPhone = item.callerNumber.trim().length > 0;
@@ -344,33 +331,10 @@ function DepartmentDetailContent({
     underReview: isUnderReviewTicket(item),
   });
   const requestSummary = parseDepartmentRequestSummary(item.summary);
-  const callerE164 = normalizeBlockedCallerE164(item.callerNumber);
-  const canBlockAndDismiss =
-    isOpen &&
-    callerE164 != null &&
-    item.callerNumber.trim() !== ANONYMOUS_CALLER_E164 &&
-    !blockedCallerE164s.includes(callerE164);
-  const [blockDismissOpen, setBlockDismissOpen] = useState(false);
   const [textBackOpen, setTextBackOpen] = useState(false);
-  const [blockMsg, setBlockMsg] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function onBlockAndDismiss() {
-    if (!callerE164) return;
-    setBlockMsg(null);
-    startTransition(async () => {
-      const result = await blockCallerAndDismissTicket({
-        ticketId: item.id,
-        phone: callerE164,
-      });
-      setBlockDismissOpen(false);
-      if (!result.ok) {
-        setBlockMsg(result.message);
-        return;
-      }
-      onRefresh();
-    });
-  }
+  const callsHref = item.callLogId
+    ? `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(item.callLogId)}`
+    : DASHBOARD_ROUTES.calls;
 
   return (
     <DetailPanelShell surface="embedded">
@@ -458,31 +422,21 @@ function DepartmentDetailContent({
             {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
             {copied ? "Copied" : "Copy"}
           </DetailActionButton>
-          {canBlockAndDismiss ? (
-            <DetailActionButton
-              type="button"
-              onClick={() => setBlockDismissOpen(true)}
-              disabled={pending}
-              className="min-h-11 px-4"
-            >
-              <Ban className="size-4" aria-hidden />
-              Block
-            </DetailActionButton>
-          ) : null}
         </div>
-        {blockMsg ? <p className="mt-2 text-[13px] text-red-600">{blockMsg}</p> : null}
+        {hasPhone ? (
+          <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
+            To block this number or listen to the recording,{" "}
+            <a
+              href={callsHref}
+              className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
+            >
+              open the call in Calls
+            </a>
+            .
+          </p>
+        ) : null}
       </div>
 
-      <ConfirmDialog
-        open={blockDismissOpen}
-        onOpenChange={setBlockDismissOpen}
-        title="Block caller and dismiss?"
-        description="This number will be blocked from future calls and this request will be marked done."
-        confirmLabel="Block + dismiss"
-        onConfirm={onBlockAndDismiss}
-        pending={pending}
-        destructive
-      />
       {hasPhone ? (
         <CallerTextBackDialog
           open={textBackOpen}

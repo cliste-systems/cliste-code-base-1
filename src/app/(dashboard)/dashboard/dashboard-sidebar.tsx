@@ -39,8 +39,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/calls": Phone,
   "/dashboard/call-history": Phone,
   "/dashboard/action-inbox": Inbox,
-  "/dashboard/contacts": Users,
-  "/dashboard/clients": Users,
   "/dashboard/routing": Share2,
   "/dashboard/cara-training": GraduationCap,
   "/dashboard/departments": LayoutGrid,

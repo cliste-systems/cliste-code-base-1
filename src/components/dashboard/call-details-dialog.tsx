@@ -17,7 +17,6 @@ import {
   type CallDetailDialogPayload,
 } from "@/app/(dashboard)/dashboard/call-history/actions";
 import { DetailSection } from "@/components/dashboard/list-detail";
-import { CallAudioPlayer } from "@/components/dashboard/call-audio-player";
 import { StaffTranscriptView } from "@/components/dashboard/staff-transcript-view";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import {
@@ -60,7 +59,6 @@ function toHistoryItem(detail: CallDetailDialogPayload) {
     hasOpenAction: false,
     followUp: null,
     postCallStatus: detail.postCallStatus,
-    hasRecording: detail.hasRecording,
   };
 }
 
@@ -198,13 +196,6 @@ export function CallDetailsDialog({
                 <p className="text-[14px] leading-relaxed text-slate-700">
                   {summary ?? "No summary available."}
                 </p>
-              </DetailSection>
-
-              <DetailSection title="Recording">
-                <CallAudioPlayer
-                  callLogId={historyItem.id}
-                  hasRecording={historyItem.hasRecording}
-                />
               </DetailSection>
 
               <DetailSection title="Transcript">

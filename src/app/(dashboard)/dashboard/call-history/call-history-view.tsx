@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { Ban, Check, Copy, Inbox, Phone, PhoneCall, Search, ShieldOff, User } from "lucide-react";
+import { Ban, Check, Copy, Inbox, Phone, PhoneCall, Search, ShieldOff } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { CallAudioPlayer } from "@/components/dashboard/call-audio-player";
+import { CallerHistorySection } from "@/components/dashboard/caller-history-section";
 import { StaffTranscriptView } from "@/components/dashboard/staff-transcript-view";
 import {
   DetailActionButton,
@@ -188,8 +189,6 @@ export function CallHistoryView({
     }
   }, [selected, businessName, blockedSet]);
 
-  const contactHref = DASHBOARD_ROUTES.contacts;
-
   return (
     <section
       className={cn(
@@ -284,7 +283,6 @@ export function CallHistoryView({
             copied={copied}
             detailLoading={detailLoading}
             onCopySummary={copySummary}
-            contactHref={contactHref}
             blockedSet={blockedSet}
             businessName={businessName}
             onRefresh={() => router.refresh()}
@@ -422,7 +420,6 @@ function CallDetailPanel({
   copied,
   detailLoading,
   onCopySummary,
-  contactHref,
   blockedSet,
   businessName,
   onRefresh,
@@ -431,7 +428,6 @@ function CallDetailPanel({
   copied: boolean;
   detailLoading: boolean;
   onCopySummary: () => void;
-  contactHref: string;
   blockedSet: Set<string>;
   businessName: string;
   onRefresh: () => void;
@@ -458,7 +454,6 @@ function CallDetailPanel({
       copied={copied}
       detailLoading={detailLoading}
       onCopySummary={onCopySummary}
-      contactHref={contactHref}
       blockedSet={blockedSet}
       businessName={businessName}
       onRefresh={onRefresh}
@@ -471,7 +466,6 @@ function CallDetailPanelContent({
   copied,
   detailLoading,
   onCopySummary,
-  contactHref,
   blockedSet,
   businessName,
   onRefresh,
@@ -480,7 +474,6 @@ function CallDetailPanelContent({
   copied: boolean;
   detailLoading: boolean;
   onCopySummary: () => void;
-  contactHref: string;
   blockedSet: Set<string>;
   businessName: string;
   onRefresh: () => void;
@@ -580,6 +573,8 @@ function CallDetailPanelContent({
           </div>
         ) : null}
 
+        <CallerHistorySection callerNumber={call.callerId} currentCallId={call.id} />
+
         <DetailSection title="Summary">
           <p className="text-[14px] leading-relaxed text-slate-700">
             {summary ?? "No summary available."}
@@ -670,10 +665,6 @@ function CallDetailPanelContent({
             <Copy className="size-3.5" aria-hidden />
           )}
           {copied ? "Copied" : "Copy summary"}
-        </DetailActionButton>
-        <DetailActionButton href={contactHref}>
-          <User className="size-3.5" aria-hidden />
-          Open contact
         </DetailActionButton>
         {call.followUp ? (
           <DetailActionButton href="/dashboard/action-inbox">
