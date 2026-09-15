@@ -41,6 +41,7 @@ export function PrivacyToolsClient() {
   const [exportPending, startExport] = useTransition();
 
   const [erasePhone, setErasePhone] = useState("");
+  const [eraseReason, setEraseReason] = useState("");
   const [eraseConfirm, setEraseConfirm] = useState("");
   const [eraseState, setEraseState] = useState<EraseState>({ status: "idle" });
   const [erasePending, startErase] = useTransition();
@@ -120,6 +121,7 @@ export function PrivacyToolsClient() {
     e.preventDefault();
     const fd = new FormData();
     fd.set("phone", erasePhone);
+    fd.set("reason", eraseReason);
     fd.set("confirm", eraseConfirm);
     startErase(async () => {
       const r = await eraseCustomerData(fd);
@@ -128,6 +130,7 @@ export function PrivacyToolsClient() {
       } else {
         setEraseState({ status: "done", counts: r.affected, phoneE164: r.phoneE164 });
         setErasePhone("");
+        setEraseReason("");
         setEraseConfirm("");
       }
     });
@@ -274,9 +277,25 @@ export function PrivacyToolsClient() {
               />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="gdpr-erase-reason">Reason for deletion</Label>
+            <textarea
+              id="gdpr-erase-reason"
+              value={eraseReason}
+              onChange={(e) => setEraseReason(e.target.value)}
+              placeholder="e.g. Customer requested erasure by phone"
+              rows={3}
+              className={cn(fieldClass, "min-h-[5.5rem] resize-y leading-relaxed")}
+              required
+            />
+          </div>
           <Button
             type="submit"
-            disabled={erasePending || eraseConfirm.toUpperCase() !== "ERASE"}
+            disabled={
+              erasePending ||
+              eraseConfirm.toUpperCase() !== "ERASE" ||
+              !eraseReason.trim()
+            }
             className={cn(
               DASHBOARD_SECONDARY_BUTTON_CLASS,
               "border-red-300 text-red-800 hover:border-red-400 hover:bg-red-50 disabled:opacity-50",

@@ -18,6 +18,7 @@ function makeItem(
 ): ActionInboxItem {
   return {
     callLogId: null,
+    callLogCreatedAt: null,
     callerNumber: "+353871234567",
     callerDisplay: "087 123 4567",
     callerName: "Test",

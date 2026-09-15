@@ -14,6 +14,7 @@ import {
   parseCallerTextBackReviewJson,
 } from "@/lib/caller-text-back-sanitize";
 import { completeOpenRouterChat } from "@/lib/openrouter-chat";
+import { callerSmsEligibility } from "@/lib/caller-line-sms";
 import { smsDestinationAllowed } from "@/lib/voice-sms-destination-guard";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -70,6 +71,12 @@ export async function sendCallerTextBackMessage(input: {
   if (!toE164) {
     return { ok: false, message: "No valid phone number for this caller." };
   }
+
+  const smsEligibility = callerSmsEligibility(toE164);
+  if (!smsEligibility.canText) {
+    return { ok: false, message: smsEligibility.reason };
+  }
+
   if (!smsDestinationAllowed(toE164)) {
     return {
       ok: false,

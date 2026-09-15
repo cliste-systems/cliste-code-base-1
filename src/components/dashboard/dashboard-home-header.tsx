@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { Bell } from "lucide-react";
 
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
 import { DashboardHeaderRangeControls } from "@/app/(dashboard)/dashboard/dashboard-header-range-controls";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 
 export function DashboardHomeHeader({
@@ -14,6 +17,9 @@ export function DashboardHomeHeader({
   greetingSubline: string;
   openActions: number;
 }) {
+  const { copy } = useDashboardVertical();
+  const followUpHref = dashboardFollowUpHubHref(copy.vertical.id);
+
   return (
     <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
@@ -25,12 +31,12 @@ export function DashboardHomeHeader({
       <div className="flex shrink-0 items-center gap-2">
         <DashboardHeaderRangeControls />
         <Link
-          href={DASHBOARD_ROUTES.actionInbox}
+          href={followUpHref}
           className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0b1220]"
           aria-label={
             openActions > 0
-              ? `Open Action Inbox, ${openActions} open`
-              : "Open Action Inbox"
+              ? `Open follow-ups, ${openActions} open`
+              : "Open follow-ups"
           }
         >
           <Bell className="size-[18px]" aria-hidden />

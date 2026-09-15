@@ -228,9 +228,10 @@ export function DashboardTopNav({
   const pathname = usePathname();
   const ready = useOnboardingAnimateIn();
   const reduceMotion = useReducedMotion();
-  const inboxHref = primaryNav.find((item) =>
-    item.href.includes("action-inbox"),
-  )?.href;
+  const inboxHref =
+    primaryNav.find((item) => item.href.includes("action-inbox"))?.href ??
+    primaryNav.find((item) => item.href.includes("departments"))?.href ??
+    "/dashboard/departments";
 
   const navClassName = cn(
     DASHBOARD_TOP_NAV_SURFACE,
@@ -303,12 +304,12 @@ export function DashboardTopNav({
         </button>
 
         <Link
-          href={inboxHref ?? "/dashboard/action-inbox"}
+          href={inboxHref}
           className={cn(
             DASHBOARD_TOP_NAV_ICON_BUTTON,
             "relative hover:text-slate-700",
           )}
-          aria-label="Open notifications"
+          aria-label="Open follow-ups"
         >
           <Bell className="size-4" aria-hidden />
           {notificationCount > 0 ? (

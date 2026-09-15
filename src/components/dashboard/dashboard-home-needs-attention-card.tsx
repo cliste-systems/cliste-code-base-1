@@ -2,6 +2,7 @@
 
 import { Inbox } from "lucide-react";
 
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
 import {
   DashboardHomeFirstRowButton,
   DashboardHomeFirstRowList,
@@ -17,9 +18,12 @@ import {
   DASHBOARD_HOME_PANEL_EMPTY_TITLE,
   dashboardHomeCardShellClassName,
 } from "@/components/dashboard/dashboard-surface";
+import {
+  dashboardFollowUpHubHref,
+  dashboardFollowUpHubLabel,
+} from "@/lib/dashboard-follow-up-hub";
 import type { HomeRequestRow } from "@/lib/dashboard-home-requests";
 import { DASHBOARD_HOME_INBOX_DISPLAY_LIMIT } from "@/lib/dashboard-home-panel-limit";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { cn } from "@/lib/utils";
 
 function NeedsAttentionEmptyState() {
@@ -51,6 +55,9 @@ export function DashboardHomeNeedsAttentionCard({
   className?: string;
   embedded?: boolean;
 }) {
+  const { copy } = useDashboardVertical();
+  const followUpHref = dashboardFollowUpHubHref(copy.vertical.id);
+  const followUpLabel = dashboardFollowUpHubLabel(copy.vertical.id);
   const displayRows = rows.slice(0, DASHBOARD_HOME_INBOX_DISPLAY_LIMIT);
   const Shell = embedded ? "div" : "section";
 
@@ -74,8 +81,8 @@ export function DashboardHomeNeedsAttentionCard({
           />
 
           <div className={cn(HOME_FIRST_ROW_FOOTER, "mt-auto")}>
-            <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.actionInbox}>
-              Open Action Inbox
+            <DashboardHomeFirstRowButton href={followUpHref}>
+              {followUpLabel}
             </DashboardHomeFirstRowButton>
           </div>
         </>

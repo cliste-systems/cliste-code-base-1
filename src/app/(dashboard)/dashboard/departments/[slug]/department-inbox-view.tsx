@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, Copy, Inbox, MessageSquare, ScrollText, Search } from "lucide-react";
 
@@ -18,6 +18,12 @@ import {
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
 import { buildCallsPageHref } from "@/lib/calls-page-href";
+import {
+  attentionRowAccent,
+  resolveAttentionTag,
+  resolveTicketAttentionLevel,
+} from "@/lib/call-attention-level";
+import { callerSmsEligibility } from "@/lib/caller-line-sms";
 import { cn } from "@/lib/utils";
 
 import { markTicketReopen, markTicketResolved } from "../../action-inbox/actions";
@@ -245,6 +251,12 @@ function DepartmentListRow({
   tinted: boolean;
 }) {
   const preview = departmentListPreview(row);
+  const attentionLevel = resolveTicketAttentionLevel(row.category, row.status);
+  const attention = attentionRowAccent(attentionLevel, row.category);
+  const attentionTag = resolveAttentionTag({
+    level: attentionLevel,
+    category: row.category,
+  });
 
   return (
     <li>
@@ -254,17 +266,33 @@ function DepartmentListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "w-full rounded-lg border px-3 py-3 text-left transition-colors",
-          tinted
-            ? "border-[#cfd9d4] bg-white hover:border-[#9da9a4]"
-            : "border-[#dfe7e2] bg-white/90 hover:border-[#9da9a4]",
-          selected &&
-            "border-[#353D42] bg-white shadow-[inset_4px_0_0_#353D42]",
+          "w-full rounded-lg border px-3 py-3 text-left",
+          selected
+            ? cn(
+                "border-[#353D42] bg-[#f6faf7] shadow-[0_1px_0_rgba(17,24,29,0.04)]",
+                attention.selectedRowAccentClass,
+              )
+            : cn(
+                tinted ? "border-[#cfd9d4] bg-white" : "border-[#dfe7e2] bg-white/90",
+                attention.rowAccentClass,
+              ),
         )}
       >
-        <p className="text-[14px] font-semibold leading-snug text-[#0b1220]">
-          {callerLine(row)}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-[#0b1220]">
+            {callerLine(row)}
+          </p>
+          {attentionTag ? (
+            <span
+              className={cn(
+                "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                attentionTag.tagClassName,
+              )}
+            >
+              {attentionTag.label}
+            </span>
+          ) : null}
+        </div>
         <p className="mt-1.5 line-clamp-2 text-[13px] leading-snug text-slate-600">
           {preview}
         </p>
@@ -329,11 +357,33 @@ function DepartmentDetailContent({
     underReview: isUnderReviewTicket(item),
   });
   const requestSummary = parseDepartmentRequestSummary(item.summary);
+  const attentionLevel = resolveTicketAttentionLevel(item.category, item.status);
+  const attentionTag = resolveAttentionTag({
+    level: attentionLevel,
+    category: item.category,
+  });
   const [textBackOpen, setTextBackOpen] = useState(false);
+  const [textBackNotice, setTextBackNotice] = useState<string | null>(null);
   const callsHref = buildCallsPageHref({
     callLogId: item.callLogId,
-    callCreatedAt: item.createdAt,
+    callCreatedAt: item.callLogCreatedAt ?? item.createdAt,
   });
+
+  function onTextBackClick() {
+    const eligibility = callerSmsEligibility(item.callerNumber);
+    if (!eligibility.canText) {
+      setTextBackNotice(eligibility.reason);
+      setTextBackOpen(false);
+      return;
+    }
+    setTextBackNotice(null);
+    setTextBackOpen(true);
+  }
+
+  useEffect(() => {
+    setTextBackNotice(null);
+    setTextBackOpen(false);
+  }, [item.id]);
 
   return (
     <DetailPanelShell surface="embedded">
@@ -342,6 +392,11 @@ function DepartmentDetailContent({
           <StatusPill variant={isOpen ? "brand" : "success"} dot>
             {isOpen ? "To do" : "Done"}
           </StatusPill>
+          {isOpen && attentionTag ? (
+            <StatusPill className={attentionTag.tagClassName}>
+              {attentionTag.label}
+            </StatusPill>
+          ) : null}
           {isUnderReviewTicket(item) ? (
             <StatusPill variant="attention">Under review</StatusPill>
           ) : null}
@@ -408,7 +463,7 @@ function DepartmentDetailContent({
           {hasPhone ? (
             <DetailActionButton
               type="button"
-              onClick={() => setTextBackOpen(true)}
+              onClick={onTextBackClick}
               className="min-h-11 px-4"
             >
               <MessageSquare className="size-4" aria-hidden />
@@ -420,6 +475,15 @@ function DepartmentDetailContent({
             {copied ? "Copied" : "Copy"}
           </DetailActionButton>
         </div>
+
+        {textBackNotice ? (
+          <p
+            className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-950"
+            role="alert"
+          >
+            {textBackNotice}
+          </p>
+        ) : null}
       </div>
 
       {hasPhone ? (

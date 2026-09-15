@@ -30,6 +30,9 @@ type ConfirmDialogProps = {
   onConfirm: () => void;
   pending?: boolean;
   destructive?: boolean;
+  /** When set, Cancel runs this instead of closing (e.g. wizard back step). */
+  onCancel?: () => void;
+  confirmDisabled?: boolean;
 };
 
 export function ConfirmDialog({
@@ -44,6 +47,8 @@ export function ConfirmDialog({
   onConfirm,
   pending = false,
   destructive = false,
+  onCancel,
+  confirmDisabled = false,
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,14 +74,20 @@ export function ConfirmDialog({
             type="button"
             variant="outline"
             disabled={pending}
-            onClick={() => onOpenChange(false)}
+            onClick={() => {
+              if (onCancel) {
+                onCancel();
+                return;
+              }
+              onOpenChange(false);
+            }}
             className={DASHBOARD_SECONDARY_BUTTON_CLASS}
           >
             {cancelLabel}
           </Button>
           <Button
             type="button"
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             onClick={onConfirm}
             className={cn(
               destructive

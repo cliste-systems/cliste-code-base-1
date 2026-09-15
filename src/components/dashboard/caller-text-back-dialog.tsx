@@ -24,6 +24,7 @@ import {
 import {
   composeCallerTextBackMessage,
 } from "@/lib/caller-text-back-content";
+import { callerSmsEligibility } from "@/lib/caller-line-sms";
 import { finalizeCallerTextBackMiddle } from "@/lib/caller-text-back-sanitize";
 import { cn } from "@/lib/utils";
 import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
@@ -77,7 +78,8 @@ export function CallerTextBackDialog({
     setSuggestedMiddle(null);
     setUsedAiReview(false);
     setStep("draft");
-    setError(null);
+    const eligibility = callerSmsEligibility(callerNumber);
+    setError(eligibility.canText ? null : eligibility.reason);
   }, [open, callerNumber, ticketId]);
 
   useEffect(() => {
@@ -95,6 +97,12 @@ export function CallerTextBackDialog({
   }
 
   function onReview() {
+    const eligibility = callerSmsEligibility(callerNumber);
+    if (!eligibility.canText) {
+      setError(eligibility.reason);
+      return;
+    }
+
     const trimmed = middle.trim();
     if (!trimmed) {
       setError("Add a short message for the customer before review.");
@@ -135,6 +143,12 @@ export function CallerTextBackDialog({
   }
 
   function onSend() {
+    const eligibility = callerSmsEligibility(callerNumber);
+    if (!eligibility.canText) {
+      setError(eligibility.reason);
+      return;
+    }
+
     const trimmed = finalizeCallerTextBackMiddle(middle);
     if (!trimmed) {
       setError("Add a short message for the customer before sending.");
@@ -167,6 +181,7 @@ export function CallerTextBackDialog({
   const showDraftEditor = step === "draft" || step === "ready";
   const showReviewPanel = step === "review" && suggestedMiddle != null;
   const showSent = step === "sent";
+  const smsBlocked = !callerSmsEligibility(callerNumber).canText;
   const callerLabel = hasKnownCallerLabel(callerName, callerDisplay);
 
   return (
@@ -223,7 +238,7 @@ export function CallerTextBackDialog({
                   </div>
                 </div>
 
-                {showDraftEditor ? (
+                {showDraftEditor && !smsBlocked ? (
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
                       <label
@@ -323,7 +338,7 @@ export function CallerTextBackDialog({
               >
                 Cancel
               </Button>
-              {step === "ready" ? (
+              {step === "ready" && !smsBlocked ? (
                 <Button
                   type="button"
                   onClick={onSend}
@@ -337,7 +352,7 @@ export function CallerTextBackDialog({
                   )}
                   {pendingSend ? "Sending…" : "Send message"}
                 </Button>
-              ) : step === "draft" ? (
+              ) : step === "draft" && !smsBlocked ? (
                 <Button
                   type="button"
                   onClick={onReview}

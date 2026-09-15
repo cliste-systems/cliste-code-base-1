@@ -168,6 +168,13 @@ export function DashboardDatePicker() {
     q.delete("page");
 
     const param = formatCallsPageDateParam(date, now);
+    const currentParam = formatCallsPageDateParam(selectedDate, now);
+
+    // A deep-linked call only exists on its own day — clear it when browsing elsewhere.
+    if (param !== currentParam) {
+      q.delete("call");
+    }
+
     if (param === todayParam) {
       q.delete("date");
     } else {

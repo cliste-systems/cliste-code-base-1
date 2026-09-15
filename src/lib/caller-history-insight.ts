@@ -1,9 +1,29 @@
 import {
+  classifyActionCategory,
+} from "@/app/(dashboard)/dashboard/action-inbox/categories";
+import {
   inferCallIntent,
   normalizeCallOutcome,
   type CallOutcome,
 } from "@/lib/call-history-types";
+import { resolveCallHistoryStatus, type CallHistoryStatusTone } from "@/lib/call-history-status";
+import {
+  assessCallerSecurityLevel,
+  callerSecurityOverviewPrefix,
+  type CallerSecurityAssessment,
+} from "@/lib/caller-security-level";
 import { ANONYMOUS_CALLER_E164 } from "@/lib/blocked-callers";
+import type { PostCallStatus } from "@/lib/post-call-processing-types";
+
+export type {
+  CallHistoryStatusTone as CallerHistoryRecentCallStatusTone,
+} from "@/lib/call-history-status";
+export {
+  CALL_HISTORY_STATUS_BADGE_CLASSES as CALLER_HISTORY_STATUS_BADGE_CLASSES,
+  CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES as CALLER_HISTORY_STATUS_ROW_ACCENT_CLASSES,
+  resolveCallHistoryListStatus,
+  resolveCallHistoryStatus as resolveCallerHistoryRecentCallStatus,
+} from "@/lib/call-history-status";
 
 export type CallerHistorySecurityFlag =
   | "blocked"
@@ -18,6 +38,8 @@ export type CallerHistoryCallInput = {
   callerName: string | null;
   outcome: string;
   aiSummary: string | null;
+  durationSeconds: number;
+  postCallStatus?: PostCallStatus | null;
 };
 
 export type CallerHistoryTicketInput = {
@@ -30,19 +52,25 @@ export type CallerHistoryRecentCall = {
   id: string;
   createdAt: string;
   dateLabel: string;
-  summaryPreview: string | null;
+  summary: string | null;
   intentLabel: string;
+  statusLabel: string;
+  statusTone: CallHistoryStatusTone;
 };
 
 export type CallerHistoryInsight =
-  | { kind: "anonymous" }
+  | { kind: "anonymous"; overview: string; security: CallerSecurityAssessment }
   | {
       kind: "first_call";
+      overview: string;
+      security: CallerSecurityAssessment;
       isBlocked: boolean;
       securityFlags: CallerHistorySecurityFlag[];
     }
   | {
       kind: "repeat";
+      overview: string;
+      security: CallerSecurityAssessment;
       totalCalls: number;
       firstCallLabel: string;
       lastCallLabel: string;
@@ -124,16 +152,179 @@ function isOpenComplaintTicket(ticket: CallerHistoryTicketInput): boolean {
   return COMPLAINT_RE.test(String(ticket.summary ?? ""));
 }
 
+function joinNatural(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0]!;
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
+}
+
+function callerSubject(knownNames: string[]): string {
+  if (knownNames.length === 1) return knownNames[0]!;
+  if (knownNames.length > 1) {
+    return `${knownNames[0]} (also used ${knownNames.slice(1).join(", ")})`;
+  }
+  return "This caller";
+}
+
+function callerThemeForCall(call: CallerHistoryCallInput): string {
+  const outcome = normalizeCallOutcome(call.outcome) as CallOutcome;
+  const summary = call.aiSummary?.trim() ?? "";
+
+  if (outcome === "callback_requested") return "callbacks";
+  if (outcome === "link_sent") return "store information";
+  if (COMPLAINT_RE.test(summary)) return "complaints";
+
+  if (
+    /(hours|open|close|location|address|directions|toilet|parking|information|availability)/i.test(
+      summary,
+    )
+  ) {
+    return "store information";
+  }
+
+  const category = summary ? classifyActionCategory(summary) : null;
+  switch (category) {
+    case "order":
+      return "bakery orders";
+    case "booking_request":
+      return "bookings";
+    case "callback":
+      return "callbacks";
+    case "quote":
+      return "price enquiries";
+    case "complaint":
+      return "complaints";
+    case "urgent":
+      return "urgent issues";
+    default:
+      break;
+  }
+
+  if (outcome === "action_created") return "follow-ups";
+  return "general enquiries";
+}
+
+function summarizeCallerThemes(calls: CallerHistoryCallInput[], maxItems = 3): string | null {
+  const counts = new Map<string, number>();
+
+  for (const call of calls.slice(0, 12)) {
+    const theme = callerThemeForCall(call);
+    counts.set(theme, (counts.get(theme) ?? 0) + 1);
+  }
+
+  const ranked = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([theme]) => theme)
+    .slice(0, maxItems);
+
+  if (ranked.length === 0) return null;
+  return joinNatural(ranked);
+}
+
+export function buildCallerHistoryOverview(
+  insight: CallerHistoryInsight,
+  callsForTopics: CallerHistoryCallInput[] = [],
+): string {
+  const securityPrefix = callerSecurityOverviewPrefix(insight.security);
+  let body = "";
+
+  if (insight.kind === "anonymous") {
+    body = "This number is withheld, so Cara can't build a caller history.";
+  } else if (insight.kind === "first_call") {
+    if (insight.isBlocked) {
+      body =
+        "First call from this number. The caller is currently blocked from reaching Cara.";
+    } else {
+      body = "First call from this number. Cara will build a clearer picture if they call again.";
+    }
+  } else {
+    const subject = callerSubject(insight.knownNames);
+    const callCount = `${insight.totalCalls} call${insight.totalCalls === 1 ? "" : "s"}`;
+    const timeline =
+      insight.firstCallLabel === insight.lastCallLabel
+        ? ["today", "yesterday"].includes(insight.lastCallLabel.toLowerCase())
+          ? insight.lastCallLabel.toLowerCase()
+          : `on ${insight.lastCallLabel.toLowerCase()}`
+        : `since ${insight.firstCallLabel.toLowerCase()}, most recently ${insight.lastCallLabel.toLowerCase()}`;
+    const sentences: string[] = [`${subject} has made ${callCount} ${timeline}.`];
+
+    const themes = summarizeCallerThemes(callsForTopics);
+    if (themes) {
+      sentences.push(`Mostly ${themes}.`);
+    }
+
+    if (insight.openFollowUps > 0) {
+      sentences.push(
+        `${insight.openFollowUps} open request${insight.openFollowUps === 1 ? "" : "s"} ${insight.openFollowUps === 1 ? "is" : "are"} still on file.`,
+      );
+    }
+
+    if (insight.isBlocked) {
+      sentences.push("This number is currently blocked.");
+    }
+
+    body = sentences.join(" ");
+  }
+
+  if (securityPrefix) {
+    return `${securityPrefix} ${body}`;
+  }
+  return body;
+}
+
+function buildCallerSecurityAssessment(input: {
+  isBlocked: boolean;
+  abuseHitCount: number;
+  openFollowUps: number;
+  securityFlags: CallerHistorySecurityFlag[];
+  calls: CallerHistoryCallInput[];
+  now?: Date;
+}): CallerSecurityAssessment {
+  return assessCallerSecurityLevel({
+    isBlocked: input.isBlocked,
+    abuseHitCount: input.abuseHitCount,
+    openFollowUps: input.openFollowUps,
+    securityFlags: input.securityFlags,
+    calls: input.calls.map((call) => ({
+      outcome: call.outcome,
+      aiSummary: call.aiSummary,
+      durationSeconds: call.durationSeconds,
+      createdAt: call.createdAt,
+    })),
+    now: input.now,
+  });
+}
+
 export function buildCallerHistoryInsight(input: {
   callerNumber: string;
   calls: CallerHistoryCallInput[];
   openTickets: CallerHistoryTicketInput[];
   isBlocked: boolean;
+  abuseHitCount?: number;
   now?: Date;
 }): CallerHistoryInsight {
   const caller = input.callerNumber.trim();
+  const abuseHitCount = Math.max(0, input.abuseHitCount ?? 0);
+  const lowSecurity = buildCallerSecurityAssessment({
+    isBlocked: false,
+    abuseHitCount: 0,
+    openFollowUps: 0,
+    securityFlags: [],
+    calls: [],
+    now: input.now,
+  });
+
   if (!caller || caller === ANONYMOUS_CALLER_E164) {
-    return { kind: "anonymous" };
+    const anonymousInsight = {
+      kind: "anonymous" as const,
+      overview: "",
+      security: lowSecurity,
+    };
+    return {
+      ...anonymousInsight,
+      overview: buildCallerHistoryOverview(anonymousInsight),
+    };
   }
 
   const now = input.now ?? new Date();
@@ -154,10 +345,24 @@ export function buildCallerHistoryInsight(input: {
   }
 
   if (totalCalls <= 1) {
-    return {
-      kind: "first_call",
+    const security = buildCallerSecurityAssessment({
+      isBlocked: input.isBlocked,
+      abuseHitCount,
+      openFollowUps,
+      securityFlags,
+      calls,
+      now,
+    });
+    const firstCallInsight = {
+      kind: "first_call" as const,
       isBlocked: input.isBlocked,
       securityFlags,
+      security,
+      overview: "",
+    };
+    return {
+      ...firstCallInsight,
+      overview: buildCallerHistoryOverview(firstCallInsight, calls),
     };
   }
 
@@ -182,17 +387,24 @@ export function buildCallerHistoryInsight(input: {
   const recentCalls: CallerHistoryRecentCall[] = calls.slice(0, RECENT_CALL_LIMIT).map((call) => {
     const outcome = normalizeCallOutcome(call.outcome) as CallOutcome;
     const summary = call.aiSummary?.trim() || null;
+    const status = resolveCallHistoryStatus({
+      outcome,
+      summary,
+      postCallStatus: call.postCallStatus,
+    });
     return {
       id: call.id,
       createdAt: call.createdAt,
       dateLabel: formatCallerHistoryDateLabel(call.createdAt, now),
-      summaryPreview: summaryPreview(summary),
+      summary,
       intentLabel: inferCallIntent(summary, outcome),
+      statusLabel: status.label,
+      statusTone: status.tone,
     };
   });
 
-  return {
-    kind: "repeat",
+  const repeatBase = {
+    kind: "repeat" as const,
     totalCalls,
     firstCallLabel: formatCallerHistoryDateLabel(oldest.createdAt, now),
     lastCallLabel: formatCallerHistoryDateLabel(newest.createdAt, now),
@@ -201,6 +413,20 @@ export function buildCallerHistoryInsight(input: {
     isBlocked: input.isBlocked,
     securityFlags,
     recentCalls,
+    security: buildCallerSecurityAssessment({
+      isBlocked: input.isBlocked,
+      abuseHitCount,
+      openFollowUps,
+      securityFlags,
+      calls,
+      now,
+    }),
+    overview: "",
+  };
+
+  return {
+    ...repeatBase,
+    overview: buildCallerHistoryOverview(repeatBase, calls),
   };
 }
 

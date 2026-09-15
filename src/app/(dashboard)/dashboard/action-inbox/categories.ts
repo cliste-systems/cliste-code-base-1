@@ -11,6 +11,7 @@ export type ActionCategory =
   | "quote"
   | "lead"
   | "complaint"
+  | "order"
   | "unclear"
   | "failed"
   | "follow_up";
@@ -23,9 +24,10 @@ export const ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
   quote: "Price enquiry",
   lead: "New enquiry",
   complaint: "Complaint",
+  order: "Order",
   unclear: "Needs review",
   failed: "Call ended",
-  follow_up: "Follow-up",
+  follow_up: "Request",
 };
 
 /** Compact pill label in list rows — kept identical to the full label so the
@@ -38,9 +40,10 @@ export const ACTION_CATEGORY_SHORT: Record<ActionCategory, string> = {
   quote: "Price enquiry",
   lead: "New enquiry",
   complaint: "Complaint",
+  order: "Order",
   unclear: "Needs review",
   failed: "Call ended",
-  follow_up: "Follow-up",
+  follow_up: "Request",
 };
 
 export const ACTION_CATEGORIES: readonly ActionCategory[] = [
@@ -51,6 +54,7 @@ export const ACTION_CATEGORIES: readonly ActionCategory[] = [
   "quote",
   "lead",
   "complaint",
+  "order",
   "unclear",
   "failed",
   "follow_up",
@@ -106,6 +110,14 @@ export function classifyActionCategory(summary: string | null | undefined): Acti
   }
   if (/\b(complaint|unhappy|angry|refund|disappointed|upset|terrible|rude)\b/.test(s)) {
     return "complaint";
+  }
+  if (
+    /\b(order(?:ed|ing)?|cake order|birthday cake|custom cake|party cake|special order)\b/.test(
+      s,
+    ) ||
+    /\b(to order|placed an order|put in an order)\b/.test(s)
+  ) {
+    return "order";
   }
   if (/(call ?back|callback|ring (me|them) back|return (the )?call|call me back|wants a call)/.test(s)) {
     return "callback";

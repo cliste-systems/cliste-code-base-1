@@ -134,6 +134,105 @@ export function DetailSection({
   );
 }
 
+/** Flat section row — label + content with a bottom divider (no nested card). */
+export function DetailSectionRow({
+  title,
+  children,
+  className,
+  contentClassName,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+  contentClassName?: string;
+}) {
+  return (
+    <section className={cn("border-b border-[#eef3f0] px-5 py-3.5 last:border-b-0", className)}>
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+        {title}
+      </h3>
+      <div className={cn("mt-2", contentClassName)}>{children}</div>
+    </section>
+  );
+}
+
+/** Collapsible section using native details/summary. */
+export function DetailCollapsibleSection({
+  title,
+  children,
+  defaultOpen = false,
+  className,
+  contentClassName,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+  contentClassName?: string;
+}) {
+  return (
+    <details
+      open={defaultOpen || undefined}
+      className={cn(
+        "group border-b border-[#eef3f0] px-5 py-3 last:border-b-0",
+        className,
+      )}
+    >
+      <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75] marker:content-none [&::-webkit-details-marker]:hidden">
+        <span className="inline-flex items-center gap-1.5">
+          <ChevronIcon />
+          {title}
+        </span>
+      </summary>
+      <div className={cn("mt-2 pb-1", contentClassName)}>{children}</div>
+    </details>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      className="size-3.5 shrink-0 text-[#94a3b8] transition-transform group-open:rotate-90"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        d="M7.21 14.77a.75.75 0 01.02-1.06L10.94 10 7.23 6.29a.75.75 0 111.06-1.06l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-.02z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+/** Bordered section card for scan-friendly detail panes (Calls, inbox, etc.). */
+export function DetailSectionCard({
+  title,
+  children,
+  className,
+  bodyClassName,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "overflow-hidden rounded-lg border border-[#dfe7e2] bg-white shadow-[0_1px_0_rgba(17,24,29,0.04)]",
+        className,
+      )}
+    >
+      <div className="border-b border-[#eef3f0] bg-[#fbfcfb] px-4 py-2.5">
+        <h3 className="text-[12px] font-semibold text-[#11181d]">{title}</h3>
+      </div>
+      <div className={cn("px-4 py-4", bodyClassName)}>{children}</div>
+    </section>
+  );
+}
+
 /** Inset surface used inside detail sections (follow-ups, transcripts). */
 export function DetailInset({
   children,

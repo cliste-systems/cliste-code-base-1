@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -14,16 +14,17 @@ import {
   Phone,
   Settings,
   Share2,
-  Users,
   X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
+import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
+import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
 import { cn } from "@/lib/utils";
 
-import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
 import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
@@ -51,6 +52,11 @@ export function DashboardMobileNav({
 }: DashboardMobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { copy } = useDashboardVertical();
+  const notificationHref = useMemo(
+    () => dashboardFollowUpHubHref(copy.vertical.id),
+    [copy.vertical.id],
+  );
 
   return (
     <div className="space-y-3">
@@ -76,9 +82,9 @@ export function DashboardMobileNav({
 
         <div className="flex items-center gap-2">
           <Link
-            href="/dashboard/action-inbox"
+            href={notificationHref}
             className="relative inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-            aria-label="Open notifications"
+            aria-label="Open follow-ups"
           >
             <Bell className="size-4" aria-hidden />
           </Link>

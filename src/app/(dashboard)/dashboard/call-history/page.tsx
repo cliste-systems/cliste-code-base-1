@@ -1,8 +1,5 @@
 import { redirect } from "next/navigation";
-import { Phone } from "lucide-react";
 
-import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
-import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import {
   DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
@@ -30,8 +27,12 @@ import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
 import { buildCallsPageHref } from "@/lib/calls-page-href";
 
 import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
+import { resolveCallHistoryNeedsAttention, normalizeCallResolution } from "@/lib/call-history-status";
+import { resolveCallDepartmentLink } from "@/lib/call-department-link";
+import { resolveCallAttentionLevel } from "@/lib/call-attention-level";
+import type { ActionCategory } from "../action-inbox/categories";
+import { classifyActionCategory } from "../action-inbox/categories";
 
-import { DashboardHeaderDateControls } from "../dashboard-header-date-controls";
 import {
   buildCallHistoryMetricsFromSummaryRows,
   type CallFollowUp,
@@ -39,7 +40,10 @@ import {
   callSummaryForDisplay,
 } from "./call-history-helpers";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
-import { CallHistoryView } from "./call-history-view";
+import { CallHistoryPageContent } from "./call-history-page-content";
+import { CallHistoryPageSections } from "./call-history-page-sections";
+
+export const dynamic = "force-dynamic";
 
 type CallHistoryPageProps = {
   searchParams?: Promise<{ call?: string; date?: string; range?: string; page?: string }>;
@@ -52,9 +56,13 @@ type CallLogListRow = {
   duration_seconds: number;
   outcome: string;
   ai_summary: string | null;
+  call_resolution?: string | null;
   created_at: string;
   post_call_status?: string | null;
   audio_storage_path?: string | null;
+  caller_data_erased_at?: string | null;
+  caller_data_erased_by_label?: string | null;
+  caller_data_erased_reason?: string | null;
 };
 
 type CallLogMetricsRow = {
@@ -75,6 +83,10 @@ type CallLinkRow = {
   id: string;
   caller_number: string;
   created_at: string;
+  outcome: string;
+  ai_summary: string | null;
+  call_resolution?: string | null;
+  post_call_status?: string | null;
 };
 
 function parsePageParam(raw: string | undefined): number {
@@ -95,6 +107,19 @@ function toListItem(
   });
   const followUp = followUpByCallId.get(row.id) ?? null;
   const outcome = normalizeCallOutcome(row.outcome);
+  const attentionLevel = resolveCallAttentionLevel({
+    hasOpenAction: Boolean(followUp),
+    postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
+    aiSummary: mapped.aiSummary,
+    followUpSummary: followUp?.summary,
+    outcome,
+  });
+  const summaryForCategory =
+    followUp?.summary?.trim() || mapped.aiSummary?.trim() || "";
+  const actionCategory: ActionCategory | null =
+    attentionLevel !== "routine" && summaryForCategory
+      ? classifyActionCategory(summaryForCategory)
+      : null;
   const item: CallHistoryListItem = {
     id: mapped.id,
     createdAt: row.created_at,
@@ -115,6 +140,17 @@ function toListItem(
     followUp,
     postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
     hasRecording: Boolean(row.audio_storage_path?.trim()),
+    departmentLink: resolveCallDepartmentLink({
+      aiSummary: mapped.aiSummary,
+      followUpSummary: followUp?.summary,
+      followUpTicketId: followUp?.id,
+    }),
+    attentionLevel,
+    actionCategory,
+    callResolution: normalizeCallResolution(row.call_resolution),
+    callerDataErasedAt: row.caller_data_erased_at ?? null,
+    callerDataErasedByLabel: row.caller_data_erased_by_label ?? null,
+    callerDataErasedReason: row.caller_data_erased_reason ?? null,
   };
   item.summaryPreview = callSummaryForDisplay(item, {
     businessName,
@@ -135,7 +171,8 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     typeof sp.call === "string" && sp.call.trim() ? sp.call.trim() : null;
   const requestedPage = parsePageParam(sp.page);
 
-  const { supabase, organizationId } = await requireDashboardSession();
+  const { supabase, organizationId, profile } = await requireDashboardSession();
+  const staffDisplayName = profile.name?.trim() || "Staff member";
 
   let deepLinkedCreatedAt: string | null = null;
   if (initialSelectedCallId) {
@@ -160,7 +197,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     );
   }
 
-  if (initialSelectedCallId && deepLinkedCreatedAt) {
+  if (initialSelectedCallId && deepLinkedCreatedAt && !sp.date) {
     const neededDate = callsPageDateForTimestamp(deepLinkedCreatedAt, now);
     if (neededDate !== selectedDateParam) {
       redirect(
@@ -216,7 +253,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
       supabase
         .from("call_logs")
         .select(
-          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, created_at, post_call_status, audio_storage_path",
+          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason",
         )
         .eq("organization_id", organizationId)
         .eq("is_test_call", false)
@@ -226,7 +263,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     applyDayFilters(
       supabase
         .from("call_logs")
-        .select("id, caller_number, created_at")
+        .select("id, caller_number, created_at, outcome, ai_summary, call_resolution, post_call_status")
         .eq("organization_id", organizationId)
         .eq("is_test_call", false),
     ),
@@ -250,7 +287,17 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     (linkRows ?? []) as CallLinkRow[],
     tickets,
   );
-  const openTicketCount = tickets.filter((t) => t.status === "open").length;
+  const needsAttentionToday = (linkRows ?? []).filter((row) => {
+    const followUp = followUpByCallId.get(row.id) ?? null;
+    return resolveCallHistoryNeedsAttention({
+      outcome: normalizeCallOutcome(row.outcome),
+      aiSummary: row.ai_summary,
+      postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
+      followUpSummary: followUp?.summary ?? null,
+      hasOpenAction: Boolean(followUp),
+      callResolution: normalizeCallResolution(row.call_resolution),
+    });
+  }).length;
 
   const total = totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / CALL_HISTORY_PAGE_SIZE));
@@ -258,7 +305,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
 
   const metrics = buildCallHistoryMetricsFromSummaryRows(
     (metricsData ?? []) as CallLogMetricsRow[],
-    openTicketCount,
+    needsAttentionToday,
   );
   if (total > 0) {
     metrics.totalCalls = total;
@@ -269,54 +316,69 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
   );
   const blockedSet = new Set(blockedCallerE164s);
 
-  const calls = !error
+  let calls = !error
     ? ((pageData ?? []) as CallLogListRow[]).map((row) =>
         toListItem(row, followUpByCallId, businessName, blockedSet),
       )
     : [];
 
+  if (
+    initialSelectedCallId &&
+    !calls.some((call) => call.id === initialSelectedCallId)
+  ) {
+    const { data: deepLinkedRow } = await supabase
+      .from("call_logs")
+      .select(
+        "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason",
+      )
+      .eq("id", initialSelectedCallId)
+      .eq("organization_id", organizationId)
+      .eq("is_test_call", false)
+      .maybeSingle();
+
+    if (deepLinkedRow) {
+      const deepLinkedCall = toListItem(
+        deepLinkedRow as CallLogListRow,
+        followUpByCallId,
+        businessName,
+        blockedSet,
+      );
+      calls = [
+        deepLinkedCall,
+        ...calls.filter((call) => call.id !== deepLinkedCall.id),
+      ];
+    }
+  }
+
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
-      <DashboardAnimatedPageSections>
-      <ClistePageHeader
-        tone="calls"
-        icon={Phone}
-        title="Calls"
-        description={greetingSubline}
-        actions={<DashboardHeaderDateControls />}
-        summary={
-          [
-            { value: String(metrics.totalCalls), label: "total calls" },
-            { value: String(metrics.routedCount), label: "routed" },
-            { value: String(metrics.needsAttentionCount), label: "need attention" },
-            { value: metrics.avgDurationLabel, label: "avg. length" },
-          ]
-        }
-      />
-
-      {error ? (
-        <p className="shrink-0 text-[13px] text-red-700">
-          Could not load calls: {error.message}
-        </p>
-      ) : (
-        <CallHistoryView
-          className="min-h-0 flex-1"
-          calls={calls}
-          metrics={metrics}
-          initialSelectedCallId={initialSelectedCallId}
-          blockedCallerE164s={blockedCallerE164s}
-          businessName={businessName}
-          pagination={{
-            page,
-            pageSize: CALL_HISTORY_PAGE_SIZE,
-            totalCount: total,
-            totalPages,
-            selectedDate: selectedDateParam,
-          }}
-        />
-      )}
-      </DashboardAnimatedPageSections>
+      <CallHistoryPageSections animateKey={`${selectedDateParam}-${page}`}>
+        {error ? (
+          <p className="shrink-0 text-[13px] text-red-700">
+            Could not load calls: {error.message}
+          </p>
+        ) : (
+          <CallHistoryPageContent
+            className="min-h-0 flex-1"
+            greetingSubline={greetingSubline}
+            metrics={metrics}
+            calls={calls}
+            staffDisplayName={staffDisplayName}
+            organizationId={organizationId}
+            initialSelectedCallId={initialSelectedCallId}
+            blockedCallerE164s={blockedCallerE164s}
+            businessName={businessName}
+            pagination={{
+              page,
+              pageSize: CALL_HISTORY_PAGE_SIZE,
+              totalCount: total,
+              totalPages,
+              selectedDate: selectedDateParam,
+            }}
+          />
+        )}
+      </CallHistoryPageSections>
       </div>
     </div>
   );

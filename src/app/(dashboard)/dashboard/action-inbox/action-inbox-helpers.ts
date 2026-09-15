@@ -28,6 +28,8 @@ export type ActionInboxItem = {
   id: string;
   /** Linked call log when post-call processing attached one. */
   callLogId: string | null;
+  /** Originating call timestamp — used for deep links into Calls. */
+  callLogCreatedAt: string | null;
   callerNumber: string;
   callerDisplay: string;
   /** Best display name (ticket, client record, or call log). */
@@ -328,14 +330,15 @@ export function matchesCategoryFilter(
 const ACTION_CATEGORY_PRIORITY: Record<ActionCategory, number> = {
   urgent: 0,
   complaint: 1,
-  booking_request: 2,
-  callback: 3,
-  confirm: 4,
-  quote: 5,
-  lead: 6,
-  follow_up: 7,
-  unclear: 8,
-  failed: 9,
+  order: 2,
+  booking_request: 3,
+  callback: 4,
+  confirm: 5,
+  quote: 6,
+  lead: 7,
+  follow_up: 8,
+  unclear: 9,
+  failed: 10,
 };
 
 /**

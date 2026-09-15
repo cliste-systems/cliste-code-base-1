@@ -23,10 +23,16 @@ import {
 } from "@/lib/dashboard-list-limits";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
+import { verticalPackForNiche } from "@/lib/verticals";
 
-import { resolveTicketDepartmentSlug } from "../departments/department-helpers";
+import {
+  departmentTicketHref,
+  resolveTicketDepartmentSlug,
+} from "../departments/department-helpers";
 import { retailDepartmentLabel } from "@/lib/retail-department-pack";
+import { resolveTicketCallLinks, type TicketCallLink } from "@/lib/resolve-ticket-call-log";
 import {
   ACTION_CATEGORY_SHORT,
   classifyActionCategory,
@@ -110,6 +116,7 @@ function toInboxItem(
   callerNameByPhone: Map<string, string | null>,
   clientsByPhone: Map<string, ClientByPhone>,
   categoryLabels: Record<ActionCategory, string>,
+  callLink?: TicketCallLink | null,
 ): ActionInboxItem {
   const category = classifyActionCategory(row.summary);
   const callerNumber = row.caller_number?.trim() ?? "";
@@ -129,7 +136,10 @@ function toInboxItem(
 
   return {
     id: row.id,
-    callLogId: row.call_log_id ? String(row.call_log_id) : null,
+    callLogId: callLink?.callLogId ?? (row.call_log_id ? String(row.call_log_id) : null),
+    callLogCreatedAt:
+      callLink?.callCreatedAt ??
+      (callLink?.callLogId || row.call_log_id ? row.created_at : null),
     callerNumber,
     callerDisplay,
     callerName,
@@ -154,6 +164,31 @@ export default async function ActionInboxPage({
   searchParams,
 }: ActionInboxPageProps) {
   const sp = searchParams ? await searchParams : {};
+  const { supabase, organizationId } = await requireDashboardSession();
+  const orgRow = await getCachedDashboardOrganizationRow();
+  const vertical = verticalPackForNiche(orgRow?.niche);
+
+  if (vertical.id === "retail") {
+    const ticketId =
+      typeof sp.ticket === "string" && sp.ticket.trim() ? sp.ticket.trim() : null;
+    if (ticketId) {
+      const { data: ticket } = await supabase
+        .from("action_tickets")
+        .select("department_slug, summary")
+        .eq("id", ticketId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (ticket) {
+        const departmentSlug = resolveTicketDepartmentSlug({
+          department_slug: ticket.department_slug,
+          summary: ticket.summary ?? "",
+        });
+        redirect(departmentTicketHref(ticketId, departmentSlug));
+      }
+    }
+    redirect(DASHBOARD_ROUTES.departments);
+  }
+
   const now = new Date();
   if (sp.range && !sp.date) {
     redirect("/dashboard/action-inbox");
@@ -165,43 +200,38 @@ export default async function ActionInboxPage({
   const initialSelectedTicketId =
     typeof sp.ticket === "string" && sp.ticket.trim() ? sp.ticket.trim() : null;
 
-  const { supabase, organizationId } = await requireDashboardSession();
-
   const [
     { data: ticketData, error },
     { data: callData },
     { data: clientData },
     { data: blockedRows },
-    orgRow,
-  ] =
-    await Promise.all([
-      supabase
-        .from("action_tickets")
-        .select(
-          "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
-        )
-        .eq("organization_id", organizationId)
-        .gte("created_at", lowerInclusive)
-        .lt("created_at", upperExclusive)
-        .order("created_at", { ascending: false })
-        .limit(ACTION_INBOX_TICKET_LIMIT),
-      supabase
-        .from("call_logs")
-        .select("caller_number, caller_name")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false })
-        .limit(ACTION_INBOX_CALL_LIMIT),
-      supabase
-        .from("clients")
-        .select("phone_e164, name, email")
-        .eq("organization_id", organizationId)
-        .limit(ACTION_INBOX_CLIENT_LIMIT),
-      supabase
-        .from("blocked_callers")
-        .select("caller_e164")
-        .eq("organization_id", organizationId),
-      getCachedDashboardOrganizationRow(),
-    ]);
+  ] = await Promise.all([
+    supabase
+      .from("action_tickets")
+      .select(
+        "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
+      )
+      .eq("organization_id", organizationId)
+      .gte("created_at", lowerInclusive)
+      .lt("created_at", upperExclusive)
+      .order("created_at", { ascending: false })
+      .limit(ACTION_INBOX_TICKET_LIMIT),
+    supabase
+      .from("call_logs")
+      .select("caller_number, caller_name")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(ACTION_INBOX_CALL_LIMIT),
+    supabase
+      .from("clients")
+      .select("phone_e164, name, email")
+      .eq("organization_id", organizationId)
+      .limit(ACTION_INBOX_CLIENT_LIMIT),
+    supabase
+      .from("blocked_callers")
+      .select("caller_e164")
+      .eq("organization_id", organizationId),
+  ]);
 
   const categoryLabels = dashboardVerticalCopy(
     orgRow?.niche,
@@ -209,10 +239,22 @@ export default async function ActionInboxPage({
   ).actionInbox.categoryLabels;
   const callerNameByPhone = buildLatestCallerNameByPhone((callData ?? []) as CallRow[]);
   const clientsByPhone = buildClientsByPhone((clientData ?? []) as ClientRow[]);
+  const ticketRows = !error ? ((ticketData ?? []) as TicketRow[]) : [];
+  const callLinks = await resolveTicketCallLinks(
+    supabase,
+    organizationId,
+    ticketRows,
+  );
   const items = !error
     ? sortActionInboxItems(
-        ((ticketData ?? []) as TicketRow[]).map((row) =>
-          toInboxItem(row, callerNameByPhone, clientsByPhone, categoryLabels),
+        ticketRows.map((row) =>
+          toInboxItem(
+            row,
+            callerNameByPhone,
+            clientsByPhone,
+            categoryLabels,
+            callLinks.get(row.id),
+          ),
         ),
       )
     : [];

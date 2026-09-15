@@ -340,9 +340,10 @@ const SALON_ACTION_CATEGORY_LABELS: Record<ActionCategory, string> = {
   quote: "Price enquiry",
   lead: "New enquiry",
   complaint: "Complaint",
+  order: "Order",
   unclear: "Needs review",
   failed: "Call ended",
-  follow_up: "Follow-up",
+  follow_up: "Request",
 };
 
 type VerticalCopyBase = Omit<
@@ -580,7 +581,7 @@ const RETAIL_COPY: VerticalCopyBase = {
     goLiveChecklistSuffix: "can handle real customer calls confidently.",
     heroThirdStat: {
       label: "Callbacks",
-      href: DASHBOARD_ROUTES.actionInbox,
+      href: DASHBOARD_ROUTES.departments,
       kind: "callbacks",
     },
   },

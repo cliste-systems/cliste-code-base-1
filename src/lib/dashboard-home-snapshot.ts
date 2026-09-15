@@ -13,6 +13,7 @@ import { sumBillableMinutesFromDurations } from "@/lib/billable-minutes";
 import { PLANS } from "@/lib/cliste-plans";
 import { buildCaraLastCallSnapshot } from "@/lib/cara-last-call";
 import { buildCaraStatus } from "@/lib/cara-status";
+import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
 import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 import { dashboardTimeGreeting } from "@/lib/dashboard-greeting";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
@@ -464,6 +465,7 @@ export async function loadDashboardHomeSnapshot(input: {
   const firstName = getFirstName(profile?.name);
   const greeting = dashboardTimeGreeting(firstName);
   const homeCopy = dashboardVerticalCopy(niche, agentBusinessType);
+  const followUpHubHref = dashboardFollowUpHubHref(homeCopy.vertical.id);
   const thirdStat = homeCopy.home.heroThirdStat ?? {
     label: "Info sent",
     href: DASHBOARD_ROUTES.routing,
@@ -484,7 +486,7 @@ export async function loadDashboardHomeSnapshot(input: {
       {
         label: "Enquiries captured",
         value: String(actionsCreated),
-        href: DASHBOARD_ROUTES.actionInbox,
+        href: followUpHubHref,
       },
       {
         label: thirdStat.label,
@@ -494,7 +496,7 @@ export async function loadDashboardHomeSnapshot(input: {
       {
         label: "Needs attention",
         value: String(openActions),
-        href: DASHBOARD_ROUTES.actionInbox,
+        href: followUpHubHref,
       },
       {
         label: "Minutes this period",

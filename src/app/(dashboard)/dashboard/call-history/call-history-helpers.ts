@@ -6,10 +6,27 @@ import {
   type CallOutcome,
 } from "@/lib/call-history-types";
 import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
+import { isCallerDataErased } from "@/lib/caller-data-erasure";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
+import { phoneQueryMatchesCaller } from "@/lib/caller-phone-search";
 import { isPostCallAttentionStatus } from "@/lib/post-call-processing-types";
 import { CALL_POST_PROCESSING_BANNER } from "@/lib/post-call-processing-types";
 import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
+import {
+  resolveCallDepartmentLink,
+  type CallDepartmentLink,
+} from "@/lib/call-department-link";
+import type { ActionCategory } from "@/app/(dashboard)/dashboard/action-inbox/categories";
+import {
+  resolveCallHistoryNeedsAttention,
+  type CallResolution,
+  normalizeCallResolution,
+} from "@/lib/call-history-status";
+import {
+  attentionRowAccent,
+  resolveAttentionTag,
+  type CallAttentionLevel,
+} from "@/lib/call-attention-level";
 export type CallFollowUp = CallFollowUpLink;
 
 export type CallHistoryListItem = {
@@ -32,6 +49,13 @@ export type CallHistoryListItem = {
   followUp: CallFollowUp | null;
   postCallStatus: PostCallStatus;
   hasRecording: boolean;
+  departmentLink: CallDepartmentLink | null;
+  attentionLevel: CallAttentionLevel;
+  actionCategory: ActionCategory | null;
+  callResolution: CallResolution | null;
+  callerDataErasedAt: string | null;
+  callerDataErasedByLabel: string | null;
+  callerDataErasedReason: string | null;
 };
 
 export function callNeedsPostCallReviewBanner(item: CallHistoryListItem): boolean {
@@ -48,8 +72,12 @@ export function callDisplayName(
 
 /** Compact list primary line — name and number on one scan line. */
 export function callListPrimaryLine(
-  item: Pick<CallHistoryListItem, "callerName" | "callerDisplay">,
+  item: Pick<
+    CallHistoryListItem,
+    "callerName" | "callerDisplay" | "callerDataErasedAt"
+  >,
 ): string {
+  if (isCallerDataErased(item)) return "Caller data erased";
   const name = callDisplayName(item);
   const phone = item.callerDisplay.trim() || "Unknown number";
   if (name === phone || isUnknownCallerLabel(name)) return phone;
@@ -68,7 +96,7 @@ export function callListTimeLabel(iso: string): string {
 }
 
 export function callListNeedsAttention(item: CallHistoryListItem): boolean {
-  return item.hasOpenAction || callNeedsPostCallReviewBanner(item);
+  return item.attentionLevel !== "routine";
 }
 
 export function summaryForDisplay(
@@ -94,6 +122,9 @@ export function callSummaryForDisplay(
   item: CallHistoryListItem,
   options: { businessName?: string; callerIsBlocked?: boolean },
 ): string | null {
+  if (isCallerDataErased(item)) {
+    return "Personal data for this call has been removed.";
+  }
   const summary = summaryForDisplay(item, options);
   if (summary) return summary;
   if (
@@ -244,14 +275,25 @@ export function matchesOutcomeFilter(
   filter: OutcomeFilterValue,
 ): boolean {
   if (filter === "all") return true;
-  if (filter === "needs_attention") return item.hasOpenAction;
+  if (filter === "needs_attention") {
+    return (
+      !isCallerDataErased(item) &&
+      resolveCallHistoryNeedsAttention({
+        outcome: item.outcome,
+        aiSummary: item.aiSummary,
+        postCallStatus: item.postCallStatus,
+        followUpSummary: item.followUp?.summary ?? null,
+        hasOpenAction: item.hasOpenAction,
+        callResolution: item.callResolution,
+      })
+    );
+  }
   return item.outcome === filter;
 }
 
 export function matchesSearch(item: CallHistoryListItem, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const qDigits = q.replace(/\D/g, "");
   const hay = [
     item.callerName ?? "",
     item.callerDisplay,
@@ -263,7 +305,7 @@ export function matchesSearch(item: CallHistoryListItem, query: string): boolean
     .join(" ")
     .toLowerCase();
   if (hay.includes(q)) return true;
-  if (qDigits.length >= 4 && item.callerId.replace(/\D/g, "").includes(qDigits)) {
+  if (phoneQueryMatchesCaller(q, item.callerId, item.callerDisplay)) {
     return true;
   }
   return false;
@@ -271,31 +313,75 @@ export function matchesSearch(item: CallHistoryListItem, query: string): boolean
 
 export type CallHistoryMetrics = {
   totalCalls: number;
-  routedCount: number;
   needsAttentionCount: number;
   avgDurationLabel: string;
 };
 
 export function buildCallHistoryMetrics(calls: CallHistoryListItem[]): CallHistoryMetrics {
-  const routedCount = calls.filter(
+  const needsAttentionCount = calls.filter(
     (c) =>
-      c.outcome === "link_sent" ||
-      c.outcome === "callback_requested" ||
-      c.outcome === "action_created",
+      !isCallerDataErased(c) &&
+      resolveCallHistoryNeedsAttention({
+        outcome: c.outcome,
+        aiSummary: c.aiSummary,
+        postCallStatus: c.postCallStatus,
+        followUpSummary: c.followUp?.summary ?? null,
+        hasOpenAction: c.hasOpenAction,
+        callResolution: c.callResolution,
+      }),
   ).length;
-  const needsAttentionCount = calls.filter((c) => c.hasOpenAction).length;
   return {
     totalCalls: calls.length,
-    routedCount,
     needsAttentionCount,
     avgDurationLabel: formatAvgDuration(averageDurationSeconds(calls)),
   };
 }
 
-/** Metrics from lightweight rows (no transcripts) plus open follow-up count. */
+export function callHistorySummarySegments(
+  metrics: CallHistoryMetrics,
+): { value: string; label: string }[] {
+  return [
+    { value: String(metrics.totalCalls), label: "total calls" },
+    { value: String(metrics.needsAttentionCount), label: "need attention" },
+    { value: metrics.avgDurationLabel, label: "avg. length" },
+  ];
+}
+
+/** Prefer call-list data on page 1 when the full day fits on one page (live updates). */
+export function resolveLiveCallHistoryMetrics({
+  calls,
+  serverMetrics,
+  totalCount,
+  page,
+  pageSize,
+}: {
+  calls: CallHistoryListItem[];
+  serverMetrics: CallHistoryMetrics;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}): CallHistoryMetrics {
+  const pageCoversFullDay = page === 1 && totalCount <= pageSize;
+
+  if (pageCoversFullDay && calls.length > 0) {
+    const fromCalls = buildCallHistoryMetrics(calls);
+    return {
+      totalCalls: Math.max(totalCount, calls.length),
+      needsAttentionCount: fromCalls.needsAttentionCount,
+      avgDurationLabel: fromCalls.avgDurationLabel,
+    };
+  }
+
+  return {
+    ...serverMetrics,
+    totalCalls: Math.max(totalCount, calls.length),
+  };
+}
+
+/** Metrics from lightweight rows (no transcripts) plus day-scoped attention count. */
 export function buildCallHistoryMetricsFromSummaryRows(
   rows: { outcome: string; duration_seconds: number }[],
-  openFollowUpCount: number,
+  needsAttentionCount: number,
 ): CallHistoryMetrics {
   const stubItems: CallHistoryListItem[] = rows.map((row, i) => ({
     id: `summary-${i}`,
@@ -317,11 +403,18 @@ export function buildCallHistoryMetricsFromSummaryRows(
     followUp: null,
     postCallStatus: "complete",
     hasRecording: false,
+    departmentLink: null,
+    attentionLevel: "routine",
+    actionCategory: null,
+    callResolution: null,
+    callerDataErasedAt: null,
+    callerDataErasedByLabel: null,
+    callerDataErasedReason: null,
   }));
   const base = buildCallHistoryMetrics(stubItems);
   return {
     ...base,
     totalCalls: rows.length,
-    needsAttentionCount: openFollowUpCount,
+    needsAttentionCount,
   };
 }

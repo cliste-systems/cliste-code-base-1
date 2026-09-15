@@ -16,6 +16,7 @@ import { requireDashboardSession } from "@/lib/dashboard-session";
 import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
 import { dashboardVerticalCopy } from "@/lib/dashboard-vertical-copy";
 import { isRetailDepartmentSlug } from "@/lib/retail-department-pack";
+import { resolveTicketCallLinks } from "@/lib/resolve-ticket-call-log";
 
 import type { ActionCategory } from "../../action-inbox/categories";
 import {
@@ -124,12 +125,22 @@ export default async function DepartmentWorkspacePage({
 
   const callerNameByPhone = buildLatestCallerNameByPhone((callData ?? []) as CallRow[]);
   const clientsByPhone = buildClientsByPhone((clientData ?? []) as ClientRow[]);
+  const ticketRows = !error ? ((ticketData ?? []) as DepartmentTicketRow[]) : [];
+  const callLinks = await resolveTicketCallLinks(
+    supabase,
+    organizationId,
+    ticketRows,
+  );
 
-  const allItems = !error
-    ? ((ticketData ?? []) as DepartmentTicketRow[]).map((row) =>
-        toDepartmentInboxItem(row, callerNameByPhone, clientsByPhone, categoryLabels),
-      )
-    : [];
+  const allItems = ticketRows.map((row) =>
+    toDepartmentInboxItem(
+      row,
+      callerNameByPhone,
+      clientsByPhone,
+      categoryLabels,
+      callLinks.get(row.id),
+    ),
+  );
 
   const items = sortDepartmentInboxItems(
     allItems.filter((item) => departmentTicketMatchesWorkspace(item.departmentSlug, slug)),

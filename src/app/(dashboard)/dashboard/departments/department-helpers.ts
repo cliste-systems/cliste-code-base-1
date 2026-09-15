@@ -25,6 +25,7 @@ import {
   type ActionInboxMetrics,
 } from "../action-inbox/action-inbox-helpers";
 import type { ActionTicketDeliveryStatus } from "@/lib/post-call-processing-types";
+import type { TicketCallLink } from "@/lib/resolve-ticket-call-log";
 
 export type DepartmentTicketRow = {
   id: string;
@@ -91,6 +92,7 @@ export function toDepartmentInboxItem(
   callerNameByPhone: Map<string, string | null>,
   clientsByPhone: Map<string, { name: string; email: string | null }>,
   categoryLabels: Record<ActionCategory, string>,
+  callLink?: TicketCallLink | null,
 ): ActionInboxItem {
   const departmentSlug = resolveTicketDepartmentSlug(row);
   const category = classifyActionCategory(row.summary);
@@ -108,7 +110,10 @@ export function toDepartmentInboxItem(
 
   return {
     id: row.id,
-    callLogId: row.call_log_id ? String(row.call_log_id) : null,
+    callLogId: callLink?.callLogId ?? (row.call_log_id ? String(row.call_log_id) : null),
+    callLogCreatedAt:
+      callLink?.callCreatedAt ??
+      (callLink?.callLogId || row.call_log_id ? row.created_at : null),
     callerNumber,
     callerDisplay,
     callerName,

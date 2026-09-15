@@ -293,6 +293,16 @@ export async function eraseCustomerData(
       message: "Type ERASE to confirm — this cannot be undone.",
     };
   }
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) {
+    return {
+      ok: false,
+      message: "Enter a reason for this erasure.",
+    };
+  }
+
+  const erasedAt = new Date().toISOString();
+  const erasedByLabel = session.profile.name?.trim() || "Staff member";
 
   // Erasure mutates rows we don't always have UPDATE policy for under
   // RLS (e.g. call_logs is mostly read-only for tenant users), so we
@@ -328,10 +338,15 @@ export async function eraseCustomerData(
       .from("call_logs")
       .update({
         caller_number: erasedPhoneSentinel(),
+        caller_name: null,
         transcript: null,
         transcript_review: null,
         ai_summary: null,
         audio_storage_path: null,
+        caller_data_erased_at: erasedAt,
+        caller_data_erased_by: session.user.id,
+        caller_data_erased_by_label: erasedByLabel,
+        caller_data_erased_reason: reason,
       })
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
@@ -380,6 +395,8 @@ export async function eraseCustomerData(
       metadata: {
         organization_id: session.organizationId,
         customer_phone_masked: maskPhoneE164(phoneE164),
+        erasure_reason: reason,
+        erased_by_label: erasedByLabel,
         ...counts,
       },
     });

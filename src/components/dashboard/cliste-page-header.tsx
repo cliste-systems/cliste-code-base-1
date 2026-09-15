@@ -82,6 +82,8 @@ type ClistePageHeaderProps = {
   title: string;
   description: ReactNode;
   summary?: InlineSummarySegment[];
+  /** Optional key or legend shown beside the summary chips (e.g. call status colours). */
+  summaryAside?: ReactNode;
   actions?: ReactNode;
   className?: string;
 };
@@ -92,6 +94,7 @@ export function ClistePageHeader({
   title,
   description,
   summary,
+  summaryAside,
   actions,
   className,
 }: ClistePageHeaderProps) {
@@ -141,22 +144,31 @@ export function ClistePageHeader({
       {summary && summary.length > 0 ? (
         <div
           className={cn(
-            "relative mt-4 flex flex-wrap gap-2 border-t pt-3",
+            "relative mt-4 flex flex-col gap-3 border-t pt-3 lg:flex-row lg:items-start lg:justify-between",
             t.rule,
           )}
-          aria-label="Page summary"
         >
-          {summary.map((segment) => (
-            <span
-              key={segment.label}
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-white/80 bg-white/78 px-2.5 py-1 text-[12px] text-slate-600 shadow-[0_1px_0_rgba(17,24,29,0.04)] tabular-nums backdrop-blur-sm"
-            >
-              <span className={cn("font-semibold", t.text)}>
-                {segment.value}
+          <div
+            className="flex flex-wrap gap-2"
+            aria-label="Page summary"
+          >
+            {summary.map((segment) => (
+              <span
+                key={segment.label}
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-white/80 bg-white/78 px-2.5 py-1 text-[12px] text-slate-600 shadow-[0_1px_0_rgba(17,24,29,0.04)] tabular-nums backdrop-blur-sm"
+              >
+                <span className={cn("font-semibold", t.text)}>
+                  {segment.value}
+                </span>
+                <span>{segment.label}</span>
               </span>
-              <span>{segment.label}</span>
-            </span>
-          ))}
+            ))}
+          </div>
+          {summaryAside ? (
+            <div className="min-w-0 lg:max-w-[min(100%,42rem)] lg:text-right">
+              {summaryAside}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </header>

@@ -4,28 +4,31 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { Ban, Check, Copy, Inbox, Phone, PhoneCall, Search, ShieldOff } from "lucide-react";
+import { Ban, Check, Copy, History, Inbox, Loader2, Phone, PhoneCall, Search, ShieldOff, Store, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
+import { CallerDataEraseDialog } from "@/components/dashboard/caller-data-erase-dialog";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { CallAudioPlayer } from "@/components/dashboard/call-audio-player";
-import { CallerHistorySection } from "@/components/dashboard/caller-history-section";
+import { CallMediaRetentionNote } from "@/components/dashboard/call-media-retention-note";
+import { CallerHistoryDialog } from "@/components/dashboard/caller-history-section";
 import { StaffTranscriptView } from "@/components/dashboard/staff-transcript-view";
 import {
   DetailActionButton,
   DetailPanelBody,
   DetailPanelFooter,
-  DetailPanelHeader,
   DetailPanelShell,
-  DetailSection,
+  DetailSectionRow,
   ListDetailLayout,
 } from "@/components/dashboard/list-detail";
 import {
   DASHBOARD_CARD_SURFACE,
+  DASHBOARD_INPUT_CLASS,
   DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { buildCallsPageHref } from "@/lib/calls-page-href";
 import {
   formatCallsPageDateParam,
   isCallsPageToday,
@@ -38,24 +41,32 @@ import {
   ANONYMOUS_CALLER_E164,
   normalizeBlockedCallerE164,
 } from "@/lib/blocked-callers";
+import { shouldShowCallsIncomingPlaceholder } from "@/lib/calls-incoming-placeholder";
+import type { CallsIncomingPlaceholder } from "@/lib/calls-incoming-placeholder";
+import { formatE164ForDisplay } from "@/lib/call-history-types";
+import { isUnknownCallerLabel } from "@/lib/caller-identity";
+import {
+  CALL_HISTORY_STATUS_BADGE_CLASSES,
+  CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES,
+  resolveCallHistoryListStatus,
+} from "@/lib/call-history-status";
+import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
 
 import {
   addBlockedCaller,
   removeBlockedCallerByPhone,
 } from "../settings/blocked-numbers-actions";
+import { eraseCustomerData } from "../privacy/actions";
 import { fetchCallHistoryDetail } from "./actions";
 import { useDashboardVertical } from "../dashboard-vertical-context";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
-  callListNeedsAttention,
   callListPrimaryLine,
   callListTimeLabel,
-  cleanedTranscriptForDisplay,
+  fullTranscriptForDisplay,
   matchesOutcomeFilter,
   matchesSearch,
-  outcomeBadgeVariant,
-  primaryTranscriptForDisplay,
   callSummaryForDisplay,
   CALL_POST_PROCESSING_BANNER,
   callNeedsPostCallReviewBanner,
@@ -63,6 +74,15 @@ import {
   type CallHistoryMetrics,
   type OutcomeFilterValue,
 } from "./call-history-helpers";
+import {
+  formatCallerDataErasedAt,
+  isCallerDataErased,
+} from "@/lib/caller-data-erasure";
+import {
+  formatCallMediaRetentionExpiredMessage,
+  isCallMediaRetentionExpired,
+} from "@/lib/call-media-retention";
+import { useCallsLiveUpdates } from "./use-calls-live-updates";
 
 export type CallHistoryPagination = {
   page: number;
@@ -75,10 +95,12 @@ export type CallHistoryPagination = {
 type CallHistoryViewProps = {
   calls: CallHistoryListItem[];
   metrics: CallHistoryMetrics;
+  organizationId: string;
   initialSelectedCallId?: string | null;
   pagination?: CallHistoryPagination;
   blockedCallerE164s: string[];
   businessName?: string;
+  staffDisplayName?: string;
   className?: string;
 };
 
@@ -106,10 +128,12 @@ function callsPageHref(
 export function CallHistoryView({
   calls,
   metrics: _metrics,
+  organizationId,
   initialSelectedCallId,
   pagination,
   blockedCallerE164s,
   businessName = "",
+  staffDisplayName = "Staff member",
   className,
 }: CallHistoryViewProps) {
   const router = useRouter();
@@ -117,7 +141,9 @@ export function CallHistoryView({
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilterValue>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    initialSelectedCallId?.trim() || null,
+  );
   const [copied, setCopied] = useState(false);
   const [detailById, setDetailById] = useState<
     Record<string, { transcriptVerbatim: string; transcriptReview: string | null }>
@@ -126,6 +152,20 @@ export function CallHistoryView({
     () => new Set(blockedCallerE164s),
     [blockedCallerE164s],
   );
+  const viewingToday = isCallsPageToday(
+    parseCallsPageDateParam(searchParams.get("date") ?? undefined),
+  );
+  const incomingPlaceholder = useCallsLiveUpdates({
+    organizationId,
+    calls,
+    viewingToday,
+    page: pagination?.page ?? 1,
+  });
+  const showIncomingPlaceholder = shouldShowCallsIncomingPlaceholder({
+    viewingToday,
+    page: pagination?.page ?? 1,
+    placeholder: incomingPlaceholder,
+  });
 
   const filtered = useMemo(() => {
     return calls.filter(
@@ -169,6 +209,14 @@ export function CallHistoryView({
   }, []);
 
   useEffect(() => {
+    const callFromUrl =
+      searchParams.get("call")?.trim() || initialSelectedCallId?.trim() || null;
+    if (callFromUrl) {
+      setSelectedId(callFromUrl);
+    }
+  }, [searchParams, initialSelectedCallId]);
+
+  useEffect(() => {
     if (resolvedSelectedId) {
       ensureDetailLoaded(resolvedSelectedId);
     }
@@ -205,7 +253,7 @@ export function CallHistoryView({
       )}
     >
       <ListDetailLayout
-        className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]"
+        className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]"
         list={
           <div className="flex h-full min-h-0 flex-col overflow-hidden border-[#dfe7e2] bg-[#fbfcfb] max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r xl:border-r-[#dfe7e2]">
             <div className="shrink-0 border-b border-inherit px-4 py-3 sm:px-5">
@@ -244,10 +292,12 @@ export function CallHistoryView({
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-2 sm:px-3",
-                filtered.length === 0 && "flex items-center justify-center",
+                filtered.length === 0 &&
+                  !showIncomingPlaceholder &&
+                  "flex items-center justify-center",
               )}
             >
-              {filtered.length === 0 ? (
+              {filtered.length === 0 && !showIncomingPlaceholder ? (
                 <EmptyState
                   icon={Phone}
                   title="No calls yet"
@@ -256,6 +306,9 @@ export function CallHistoryView({
                 />
               ) : (
                 <ul className="space-y-1.5" role="listbox" aria-label="Calls">
+                  {showIncomingPlaceholder && incomingPlaceholder ? (
+                    <CallIncomingPlaceholderRow placeholder={incomingPlaceholder} />
+                  ) : null}
                   {filtered.map((row) => (
                     <CallListRow
                       key={row.id}
@@ -280,19 +333,93 @@ export function CallHistoryView({
           </div>
         }
         detail={
-          <CallDetailPanel
-            call={selected}
-            copied={copied}
-            detailLoading={detailLoading}
-            onCopySummary={copySummary}
-            blockedSet={blockedSet}
-            businessName={businessName}
-            onRefresh={() => router.refresh()}
-          />
+          showIncomingPlaceholder && incomingPlaceholder && !selected ? (
+            <CallIncomingDetailPlaceholder placeholder={incomingPlaceholder} />
+          ) : (
+            <CallDetailPanel
+              call={selected}
+              copied={copied}
+              detailLoading={detailLoading}
+              onCopySummary={copySummary}
+              blockedSet={blockedSet}
+              businessName={businessName}
+              staffDisplayName={staffDisplayName}
+              onRefresh={() => router.refresh()}
+            />
+          )
         }
       />
     </section>
   );
+}
+
+function CallIncomingPlaceholderRow({
+  placeholder,
+}: {
+  placeholder: CallsIncomingPlaceholder;
+}) {
+  const callerLabel = formatIncomingCallerLabel(placeholder.callerNumber);
+  const isLoading = placeholder.phase === "loading";
+
+  return (
+    <li aria-live="polite">
+      <div
+        className={cn(
+          "rounded-lg border border-dashed px-3 py-2.5",
+          "border-[#9da9a4] bg-[#f4f7f5]",
+        )}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-semibold leading-snug text-[#0b1220]">
+              {callerLabel}
+            </p>
+            <p className="mt-1 text-[12px] text-slate-600">
+              {isLoading
+                ? "A new call has come in and it's currently loading."
+                : "Call in progress — details will appear when the call ends."}
+            </p>
+          </div>
+          <Loader2
+            className="mt-0.5 size-4 shrink-0 animate-spin text-[#353D42]"
+            aria-hidden
+          />
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function CallIncomingDetailPlaceholder({
+  placeholder,
+}: {
+  placeholder: CallsIncomingPlaceholder;
+}) {
+  const isLoading = placeholder.phase === "loading";
+
+  return (
+    <DetailPanelShell surface="embedded">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-9 text-center">
+        <Loader2 className="size-8 animate-spin text-[#353D42]" aria-hidden />
+        <p className="mt-4 text-[15px] font-semibold text-[#11181d]">
+          {isLoading ? "Loading call details" : "Call in progress"}
+        </p>
+        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-slate-600">
+          {isLoading
+            ? "A new call has come in and it's currently loading. The summary and transcript will appear here shortly."
+            : "Cara is speaking with this caller now. The call log will update as soon as the call finishes."}
+        </p>
+        <p className="mt-4 text-[13px] font-medium text-[#353D42]">
+          {formatIncomingCallerLabel(placeholder.callerNumber)}
+        </p>
+      </div>
+    </DetailPanelShell>
+  );
+}
+
+function formatIncomingCallerLabel(callerNumber: string | null): string {
+  if (!callerNumber?.trim()) return "Incoming call";
+  return formatE164ForDisplay(callerNumber) || callerNumber;
 }
 
 function CallListRow({
@@ -306,7 +433,17 @@ function CallListRow({
 }) {
   const primary = callListPrimaryLine(row);
   const time = callListTimeLabel(row.createdAt);
-  const needsAttention = callListNeedsAttention(row);
+  const callStatus = resolveCallHistoryListStatus({
+    outcome: row.outcome,
+    aiSummary: row.aiSummary,
+    postCallStatus: row.postCallStatus,
+    followUpSummary: row.followUp?.summary ?? null,
+    hasOpenAction: row.hasOpenAction,
+    callResolution: row.callResolution,
+  });
+  const statusAccent = CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES[callStatus.tone];
+  const mediaRetentionExpired =
+    !isCallerDataErased(row) && isCallMediaRetentionExpired(row.createdAt);
 
   return (
     <li>
@@ -316,10 +453,13 @@ function CallListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "w-full cursor-pointer rounded-lg border px-3 py-2.5 text-left transition-colors",
+          "w-full cursor-pointer rounded-lg border px-3 py-2 text-left",
           selected
-            ? "border-[#353D42] bg-white shadow-[inset_4px_0_0_#353D42]"
-            : "border-[#dfe7e2] bg-white/90 hover:border-[#9da9a4]",
+            ? cn(
+                "border-[#353D42] bg-[#f6faf7] shadow-[0_1px_0_rgba(17,24,29,0.04)]",
+                statusAccent.selectedRowAccentClass,
+              )
+            : cn("border-[#dfe7e2] bg-white", statusAccent.rowAccentClass),
         )}
       >
         <div className="flex items-start justify-between gap-2">
@@ -335,13 +475,22 @@ function CallListRow({
             <span className="tabular-nums">{row.durationLabel}</span>
             <span className="text-slate-300"> · </span>
             {row.outcomeLabel}
+            {mediaRetentionExpired ? (
+              <>
+                <span className="text-slate-300"> · </span>
+                <span className="text-slate-400">Media deleted</span>
+              </>
+            ) : null}
           </p>
-          {needsAttention ? (
+          {!isCallerDataErased(row) ? (
             <span
-              className="size-2 shrink-0 rounded-full bg-amber-500"
-              title="Needs attention"
-              aria-label="Needs attention"
-            />
+              className={cn(
+                "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                CALL_HISTORY_STATUS_BADGE_CLASSES[callStatus.tone],
+              )}
+            >
+              {callStatus.label}
+            </span>
           ) : null}
         </div>
       </button>
@@ -413,6 +562,7 @@ function CallDetailPanel({
   onCopySummary,
   blockedSet,
   businessName,
+  staffDisplayName,
   onRefresh,
 }: {
   call: CallHistoryListItem | null;
@@ -421,6 +571,7 @@ function CallDetailPanel({
   onCopySummary: () => void;
   blockedSet: Set<string>;
   businessName: string;
+  staffDisplayName: string;
   onRefresh: () => void;
 }) {
   if (!call) {
@@ -447,6 +598,7 @@ function CallDetailPanel({
       onCopySummary={onCopySummary}
       blockedSet={blockedSet}
       businessName={businessName}
+      staffDisplayName={staffDisplayName}
       onRefresh={onRefresh}
     />
   );
@@ -459,6 +611,7 @@ function CallDetailPanelContent({
   onCopySummary,
   blockedSet,
   businessName,
+  staffDisplayName,
   onRefresh,
 }: {
   call: CallHistoryListItem;
@@ -467,34 +620,63 @@ function CallDetailPanelContent({
   onCopySummary: () => void;
   blockedSet: Set<string>;
   businessName: string;
+  staffDisplayName: string;
   onRefresh: () => void;
 }) {
-  const [showCleanedTranscript, setShowCleanedTranscript] = useState(false);
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [unblockConfirmOpen, setUnblockConfirmOpen] = useState(false);
+  const [eraseConfirmOpen, setEraseConfirmOpen] = useState(false);
+  const [callerHistoryOpen, setCallerHistoryOpen] = useState(false);
   const [blockMsg, setBlockMsg] = useState<string | null>(null);
+  const [eraseMsg, setEraseMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const openPastCall = useCallback((callId: string, createdAt: string) => {
+    setCallerHistoryOpen(false);
+    router.push(
+      buildCallsPageHref({
+        callLogId: callId,
+        callCreatedAt: createdAt,
+      }),
+    );
+  }, [router]);
 
   const callerE164 = normalizeBlockedCallerE164(call.callerId);
+  const callerDataErased = isCallerDataErased(call);
   const canManageBlock =
-    callerE164 != null && call.callerId.trim() !== ANONYMOUS_CALLER_E164;
+    callerE164 != null &&
+    call.callerId.trim() !== ANONYMOUS_CALLER_E164 &&
+    !callerDataErased;
+  const canDeleteCallerData = canManageBlock;
   const isBlocked = callerE164 != null && blockedSet.has(callerE164);
 
   const summary = callSummaryForDisplay(call, {
     businessName,
     callerIsBlocked: isBlocked,
   });
-  const safeTranscript = primaryTranscriptForDisplay(call);
-  const cleanedTranscript = cleanedTranscriptForDisplay(call);
-  const showCleaned =
-    showCleanedTranscript && cleanedTranscript != null && cleanedTranscript !== safeTranscript;
-  const hasCleanedToggle =
-    cleanedTranscript != null &&
-    safeTranscript != null &&
-    cleanedTranscript.trim() !== safeTranscript.trim();
+  const rawTranscript = fullTranscriptForDisplay(call);
+  const mediaRetentionExpired =
+    !callerDataErased && isCallMediaRetentionExpired(call.createdAt);
+  const mediaRetentionExpiredMessage = mediaRetentionExpired
+    ? formatCallMediaRetentionExpiredMessage(call.createdAt)
+    : null;
   const name = callDisplayName(call);
-  const showOutcomeBadge = call.outcome !== "answered";
+  const phone = call.callerDisplay.trim() || "Unknown number";
+  const showCallerName =
+    name !== phone && !isUnknownCallerLabel(name) && name.trim().length > 0;
+  const callStatus = resolveCallHistoryListStatus({
+    outcome: call.outcome,
+    aiSummary: call.aiSummary,
+    postCallStatus: call.postCallStatus,
+    followUpSummary: call.followUp?.summary ?? null,
+    hasOpenAction: call.hasOpenAction,
+    callResolution: call.callResolution,
+  });
+  const { copy } = useDashboardVertical();
+  const followUpHref = call.followUp
+    ? call.departmentLink?.href ?? dashboardFollowUpHubHref(copy.vertical.id)
+    : null;
 
   function onConfirmBlock() {
     if (!callerE164) return;
@@ -526,147 +708,232 @@ function CallDetailPanelContent({
     });
   }
 
+  function onConfirmEraseCallerData(input: { reason: string; confirm: string }) {
+    if (!callerE164) return;
+    setEraseMsg(null);
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("phone", callerE164);
+      formData.set("reason", input.reason);
+      formData.set("confirm", input.confirm);
+      const result = await eraseCustomerData(formData);
+      setEraseConfirmOpen(false);
+      if (!result.ok) {
+        setEraseMsg(result.message);
+        return;
+      }
+      const { affected } = result;
+      setEraseMsg(
+        `Caller data erased (${affected.call_logs_redacted} call${affected.call_logs_redacted === 1 ? "" : "s"}, ${affected.action_tickets_redacted} ticket${affected.action_tickets_redacted === 1 ? "" : "s"}).`,
+      );
+      onRefresh();
+    });
+  }
+
   return (
     <DetailPanelShell surface="embedded">
-      <DetailPanelHeader
-        eyebrow="Call details"
-        title={name}
-        subtitle={call.callerDisplay || "Unknown number"}
-        meta={
-          <>
-            {call.dateTimeLabel}
-            <span className="text-slate-300"> · </span>
-            <span className="tabular-nums">{call.durationLabel}</span>
-          </>
-        }
-        badges={
-          <>
-            {showOutcomeBadge ? (
-              <StatusPill variant={outcomeBadgeVariant(call.outcome)} dot>
-                {call.outcomeLabel}
-              </StatusPill>
+      <div className="shrink-0 border-b border-[#dfe7e2] bg-[#f6faf7] px-5 py-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <h2 className="text-[18px] font-semibold tracking-tight text-[#11181d]">
+              {callerDataErased ? "Caller data erased" : phone}
+            </h2>
+            {showCallerName && !callerDataErased ? (
+              <p className="mt-0.5 text-[13px] text-[#5b6b65]">{name}</p>
             ) : null}
-            <StatusPill>{call.intentLabel}</StatusPill>
-            {call.hasOpenAction ? (
-              <StatusPill variant="attention">Needs attention</StatusPill>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-[12px] text-[#6b7c75]">
+            <span className="whitespace-nowrap">
+              {call.dateTimeLabel}
+              <span className="text-slate-300"> · </span>
+              <span className="tabular-nums">{call.durationLabel}</span>
+            </span>
+            {!callerDataErased ? (
+              <StatusPill className={CALL_HISTORY_STATUS_BADGE_CLASSES[callStatus.tone]}>
+                {callStatus.label}
+              </StatusPill>
             ) : null}
             {callNeedsPostCallReviewBanner(call) ? (
               <StatusPill variant="attention">Processing issue</StatusPill>
             ) : null}
-          </>
-        }
-      />
+          </div>
+        </div>
+      </div>
 
-      <DetailPanelBody>
+      <DetailPanelBody className="space-y-0 px-0 py-0">
         {callNeedsPostCallReviewBanner(call) ? (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-950">
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-[13px] leading-relaxed text-amber-950">
             {CALL_POST_PROCESSING_BANNER}
           </div>
         ) : null}
 
-        <DetailSection title="Summary">
-          <p className="text-[14px] leading-relaxed text-slate-700">
-            {summary ?? "No summary available."}
+        <DetailSectionRow title="Summary">
+          <p className="text-[14px] leading-relaxed text-[#11181d]">
+            {summary ??
+              (callerDataErased
+                ? "Personal data for this call has been removed."
+                : "No summary available.")}
           </p>
-        </DetailSection>
+        </DetailSectionRow>
 
-        <DetailSection title="Recording">
-          <CallAudioPlayer callLogId={call.id} hasRecording={call.hasRecording} />
-        </DetailSection>
+        {mediaRetentionExpiredMessage ? (
+          <div className="border-b border-[#eef3f0] bg-slate-50 px-5 py-3 text-[13px] leading-relaxed text-slate-600">
+            {mediaRetentionExpiredMessage}
+          </div>
+        ) : null}
 
-        <CallerHistorySection callerNumber={call.callerId} currentCallId={call.id} />
-
-        <DetailSection title="Transcript">
-          {detailLoading ? (
-            <p className="text-[13px] text-slate-500">Loading transcript…</p>
-          ) : !safeTranscript && !showCleaned ? (
-            <p className="text-[13px] text-slate-500">No transcript available.</p>
-          ) : !transcriptOpen ? (
-            <button
-              type="button"
-              onClick={() => setTranscriptOpen(true)}
-              className="text-[13px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
-            >
-              Show full transcript
-            </button>
-          ) : (
-            <>
-              <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
-                Stored for 30 days. Personal details can be erased via{" "}
-                <Link
-                  href="/dashboard/legal/data-requests"
-                  className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
-                >
-                  Legal → Data requests
-                </Link>
-                .
-              </p>
-              <StaffTranscriptView
-                text={(showCleaned ? cleanedTranscript : safeTranscript) ?? ""}
-              />
-              <div className="mt-2 flex flex-wrap gap-3">
-                {hasCleanedToggle ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowCleanedTranscript((v) => !v)}
-                    className="text-[12px] font-medium text-[#0b1220] underline-offset-2 hover:underline"
-                  >
-                    {showCleaned ? "Show full transcript" : "Show cleaned transcript"}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => setTranscriptOpen(false)}
-                  className="text-[12px] font-medium text-slate-500 underline-offset-2 hover:underline"
-                >
-                  Hide transcript
-                </button>
+        {callerDataErased ? (
+          <DetailSectionRow title="Caller data">
+            <dl className="space-y-2 text-[13px] leading-relaxed text-[#11181d]">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+                  Erased on
+                </dt>
+                <dd className="mt-0.5">
+                  {call.callerDataErasedAt
+                    ? formatCallerDataErasedAt(call.callerDataErasedAt)
+                    : "Unknown"}
+                </dd>
               </div>
-            </>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+                  Erased by
+                </dt>
+                <dd className="mt-0.5">
+                  {call.callerDataErasedByLabel?.trim() || "Staff member"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+                  Reason
+                </dt>
+                <dd className="mt-0.5 whitespace-pre-wrap">
+                  {call.callerDataErasedReason?.trim() || "No reason recorded"}
+                </dd>
+              </div>
+            </dl>
+          </DetailSectionRow>
+        ) : null}
+
+        <DetailSectionRow title="Recording" contentClassName="mt-1.5">
+          {callerDataErased ? (
+            <p className="text-[13px] text-slate-500">
+              Recording removed when caller data was erased.
+            </p>
+          ) : mediaRetentionExpired ? (
+            <p className="text-[13px] text-slate-500">
+              Recording no longer available — deleted after 30 days.
+            </p>
+          ) : (
+            <CallAudioPlayer
+              callLogId={call.id}
+              createdAt={call.createdAt}
+              callerNumber={call.callerId}
+              callerName={call.callerName}
+              hasRecording={call.hasRecording}
+              embedded
+            />
           )}
-        </DetailSection>
+        </DetailSectionRow>
+
+        <DetailSectionRow title="Transcript">
+          {callerDataErased ? (
+            <p className="text-[13px] text-slate-500">
+              Transcript removed when caller data was erased.
+            </p>
+          ) : mediaRetentionExpired ? (
+            <p className="text-[13px] text-slate-500">
+              Transcript no longer available — deleted after 30 days.
+            </p>
+          ) : detailLoading ? (
+            <p className="text-[13px] text-slate-500">Loading transcript…</p>
+          ) : rawTranscript ? (
+            <StaffTranscriptView text={rawTranscript} />
+          ) : (
+            <p className="text-[13px] text-slate-500">No transcript available.</p>
+          )}
+        </DetailSectionRow>
       </DetailPanelBody>
 
       <DetailPanelFooter>
-        {canManageBlock ? (
-          isBlocked ? (
-            <DetailActionButton
-              type="button"
-              onClick={() => setUnblockConfirmOpen(true)}
-              disabled={pending}
-            >
-              <ShieldOff className="size-3.5" aria-hidden />
-              Unblock
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {canManageBlock ? (
+              isBlocked ? (
+                <DetailActionButton
+                  type="button"
+                  onClick={() => setUnblockConfirmOpen(true)}
+                  disabled={pending}
+                >
+                  <ShieldOff className="size-3.5" aria-hidden />
+                  Unblock
+                </DetailActionButton>
+              ) : (
+                <DetailActionButton
+                  type="button"
+                  onClick={() => setBlockConfirmOpen(true)}
+                  disabled={pending}
+                >
+                  <Ban className="size-3.5" aria-hidden />
+                  Block this caller
+                </DetailActionButton>
+              )
+            ) : null}
+            <DetailActionButton onClick={onCopySummary} disabled={!summary}>
+              {copied ? (
+                <Check className="size-3.5" aria-hidden />
+              ) : (
+                <Copy className="size-3.5" aria-hidden />
+              )}
+              {copied ? "Copied" : "Copy summary"}
             </DetailActionButton>
-          ) : (
-            <DetailActionButton
-              type="button"
-              onClick={() => setBlockConfirmOpen(true)}
-              disabled={pending}
-            >
-              <Ban className="size-3.5" aria-hidden />
-              Block this caller
-            </DetailActionButton>
-          )
-        ) : null}
-        <DetailActionButton onClick={onCopySummary} disabled={!summary}>
-          {copied ? (
-            <Check className="size-3.5" aria-hidden />
-          ) : (
-            <Copy className="size-3.5" aria-hidden />
-          )}
-          {copied ? "Copied" : "Copy summary"}
-        </DetailActionButton>
-        {call.followUp ? (
-          <DetailActionButton href="/dashboard/action-inbox">
-            <Inbox className="size-3.5" aria-hidden />
-            View follow-up
-          </DetailActionButton>
-        ) : null}
+            {!callerDataErased ? (
+              <DetailActionButton
+                type="button"
+                onClick={() => setCallerHistoryOpen(true)}
+              >
+                <History className="size-3.5" aria-hidden />
+                Caller history
+              </DetailActionButton>
+            ) : null}
+            {followUpHref && !callerDataErased ? (
+              <DetailActionButton href={followUpHref}>
+                {call.departmentLink ? (
+                  <Store className="size-3.5" aria-hidden />
+                ) : (
+                  <Inbox className="size-3.5" aria-hidden />
+                )}
+                {call.departmentLink?.buttonLabel ?? "View follow-up"}
+              </DetailActionButton>
+            ) : null}
+          </div>
+
+          {!callerDataErased ? (
+            <div className="flex shrink-0 items-center gap-3">
+              {canDeleteCallerData ? (
+                <DetailActionButton
+                  type="button"
+                  onClick={() => setEraseConfirmOpen(true)}
+                  disabled={pending}
+                  className="border-red-200 text-red-800 hover:border-red-300 hover:bg-red-50"
+                >
+                  <Trash2 className="size-3.5" aria-hidden />
+                  Delete caller data
+                </DetailActionButton>
+              ) : null}
+              {!mediaRetentionExpired ? (
+                <CallMediaRetentionNote createdAt={call.createdAt} />
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </DetailPanelFooter>
 
       {blockMsg ? (
         <p className="px-5 pb-3 text-[12px] text-slate-600">{blockMsg}</p>
+      ) : null}
+      {eraseMsg ? (
+        <p className="px-5 pb-3 text-[12px] text-slate-600">{eraseMsg}</p>
       ) : null}
 
       <ConfirmDialog
@@ -688,6 +955,23 @@ function CallDetailPanelContent({
         onConfirm={onConfirmUnblock}
         pending={pending}
         destructive
+      />
+      <CallerDataEraseDialog
+        open={eraseConfirmOpen}
+        onOpenChange={setEraseConfirmOpen}
+        phoneDisplay={phone}
+        callerName={showCallerName ? name : null}
+        performedByName={staffDisplayName}
+        pending={pending}
+        onConfirm={onConfirmEraseCallerData}
+      />
+      <CallerHistoryDialog
+        open={callerHistoryOpen}
+        onOpenChange={setCallerHistoryOpen}
+        callerNumber={call.callerId}
+        currentCallId={call.id}
+        phoneDisplay={phone}
+        onSelectCall={openPastCall}
       />
     </DetailPanelShell>
   );

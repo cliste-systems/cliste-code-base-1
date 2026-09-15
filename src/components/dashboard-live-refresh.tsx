@@ -4,8 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
 import { createClient } from "@/utils/supabase/client";
+import { mergeCallsIncomingPlaceholderSession } from "@/lib/calls-incoming-placeholder-session";
 import {
   dispatchDashboardActivityEvent,
+  dispatchDashboardIncomingCallEvent,
 } from "@/lib/dashboard-live-events";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
@@ -58,6 +60,41 @@ function isRealtimeHealthyStatus(status: string): boolean {
   return status === "SUBSCRIBED";
 }
 
+function readStringField(row: Record<string, unknown>, key: string): string | null {
+  const value = row[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function handleUsageRecordInsert(
+  organizationId: string,
+  payload: { new: Record<string, unknown> },
+) {
+  const row = payload.new;
+  const detail = {
+    phase: "in_progress" as const,
+    callerNumber: readStringField(row, "caller_number"),
+    startedAt: readStringField(row, "started_at") ?? new Date().toISOString(),
+  };
+  mergeCallsIncomingPlaceholderSession(organizationId, detail);
+  dispatchDashboardIncomingCallEvent(detail);
+}
+
+function handleCallLogInsert(
+  organizationId: string,
+  payload: { new: Record<string, unknown> },
+) {
+  const row = payload.new;
+  const detail = {
+    phase: "loading" as const,
+    callLogId: readStringField(row, "id"),
+    callerNumber: readStringField(row, "caller_number"),
+    startedAt: readStringField(row, "created_at") ?? new Date().toISOString(),
+  };
+  mergeCallsIncomingPlaceholderSession(organizationId, detail);
+  dispatchDashboardIncomingCallEvent(detail);
+}
+
+
 type DashboardLiveRefreshProps = {
   organizationId: string;
 };
@@ -85,7 +122,6 @@ export function DashboardLiveRefresh({
   }, [pathname]);
 
   const pollRefresh = useCallback(() => {
-    if (realtimeHealthyRef.current) return;
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
       return;
     }
@@ -108,7 +144,7 @@ export function DashboardLiveRefresh({
   }, []);
 
   const startPolling = useCallback(() => {
-    if (pollIntervalRef.current || realtimeHealthyRef.current) return;
+    if (pollIntervalRef.current) return;
     if (!shouldPoll(pathnameRef.current)) return;
     lastPollRefreshAt.current = Date.now();
     pollIntervalRef.current = setInterval(pollRefresh, POLL_INTERVAL_MS);
@@ -194,7 +230,10 @@ export function DashboardLiveRefresh({
           table: "call_logs",
           filter,
         },
-        scheduleRealtimeRefresh,
+        (payload) => {
+          handleCallLogInsert(organizationId, payload);
+          scheduleRealtimeRefresh();
+        },
       )
       .on(
         "postgres_changes",
@@ -274,7 +313,10 @@ export function DashboardLiveRefresh({
           table: "usage_records",
           filter,
         },
-        scheduleRealtimeRefresh,
+        (payload) => {
+          handleUsageRecordInsert(organizationId, payload);
+          scheduleRealtimeRefresh();
+        },
       )
       .on(
         "postgres_changes",
@@ -289,9 +331,7 @@ export function DashboardLiveRefresh({
       .subscribe((status) => {
         const healthy = isRealtimeHealthyStatus(status);
         realtimeHealthyRef.current = healthy;
-        if (healthy) {
-          stopPolling();
-        } else if (shouldPoll(pathnameRef.current)) {
+        if (shouldPoll(pathnameRef.current)) {
           startPolling();
         }
         if (IS_DEV && (status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {

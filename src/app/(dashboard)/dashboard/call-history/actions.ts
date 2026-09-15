@@ -16,6 +16,7 @@ import {
 } from "@/lib/blocked-callers";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
+import { resolveCallLogIdForTicket } from "@/lib/resolve-ticket-call-log";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 
 const UUID_RE =
@@ -55,20 +56,35 @@ export async function fetchCallerHistoryInsight(input: {
 }): Promise<CallerHistoryInsight> {
   const callerNumber = String(input.callerNumber ?? "").trim();
   if (!callerNumber || callerNumber === ANONYMOUS_CALLER_E164) {
-    return { kind: "anonymous" };
+    return buildCallerHistoryInsight({
+      callerNumber: ANONYMOUS_CALLER_E164,
+      calls: [],
+      openTickets: [],
+      isBlocked: false,
+      abuseHitCount: 0,
+    });
   }
 
   const callerE164 = normalizeBlockedCallerE164(callerNumber);
   if (!callerE164) {
-    return { kind: "anonymous" };
+    return buildCallerHistoryInsight({
+      callerNumber: ANONYMOUS_CALLER_E164,
+      calls: [],
+      openTickets: [],
+      isBlocked: false,
+      abuseHitCount: 0,
+    });
   }
 
   const { supabase, organizationId } = await requireDashboardSession();
 
-  const [{ data: callRows }, { data: ticketRows }, { data: blockedRow }] = await Promise.all([
+  const [{ data: callRows }, { data: ticketRows }, { data: blockedRow }, { data: abuseRow }] =
+    await Promise.all([
     supabase
       .from("call_logs")
-      .select("id, caller_name, outcome, ai_summary, created_at")
+      .select(
+        "id, caller_name, outcome, ai_summary, duration_seconds, created_at, post_call_status",
+      )
       .eq("organization_id", organizationId)
       .eq("caller_number", callerE164)
       .order("created_at", { ascending: false })
@@ -86,6 +102,12 @@ export async function fetchCallerHistoryInsight(input: {
       .eq("organization_id", organizationId)
       .eq("caller_e164", callerE164)
       .maybeSingle(),
+    supabase
+      .from("caller_abuse_signals")
+      .select("hit_count")
+      .eq("organization_id", organizationId)
+      .eq("caller_number", callerE164)
+      .maybeSingle(),
   ]);
 
   return buildCallerHistoryInsight({
@@ -96,6 +118,8 @@ export async function fetchCallerHistoryInsight(input: {
       callerName: row.caller_name?.trim() || null,
       outcome: String(row.outcome ?? ""),
       aiSummary: row.ai_summary?.trim() || null,
+      durationSeconds: Number(row.duration_seconds ?? 0),
+      postCallStatus: (row.post_call_status as PostCallStatus) ?? "complete",
     })),
     openTickets: (ticketRows ?? []).map((row) => ({
       status: String(row.status ?? ""),
@@ -103,6 +127,7 @@ export async function fetchCallerHistoryInsight(input: {
       departmentSlug: row.department_slug?.trim() || null,
     })),
     isBlocked: Boolean(blockedRow),
+    abuseHitCount: Number(abuseRow?.hit_count ?? 0),
   });
 }
 
@@ -165,10 +190,12 @@ export async function fetchCallDetailForTicket(input: {
   const ticketId = input.ticketId.trim();
   if (!UUID_RE.test(ticketId)) return null;
 
+  const { supabase, organizationId } = await requireDashboardSession();
   const callLogId =
     (input.callLogId?.trim() && UUID_RE.test(input.callLogId.trim())
       ? input.callLogId.trim()
-      : null) ?? (await resolveCallLogIdForTicket(ticketId));
+      : null) ??
+    (await resolveCallLogIdForTicket(supabase, organizationId, ticketId));
 
   if (!callLogId) return null;
 
@@ -176,42 +203,6 @@ export async function fetchCallDetailForTicket(input: {
   if (!detail) return null;
 
   return detail;
-}
-
-async function resolveCallLogIdForTicket(ticketId: string): Promise<string | null> {
-  const { supabase, organizationId } = await requireDashboardSession();
-
-  const { data: ticket, error } = await supabase
-    .from("action_tickets")
-    .select("call_log_id, caller_number, created_at")
-    .eq("id", ticketId)
-    .eq("organization_id", organizationId)
-    .maybeSingle();
-
-  if (error || !ticket) return null;
-
-  const linked = String(ticket.call_log_id ?? "").trim();
-  if (linked && UUID_RE.test(linked)) return linked;
-
-  const callerNumber = String(ticket.caller_number ?? "").trim();
-  const ticketAt = String(ticket.created_at ?? "").trim();
-  if (!callerNumber || !ticketAt) return null;
-
-  const windowStart = new Date(new Date(ticketAt).getTime() - 2 * 60 * 60 * 1000).toISOString();
-
-  const { data: call } = await supabase
-    .from("call_logs")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("caller_number", callerNumber)
-    .gte("created_at", windowStart)
-    .lte("created_at", ticketAt)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const fallbackId = String(call?.id ?? "").trim();
-  return fallbackId && UUID_RE.test(fallbackId) ? fallbackId : null;
 }
 
 async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayload | null> {

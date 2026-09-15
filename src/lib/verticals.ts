@@ -172,6 +172,7 @@ const RETAIL_PACK: VerticalPack = {
       },
     ],
     hiddenHrefs: [
+      DASHBOARD_ROUTES.actionInbox,
       DASHBOARD_ROUTES.routing,
       DASHBOARD_ROUTES.locations,
       DASHBOARD_ROUTES.usage,
