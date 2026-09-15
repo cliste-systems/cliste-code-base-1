@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { AuthHashGuard } from "@/components/auth-hash-guard";
 import { CookieNoticeBanner } from "@/components/cookie-notice-banner";
@@ -48,6 +49,7 @@ export default function RootLayout({
         <AuthHashGuard />
         {children}
         <CookieNoticeBanner />
+        <Analytics />
       </body>
     </html>
   );
