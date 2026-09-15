@@ -171,8 +171,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     typeof sp.call === "string" && sp.call.trim() ? sp.call.trim() : null;
   const requestedPage = parsePageParam(sp.page);
 
-  const { supabase, organizationId, profile } = await requireDashboardSession();
-  const staffDisplayName = profile.name?.trim() || "Staff member";
+  const { supabase, organizationId } = await requireDashboardSession();
 
   let deepLinkedCreatedAt: string | null = null;
   if (initialSelectedCallId) {
@@ -364,7 +363,6 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
             greetingSubline={greetingSubline}
             metrics={metrics}
             calls={calls}
-            staffDisplayName={staffDisplayName}
             organizationId={organizationId}
             initialSelectedCallId={initialSelectedCallId}
             blockedCallerE164s={blockedCallerE164s}

@@ -25,7 +25,6 @@ type CallHistoryPageContentProps = {
   initialSelectedCallId?: string | null;
   blockedCallerE164s: string[];
   businessName: string;
-  staffDisplayName: string;
   pagination: CallHistoryPagination;
   className?: string;
 };
@@ -38,7 +37,6 @@ export function CallHistoryPageContent({
   initialSelectedCallId,
   blockedCallerE164s,
   businessName,
-  staffDisplayName,
   pagination,
   className,
 }: CallHistoryPageContentProps) {
@@ -73,7 +71,6 @@ export function CallHistoryPageContent({
         initialSelectedCallId={initialSelectedCallId}
         blockedCallerE164s={blockedCallerE164s}
         businessName={businessName}
-        staffDisplayName={staffDisplayName}
         pagination={pagination}
       />
     </>

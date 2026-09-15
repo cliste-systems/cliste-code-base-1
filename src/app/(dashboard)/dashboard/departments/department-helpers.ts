@@ -1,5 +1,9 @@
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { resolveCallerDisplayName } from "@/lib/caller-identity";
+import {
+  CALLER_DATA_ERASED_LABEL,
+  isErasedCallerNumber,
+} from "@/lib/caller-data-erasure";
 import { classifyActionDepartment } from "@/lib/classify-action-department";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
@@ -98,15 +102,16 @@ export function toDepartmentInboxItem(
   const category = classifyActionCategory(row.summary);
   const deliveryStatus = (row.delivery_status as ActionTicketDeliveryStatus) ?? "confirmed";
   const callerNumber = row.caller_number?.trim() ?? "";
-  const callerDisplay = formatE164ForDisplay(callerNumber) || "";
+  const callerDisplay = isErasedCallerNumber(callerNumber)
+    ? CALLER_DATA_ERASED_LABEL
+    : formatE164ForDisplay(callerNumber) || "";
   const key = phoneKey(callerNumber);
   const client = key ? clientsByPhone.get(key) : undefined;
   const callLogName = key ? (callerNameByPhone.get(key) ?? null) : null;
 
-  const callerName = resolveCallerDisplayName(
-    [row.caller_name, client?.name, callLogName],
-    callerDisplay,
-  );
+  const callerName = isErasedCallerNumber(callerNumber)
+    ? CALLER_DATA_ERASED_LABEL
+    : resolveCallerDisplayName([row.caller_name, client?.name, callLogName], callerDisplay);
 
   return {
     id: row.id,

@@ -32,7 +32,7 @@ describe("retail product clarification", () => {
     ]);
     assert.ok(hint);
     assert.match(hint ?? "", /fresh at the fish counter/i);
-    assert.match(hint ?? "", /pre-pack pack in the fish aisle/i);
+    assert.match(hint ?? "", /pre-pack packs in the fish aisle/i);
     assert.match(hint ?? "", /Do not quote a specific price/i);
   });
 
@@ -177,5 +177,54 @@ describe("retail product clarification", () => {
     assert.ok(response.clarificationHint);
     assert.equal(response.matches.length, 3);
     assert.match(response.matches[0]?.product_name ?? "", /Sirloin/i);
+    assert.match(response.clarificationHint ?? "", /butcher counter/i);
+    assert.match(response.clarificationHint ?? "", /pre-pack/i);
+  });
+
+  it("asks counter vs pre-pack for broad deli ham offers", () => {
+    const response = resolveProductSearchResponse("ham on offer", [
+      {
+        product_name: "SuperValu Traditional Cooked Ham (1 kg)",
+        service_area: "deli",
+        fulfilment: "counter",
+        quote_text: "At the deli counter this week — cooked ham per kilo",
+      },
+      {
+        product_name: "Horgans Sliced Cooked Ham (120 g)",
+        service_area: "deli",
+        fulfilment: "prepack",
+        quote_text: "In the chilled pre-pack deli this week — sliced ham",
+      },
+    ]);
+    assert.ok(response.clarificationHint);
+    assert.match(response.clarificationHint ?? "", /deli counter/i);
+    assert.match(response.clarificationHint ?? "", /pre-pack/i);
+    assert.equal(response.matches.length, 2);
+  });
+
+  it("asks counter vs pre-pack for broad fish offers", () => {
+    const hint = buildOfferFulfilmentClarificationHint([
+      {
+        product_name: "Loose Side of Salmon (700 g)",
+        service_area: "fish",
+        fulfilment: "counter",
+      },
+      {
+        product_name: "SuperValu Cajun Salmon Darnes (220 g)",
+        service_area: "fish",
+        fulfilment: "prepack",
+      },
+    ]);
+    assert.ok(hint);
+    assert.match(hint ?? "", /fish counter/i);
+  });
+
+  it("clarifies broad ambient grocery offers by product type", () => {
+    const hint = buildBroadProductClarificationHint("biscuits", [
+      { productName: "McVitie's Hobnobs Milk Chocolate Biscuits (262 g)" },
+      { productName: "McVitie's Rich Tea Biscuits (300 g)" },
+    ]);
+    assert.ok(hint);
+    assert.match(hint ?? "", /clarifying question/i);
   });
 });

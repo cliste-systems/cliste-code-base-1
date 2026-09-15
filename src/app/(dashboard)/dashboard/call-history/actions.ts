@@ -8,12 +8,17 @@ import {
 } from "@/lib/call-history-types";
 import {
   buildCallerHistoryInsight,
+  buildErasedCallerHistoryInsight,
   type CallerHistoryInsight,
 } from "@/lib/caller-history-insight";
 import {
   ANONYMOUS_CALLER_E164,
   normalizeBlockedCallerE164,
 } from "@/lib/blocked-callers";
+import {
+  ERASED_CALLER_E164,
+  pickCallerDataErasureAudit,
+} from "@/lib/caller-data-erasure";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
 import { resolveCallLogIdForTicket } from "@/lib/resolve-ticket-call-log";
@@ -52,7 +57,7 @@ const CALLER_HISTORY_CALL_LIMIT = 30;
 
 export async function fetchCallerHistoryInsight(input: {
   callerNumber: string;
-  excludeCallId?: string;
+  currentCallId?: string;
 }): Promise<CallerHistoryInsight> {
   const callerNumber = String(input.callerNumber ?? "").trim();
   if (!callerNumber || callerNumber === ANONYMOUS_CALLER_E164) {
@@ -78,12 +83,20 @@ export async function fetchCallerHistoryInsight(input: {
 
   const { supabase, organizationId } = await requireDashboardSession();
 
+  if (callerE164 === ERASED_CALLER_E164) {
+    return loadErasedCallerHistoryInsight(
+      supabase,
+      organizationId,
+      input.currentCallId,
+    );
+  }
+
   const [{ data: callRows }, { data: ticketRows }, { data: blockedRow }, { data: abuseRow }] =
     await Promise.all([
     supabase
       .from("call_logs")
       .select(
-        "id, caller_name, outcome, ai_summary, duration_seconds, created_at, post_call_status",
+        "id, caller_name, outcome, ai_summary, duration_seconds, created_at, post_call_status, caller_data_erased_at",
       )
       .eq("organization_id", organizationId)
       .eq("caller_number", callerE164)
@@ -112,7 +125,9 @@ export async function fetchCallerHistoryInsight(input: {
 
   return buildCallerHistoryInsight({
     callerNumber: callerE164,
-    calls: (callRows ?? []).map((row) => ({
+    calls: (callRows ?? [])
+      .filter((row) => !row.caller_data_erased_at)
+      .map((row) => ({
       id: String(row.id),
       createdAt: String(row.created_at ?? ""),
       callerName: row.caller_name?.trim() || null,
@@ -129,6 +144,34 @@ export async function fetchCallerHistoryInsight(input: {
     isBlocked: Boolean(blockedRow),
     abuseHitCount: Number(abuseRow?.hit_count ?? 0),
   });
+}
+
+async function loadErasedCallerHistoryInsight(
+  supabase: Awaited<ReturnType<typeof requireDashboardSession>>["supabase"],
+  organizationId: string,
+  currentCallId?: string,
+): Promise<CallerHistoryInsight> {
+  const callId = String(currentCallId ?? "").trim();
+  if (!UUID_RE.test(callId)) {
+    return buildErasedCallerHistoryInsight(null);
+  }
+
+  const { data } = await supabase
+    .from("call_logs")
+    .select(
+      "caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason",
+    )
+    .eq("id", callId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  return buildErasedCallerHistoryInsight(
+    pickCallerDataErasureAudit({
+      callerDataErasedAt: data?.caller_data_erased_at ?? null,
+      callerDataErasedByLabel: data?.caller_data_erased_by_label ?? null,
+      callerDataErasedReason: data?.caller_data_erased_reason ?? null,
+    }),
+  );
 }
 
 export async function fetchCallRecordingPlaybackUrl(

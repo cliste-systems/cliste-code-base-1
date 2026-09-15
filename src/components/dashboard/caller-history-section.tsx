@@ -15,11 +15,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  buildErasedCallerHistoryInsight,
   CALLER_HISTORY_FLAG_LABELS,
   type CallerHistoryInsight,
   type CallerHistoryRecentCall,
   type CallerHistorySecurityFlag,
 } from "@/lib/caller-history-insight";
+import {
+  formatCallerDataErasedAt,
+  type CallerDataErasureAudit,
+} from "@/lib/caller-data-erasure";
 import {
   CALL_HISTORY_STATUS_BADGE_CLASSES,
   type CallHistoryStatusTone,
@@ -37,6 +42,8 @@ type CallerHistoryDialogProps = {
   callerNumber: string;
   currentCallId: string;
   phoneDisplay?: string;
+  callerDataErased?: boolean;
+  erasureAudit?: CallerDataErasureAudit | null;
   onSelectCall?: (callId: string, createdAt: string) => void;
 };
 
@@ -153,7 +160,11 @@ function SecurityLevelSection({ security }: { security: CallerSecurityAssessment
   );
 }
 
-function CallerInsightPanel({ insight }: { insight: CallerHistoryInsight }) {
+function CallerInsightPanel({
+  insight,
+}: {
+  insight: Exclude<CallerHistoryInsight, { kind: "erased" }>;
+}) {
   const flags = insight.kind === "anonymous" ? [] : insight.securityFlags;
 
   return (
@@ -266,6 +277,47 @@ function PastCallsPanel({
   );
 }
 
+function ErasedCallerHistoryPanel({
+  insight,
+}: {
+  insight: Extract<CallerHistoryInsight, { kind: "erased" }>;
+}) {
+  const { audit } = insight;
+
+  return (
+    <div className="rounded-2xl border border-[#dfe7e2] bg-[#fbfcfb] px-5 py-5 sm:px-6">
+      <p className="text-[14px] leading-relaxed text-[#11181d]">
+        Caller data has been erased. Cara no longer keeps a profile, security read, or call
+        summaries for this caller.
+      </p>
+      <dl className="mt-4 space-y-3 text-[13px] leading-relaxed text-[#11181d]">
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+            Erased on
+          </dt>
+          <dd className="mt-0.5">
+            {audit.erasedAt ? formatCallerDataErasedAt(audit.erasedAt) : "Unknown"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+            Erased by
+          </dt>
+          <dd className="mt-0.5">{audit.erasedByLabel?.trim() || "Staff member"}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b7c75]">
+            Reason
+          </dt>
+          <dd className="mt-0.5 whitespace-pre-wrap">
+            {audit.erasedReason?.trim() || "No reason recorded"}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 function CallerHistoryBody({
   insight,
   currentCallId,
@@ -275,6 +327,10 @@ function CallerHistoryBody({
   currentCallId: string;
   onSelectCall?: (callId: string, createdAt: string) => void;
 }) {
+  if (insight.kind === "erased") {
+    return <ErasedCallerHistoryPanel insight={insight} />;
+  }
+
   return (
     <div className="space-y-5 pb-1">
       <CallerInsightPanel insight={insight} />
@@ -302,6 +358,8 @@ export function CallerHistoryDialog({
   callerNumber,
   currentCallId,
   phoneDisplay,
+  callerDataErased = false,
+  erasureAudit = null,
   onSelectCall,
 }: CallerHistoryDialogProps) {
   const [loading, setLoading] = useState(false);
@@ -313,11 +371,19 @@ export function CallerHistoryDialog({
     }
 
     let cancelled = false;
+
+    if (callerDataErased) {
+      setLoading(false);
+      setInsight(buildErasedCallerHistoryInsight(erasureAudit));
+      return;
+    }
+
     setLoading(true);
     setInsight(null);
 
     void fetchCallerHistoryInsight({
       callerNumber,
+      currentCallId,
     })
       .then((result) => {
         if (cancelled) return;
@@ -330,9 +396,10 @@ export function CallerHistoryDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, callerNumber, currentCallId]);
+  }, [open, callerNumber, currentCallId, callerDataErased, erasureAudit]);
 
-  const securityLevel = insight?.security.level;
+  const securityLevel =
+    insight && insight.kind !== "erased" ? insight.security.level : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

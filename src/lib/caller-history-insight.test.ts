@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildErasedCallerHistoryInsight,
   buildCallerHistoryInsight,
   formatCallerHistoryDateLabel,
 } from "./caller-history-insight";
@@ -32,6 +33,17 @@ function call(
 }
 
 describe("caller-history-insight", () => {
+  it("returns erased insight without security profiling", () => {
+    const insight = buildErasedCallerHistoryInsight({
+      callerDataErasedAt: "2026-09-15T16:22:20.569Z",
+      callerDataErasedByLabel: "Garreth Ferry",
+      callerDataErasedReason: "Customer wanted",
+    });
+    assert.equal(insight.kind, "erased");
+    assert.match(insight.overview, /Garreth Ferry/);
+    assert.equal("security" in insight, false);
+  });
+
   it("returns anonymous for withheld numbers", () => {
     const insight = buildCallerHistoryInsight({
       callerNumber: "+anonymous",

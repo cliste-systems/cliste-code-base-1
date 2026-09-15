@@ -76,6 +76,8 @@ import {
 } from "./call-history-helpers";
 import {
   formatCallerDataErasedAt,
+  CALLER_DATA_ERASED_BADGE_CLASS,
+  CALLER_DATA_ERASED_ROW_ACCENT,
   isCallerDataErased,
 } from "@/lib/caller-data-erasure";
 import {
@@ -100,7 +102,6 @@ type CallHistoryViewProps = {
   pagination?: CallHistoryPagination;
   blockedCallerE164s: string[];
   businessName?: string;
-  staffDisplayName?: string;
   className?: string;
 };
 
@@ -133,7 +134,6 @@ export function CallHistoryView({
   pagination,
   blockedCallerE164s,
   businessName = "",
-  staffDisplayName = "Staff member",
   className,
 }: CallHistoryViewProps) {
   const router = useRouter();
@@ -343,7 +343,6 @@ export function CallHistoryView({
               onCopySummary={copySummary}
               blockedSet={blockedSet}
               businessName={businessName}
-              staffDisplayName={staffDisplayName}
               onRefresh={() => router.refresh()}
             />
           )
@@ -441,9 +440,12 @@ function CallListRow({
     hasOpenAction: row.hasOpenAction,
     callResolution: row.callResolution,
   });
-  const statusAccent = CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES[callStatus.tone];
+  const callerDataErased = isCallerDataErased(row);
+  const statusAccent = callerDataErased
+    ? CALLER_DATA_ERASED_ROW_ACCENT
+    : CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES[callStatus.tone];
   const mediaRetentionExpired =
-    !isCallerDataErased(row) && isCallMediaRetentionExpired(row.createdAt);
+    !callerDataErased && isCallMediaRetentionExpired(row.createdAt);
 
   return (
     <li>
@@ -482,7 +484,16 @@ function CallListRow({
               </>
             ) : null}
           </p>
-          {!isCallerDataErased(row) ? (
+          {callerDataErased ? (
+            <span
+              className={cn(
+                "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                CALLER_DATA_ERASED_BADGE_CLASS,
+              )}
+            >
+              Erased
+            </span>
+          ) : (
             <span
               className={cn(
                 "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
@@ -491,7 +502,7 @@ function CallListRow({
             >
               {callStatus.label}
             </span>
-          ) : null}
+          )}
         </div>
       </button>
     </li>
@@ -562,7 +573,6 @@ function CallDetailPanel({
   onCopySummary,
   blockedSet,
   businessName,
-  staffDisplayName,
   onRefresh,
 }: {
   call: CallHistoryListItem | null;
@@ -571,7 +581,6 @@ function CallDetailPanel({
   onCopySummary: () => void;
   blockedSet: Set<string>;
   businessName: string;
-  staffDisplayName: string;
   onRefresh: () => void;
 }) {
   if (!call) {
@@ -598,7 +607,6 @@ function CallDetailPanel({
       onCopySummary={onCopySummary}
       blockedSet={blockedSet}
       businessName={businessName}
-      staffDisplayName={staffDisplayName}
       onRefresh={onRefresh}
     />
   );
@@ -611,7 +619,6 @@ function CallDetailPanelContent({
   onCopySummary,
   blockedSet,
   businessName,
-  staffDisplayName,
   onRefresh,
 }: {
   call: CallHistoryListItem;
@@ -620,7 +627,6 @@ function CallDetailPanelContent({
   onCopySummary: () => void;
   blockedSet: Set<string>;
   businessName: string;
-  staffDisplayName: string;
   onRefresh: () => void;
 }) {
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
@@ -708,12 +714,17 @@ function CallDetailPanelContent({
     });
   }
 
-  function onConfirmEraseCallerData(input: { reason: string; confirm: string }) {
+  function onConfirmEraseCallerData(input: {
+    reason: string;
+    performedBy: string;
+    confirm: string;
+  }) {
     if (!callerE164) return;
     setEraseMsg(null);
     startTransition(async () => {
       const formData = new FormData();
       formData.set("phone", callerE164);
+      formData.set("performedBy", input.performedBy);
       formData.set("reason", input.reason);
       formData.set("confirm", input.confirm);
       const result = await eraseCustomerData(formData);
@@ -748,11 +759,13 @@ function CallDetailPanelContent({
               <span className="text-slate-300"> · </span>
               <span className="tabular-nums">{call.durationLabel}</span>
             </span>
-            {!callerDataErased ? (
+            {callerDataErased ? (
+              <StatusPill className={CALLER_DATA_ERASED_BADGE_CLASS}>Erased</StatusPill>
+            ) : (
               <StatusPill className={CALL_HISTORY_STATUS_BADGE_CLASSES[callStatus.tone]}>
                 {callStatus.label}
               </StatusPill>
-            ) : null}
+            )}
             {callNeedsPostCallReviewBanner(call) ? (
               <StatusPill variant="attention">Processing issue</StatusPill>
             ) : null}
@@ -961,7 +974,6 @@ function CallDetailPanelContent({
         onOpenChange={setEraseConfirmOpen}
         phoneDisplay={phone}
         callerName={showCallerName ? name : null}
-        performedByName={staffDisplayName}
         pending={pending}
         onConfirm={onConfirmEraseCallerData}
       />
@@ -970,7 +982,13 @@ function CallDetailPanelContent({
         onOpenChange={setCallerHistoryOpen}
         callerNumber={call.callerId}
         currentCallId={call.id}
-        phoneDisplay={phone}
+        phoneDisplay={callerDataErased ? "Caller data erased" : phone}
+        callerDataErased={callerDataErased}
+        erasureAudit={{
+          callerDataErasedAt: call.callerDataErasedAt,
+          callerDataErasedByLabel: call.callerDataErasedByLabel,
+          callerDataErasedReason: call.callerDataErasedReason,
+        }}
         onSelectCall={openPastCall}
       />
     </DetailPanelShell>

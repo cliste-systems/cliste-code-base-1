@@ -25,7 +25,7 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
   if (
-    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|wine|beer|spirits|alcohol|dairy|ambient) offers\b|\boff[- ]licence offers\b|\b(?:what )?(?:alcohol|wine|beer|spirits|dairy|ambient)\b.*\b(?:on offer|offers?|this week)\b/i.test(
+    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b|\b(?:what )?(?:alcohol|wine|beer|spirits|dairy|ambient|fruit|veg|produce|bakery|deli|fish|butcher|grocery|provisions|frozen|household)\b.*\b(?:on offer|offers?|this week|specials?)\b/i.test(
       trimmed,
     )
   ) {
@@ -35,13 +35,20 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
   if (
     tokens.length === 1 &&
-    /^(meat|butcher|deli|offers?|promos?|grocery|wine|beer|alcohol|dairy|ambient|spirits)$/i.test(
+    /^(meat|butcher|deli|fish|produce|bakery|grocery|offers?|promos?|wine|beer|alcohol|dairy|ambient|spirits|fruit|veg|vegetables|seafood|provisions|frozen|household|fishmonger)$/i.test(
       tokens[0] ?? "",
     )
   ) {
     return true;
   }
   if (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2) {
+    return true;
+  }
+  if (
+    inferWeeklyOfferServiceAreaFromQuery(trimmed) &&
+    /\b(?:offers?|specials?|deals?|promos?|on offer|this week)\b/i.test(trimmed) &&
+    offerSearchProductTokens(trimmed).length === 0
+  ) {
     return true;
   }
   return false;
@@ -84,13 +91,24 @@ export function inferWeeklyOffersBrowseCategories(query: string): string[] {
   if (/wine|beer|off[- ]licence|spirits|alcohol|alcoholic|liquor|liqueur|cider/i.test(trimmed)) {
     return ["wine", "beer", "spirits"];
   }
+  if (/fruit|veg|vegetable|produce|potato/i.test(trimmed)) {
+    return ["fruit", "potatoes", "vegetables"];
+  }
+  if (/bakery|bread|scone|croissant|baguette/i.test(trimmed)) {
+    return ["bread", "croissant", "scone"];
+  }
+  if (/provisions|ambient|household|tea|coffee|biscuits|back store|backstore/i.test(trimmed)) {
+    return ["tea", "coffee", "biscuits", "household"];
+  }
   if (/dairy|milk|yogurt|cheese|butter/i.test(trimmed)) {
     return ["milk", "yogurt", "cheese", "butter"];
   }
-  if (/ambient|household|tea|coffee|biscuits/i.test(trimmed)) {
-    return ["tea", "coffee", "biscuits", "household"];
+  if (/fish|seafood|salmon|cod/i.test(trimmed)) {
+    return ["salmon", "cod", "prawns"];
   }
-  if (/butcher|meat counter/i.test(trimmed)) return ["striploin", "rashers", "sausages"];
+  if (/butcher|meat counter|meat department/i.test(trimmed)) {
+    return ["striploin", "rashers", "sausages"];
+  }
   if (/confectionery|sweets|candy/.test(trimmed)) return ["chocolate", "sweets"];
   if (inferWeeklyOffersExcludeMeat(trimmed)) {
     return ["chocolate", "crisps", "yogurt", "bread", "fruit"];
@@ -109,19 +127,47 @@ export function inferWeeklyOfferServiceAreaFromQuery(
   query: string,
 ): SupervaluServiceArea | null {
   const q = query.toLowerCase();
-  if (/off[- ]licence|wine|beer|spirits|cider|alcohol|alcoholic|liquor|liqueur/i.test(q)) {
+  if (
+    /off[- ]licence|off licence|wine|beer|spirits|cider|alcohol|alcoholic|liquor|liqueur|drinks aisle/i.test(
+      q,
+    )
+  ) {
     return "off_licence";
   }
-  if (/fish counter|fishmonger|salmon|cod|haddock|seafood|prawn|trout|mackerel|tuna/i.test(q)) {
+  if (
+    /fish counter|fishmonger|fish department|seafood counter|salmon|cod|haddock|seafood|prawn|trout|mackerel|tuna/i.test(
+      q,
+    )
+  ) {
     return "fish";
   }
-  if (/deli|carrolls|sliced ham|cooked meat|salami|charcuterie/i.test(q)) return "deli";
-  if (/butcher|meat counter|striploin|sirloin|steak|rashers|sausages/i.test(q)) {
+  if (/deli counter|deli department|deli|carrolls|sliced ham|cooked meat|salami|charcuterie/i.test(q)) {
+    return "deli";
+  }
+  if (
+    /butcher counter|butcher department|meat counter|meat department|fresh meat|butcher|striploin|sirloin|steak|rashers|sausages/i.test(
+      q,
+    )
+  ) {
     return "butcher";
   }
-  if (/fruit|veg|vegetable|potato|apple|produce/i.test(q)) return "produce";
-  if (/dairy|ambient|milk|yogurt|cheese|butter/i.test(q)) return "grocery";
-  if (/bakery|croissant|scone|baguette/i.test(q)) return "bakery";
+  if (
+    /fruit and veg|fruit & veg|fruit counter|veg counter|fruit|veg|vegetable|potato|apple|produce|green grocers/i.test(
+      q,
+    )
+  ) {
+    return "produce";
+  }
+  if (/bakery|in[- ]store bakery|bread counter|croissant|scone|baguette/i.test(q)) {
+    return "bakery";
+  }
+  if (
+    /dairy wall|dairy|ambient|provisions|back store|backstore|household|frozen|grocery|milk|yogurt|cheese|butter|centre aisle|center aisle/i.test(
+      q,
+    )
+  ) {
+    return "grocery";
+  }
   return null;
 }
 
@@ -129,11 +175,15 @@ export function inferWeeklyOfferFulfilmentFromQuery(
   query: string,
 ): SupervaluFulfilment | null {
   const q = query.toLowerCase();
-  if (/pre\s*-?\s*pack|packaged|quick fry|meat aisle|chilled aisle|pack\b/i.test(q)) {
+  if (
+    /pre\s*-?\s*pack|packaged|quick fry|meat aisle|fish aisle|chilled aisle|chilled pack|in the aisle|on the shelf|shelf pack/i.test(
+      q,
+    )
+  ) {
     return "prepack";
   }
   if (
-    /butcher counter|deli counter|fish counter|the counter|fresh sliced|per kilo|per kg|by weight|loose/i.test(
+    /(?:butcher|meat|fish|deli|seafood)\s+counter|counter\s+(?:ham|meat|fish|salmon|steak|prawns?)|the counter|fresh sliced|per kilo|per kg|by weight|loose|priced per/i.test(
       q,
     )
   ) {
@@ -143,10 +193,6 @@ export function inferWeeklyOfferFulfilmentFromQuery(
     return "counter";
   }
   if (/fruit|veg|produce/i.test(q) && /fresh counter|loose/i.test(q)) {
-    return "counter";
-  }
-  if (/butcher|butchers|meat counter/i.test(q)) return "counter";
-  if (/deli/i.test(q) && !/pre\s*-?\s*pack|packaged|chilled aisle/i.test(q)) {
     return "counter";
   }
   return null;
@@ -164,10 +210,10 @@ export function inferWeeklyOfferChannelFromQuery(
   if (serviceArea === "fish" && fulfilment === "prepack") return "prepack";
   if (serviceArea === "deli" && fulfilment === "counter") return "butcher_counter";
   if (serviceArea === "deli" && fulfilment === "prepack") return "prepack";
-  if (/butcher|meat counter|the counter|butchers/i.test(query.toLowerCase())) {
+  if (/butcher counter|meat counter|butchers counter|the butcher counter/i.test(query.toLowerCase())) {
     return "butcher_counter";
   }
-  if (/pre\s*-?\s*pack|packaged|quick fry|meat aisle|chilled aisle/i.test(query.toLowerCase())) {
+  if (/pre\s*-?\s*pack|packaged|quick fry|meat aisle|fish aisle|chilled aisle/i.test(query.toLowerCase())) {
     return "prepack";
   }
   return null;
@@ -301,6 +347,9 @@ const STOPWORDS = new Set([
   "with", "from", "that", "this", "are", "be", "can", "have", "has", "does",
   "did", "will", "would", "please", "cost", "price", "offer", "offers",
   "special", "week", "today", "stock", "sell", "yous", "ye", "got",
+  "any", "there", "some", "just", "hello", "yeah", "yep", "well", "also",
+  "actually", "whats", "like", "right", "so", "wondering", "know", "tell",
+  "could", "would", "thanks", "thank", "hi", "em", "uh", "um",
 ]);
 
 export function tokenizeSupervaluSearchQuery(query: string): string[] {
@@ -364,6 +413,7 @@ const FULFILMENT_QUERY_TOKENS = new Set([
   "per",
   "fish",
   "butcher",
+  "butchers",
   "deli",
   "prepack",
   "packaged",
@@ -372,6 +422,28 @@ const FULFILMENT_QUERY_TOKENS = new Set([
   "sliced",
   "fishmonger",
   "fishcounter",
+  "meat",
+  "shop",
+  "store",
+  "section",
+  "department",
+  "seafood",
+  "produce",
+  "fruit",
+  "veg",
+  "vegetables",
+  "bakery",
+  "grocery",
+  "dairy",
+  "ambient",
+  "provisions",
+  "frozen",
+  "household",
+  "alcohol",
+  "wine",
+  "beer",
+  "spirits",
+  "backstore",
 ]);
 
 export function offerSearchProductTokens(query: string): string[] {
@@ -668,7 +740,12 @@ export function searchSyncedWeeklyOffersInRows(
   }
 
   const tokens = queryTokens(trimmed);
-  if (tokens.length === 0) return [];
+  if (tokens.length === 0) {
+    if (filters.serviceArea || filters.fulfilment) {
+      return sampleRetailWeeklyOffersAcrossDepartments(rows, tokenLimit, browseOptions);
+    }
+    return [];
+  }
 
   let matches = rows
     .filter((row) => rowMatchesFilters(row, filters, { excludeMeat, alcoholOnly }))

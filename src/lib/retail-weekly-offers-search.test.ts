@@ -520,6 +520,37 @@ describe("retail weekly offers search", () => {
     assert.equal(inferWeeklyOffersListIntent("dairy on offer"), true);
     assert.equal(inferWeeklyOffersListIntent("ham"), false);
     assert.equal(inferWeeklyOffersListIntent("rashers"), false);
+    assert.equal(
+      inferWeeklyOffersListIntent("what offers in the meat counter this week"),
+      true,
+    );
+    assert.equal(
+      inferWeeklyOffersListIntent("what's on offer at the butcher counter"),
+      true,
+    );
+    assert.equal(inferWeeklyOffersListIntent("what offers in the fruit and veg"), true);
+    assert.equal(inferWeeklyOffersListIntent("any offers on the dairy wall"), true);
+    assert.equal(inferWeeklyOffersListIntent("offers in the back store"), true);
+    assert.equal(inferWeeklyOffersListIntent("fish offers this week"), true);
+  });
+
+  it("infers store section service areas from varied caller phrasing", () => {
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "grocery");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("back store specials"), "grocery");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("provisions on offer"), "grocery");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("fruit and veg offers"), "produce");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("off licence wine"), "off_licence");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("seafood counter salmon"), "fish");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("deli department ham"), "deli");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("meat department steaks"), "butcher");
+  });
+
+  it("only narrows fulfilment when the caller explicitly chose counter or pre-pack", () => {
+    assert.equal(inferWeeklyOfferFulfilmentFromQuery("deli offers"), null);
+    assert.equal(inferWeeklyOfferFulfilmentFromQuery("butcher offers"), null);
+    assert.equal(inferWeeklyOfferFulfilmentFromQuery("meat counter steaks"), "counter");
+    assert.equal(inferWeeklyOfferFulfilmentFromQuery("pre-pack ham"), "prepack");
+    assert.equal(inferWeeklyOfferFulfilmentFromQuery("fish aisle salmon"), "prepack");
   });
 
   it("samples off-licence offers for alcohol category questions", async () => {

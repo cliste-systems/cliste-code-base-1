@@ -2,6 +2,11 @@ import { addDays, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 import { formatE164ForDisplay } from "@/lib/call-history-types";
+import {
+  CALLER_DATA_ERASED_LABEL,
+  isCallerDataErased,
+  isErasedCallerNumber,
+} from "@/lib/caller-data-erasure";
 
 const DUBLIN = "Europe/Dublin";
 
@@ -83,7 +88,11 @@ export function formatDashboardFeedRelativeTime(
 export function ticketCallerLabel(input: {
   caller_name?: string | null;
   caller_number?: string | null;
+  caller_data_erased_at?: string | null;
 }): string {
+  if (isCallerDataErased(input) || isErasedCallerNumber(input.caller_number)) {
+    return CALLER_DATA_ERASED_LABEL;
+  }
   const first = callerFirstName(input);
   if (first) return first;
   const phone = input.caller_number?.trim();
@@ -104,7 +113,11 @@ export function callerFirstName(input: {
 export function callerLiveActivityLabel(input: {
   caller_name?: string | null;
   caller_number?: string | null;
+  caller_data_erased_at?: string | null;
 }): { title: string; subtitle?: string } {
+  if (isCallerDataErased(input) || isErasedCallerNumber(input.caller_number)) {
+    return { title: CALLER_DATA_ERASED_LABEL };
+  }
   const first = callerFirstName(input);
   const phoneRaw = input.caller_number?.trim();
   const phone = phoneRaw ? formatE164ForDisplay(phoneRaw) || phoneRaw : null;

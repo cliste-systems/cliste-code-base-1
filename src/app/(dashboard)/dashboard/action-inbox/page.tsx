@@ -17,6 +17,10 @@ import {
 } from "@/lib/call-history-types";
 import { resolveCallerDisplayName } from "@/lib/caller-identity";
 import {
+  CALLER_DATA_ERASED_LABEL,
+  isErasedCallerNumber,
+} from "@/lib/caller-data-erasure";
+import {
   ACTION_INBOX_CALL_LIMIT,
   ACTION_INBOX_CLIENT_LIMIT,
   ACTION_INBOX_TICKET_LIMIT,
@@ -120,15 +124,16 @@ function toInboxItem(
 ): ActionInboxItem {
   const category = classifyActionCategory(row.summary);
   const callerNumber = row.caller_number?.trim() ?? "";
-  const callerDisplay = formatE164ForDisplay(callerNumber) || "";
+  const callerDisplay = isErasedCallerNumber(callerNumber)
+    ? CALLER_DATA_ERASED_LABEL
+    : formatE164ForDisplay(callerNumber) || "";
   const key = phoneKey(callerNumber);
   const client = key ? clientsByPhone.get(key) : undefined;
   const callLogName = key ? (callerNameByPhone.get(key) ?? null) : null;
 
-  const callerName = resolveCallerDisplayName(
-    [row.caller_name, client?.name, callLogName],
-    callerDisplay,
-  );
+  const callerName = isErasedCallerNumber(callerNumber)
+    ? CALLER_DATA_ERASED_LABEL
+    : resolveCallerDisplayName([row.caller_name, client?.name, callLogName], callerDisplay);
 
   const contactEmail = resolveContactEmail(client?.email, row.summary);
   const departmentSlug = resolveTicketDepartmentSlug(row);

@@ -8,6 +8,7 @@ import {
 import type { SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
 import {
   inferWeeklyOffersListIntent,
+  offerSearchProductTokens,
   searchSyncedWeeklyOffersByQuery,
   RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
   tokenizeSupervaluSearchQuery,
@@ -54,7 +55,7 @@ export function catalogProductTokens(query: string): string[] {
       stripCatalogSearchBoilerplate(normalizeCatalogBrandQuery(query)),
     ) ||
     normalizeCatalogBrandQuery(query);
-  return tokenizeSupervaluSearchQuery(core).filter(
+  return offerSearchProductTokens(core).filter(
     (token) =>
       !CATALOG_BRAND_QUERY_TOKENS.has(token) && !CATALOG_PREP_NOISE_TOKENS.has(token),
   );
@@ -78,22 +79,35 @@ export function filterCatalogMatchesByQuery(
   query: string,
   matches: SupervaluCatalogMatch[],
 ): SupervaluCatalogMatch[] {
+  if (matches.length === 0) return matches;
+
   const productTokens = catalogProductTokens(query);
-  if (productTokens.length === 0 || matches.length === 0) return matches;
-
-  const phraseMatches = matches.filter((match) =>
-    productNameMatchesTokens(match.productName, productTokens),
-  );
-  if (phraseMatches.length === 0) return [];
-
-  if (queryRequestsSupervaluOwnLabel(query)) {
-    const ownLabel = phraseMatches.filter((match) =>
-      /\bsupervalu\b/i.test(match.productName),
-    );
-    return ownLabel;
+  if (productTokens.length === 0) {
+    return matches;
   }
 
-  return phraseMatches;
+  const applyOwnLabelFilter = (pool: SupervaluCatalogMatch[]) => {
+    if (!queryRequestsSupervaluOwnLabel(query)) return pool;
+    return pool.filter((match) => /\bsupervalu\b/i.test(match.productName));
+  };
+
+  const strictMatches = matches.filter((match) =>
+    productNameMatchesTokens(match.productName, productTokens),
+  );
+  if (strictMatches.length > 0) {
+    return applyOwnLabelFilter(strictMatches);
+  }
+
+  const broadMatches = matches.filter((match) =>
+    productTokens.some((token) =>
+      productNameMatchesTokens(match.productName, [token]),
+    ),
+  );
+  if (broadMatches.length > 0) {
+    return applyOwnLabelFilter(broadMatches);
+  }
+
+  return matches;
 }
 
 function shortCatalogProductLabel(productName: string): string {
@@ -148,6 +162,10 @@ export function stripCatalogSearchBoilerplate(query: string): string {
   return query
     .replace(
       /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
+      " ",
+    )
+    .replace(
+      /\b(just wondering|i was wondering|hello|hi|yeah|yep|there|any|some|well|please|thanks|thank you|could you|can you|would you|tell me|let me know|do you know|have you got|have ye got|got any|is there|are there|what are|what'?s|whats|what is|what were|wondering)\b/gi,
       " ",
     )
     .replace(/^(?:is|are|the|a|an)\b\s*/gi, "")

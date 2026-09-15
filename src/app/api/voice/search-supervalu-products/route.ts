@@ -173,31 +173,6 @@ export async function POST(request: Request) {
     mappedMatches,
   );
 
-  // #region agent log
-  fetch("http://127.0.0.1:7662/ingest/95496c05-1739-4e32-b7be-319b56b1c5b5", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0f50f3" },
-    body: JSON.stringify({
-      sessionId: "0f50f3",
-      runId: "alcohol-fix",
-      hypothesisId: "B",
-      location: "search-supervalu-products/route.ts:response",
-      message: "catalog lookup response shaping",
-      data: {
-        query,
-        intent,
-        rawMatchCount: mappedMatches.length,
-        responseMatchCount: responseMatches.length,
-        clarificationBlocked: Boolean(clarificationHint),
-        alcoholMatches: responseMatches.filter((m) => m.is_alcohol).length,
-        serviceAreas: [...new Set(responseMatches.map((m) => m.service_area).filter(Boolean))],
-        topProducts: responseMatches.slice(0, 3).map((m) => m.product_name?.slice(0, 40)),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   return NextResponse.json({
     ok: true,
     intent,

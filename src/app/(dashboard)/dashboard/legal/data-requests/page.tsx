@@ -3,6 +3,8 @@ import Link from "next/link";
 import { DashboardAnimatedStack } from "@/components/dashboard/dashboard-animated-group";
 import { CLISTE_COMPANY, PRODUCT_NAME } from "@/lib/company-details";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-cache";
+import { verticalPackForNiche } from "@/lib/verticals";
 
 import { PrivacyToolsClient } from "../../privacy/privacy-client";
 
@@ -10,10 +12,14 @@ export const metadata = {
   title: `Data requests — Legal — ${PRODUCT_NAME}`,
 };
 
-export default function LegalDataRequestsPage() {
+export default async function LegalDataRequestsPage() {
+  const org = await getCachedDashboardOrganizationRow();
+  const includesAppointments = verticalPackForNiche(org?.niche ?? "").capabilities
+    .usesServiceCatalog;
+
   return (
     <DashboardAnimatedStack embedded>
-      <PrivacyToolsClient />
+      <PrivacyToolsClient includesAppointments={includesAppointments} />
 
       <section className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
         <div className="space-y-3 px-5 py-5">
@@ -32,9 +38,19 @@ export default function LegalDataRequestsPage() {
             </li>
             <li>
               <strong className="font-medium text-[#0b1220]">Export</strong> —
-              every appointment, call log (including transcripts, AI summaries,
-              and time-limited call recording playback links where still retained),
-              and action-inbox ticket for that phone number in your account.
+              {includesAppointments ? (
+                <>
+                  every appointment, call log (including transcripts, AI summaries,
+                  and time-limited call recording playback links where still retained),
+                  and action-inbox ticket for that phone number in your account.
+                </>
+              ) : (
+                <>
+                  every call log (including transcripts, AI summaries, and
+                  time-limited call recording playback links where still retained)
+                  and action-inbox ticket for that phone number in your account.
+                </>
+              )}
             </li>
             <li>
               <strong className="font-medium text-[#0b1220]">Erase</strong> —

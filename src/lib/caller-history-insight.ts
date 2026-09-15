@@ -13,6 +13,11 @@ import {
   type CallerSecurityAssessment,
 } from "@/lib/caller-security-level";
 import { ANONYMOUS_CALLER_E164 } from "@/lib/blocked-callers";
+import {
+  callerDataErasureSummary,
+  pickCallerDataErasureAudit,
+  type CallerDataErasureAudit,
+} from "@/lib/caller-data-erasure";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 
 export type {
@@ -59,6 +64,13 @@ export type CallerHistoryRecentCall = {
 };
 
 export type CallerHistoryInsight =
+  | {
+      kind: "erased";
+      overview: string;
+      audit: Required<
+        Pick<CallerDataErasureAudit, "erasedAt" | "erasedByLabel" | "erasedReason">
+      >;
+    }
   | { kind: "anonymous"; overview: string; security: CallerSecurityAssessment }
   | {
       kind: "first_call";
@@ -220,6 +232,17 @@ function summarizeCallerThemes(calls: CallerHistoryCallInput[], maxItems = 3): s
 
   if (ranked.length === 0) return null;
   return joinNatural(ranked);
+}
+
+export function buildErasedCallerHistoryInsight(
+  audit: CallerDataErasureAudit | null | undefined,
+): Extract<CallerHistoryInsight, { kind: "erased" }> {
+  const normalized = pickCallerDataErasureAudit(audit);
+  return {
+    kind: "erased",
+    audit: normalized,
+    overview: callerDataErasureSummary(normalized),
+  };
 }
 
 export function buildCallerHistoryOverview(

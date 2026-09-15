@@ -26,12 +26,11 @@ type CallerDataEraseDialogProps = {
   onOpenChange: (open: boolean) => void;
   phoneDisplay: string;
   callerName?: string | null;
-  performedByName: string;
   pending?: boolean;
-  onConfirm: (input: { reason: string; confirm: string }) => void;
+  onConfirm: (input: { reason: string; performedBy: string; confirm: string }) => void;
 };
 
-function ErasureReviewCard({
+export function ErasureReviewCard({
   phoneDisplay,
   callerName,
   performedByName,
@@ -80,30 +79,33 @@ export function CallerDataEraseDialog({
   onOpenChange,
   phoneDisplay,
   callerName = null,
-  performedByName,
   pending = false,
   onConfirm,
 }: CallerDataEraseDialogProps) {
   const [step, setStep] = useState<"details" | "confirm">("details");
   const [reason, setReason] = useState("");
+  const [performedBy, setPerformedBy] = useState("");
   const [eraseConfirmText, setEraseConfirmText] = useState("");
 
   useEffect(() => {
     if (!open) {
       setStep("details");
       setReason("");
+      setPerformedBy("");
       setEraseConfirmText("");
     }
   }, [open]);
 
   const trimmedReason = reason.trim();
-  const canContinue = trimmedReason.length > 0;
+  const trimmedPerformedBy = performedBy.trim();
+  const canContinue = trimmedReason.length > 0 && trimmedPerformedBy.length > 0;
   const canDelete = eraseConfirmText.trim().toUpperCase() === "ERASE";
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
       setStep("details");
       setReason("");
+      setPerformedBy("");
       setEraseConfirmText("");
     }
     onOpenChange(nextOpen);
@@ -137,29 +139,45 @@ export function CallerDataEraseDialog({
 
         <div className="space-y-5 px-6 py-6 sm:px-8">
           {step === "details" ? (
-            <div className="space-y-2">
-              <Label htmlFor="erase-caller-reason" className="text-[13px] text-slate-700">
-                Reason for deletion
-              </Label>
-              <Textarea
-                id="erase-caller-reason"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="e.g. Customer requested erasure by phone"
-                rows={4}
-                className={cn(
-                  DASHBOARD_INPUT_CLASS,
-                  "min-h-[6.5rem] resize-y bg-[#fbfcfb] px-3.5 py-3 text-[14px] leading-relaxed",
-                )}
-                required
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="erase-caller-performed-by" className="text-[13px] text-slate-700">
+                  Erased by
+                </Label>
+                <Input
+                  id="erase-caller-performed-by"
+                  type="text"
+                  value={performedBy}
+                  onChange={(event) => setPerformedBy(event.target.value)}
+                  placeholder="Staff member name"
+                  className={cn(DASHBOARD_INPUT_CLASS, "h-11")}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="erase-caller-reason" className="text-[13px] text-slate-700">
+                  Reason for deletion
+                </Label>
+                <Textarea
+                  id="erase-caller-reason"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="e.g. Customer requested erasure by phone"
+                  rows={4}
+                  className={cn(
+                    DASHBOARD_INPUT_CLASS,
+                    "min-h-[6.5rem] resize-y bg-[#fbfcfb] px-3.5 py-3 text-[14px] leading-relaxed",
+                  )}
+                  required
+                />
+              </div>
             </div>
           ) : (
             <>
               <ErasureReviewCard
                 phoneDisplay={phoneDisplay}
                 callerName={callerName}
-                performedByName={performedByName}
+                performedByName={trimmedPerformedBy}
                 reason={trimmedReason}
               />
               <div className="space-y-2">
@@ -208,7 +226,11 @@ export function CallerDataEraseDialog({
                 setStep("confirm");
                 return;
               }
-              onConfirm({ reason: trimmedReason, confirm: eraseConfirmText });
+              onConfirm({
+                reason: trimmedReason,
+                performedBy: trimmedPerformedBy,
+                confirm: eraseConfirmText,
+              });
             }}
             className={cn(
               step === "confirm"

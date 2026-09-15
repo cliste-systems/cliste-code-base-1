@@ -17,6 +17,13 @@ export type ClarificationMatch = {
   fulfilment?: string | null;
 };
 
+const COUNTER_PREPACK_AREA_HINTS: Record<string, string> = {
+  butcher:
+    "fresh at the butcher counter, priced per kilo, or the pre-pack packs in the meat aisle",
+  fish: "fresh at the fish counter, or the pre-pack packs in the fish aisle",
+  deli: "fresh sliced at the deli counter, or the chilled pre-pack packs",
+};
+
 /** Caller named a category, not a specific brand/type/size. */
 export function isBroadProductQuery(query: string): boolean {
   const trimmed = query.trim();
@@ -61,6 +68,13 @@ function matchServiceArea(match: ClarificationMatch): string {
   return String(match.serviceArea ?? match.service_area ?? "")
     .trim()
     .toLowerCase();
+}
+
+function fulfilmentClarificationAreaHint(serviceArea: string): string {
+  return (
+    COUNTER_PREPACK_AREA_HINTS[serviceArea] ??
+    "fresh at the counter, or the pre-pack packs in the aisle"
+  );
 }
 
 /** When the caller already said counter/loose/pre-pack, narrow matches before clarifying. */
@@ -109,19 +123,8 @@ export function buildOfferFulfilmentClarificationHint(
   const fulfilments = new Set(matches.map((match) => matchFulfilment(match)).filter(Boolean));
   if (!fulfilments.has("counter") || !fulfilments.has("prepack")) return null;
 
-  const counterExample = matches.find((match) => matchFulfilment(match) === "counter");
-  const prepackExample = matches.find((match) => matchFulfilment(match) === "prepack");
-  const counterArea = matchServiceArea(counterExample ?? {});
-  const prepackArea = matchServiceArea(prepackExample ?? {});
-
-  let areaHint = "fresh at the counter, or the pre-pack pack in the aisle";
-  if (counterArea === "fish" || prepackArea === "fish") {
-    areaHint = "fresh at the fish counter, or the pre-pack pack in the fish aisle";
-  } else if (counterArea === "butcher" || prepackArea === "butcher") {
-    areaHint = "fresh at the butcher counter, or the pre-pack pack in the meat aisle";
-  } else if (counterArea === "deli" || prepackArea === "deli") {
-    areaHint = "fresh sliced at the deli counter, or the chilled pre-pack pack";
-  }
+  const serviceArea = [...areas][0] ?? "";
+  const areaHint = fulfilmentClarificationAreaHint(serviceArea);
 
   return (
     "Both fresh counter and pre-pack options are on offer this week — ask ONE short clarifying question, for example: " +
@@ -137,7 +140,7 @@ export function buildBroadProductClarificationHint(
   if (inferWeeklyOffersListIntent(query)) return null;
   if (inferWeeklyOfferFulfilmentFromQuery(query)) return null;
   if (!isBroadProductQuery(query)) return null;
-  if (matches.length < 3) return null;
+  if (matches.length < 2) return null;
 
   const labels = distinctProductLabels(matches);
   if (labels.length < 2) return null;

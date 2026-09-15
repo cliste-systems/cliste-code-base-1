@@ -1,5 +1,4 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
-import { formatE164ForDisplay } from "@/lib/call-history-types";
 import {
   callerLiveActivityLabel,
   formatDashboardFeedRelativeTime,
@@ -17,6 +16,7 @@ export type ActivityFeedSourceCall = {
   outcome: string | null;
   caller_number: string | null;
   caller_name?: string | null;
+  caller_data_erased_at?: string | null;
   ai_summary?: string | null;
 };
 
@@ -28,11 +28,7 @@ export type ActivityFeedSourceTicket = {
 };
 
 function callerLabelFor(row: ActivityFeedSourceCall): string {
-  const name = row.caller_name?.trim();
-  if (name) return name;
-  const phone = row.caller_number?.trim();
-  if (phone) return formatE164ForDisplay(phone) || phone;
-  return "Unknown caller";
+  return ticketCallerLabel(row);
 }
 
 /** Overview Live activity — incoming calls only, first name + number. */

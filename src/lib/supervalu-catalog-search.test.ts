@@ -187,4 +187,85 @@ describe("supervalu catalog search", () => {
     assert.match(quote, /doesn't mean we never stock it/i);
     assert.match(quote, /Birds Eye/i);
   });
+
+  const sirloinOffer = {
+    productName: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+    department: "Butcher",
+    sku: null,
+    currentPriceEur: 16.74,
+    wasPriceEur: null,
+    discountLabel: "Only €16.74",
+    isOnOffer: true,
+    score: 1,
+    quoteText: "At the butcher counter this week — sirloin steak",
+  };
+
+  it("keeps steak offers for natural caller phrasing", () => {
+    for (const query of [
+      "steaks",
+      "steak",
+      "steaks on offer this week",
+      "is there any steaks on offer this week",
+      "any steaks on offer",
+      "meat counter steaks",
+      "what offers in the meat counter this week",
+      "hello just wondering any steaks on offer",
+    ]) {
+      const matches = filterCatalogMatchesByQuery(query, [sirloinOffer]);
+      assert.equal(
+        matches.length,
+        1,
+        `expected steak match for query: ${query}`,
+      );
+    }
+  });
+
+  const deliHamOffer = {
+    productName: "SuperValu Traditional Cooked Ham (1 kg)",
+    department: "Ham",
+    sku: null,
+    currentPriceEur: 22,
+    wasPriceEur: null,
+    discountLabel: null,
+    isOnOffer: true,
+    score: 1,
+    quoteText: "deli ham",
+  };
+
+  const wineOffer = {
+    productName: "Brancott Estate Marlborough Sauvignon Blanc (75 cl)",
+    department: "Wine",
+    sku: null,
+    currentPriceEur: 12,
+    wasPriceEur: null,
+    discountLabel: null,
+    isOnOffer: true,
+    score: 1,
+    quoteText: "wine",
+  };
+
+  it("keeps offers for natural phrasing across store sections", () => {
+    assert.equal(
+      filterCatalogMatchesByQuery("any wine on offer this week", [wineOffer]).length,
+      1,
+    );
+    assert.equal(
+      filterCatalogMatchesByQuery("what offers in the deli this week", [deliHamOffer]).length,
+      1,
+    );
+    assert.equal(
+      filterCatalogMatchesByQuery("off licence beer offers", [wineOffer]).length,
+      1,
+    );
+    assert.equal(
+      filterCatalogMatchesByQuery("dairy wall yogurt on offer", [
+        {
+          ...wineOffer,
+          productName: "Activia Strawberry Yogurt 4 Pack (480 g)",
+          quoteText: "yogurt",
+        },
+      ]).length,
+      1,
+    );
+  });
 });

@@ -65,13 +65,7 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
   const sb = session.supabase;
 
   const [appts, calls, tickets] = await Promise.all([
-    sb
-      .from("appointments")
-      .select(
-        "id, customer_name, customer_phone, customer_email, service_id, start_time, end_time, status, source, payment_status, amount_cents, currency, booking_reference, created_at",
-      )
-      .eq("organization_id", session.organizationId)
-      .limit(5000),
+    fetchAppointmentsForExport(sb, session.organizationId),
     sb
       .from("call_logs")
       .select(
@@ -88,9 +82,8 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
       .limit(5000),
   ]);
 
-  if (appts.error || calls.error || tickets.error) {
+  if (calls.error || tickets.error) {
     console.error("[gdpr] portability export error", {
-      a: appts.error?.message,
       c: calls.error?.message,
       t: tickets.error?.message,
     });
@@ -107,7 +100,7 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
       metadata: {
         organization_id: session.organizationId,
         export_type: "art20_portability",
-        appointment_count: appts.data?.length ?? 0,
+        appointment_count: appts.length,
         call_log_count: calls.data?.length ?? 0,
         action_ticket_count: tickets.data?.length ?? 0,
       },
@@ -124,7 +117,7 @@ export async function exportOrganizationPortabilityData(): Promise<GdprPortabili
       organization_id: session.organizationId,
       call_recordings_note:
         "Call audio recordings are not included in this export. Where a recording exists, it is available in the dashboard for up to 30 days and then deleted automatically.",
-      appointments: appts.data ?? [],
+      appointments: appts,
       call_logs: calls.data ?? [],
       action_tickets: tickets.data ?? [],
     },
@@ -155,14 +148,7 @@ export async function exportCustomerData(
   const sb = session.supabase;
 
   const [appts, calls, tickets, blocked] = await Promise.all([
-    sb
-      .from("appointments")
-      .select(
-        "id, customer_name, customer_phone, customer_email, service_id, start_time, end_time, status, source, payment_status, amount_cents, currency, booking_reference, created_at",
-      )
-      .eq("organization_id", session.organizationId)
-      .eq("customer_phone", phoneE164)
-      .limit(500),
+    fetchAppointmentsForExport(sb, session.organizationId, phoneE164),
     sb
       .from("call_logs")
       .select(
@@ -187,9 +173,8 @@ export async function exportCustomerData(
       .limit(50),
   ]);
 
-  if (appts.error || calls.error || tickets.error || blocked.error) {
+  if (calls.error || tickets.error || blocked.error) {
     console.error("[gdpr] export query error", {
-      a: appts.error?.message,
       c: calls.error?.message,
       t: tickets.error?.message,
       b: blocked.error?.message,
@@ -209,7 +194,7 @@ export async function exportCustomerData(
       metadata: {
         organization_id: session.organizationId,
         customer_phone_masked: maskPhoneE164(phoneE164),
-        appointment_count: appts.data?.length ?? 0,
+        appointment_count: appts.length,
         call_log_count: calls.data?.length ?? 0,
         action_ticket_count: tickets.data?.length ?? 0,
         blocked_caller_count: blocked.data?.length ?? 0,
@@ -254,7 +239,7 @@ export async function exportCustomerData(
       customer_phone_e164: phoneE164,
       call_recordings_note:
         "Call audio is included as time-limited playback links where a recording still exists (up to 30 days).",
-      appointments: appts.data ?? [],
+      appointments: appts,
       call_logs: enrichedCallLogs,
       action_tickets: tickets.data ?? [],
       blocked_callers: blocked.data ?? [],
@@ -300,9 +285,16 @@ export async function eraseCustomerData(
       message: "Enter a reason for this erasure.",
     };
   }
+  const performedBy = String(formData.get("performedBy") ?? "").trim();
+  if (!performedBy) {
+    return {
+      ok: false,
+      message: "Enter who is performing this erasure.",
+    };
+  }
 
   const erasedAt = new Date().toISOString();
-  const erasedByLabel = session.profile.name?.trim() || "Staff member";
+  const erasedByLabel = performedBy;
 
   // Erasure mutates rows we don't always have UPDATE policy for under
   // RLS (e.g. call_logs is mostly read-only for tenant users), so we
@@ -323,17 +315,13 @@ export async function eraseCustomerData(
     await deleteCallRecordingObjects(recordingPaths);
   }
 
-  const [apptsRes, callsRes, ticketsRes, blockedRes] = await Promise.all([
-    admin
-      .from("appointments")
-      .update({
-        customer_name: "Erased (GDPR)",
-        customer_phone: erasedPhoneSentinel(),
-        customer_email: null,
-      })
-      .eq("organization_id", session.organizationId)
-      .eq("customer_phone", phoneE164)
-      .select("id"),
+  const apptsRes = await anonymiseAppointmentsForErasure(
+    admin,
+    session.organizationId,
+    phoneE164,
+  );
+
+  const [callsRes, ticketsRes, blockedRes] = await Promise.all([
     admin
       .from("call_logs")
       .update({
@@ -356,6 +344,7 @@ export async function eraseCustomerData(
       .update({
         summary: "[Erased on customer request — GDPR Art 17]",
         caller_number: erasedPhoneSentinel(),
+        caller_name: null,
       })
       .eq("organization_id", session.organizationId)
       .eq("caller_number", phoneE164)
@@ -368,9 +357,9 @@ export async function eraseCustomerData(
       .select("id"),
   ]);
 
-  if (apptsRes.error || callsRes.error || ticketsRes.error || blockedRes.error) {
+  if (callsRes.error || ticketsRes.error || blockedRes.error) {
     console.error("[gdpr] erasure error", {
-      a: apptsRes.error?.message,
+      a: apptsRes.skipped ? apptsRes.skipReason : undefined,
       c: callsRes.error?.message,
       t: ticketsRes.error?.message,
       b: blockedRes.error?.message,
@@ -379,7 +368,7 @@ export async function eraseCustomerData(
   }
 
   const counts: GdprErasureCounts = {
-    appointments_anonymised: apptsRes.data?.length ?? 0,
+    appointments_anonymised: apptsRes.count,
     call_logs_redacted: callsRes.data?.length ?? 0,
     action_tickets_redacted: ticketsRes.data?.length ?? 0,
     blocked_callers_deleted: blockedRes.data?.length ?? 0,
@@ -406,6 +395,7 @@ export async function eraseCustomerData(
 
   revalidatePath("/dashboard/calls");
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/legal/data-requests");
 
   return { ok: true, phoneE164, affected: counts };
 }
@@ -420,4 +410,56 @@ function erasedPhoneSentinel(): string {
 function maskPhoneE164(e164: string): string {
   if (e164.length <= 4) return "***";
   return `${e164.slice(0, 4)}***${e164.slice(-2)}`;
+}
+
+const APPOINTMENTS_EXPORT_COLUMNS =
+  "id, customer_name, customer_phone, customer_email, service_id, start_time, end_time, status, source, payment_status, amount_cents, currency, booking_reference, created_at";
+
+/** Voice-only / retail orgs may not have appointments deployed — export still succeeds. */
+async function fetchAppointmentsForExport(
+  sb: Awaited<ReturnType<typeof requireDashboardSession>>["supabase"],
+  organizationId: string,
+  customerPhone?: string,
+): Promise<Record<string, unknown>[]> {
+  let query = sb
+    .from("appointments")
+    .select(APPOINTMENTS_EXPORT_COLUMNS)
+    .eq("organization_id", organizationId)
+    .limit(customerPhone ? 500 : 5000);
+  if (customerPhone) {
+    query = query.eq("customer_phone", customerPhone);
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.warn("[gdpr] appointments export skipped", error.message);
+    return [];
+  }
+  return (data ?? []) as Record<string, unknown>[];
+}
+
+type AppointmentErasureResult =
+  | { count: number; skipped?: false }
+  | { count: 0; skipped: true; skipReason: string };
+
+/** Salon orgs anonymise booking rows; retail orgs often have no appointments table. */
+async function anonymiseAppointmentsForErasure(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  phoneE164: string,
+): Promise<AppointmentErasureResult> {
+  const { data, error } = await admin
+    .from("appointments")
+    .update({
+      customer_name: "Erased (GDPR)",
+      customer_phone: erasedPhoneSentinel(),
+      customer_email: null,
+    })
+    .eq("organization_id", organizationId)
+    .eq("customer_phone", phoneE164)
+    .select("id");
+  if (error) {
+    console.warn("[gdpr] appointments erasure skipped", error.message);
+    return { count: 0, skipped: true, skipReason: error.message };
+  }
+  return { count: data?.length ?? 0 };
 }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Download, FileJson, Trash2 } from "lucide-react";
 
+import { ErasureReviewCard } from "@/components/dashboard/caller-data-erase-dialog";
 import { DashboardAnimatedGroup } from "@/components/dashboard/dashboard-animated-group";
 import { SectionCard } from "@/components/dashboard/section-card";
 import {
@@ -13,6 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
+import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { cn } from "@/lib/utils";
 
 import {
@@ -35,14 +39,32 @@ type EraseState =
   | { status: "error"; message: string }
   | { status: "done"; counts: GdprErasureCounts; phoneE164: string };
 
-export function PrivacyToolsClient() {
+type PrivacyToolsClientProps = {
+  includesAppointments?: boolean;
+};
+
+function formatPhoneForDisplay(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  try {
+    return formatE164ForDisplay(normalizeCustomerPhoneE164(trimmed)) || trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+export function PrivacyToolsClient({
+  includesAppointments = true,
+}: PrivacyToolsClientProps) {
   const [exportPhone, setExportPhone] = useState("");
   const [exportState, setExportState] = useState<ExportState>({ status: "idle" });
   const [exportPending, startExport] = useTransition();
 
   const [erasePhone, setErasePhone] = useState("");
+  const [erasePerformedBy, setErasePerformedBy] = useState("");
   const [eraseReason, setEraseReason] = useState("");
   const [eraseConfirm, setEraseConfirm] = useState("");
+  const [eraseStep, setEraseStep] = useState<"details" | "confirm">("details");
   const [eraseState, setEraseState] = useState<EraseState>({ status: "idle" });
   const [erasePending, startErase] = useTransition();
 
@@ -77,7 +99,7 @@ export function PrivacyToolsClient() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cliste-data-export-${exportState.phoneE164.replace(/\D/g, "")}-${new Date()
+    a.download = `hellocara-data-export-${exportState.phoneE164.replace(/\D/g, "")}-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
     a.click();
@@ -100,7 +122,7 @@ export function PrivacyToolsClient() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `cliste-portability-export-${stamp}.json`;
+        a.download = `hellocara-portability-export-${stamp}.json`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -110,7 +132,7 @@ export function PrivacyToolsClient() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `cliste-portability-export-${stamp}.csv`;
+        a.download = `hellocara-portability-export-${stamp}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -119,8 +141,15 @@ export function PrivacyToolsClient() {
 
   function onErase(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (eraseStep === "details") {
+      if (!erasePhone.trim() || !erasePerformedBy.trim() || !eraseReason.trim()) return;
+      setEraseStep("confirm");
+      setEraseConfirm("");
+      return;
+    }
     const fd = new FormData();
     fd.set("phone", erasePhone);
+    fd.set("performedBy", erasePerformedBy);
     fd.set("reason", eraseReason);
     fd.set("confirm", eraseConfirm);
     startErase(async () => {
@@ -130,11 +159,22 @@ export function PrivacyToolsClient() {
       } else {
         setEraseState({ status: "done", counts: r.affected, phoneE164: r.phoneE164 });
         setErasePhone("");
+        setErasePerformedBy("");
         setEraseReason("");
         setEraseConfirm("");
+        setEraseStep("details");
       }
     });
   }
+
+  const trimmedEraseReason = eraseReason.trim();
+  const trimmedErasePerformedBy = erasePerformedBy.trim();
+  const erasePhoneDisplay = formatPhoneForDisplay(erasePhone);
+  const canContinueErase =
+    erasePhone.trim().length > 0 &&
+    trimmedErasePerformedBy.length > 0 &&
+    trimmedEraseReason.length > 0;
+  const canSubmitErase = eraseConfirm.trim().toUpperCase() === "ERASE";
 
   return (
     <DashboardAnimatedGroup>
@@ -178,10 +218,14 @@ export function PrivacyToolsClient() {
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-[13px] leading-relaxed text-slate-700">
             <p>
               Found{" "}
-              <strong className="text-[#0b1220]">
-                {exportState.data.appointments.length}
-              </strong>{" "}
-              appointments,{" "}
+              {includesAppointments ? (
+                <>
+                  <strong className="text-[#0b1220]">
+                    {exportState.data.appointments.length}
+                  </strong>{" "}
+                  appointments,{" "}
+                </>
+              ) : null}
               <strong className="text-[#0b1220]">
                 {exportState.data.call_logs.length}
               </strong>{" "}
@@ -208,7 +252,11 @@ export function PrivacyToolsClient() {
         flat
         icon={FileJson}
         title="Export all customer records (Article 20)"
-        description="GDPR Article 20 — data portability. Download every appointment, call log, and action ticket for your business in a structured JSON or CSV bundle."
+        description={
+          includesAppointments
+            ? "GDPR Article 20 — data portability. Download every appointment, call log, and action ticket for your business in a structured JSON or CSV bundle."
+            : "GDPR Article 20 — data portability. Download every call log and action ticket for your business in a structured JSON or CSV bundle."
+        }
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button
@@ -236,7 +284,10 @@ export function PrivacyToolsClient() {
         ) : null}
         {portabilityState.status === "ready" ? (
           <p className="text-[13px] text-slate-600">
-            Last export: {portabilityState.data.appointments.length} appointments,{" "}
+            Last export:{" "}
+            {includesAppointments
+              ? `${portabilityState.data.appointments.length} appointments, `
+              : ""}
             {portabilityState.data.call_logs.length} call logs,{" "}
             {portabilityState.data.action_tickets.length} action tickets.
           </p>
@@ -250,59 +301,105 @@ export function PrivacyToolsClient() {
         description="GDPR Article 17 — erasure. Cannot be undone."
       >
         <form onSubmit={onErase} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="gdpr-erase-phone">Customer phone</Label>
-              <Input
-                id="gdpr-erase-phone"
-                type="tel"
-                inputMode="tel"
-                placeholder="+353 87 123 4567"
-                value={erasePhone}
-                onChange={(e) => setErasePhone(e.target.value)}
-                className={fieldClass}
-                required
+          {eraseStep === "details" ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="gdpr-erase-phone">Customer phone</Label>
+                  <Input
+                    id="gdpr-erase-phone"
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="+353 87 123 4567"
+                    value={erasePhone}
+                    onChange={(e) => setErasePhone(e.target.value)}
+                    className={fieldClass}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="gdpr-erase-performed-by">Erased by</Label>
+                  <Input
+                    id="gdpr-erase-performed-by"
+                    type="text"
+                    placeholder="Staff member name"
+                    value={erasePerformedBy}
+                    onChange={(e) => setErasePerformedBy(e.target.value)}
+                    className={fieldClass}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="gdpr-erase-reason">Reason for deletion</Label>
+                <Textarea
+                  id="gdpr-erase-reason"
+                  value={eraseReason}
+                  onChange={(e) => setEraseReason(e.target.value)}
+                  placeholder="e.g. Customer requested erasure by phone"
+                  rows={4}
+                  className={cn(
+                    fieldClass,
+                    "min-h-[6.5rem] w-full resize-y bg-[#fbfcfb] px-3.5 py-3 text-[13px] leading-relaxed",
+                  )}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                <Button
+                  type="submit"
+                  disabled={erasePending || !canContinueErase}
+                  className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "w-full sm:w-auto")}
+                >
+                  Continue
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <ErasureReviewCard
+                phoneDisplay={erasePhoneDisplay || erasePhone.trim()}
+                performedByName={trimmedErasePerformedBy}
+                reason={trimmedEraseReason}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="gdpr-erase-confirm">Confirmation</Label>
-              <Input
-                id="gdpr-erase-confirm"
-                type="text"
-                placeholder='Type "ERASE" to confirm'
-                value={eraseConfirm}
-                onChange={(e) => setEraseConfirm(e.target.value)}
-                className={cn(fieldClass, "uppercase")}
-                required
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="gdpr-erase-reason">Reason for deletion</Label>
-            <textarea
-              id="gdpr-erase-reason"
-              value={eraseReason}
-              onChange={(e) => setEraseReason(e.target.value)}
-              placeholder="e.g. Customer requested erasure by phone"
-              rows={3}
-              className={cn(fieldClass, "min-h-[5.5rem] resize-y leading-relaxed")}
-              required
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={
-              erasePending ||
-              eraseConfirm.toUpperCase() !== "ERASE" ||
-              !eraseReason.trim()
-            }
-            className={cn(
-              DASHBOARD_SECONDARY_BUTTON_CLASS,
-              "border-red-300 text-red-800 hover:border-red-400 hover:bg-red-50 disabled:opacity-50",
-            )}
-          >
-            {erasePending ? "Erasing…" : "Erase customer data"}
-          </Button>
+              <div className="space-y-1.5">
+                <Label htmlFor="gdpr-erase-confirm">Type ERASE to confirm</Label>
+                <Input
+                  id="gdpr-erase-confirm"
+                  type="text"
+                  placeholder="ERASE"
+                  value={eraseConfirm}
+                  onChange={(e) => setEraseConfirm(e.target.value)}
+                  className={cn(fieldClass, "uppercase")}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-3 pt-1 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={erasePending}
+                  onClick={() => {
+                    setEraseStep("details");
+                    setEraseConfirm("");
+                  }}
+                  className={cn(DASHBOARD_SECONDARY_BUTTON_CLASS, "w-full sm:w-auto")}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={erasePending || !canSubmitErase}
+                  className={cn(
+                    "h-10 w-full rounded-xl bg-red-700 px-5 text-[13px] font-medium text-white hover:bg-red-800 disabled:opacity-50 sm:w-auto",
+                  )}
+                >
+                  {erasePending ? "Erasing…" : "Erase customer data"}
+                </Button>
+              </div>
+            </>
+          )}
         </form>
         {eraseState.status === "error" ? (
           <p className="text-[13px] text-red-700" role="alert">
@@ -314,7 +411,9 @@ export function PrivacyToolsClient() {
             <p>
               Erased data for{" "}
               <strong className="text-[#0b1220]">{eraseState.phoneE164}</strong>:{" "}
-              {eraseState.counts.appointments_anonymised} appointments,{" "}
+              {includesAppointments && eraseState.counts.appointments_anonymised > 0
+                ? `${eraseState.counts.appointments_anonymised} appointments, `
+                : ""}
               {eraseState.counts.call_logs_redacted} call logs,{" "}
               {eraseState.counts.action_tickets_redacted} action tickets
               {eraseState.counts.blocked_callers_deleted > 0
