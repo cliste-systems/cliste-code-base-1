@@ -3,7 +3,6 @@ import {
   revalidateActionTicketSurfaces,
   resolveActionTicketDepartment,
 } from "@/lib/action-ticket-routing";
-import { classifyActionDepartment } from "@/lib/classify-action-department";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
@@ -68,7 +67,6 @@ export async function reprocessCallLogPostCall(callLogId: string): Promise<Repro
 
   const departmentSlug = await resolveActionTicketDepartment({
     summary: summaryText,
-    departmentSlug: classifyActionDepartment(summaryText),
     routeId: null,
   });
   const briefSummary = buildActionTicketBriefSummary(summaryText);

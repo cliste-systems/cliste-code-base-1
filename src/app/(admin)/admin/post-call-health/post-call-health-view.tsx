@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-import { AdminBadge } from "@/components/admin/admin-badge";
 import { AdminListCard } from "@/components/admin/admin-list-card";
 import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import {
@@ -42,6 +41,39 @@ function statusTone(status: PostCallStatus): "danger" | "warning" | "neutral" {
   if (status === "failed") return "danger";
   if (status === "partial") return "warning";
   return "neutral";
+}
+
+function statusBadgeClass(tone: "danger" | "warning" | "neutral"): string {
+  return cn(
+    "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
+    tone === "warning" && "border-amber-200 bg-amber-50 text-amber-800",
+    tone === "danger" && "border-red-200 bg-red-50 text-red-800",
+    tone === "neutral" && "border-gray-200 bg-white text-gray-700",
+  );
+}
+
+function PostCallStatusBadge({
+  status,
+  label,
+}: {
+  status: PostCallStatus;
+  label?: string;
+}) {
+  return (
+    <span className={statusBadgeClass(statusTone(status))}>
+      {label ?? statusLabel(status)}
+    </span>
+  );
+}
+
+function PostCallToneBadge({
+  tone,
+  children,
+}: {
+  tone: "danger" | "warning" | "neutral";
+  children: ReactNode;
+}) {
+  return <span className={statusBadgeClass(tone)}>{children}</span>;
 }
 
 function statusLabel(status: PostCallStatus): string {
@@ -157,15 +189,13 @@ export function PostCallHealthView({
                         ) : null}
                       </td>
                       <td className={adminTableTdClass}>
-                        <AdminBadge tone={statusTone(row.postCallStatus)}>
-                          {statusLabel(row.postCallStatus)}
-                        </AdminBadge>
+                        <PostCallStatusBadge status={row.postCallStatus} />
                       </td>
                       <td className={adminTableTdClass}>
                         {missingTicket ? (
-                          <AdminBadge tone="danger">Missing</AdminBadge>
+                          <PostCallToneBadge tone="danger">Missing</PostCallToneBadge>
                         ) : row.hasLinkedTicket ? (
-                          <AdminBadge tone="neutral">Linked</AdminBadge>
+                          <PostCallToneBadge tone="neutral">Linked</PostCallToneBadge>
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
@@ -191,11 +221,9 @@ export function PostCallHealthView({
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-              <AdminBadge tone={statusTone(selected.postCallStatus)}>
-                {statusLabel(selected.postCallStatus)}
-              </AdminBadge>
+              <PostCallStatusBadge status={selected.postCallStatus} />
               {selected.postCallExpectedTicket && !selected.hasLinkedTicket ? (
-                <AdminBadge tone="danger">Expected ticket missing</AdminBadge>
+                <PostCallToneBadge tone="danger">Expected ticket missing</PostCallToneBadge>
               ) : null}
             </div>
 
