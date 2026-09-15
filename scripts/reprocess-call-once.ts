@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { reprocessCallLogPostCall } from "../src/lib/post-call-reprocess.ts";
+import { reprocessCallLogPostCall } from "../src/lib/post-call-reprocess";
 
 async function main() {
   const callLogId = "48b26233-97b2-46cb-8b88-d1cf14f26219";
