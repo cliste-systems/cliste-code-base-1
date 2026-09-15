@@ -14,7 +14,7 @@ import {
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import { cn } from "@/lib/utils";
 
-import { DashboardHeaderRangeControls } from "../dashboard-header-range-controls";
+import { DashboardHeaderDateControls } from "../dashboard-header-date-controls";
 
 /** Today / Yesterday / "Mon 23 Jun" — the heading for a day group. */
 function dayGroupLabel(iso: string | undefined): string {
@@ -54,9 +54,11 @@ function groupRowsByDay(
 export function ActivityView({
   rows,
   summary,
+  dateLabel,
 }: {
   rows: TimelineFeedRow[];
   summary: { value: string; label: string }[];
+  dateLabel: string;
 }) {
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
@@ -66,9 +68,9 @@ export function ActivityView({
             tone="activity"
             icon={Activity}
             title="Activity"
-            description="Calls answered, links sent, and enquiries captured."
+            description={dateLabel}
             summary={summary}
-            actions={<DashboardHeaderRangeControls />}
+            actions={<DashboardHeaderDateControls />}
           />
 
           <section

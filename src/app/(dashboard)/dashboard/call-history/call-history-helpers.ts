@@ -1,5 +1,5 @@
 import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
-import { resolveCallerDisplayName } from "@/lib/caller-identity";
+import { resolveCallerDisplayName, isUnknownCallerLabel } from "@/lib/caller-identity";
 import type { CallFollowUpLink } from "@/lib/call-history-follow-up";
 import {
   normalizeCallOutcome,
@@ -44,6 +44,31 @@ export function callDisplayName(
   item: Pick<CallHistoryListItem, "callerName" | "callerDisplay">,
 ): string {
   return resolveCallerDisplayName([item.callerName], item.callerDisplay);
+}
+
+/** Compact list primary line — name and number on one scan line. */
+export function callListPrimaryLine(
+  item: Pick<CallHistoryListItem, "callerName" | "callerDisplay">,
+): string {
+  const name = callDisplayName(item);
+  const phone = item.callerDisplay.trim() || "Unknown number";
+  if (name === phone || isUnknownCallerLabel(name)) return phone;
+  return `${name} ${phone}`;
+}
+
+/** Time-only label for same-day call lists. */
+export function callListTimeLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IE", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export function callListNeedsAttention(item: CallHistoryListItem): boolean {
+  return item.hasOpenAction || callNeedsPostCallReviewBanner(item);
 }
 
 export function summaryForDisplay(

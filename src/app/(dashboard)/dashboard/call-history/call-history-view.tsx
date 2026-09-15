@@ -23,8 +23,6 @@ import {
 } from "@/components/dashboard/list-detail";
 import {
   DASHBOARD_CARD_SURFACE,
-  DASHBOARD_ICON_CHIP_ROW,
-  DASHBOARD_ICON_GLYPH_LG,
   DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
@@ -50,6 +48,9 @@ import { useDashboardVertical } from "../dashboard-vertical-context";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
+  callListNeedsAttention,
+  callListPrimaryLine,
+  callListTimeLabel,
   cleanedTranscriptForDisplay,
   matchesOutcomeFilter,
   matchesSearch,
@@ -204,15 +205,13 @@ export function CallHistoryView({
       )}
     >
       <ListDetailLayout
-        className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.15fr)_420px]"
+        className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]"
         list={
-          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#fbfcfb] max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r xl:border-[#dfe7e2]">
-            <div className="flex shrink-0 flex-col gap-2 border-b border-[#dfe7e2] bg-[#fbfcfb] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <h2 className="text-[15px] font-semibold tracking-tight text-[#11181d]">
-                Calls
-              </h2>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative w-full shrink-0 sm:w-44">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden border-[#dfe7e2] bg-[#fbfcfb] max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r xl:border-r-[#dfe7e2]">
+            <div className="shrink-0 border-b border-inherit px-4 py-3 sm:px-5">
+              <p className="text-[14px] font-semibold text-[#11181d]">Call log</p>
+              <div className="mt-2 flex flex-col gap-2">
+                <div className="relative">
                   <Search
                     className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
                     aria-hidden
@@ -221,9 +220,9 @@ export function CallHistoryView({
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search calls"
+                    placeholder="Search name or number"
                     aria-label="Search calls"
-                    className="h-9 w-full border-[#b9c8c1] bg-white py-1 pl-8 text-[13px] placeholder:text-slate-400"
+                    className="h-10 w-full border-[#b9c8c1] bg-white py-1 pl-8 text-[14px] placeholder:text-slate-400"
                   />
                 </div>
                 <select
@@ -232,7 +231,7 @@ export function CallHistoryView({
                     setOutcomeFilter(e.target.value as OutcomeFilterValue)
                   }
                   aria-label="Filter by outcome"
-                  className={cn(DASHBOARD_SELECT_CLASS, "h-9 w-full shrink-0 sm:w-[11rem]")}
+                  className={cn(DASHBOARD_SELECT_CLASS, "h-10 w-full shrink-0")}
                 >
                   {OUTCOME_FILTER_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -244,22 +243,19 @@ export function CallHistoryView({
             </div>
             <div
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto overscroll-y-contain",
-                filtered.length === 0 &&
-                  "flex items-center justify-center",
+                "min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-2 sm:px-3",
+                filtered.length === 0 && "flex items-center justify-center",
               )}
             >
               {filtered.length === 0 ? (
-                <div className="flex h-full w-full items-center justify-center p-6">
-                  <EmptyState
-                    icon={Phone}
-                    title="No calls yet"
-                    description={copy.calls.emptyDescription}
-                    className="w-full max-w-xl px-4 py-10"
-                  />
-                </div>
+                <EmptyState
+                  icon={Phone}
+                  title="No calls yet"
+                  description={copy.calls.emptyDescription}
+                  className="w-full py-10"
+                />
               ) : (
-                <ul className="space-y-2 p-2 sm:p-3" role="listbox" aria-label="Calls">
+                <ul className="space-y-1.5" role="listbox" aria-label="Calls">
                   {filtered.map((row) => (
                     <CallListRow
                       key={row.id}
@@ -308,8 +304,9 @@ function CallListRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const name = callDisplayName(row);
-  const preview = row.summaryPreview;
+  const primary = callListPrimaryLine(row);
+  const time = callListTimeLabel(row.createdAt);
+  const needsAttention = callListNeedsAttention(row);
 
   return (
     <li>
@@ -319,47 +316,34 @@ function CallListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "flex min-h-[82px] w-full cursor-pointer gap-3 rounded-lg border px-3 py-3 text-left shadow-[0_1px_0_rgba(17,24,29,0.04)] transition-colors sm:gap-4 sm:px-4",
+          "w-full cursor-pointer rounded-lg border px-3 py-2.5 text-left transition-colors",
           selected
-            ? "border-[#353D42] bg-white shadow-[inset_3px_0_0_#353D42,0_1px_0_rgba(17,24,29,0.04)]"
-            : "border-[#dfe7e2] bg-white/78 hover:border-[#9da9a4] hover:bg-white",
+            ? "border-[#353D42] bg-white shadow-[inset_4px_0_0_#353D42]"
+            : "border-[#dfe7e2] bg-white/90 hover:border-[#9da9a4]",
         )}
       >
-        <span className={DASHBOARD_ICON_CHIP_ROW}>
-          <Phone className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold text-[#11181d]">
-            {name}
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-snug text-[#0b1220]">
+            {primary}
+          </p>
+          <span className="shrink-0 text-[12px] tabular-nums text-slate-500">
+            {time}
           </span>
-          <span className="mt-0.5 block truncate text-[12px] text-slate-500">
-            {row.callerDisplay || "Unknown number"}
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-[12px] text-slate-500">
+            <span className="tabular-nums">{row.durationLabel}</span>
             <span className="text-slate-300"> · </span>
-            {row.dateTimeLabel}
-          </span>
-          <span className="mt-2 block text-[12px] font-medium text-slate-600">
-            {row.intentLabel}
-          </span>
-          {preview ? (
-            <span className="mt-0.5 line-clamp-1 text-[12px] text-slate-500">
-              {preview}
-            </span>
-          ) : null}
-        </span>
-        <span className="flex shrink-0 flex-col items-end gap-1.5 text-right">
-          <StatusPill variant={outcomeBadgeVariant(row.outcome)} dot>
             {row.outcomeLabel}
-          </StatusPill>
-          <span className="text-[12px] tabular-nums text-slate-500">
-            {row.durationLabel}
-          </span>
-          {row.hasOpenAction ? (
-            <StatusPill variant="attention">Needs attention</StatusPill>
+          </p>
+          {needsAttention ? (
+            <span
+              className="size-2 shrink-0 rounded-full bg-amber-500"
+              title="Needs attention"
+              aria-label="Needs attention"
+            />
           ) : null}
-          {callNeedsPostCallReviewBanner(row) ? (
-            <StatusPill variant="attention">Processing issue</StatusPill>
-          ) : null}
-        </span>
+        </div>
       </button>
     </li>
   );
@@ -580,8 +564,6 @@ function CallDetailPanelContent({
           </div>
         ) : null}
 
-        <CallerHistorySection callerNumber={call.callerId} currentCallId={call.id} />
-
         <DetailSection title="Summary">
           <p className="text-[14px] leading-relaxed text-slate-700">
             {summary ?? "No summary available."}
@@ -591,6 +573,8 @@ function CallDetailPanelContent({
         <DetailSection title="Recording">
           <CallAudioPlayer callLogId={call.id} hasRecording={call.hasRecording} />
         </DetailSection>
+
+        <CallerHistorySection callerNumber={call.callerId} currentCallId={call.id} />
 
         <DetailSection title="Transcript">
           {detailLoading ? (

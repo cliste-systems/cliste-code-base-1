@@ -31,7 +31,7 @@ import { buildCallsPageHref } from "@/lib/calls-page-href";
 
 import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
 
-import { CallsDatePicker } from "@/components/dashboard/calls-date-picker";
+import { DashboardHeaderDateControls } from "../dashboard-header-date-controls";
 import {
   buildCallHistoryMetricsFromSummaryRows,
   type CallFollowUp,
@@ -284,7 +284,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         icon={Phone}
         title="Calls"
         description={greetingSubline}
-        actions={<CallsDatePicker />}
+        actions={<DashboardHeaderDateControls />}
         summary={
           [
             { value: String(metrics.totalCalls), label: "total calls" },

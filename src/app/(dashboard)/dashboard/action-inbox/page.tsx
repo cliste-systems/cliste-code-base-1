@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Inbox } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
@@ -6,6 +7,11 @@ import {
   DASHBOARD_HOME_CONTENT_COLUMN,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
 } from "@/components/dashboard/dashboard-surface";
+import {
+  callsPageDateGreetingSubline,
+  getCallsPageDayBoundsIso,
+  parseCallsPageDateParam,
+} from "@/lib/calls-page-date";
 import {
   formatE164ForDisplay,
 } from "@/lib/call-history-types";
@@ -36,9 +42,10 @@ import {
 } from "./action-inbox-helpers";
 import type { ActionTicketDeliveryStatus } from "@/lib/post-call-processing-types";
 import { ActionInboxView } from "./action-inbox-view";
+import { DashboardHeaderDateControls } from "../dashboard-header-date-controls";
 
 type ActionInboxPageProps = {
-  searchParams?: Promise<{ ticket?: string }>;
+  searchParams?: Promise<{ ticket?: string; date?: string; range?: string }>;
 };
 
 type TicketRow = {
@@ -147,6 +154,14 @@ export default async function ActionInboxPage({
   searchParams,
 }: ActionInboxPageProps) {
   const sp = searchParams ? await searchParams : {};
+  const now = new Date();
+  if (sp.range && !sp.date) {
+    redirect("/dashboard/action-inbox");
+  }
+
+  const selectedDate = parseCallsPageDateParam(sp.date, now);
+  const dateLabel = callsPageDateGreetingSubline(selectedDate, now);
+  const { lowerInclusive, upperExclusive } = getCallsPageDayBoundsIso(selectedDate);
   const initialSelectedTicketId =
     typeof sp.ticket === "string" && sp.ticket.trim() ? sp.ticket.trim() : null;
 
@@ -166,6 +181,8 @@ export default async function ActionInboxPage({
           "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
         )
         .eq("organization_id", organizationId)
+        .gte("created_at", lowerInclusive)
+        .lt("created_at", upperExclusive)
         .order("created_at", { ascending: false })
         .limit(ACTION_INBOX_TICKET_LIMIT),
       supabase
@@ -213,7 +230,8 @@ export default async function ActionInboxPage({
         tone="inbox"
         icon={Inbox}
         title="Action inbox"
-        description="Brief triage across departments — open the full follow-up in the right workspace."
+        description={dateLabel}
+        actions={<DashboardHeaderDateControls />}
         summary={[
           { value: String(metrics.openCount), label: "open" },
           { value: String(metrics.urgentCount), label: "urgent" },

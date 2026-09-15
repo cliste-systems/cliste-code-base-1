@@ -1,8 +1,10 @@
+import { redirect } from "next/navigation";
+
 import {
-  getDashboardMetricRangeLowerBoundIso,
-  getDashboardMetricRangeUpperExclusiveIso,
-  parseDashboardMetricRange,
-} from "@/lib/dashboard-metric-range";
+  callsPageDateGreetingSubline,
+  getCallsPageDayBoundsIso,
+  parseCallsPageDateParam,
+} from "@/lib/calls-page-date";
 import { buildDashboardActivityFeed } from "@/lib/dashboard-activity-feed";
 import { ACTIVITY_FEED_LIMIT } from "@/lib/dashboard-list-limits";
 import { formatDashboardFeedRelativeTime } from "@/lib/dashboard-feed-time";
@@ -16,17 +18,14 @@ import { ActivityView } from "./activity-view";
 export const dynamic = "force-dynamic";
 
 type ActivityPageProps = {
-  searchParams?: Promise<{ range?: string }>;
+  searchParams?: Promise<{ date?: string; range?: string }>;
 };
 
-function applyRangeEnd<T extends { gte: (col: string, v: string) => T; lt: (col: string, v: string) => T }>(
-  query: T,
-  rangeEndExclusiveIso: string | null,
-): T {
-  if (rangeEndExclusiveIso) {
-    return query.lt("created_at", rangeEndExclusiveIso);
-  }
-  return query;
+function applyDayBounds<T extends {
+  gte: (col: string, v: string) => T;
+  lt: (col: string, v: string) => T;
+}>(query: T, lowerInclusive: string, upperExclusive: string): T {
+  return query.gte("created_at", lowerInclusive).lt("created_at", upperExclusive);
 }
 
 function applyOrganizationScope<T>(query: T, organizationIds: string[]): T {
@@ -53,40 +52,42 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
   const scopedOrgIds = scope.organizationIds;
 
   const sp = searchParams ? await searchParams : {};
-  const metricRangeStartIso = getDashboardMetricRangeLowerBoundIso(
-    parseDashboardMetricRange(sp.range),
-  );
-  const metricRangeEndExclusiveIso =
-    getDashboardMetricRangeUpperExclusiveIso(
-      parseDashboardMetricRange(sp.range),
-    );
+  const now = new Date();
+  if (sp.range && !sp.date) {
+    const params = new URLSearchParams();
+    redirect(params.size ? `/dashboard/activity?${params.toString()}` : "/dashboard/activity");
+  }
 
-  const callsQuery = applyRangeEnd(
+  const selectedDate = parseCallsPageDateParam(sp.date, now);
+  const dateLabel = callsPageDateGreetingSubline(selectedDate, now);
+  const { lowerInclusive, upperExclusive } = getCallsPageDayBoundsIso(selectedDate);
+
+  const callsQuery = applyDayBounds(
     applyOrganizationScope(
       supabase
         .from("call_logs")
         .select(
           "id, created_at, outcome, caller_number, caller_name, ai_summary",
         )
-        .gte("created_at", metricRangeStartIso)
         .order("created_at", { ascending: false })
         .limit(ACTIVITY_FEED_LIMIT),
       scopedOrgIds,
     ),
-    metricRangeEndExclusiveIso,
+    lowerInclusive,
+    upperExclusive,
   );
 
-  const ticketsQuery = applyRangeEnd(
+  const ticketsQuery = applyDayBounds(
     applyOrganizationScope(
       supabase
         .from("action_tickets")
         .select("id, created_at, caller_name, caller_number")
-        .gte("created_at", metricRangeStartIso)
         .order("created_at", { ascending: false })
         .limit(ACTIVITY_FEED_LIMIT),
       scopedOrgIds,
     ),
-    metricRangeEndExclusiveIso,
+    lowerInclusive,
+    upperExclusive,
   );
 
   const [callsRes, ticketsRes] = await Promise.all([
@@ -116,5 +117,5 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
     },
   ];
 
-  return <ActivityView rows={rows} summary={summary} />;
+  return <ActivityView rows={rows} summary={summary} dateLabel={dateLabel} />;
 }
