@@ -139,6 +139,9 @@ export function DashboardMobileNav({
             );
           })}
           <div className="col-span-2 space-y-2 border-t border-slate-100 pt-2">
+            <p className="px-1 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
+              Account
+            </p>
             <AccountSidebarNav
               items={accountNav.map((item) => ({
                 href: item.href,

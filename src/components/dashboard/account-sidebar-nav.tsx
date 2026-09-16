@@ -1,28 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Building2,
+  Gauge,
+  LayoutDashboard,
+  LifeBuoy,
+  Settings,
+  Shield,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, CircleUser } from "lucide-react";
 
 import {
   ACCOUNT_SIDEBAR_CHILDREN,
-  isAccountNavPath,
   type AccountNavChild,
 } from "@/lib/dashboard-account-nav";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import {
-  DASHBOARD_SIDEBAR_CHEVRON_CLASS,
-  DashboardSidebarNavExpand,
-} from "@/components/dashboard/dashboard-sidebar-nav-expand";
-import {
   dashboardSidebarGroupClassName,
-  dashboardSidebarHeaderClassName,
-  dashboardSidebarSubRowClassName,
+  dashboardSidebarRowClassName,
 } from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { cn } from "@/lib/utils";
 
-function NavSubRow({
+const NAV_ICONS: Record<string, LucideIcon> = {
+  "/dashboard/usage": Gauge,
+  "/dashboard/billing": Gauge,
+  "/dashboard/support": LifeBuoy,
+  "/dashboard/legal/data-requests": Shield,
+  "/dashboard/privacy": Shield,
+  "/dashboard/locations": Building2,
+  "/dashboard/team": Users,
+  "/dashboard/settings": Settings,
+};
+
+function NavRow({
   href,
   label,
   active,
@@ -33,17 +46,33 @@ function NavSubRow({
   active: boolean;
   badge?: number;
 }) {
+  const Icon = NAV_ICONS[href] ?? LayoutDashboard;
   const showBadge = typeof badge === "number" && badge > 0;
 
   return (
     <Link
       href={href}
-      className={dashboardSidebarSubRowClassName(active)}
+      className={dashboardSidebarRowClassName(active)}
       aria-current={active ? "page" : undefined}
     >
-      <span className="truncate">{label}</span>
+      <span className="flex min-w-0 flex-1 items-center gap-3">
+        <Icon
+          className={cn(
+            "size-4 shrink-0 transition-colors",
+            active
+              ? "text-[#0f172a]"
+              : "text-[#64748b] group-hover:text-[#0f172a]",
+          )}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+        <span className="truncate">{label}</span>
+      </span>
       {showBadge ? (
-        <span className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums">
+        <span
+          className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums"
+          aria-label={`${formatNavBadgeCount(badge)} pending`}
+        >
           {formatNavBadgeCount(badge)}
         </span>
       ) : null}
@@ -77,60 +106,18 @@ export function AccountSidebarNav({
   items?: AccountNavChild[];
 }) {
   const pathname = usePathname();
-  const onAccountRoute = isAccountNavPath(pathname);
-  const [manuallyExpanded, setManuallyExpanded] = useState(false);
-  const [routeCollapsed, setRouteCollapsed] = useState(false);
-
-  const childActive = items.some((item) => isChildActive(pathname, item.href));
-  const expanded = onAccountRoute ? !routeCollapsed : manuallyExpanded;
 
   return (
     <div className={dashboardSidebarGroupClassName()}>
-      <button
-        type="button"
-        onClick={() => {
-          if (onAccountRoute) {
-            setRouteCollapsed((open) => !open);
-            return;
-          }
-          setManuallyExpanded((open) => !open);
-        }}
-        className={dashboardSidebarHeaderClassName(onAccountRoute && childActive)}
-        aria-expanded={expanded}
-      >
-        <span className="flex min-w-0 flex-1 items-center gap-3">
-          <CircleUser
-            className={cn(
-              "size-4 shrink-0",
-              onAccountRoute
-                ? "text-[#0f172a]"
-                : "text-[#64748b] group-hover:text-[#0f172a]",
-            )}
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          <span className="truncate">Account</span>
-        </span>
-        <ChevronDown
-          className={cn(
-            DASHBOARD_SIDEBAR_CHEVRON_CLASS,
-            expanded ? "rotate-0" : "-rotate-90",
-          )}
-          aria-hidden
+      {items.map((item) => (
+        <NavRow
+          key={item.href}
+          href={item.href}
+          label={item.label}
+          active={isChildActive(pathname, item.href)}
+          badge={item.badge}
         />
-      </button>
-
-      <DashboardSidebarNavExpand expanded={expanded}>
-        {items.map((item) => (
-          <NavSubRow
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={isChildActive(pathname, item.href)}
-            badge={item.badge}
-          />
-        ))}
-      </DashboardSidebarNavExpand>
+      ))}
     </div>
   );
 }
