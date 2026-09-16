@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import {
   AlertTriangle,
+  Bug,
   FlaskConical,
   LayoutGrid,
   LifeBuoy,
@@ -44,6 +45,12 @@ const baseNav = [
     href: "/admin/post-call-health",
     label: "Post-call health",
     icon: AlertTriangle,
+    exact: false,
+  },
+  {
+    href: "/admin/platform-health",
+    label: "Platform health",
+    icon: Bug,
     exact: false,
   },
   { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },

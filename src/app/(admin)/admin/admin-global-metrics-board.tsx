@@ -3,10 +3,12 @@ import { Suspense, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
+  Bug,
   Clock3,
   LifeBuoy,
   Phone,
   ShieldAlert,
+  Users,
 } from "lucide-react";
 
 import type { AnalyticsSegment } from "@/lib/dashboard-home-analytics";
@@ -24,25 +26,43 @@ function HeadlineMetric({
   icon: Icon,
   href,
   tone = "default",
+  size = "default",
 }: {
   label: string;
   value: string;
   icon: LucideIcon;
   href?: string;
   tone?: "default" | "urgent";
+  size?: "default" | "compact";
 }) {
   const urgent = tone === "urgent";
+  const compact = size === "compact";
   const inner = (
-    <div className="flex min-w-0 flex-col gap-3 px-4 py-5 sm:px-5 sm:py-6">
-      <div className="flex items-center gap-2 text-white/70">
-        <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-        <span className="text-[12px] font-medium tracking-wide uppercase">
+    <div
+      className={cn(
+        "flex min-w-0 flex-col",
+        compact ? "gap-2 px-3 py-3 sm:px-4" : "gap-3 px-4 py-5 sm:px-5 sm:py-6",
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-white/70">
+        <Icon
+          className={cn("shrink-0", compact ? "size-3.5" : "size-4")}
+          strokeWidth={1.5}
+          aria-hidden
+        />
+        <span
+          className={cn(
+            "font-medium uppercase tracking-wide",
+            compact ? "text-[10px] leading-tight" : "text-[12px]",
+          )}
+        >
           {label}
         </span>
       </div>
       <p
         className={cn(
-          "text-[36px] font-semibold leading-none tracking-tight tabular-nums sm:text-[42px]",
+          "font-semibold leading-none tracking-tight tabular-nums",
+          compact ? "text-2xl" : "text-[36px] sm:text-[42px]",
           urgent ? "text-red-300" : "text-white",
         )}
       >
@@ -51,18 +71,21 @@ function HeadlineMetric({
     </div>
   );
 
+  const shellClass = cn(
+    "block min-w-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/30",
+    href && "hover:bg-white/5",
+    compact && urgent && "bg-red-500/10",
+  );
+
   if (href) {
     return (
-      <Link
-        href={href}
-        className="block min-w-0 outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/30"
-      >
+      <Link href={href} className={shellClass}>
         {inner}
       </Link>
     );
   }
 
-  return <div className="min-w-0">{inner}</div>;
+  return <div className={cn("min-w-0", compact && urgent && "bg-red-500/10")}>{inner}</div>;
 }
 
 function BreakdownBar({ segment }: { segment: AnalyticsSegment }) {
@@ -128,6 +151,7 @@ export type AdminGlobalMetricsBoardProps = {
   calls: number;
   pipelineIncidents: number;
   postCallFailures: number;
+  platformCritical: number;
   authFailures: number;
   support: number;
   organizations: number;
@@ -149,6 +173,7 @@ export function AdminGlobalMetricsBoard({
   calls,
   pipelineIncidents,
   postCallFailures,
+  platformCritical,
   authFailures,
   support,
   organizations,
@@ -189,7 +214,7 @@ export function AdminGlobalMetricsBoard({
           </Suspense>
         </div>
 
-        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-6 lg:divide-x lg:divide-y-0">
+        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-4 sm:divide-y-0 lg:divide-x">
           <HeadlineMetric
             label={`Calls · ${periodLabel.toLowerCase()}`}
             value={formatInt(calls)}
@@ -201,52 +226,61 @@ export function AdminGlobalMetricsBoard({
             icon={Clock3}
           />
           <HeadlineMetric
-            label="Pipeline · 7d"
-            value={formatInt(pipelineIncidents)}
-            icon={AlertTriangle}
-            href="/admin/security?view=pipeline"
-            tone={pipelineIncidents > 0 ? "urgent" : "default"}
+            label="Live tenants"
+            value={formatInt(organizations)}
+            icon={Users}
           />
           <HeadlineMetric
-            label="Post-call · 7d"
-            value={formatInt(postCallFailures)}
-            icon={AlertTriangle}
-            href="/admin/post-call-health"
-            tone={postCallFailures > 0 ? "urgent" : "default"}
-          />
-          <HeadlineMetric
-            label="Auth fails · 24h"
-            value={formatInt(authFailures)}
-            icon={ShieldAlert}
-            href="/admin/security"
-            tone={authFailures > 0 ? "urgent" : "default"}
-          />
-          <HeadlineMetric
-            label="Open support"
-            value={formatInt(support)}
-            icon={LifeBuoy}
-            href="/admin/support"
+            label="Avg calls / tenant"
+            value={organizations > 0 ? (calls / organizations).toFixed(1) : "—"}
+            icon={Clock3}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-px border-t border-white/10 bg-white/10 sm:grid-cols-2">
-          <div className="bg-[#0b1220] px-4 py-3 sm:px-5">
-            <p className="text-[11px] uppercase tracking-wide text-white/45">
-              Live tenants
-            </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
-              {formatInt(organizations)}
-            </p>
-          </div>
-          <div className="bg-[#0b1220] px-4 py-3 sm:px-5">
-            <p className="text-[11px] uppercase tracking-wide text-white/45">
-              Avg calls per tenant
-            </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
-              {organizations > 0
-                ? (calls / organizations).toFixed(1)
-                : "—"}
-            </p>
+        <div className="border-t border-white/10">
+          <p className="px-4 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45 sm:px-5">
+            Ops health
+          </p>
+          <div className="mt-1 grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
+            <HeadlineMetric
+              label="Pipeline · 7d"
+              value={formatInt(pipelineIncidents)}
+              icon={AlertTriangle}
+              href="/admin/security?view=pipeline"
+              tone={pipelineIncidents > 0 ? "urgent" : "default"}
+              size="compact"
+            />
+            <HeadlineMetric
+              label="Post-call · 7d"
+              value={formatInt(postCallFailures)}
+              icon={AlertTriangle}
+              href="/admin/post-call-health"
+              tone={postCallFailures > 0 ? "urgent" : "default"}
+              size="compact"
+            />
+            <HeadlineMetric
+              label="Platform · 7d"
+              value={formatInt(platformCritical)}
+              icon={Bug}
+              href="/admin/platform-health"
+              tone={platformCritical > 0 ? "urgent" : "default"}
+              size="compact"
+            />
+            <HeadlineMetric
+              label="Auth fails · 24h"
+              value={formatInt(authFailures)}
+              icon={ShieldAlert}
+              href="/admin/security"
+              tone={authFailures > 0 ? "urgent" : "default"}
+              size="compact"
+            />
+            <HeadlineMetric
+              label="Open support"
+              value={formatInt(support)}
+              icon={LifeBuoy}
+              href="/admin/support"
+              size="compact"
+            />
           </div>
         </div>
       </div>

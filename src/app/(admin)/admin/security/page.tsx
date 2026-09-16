@@ -89,6 +89,22 @@ function outcomeLabel(outcome: SecurityEventRow["outcome"]): string {
   }
 }
 
+function outcomeTone(
+  outcome: SecurityEventRow["outcome"],
+): "neutral" | "danger" | "warning" | "success" {
+  switch (outcome) {
+    case "success":
+      return "success";
+    case "failure":
+      return "danger";
+    case "rate_limited":
+    case "config_error":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
 function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -219,7 +235,11 @@ export default async function AdminSecurityPage({
 
   const stats = (
     <AdminStatsGrid>
-      <AdminStatCard label="Failed (24h)" value={failures24h} />
+      <AdminStatCard
+        label="Failed (24h)"
+        value={failures24h}
+        tone={failures24h > 0 ? "danger" : "neutral"}
+      />
       <AdminStatCard label="Successful (24h)" value={success24h} />
       <AdminStatCard label="Unique IPs (24h)" value={uniqueIps24h} />
       <AdminStatCard
@@ -306,7 +326,9 @@ function AuthEventsTable({ rows }: { rows: SecurityEventRow[] }) {
                   {formatEventType(row.event_type)}
                 </td>
                 <td className={`whitespace-nowrap ${adminTableTdClass}`}>
-                  <AdminBadge>{outcomeLabel(row.outcome)}</AdminBadge>
+                  <AdminBadge tone={outcomeTone(row.outcome)}>
+                    {outcomeLabel(row.outcome)}
+                  </AdminBadge>
                 </td>
                 <td className={`text-gray-600 ${adminTableTdClass}`}>
                   {identity}

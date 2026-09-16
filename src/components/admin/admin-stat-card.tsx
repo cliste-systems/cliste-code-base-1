@@ -6,6 +6,7 @@ type AdminStatCardProps = {
   label: string;
   value: ReactNode;
   muted?: boolean;
+  tone?: "neutral" | "danger" | "warning" | "success";
   className?: string;
 };
 
@@ -13,6 +14,7 @@ export function AdminStatCard({
   label,
   value,
   muted,
+  tone = "neutral",
   className,
 }: AdminStatCardProps) {
   return (
@@ -28,7 +30,11 @@ export function AdminStatCard({
       <p
         className={cn(
           "mt-2 text-2xl font-semibold tracking-tight",
-          muted ? "text-gray-500" : "text-gray-900",
+          muted && "text-gray-500",
+          !muted && tone === "neutral" && "text-gray-900",
+          !muted && tone === "danger" && "text-red-700",
+          !muted && tone === "warning" && "text-amber-700",
+          !muted && tone === "success" && "text-emerald-700",
         )}
       >
         {value}

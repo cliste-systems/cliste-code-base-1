@@ -5,7 +5,7 @@
 const PRONUNCIATION_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
   [/\bHello Cara\b/gi, "Hello Car-ah"],
   [/\bCara\b/g, "Car-ah"],
-  [/\bKavanaghs\b/gi, "Kavanahs"],
+  [/\bKavanaghs\b/gi, "Kav-an-as"],
   [/\bDonegal Town\b/gi, "Doneygall Town"],
   [/\bDonegal\b/gi, "Doneygall"],
   [/\bReal Rewards\b/gi, "Real Re-wards"],
