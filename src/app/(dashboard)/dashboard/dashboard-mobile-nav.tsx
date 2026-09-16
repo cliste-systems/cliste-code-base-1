@@ -28,10 +28,8 @@ import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vert
 import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
 import { cn } from "@/lib/utils";
 
-import {
-  isDashboardNavItemActive,
-  type DashboardSidebarNavItem,
-} from "./dashboard-sidebar";
+import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
+import { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
