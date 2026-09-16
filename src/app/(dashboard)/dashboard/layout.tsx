@@ -169,7 +169,10 @@ export default async function DashboardLayout({
   const accountNav = resolvedNavItems
     .filter((i) => i.section === "account")
     .map((item) => toNavItem(item, navBadges));
-  const mobileNavItems: DashboardSidebarNavItem[] = coreNav;
+  const mobileNavItems: DashboardSidebarNavItem[] = [
+    ...coreNav,
+    ...accountNav,
+  ];
 
   const accountSummary = buildDashboardAccountSummary(profile, user, {
     name: accountBilling?.name ?? orgRow?.name ?? null,
