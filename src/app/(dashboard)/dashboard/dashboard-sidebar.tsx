@@ -21,11 +21,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AccountSidebarNav } from "@/components/dashboard/account-sidebar-nav";
 import { LocationSwitcher } from "@/components/dashboard/location-switcher";
 import { DashboardProfileMenu } from "@/components/dashboard/dashboard-profile-menu";
 import type { AccountLocationRow } from "@/lib/account-locations";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import { dashboardSidebarRowClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
+import { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 import { cn } from "@/lib/utils";
 
 import type { DashboardAccountSummary } from "@/lib/dashboard-account-summary";
@@ -62,21 +64,7 @@ export type DashboardSidebarNavItem = {
   activeAliases?: string[];
 };
 
-export function isDashboardNavItemActive(
-  pathname: string,
-  item: DashboardSidebarNavItem,
-): boolean {
-  if (item.activePrefix) {
-    return pathname.startsWith(item.activePrefix);
-  }
-  if (item.href === "/dashboard") {
-    return pathname === "/dashboard";
-  }
-  const paths = [item.href, ...(item.activeAliases ?? [])];
-  return paths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
-}
+export { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 
 type DashboardSidebarProps = {
   coreNav: DashboardSidebarNavItem[];
@@ -208,7 +196,12 @@ export function DashboardSidebar({
           {accountNav.length > 0 ? (
             <>
               <div className="mx-0.5 h-px shrink-0 bg-[#e2e8f0]/90" />
-              <NavSection label="Account" items={accountNav} />
+              <section className="space-y-1.5" aria-label="Account">
+                <p className="px-3 text-[10px] font-semibold tracking-[0.2em] text-slate-400 uppercase">
+                  Account
+                </p>
+                <AccountSidebarNav items={accountNav} />
+              </section>
             </>
           ) : null}
           {needsPassword ? (

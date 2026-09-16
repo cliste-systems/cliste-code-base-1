@@ -4,6 +4,8 @@ export type AccountNavChild = {
   href: string;
   label: string;
   badge?: number;
+  activePrefix?: string;
+  activeAliases?: string[];
 };
 
 export const ACCOUNT_SIDEBAR_CHILDREN: Omit<AccountNavChild, "badge">[] = [
