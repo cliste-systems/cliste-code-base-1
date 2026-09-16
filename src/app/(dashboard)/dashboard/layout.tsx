@@ -55,6 +55,7 @@ const navItems: {
   href: string;
   label: string;
   section: "core" | "account";
+  activeAliases?: string[];
 }[] = [
   { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
   { href: DASHBOARD_ROUTES.activity, label: "Activity", section: "core" },
@@ -63,9 +64,19 @@ const navItems: {
   { href: DASHBOARD_ROUTES.caraTraining, label: "Training", section: "core" },
   { href: DASHBOARD_ROUTES.businessFaqs, label: "FAQs", section: "core" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
-  { href: DASHBOARD_ROUTES.usage, label: "Usage", section: "account" },
+  {
+    href: DASHBOARD_ROUTES.usage,
+    label: "Usage",
+    section: "account",
+    activeAliases: ["/dashboard/billing"],
+  },
   { href: DASHBOARD_ROUTES.support, label: "Support", section: "account" },
-  { href: DASHBOARD_ROUTES.legalDataRequests, label: "Legal", section: "account" },
+  {
+    href: DASHBOARD_ROUTES.legalDataRequests,
+    label: "Legal",
+    section: "account",
+    activeAliases: ["/dashboard/privacy"],
+  },
   { href: DASHBOARD_ROUTES.locations, label: "Locations", section: "account" },
   { href: DASHBOARD_ROUTES.team, label: "Team", section: "account" },
   { href: DASHBOARD_ROUTES.settings, label: "Settings", section: "account" },
@@ -79,6 +90,7 @@ function toNavItem(
   return {
     href: item.href,
     label: item.label,
+    ...(item.activeAliases ? { activeAliases: item.activeAliases } : {}),
     ...(typeof n === "number" && n > 0 ? { badge: n } : {}),
   };
 }
