@@ -142,7 +142,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    captureObservedError("[voice/platform-event] failed", e);
+    await captureObservedError(e, { route: "voice/platform-event" });
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "Server error" },
       { status: 500 },
