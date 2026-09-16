@@ -8,7 +8,7 @@ describe("voice-preview-tts-text", () => {
     const out = prepareVoicePreviewTtsText(
       "You're through to Kavanaghs SuperValu Donegal Town — I'm Cara, the AI assistant.",
     );
-    assert.match(out, /Kav-an-as/);
+    assert.match(out, /Kav-an-aghs/);
     assert.match(out, /Doneygall Town/);
     assert.match(out, /I'm Car-ah,/);
     assert.doesNotMatch(out, /\bCara\b/);
