@@ -90,7 +90,10 @@ export function ticketCallerLabel(input: {
   caller_number?: string | null;
   caller_data_erased_at?: string | null;
 }): string {
-  if (isCallerDataErased(input) || isErasedCallerNumber(input.caller_number)) {
+  if (
+    isCallerDataErased({ callerDataErasedAt: input.caller_data_erased_at }) ||
+    isErasedCallerNumber(input.caller_number)
+  ) {
     return CALLER_DATA_ERASED_LABEL;
   }
   const first = callerFirstName(input);
@@ -115,7 +118,10 @@ export function callerLiveActivityLabel(input: {
   caller_number?: string | null;
   caller_data_erased_at?: string | null;
 }): { title: string; subtitle?: string } {
-  if (isCallerDataErased(input) || isErasedCallerNumber(input.caller_number)) {
+  if (
+    isCallerDataErased({ callerDataErasedAt: input.caller_data_erased_at }) ||
+    isErasedCallerNumber(input.caller_number)
+  ) {
     return { title: CALLER_DATA_ERASED_LABEL };
   }
   const first = callerFirstName(input);

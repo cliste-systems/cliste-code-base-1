@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { PlatformEventRow } from "@/lib/platform-events";
+import type { PlatformEventRow, PlatformEventSeverity } from "@/lib/platform-events";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type MissingRecordingRow = {

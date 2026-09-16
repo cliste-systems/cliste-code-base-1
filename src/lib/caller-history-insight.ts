@@ -249,6 +249,10 @@ export function buildCallerHistoryOverview(
   insight: CallerHistoryInsight,
   callsForTopics: CallerHistoryCallInput[] = [],
 ): string {
+  if (insight.kind === "erased") {
+    return insight.overview;
+  }
+
   const securityPrefix = callerSecurityOverviewPrefix(insight.security);
   let body = "";
 
