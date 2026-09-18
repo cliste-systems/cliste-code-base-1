@@ -14,6 +14,7 @@ const dept = {
   phone_e164: "+353871234567",
   cara_note: null,
   handles_text: null,
+  manager_name: null,
   is_off_licence: false,
   is_an_post: false,
 };

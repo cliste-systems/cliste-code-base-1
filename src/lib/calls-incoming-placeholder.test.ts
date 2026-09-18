@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
   mergeIncomingCallEvent,
@@ -15,33 +16,36 @@ describe("shouldShowCallsIncomingPlaceholder", () => {
       startedAt: "2026-09-15T12:00:00.000Z",
     };
 
-    expect(
+    assert.equal(
       shouldShowCallsIncomingPlaceholder({
         viewingToday: true,
         page: 1,
         placeholder,
       }),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assert.equal(
       shouldShowCallsIncomingPlaceholder({
         viewingToday: false,
         page: 1,
         placeholder,
       }),
-    ).toBe(false);
-    expect(
+      false,
+    );
+    assert.equal(
       shouldShowCallsIncomingPlaceholder({
         viewingToday: true,
         page: 2,
         placeholder,
       }),
-    ).toBe(false);
+      false,
+    );
   });
 });
 
 describe("shouldClearCallsIncomingPlaceholder", () => {
   it("clears when the call log id appears", () => {
-    expect(
+    assert.equal(
       shouldClearCallsIncomingPlaceholder(
         {
           phase: "loading",
@@ -51,11 +55,12 @@ describe("shouldClearCallsIncomingPlaceholder", () => {
         },
         [{ id: "call-1", createdAt: "2026-09-15T12:01:00.000Z" }],
       ),
-    ).toBe(true);
+      true,
+    );
   });
 
   it("clears in-progress rows when a new call lands after start time", () => {
-    expect(
+    assert.equal(
       shouldClearCallsIncomingPlaceholder(
         {
           phase: "in_progress",
@@ -65,13 +70,14 @@ describe("shouldClearCallsIncomingPlaceholder", () => {
         },
         [{ id: "call-2", createdAt: "2026-09-15T12:00:30.000Z" }],
       ),
-    ).toBe(true);
+      true,
+    );
   });
 });
 
 describe("mergeIncomingCallEvent", () => {
   it("upgrades in-progress to loading while keeping caller number", () => {
-    expect(
+    assert.deepEqual(
       mergeIncomingCallEvent(
         {
           phase: "in_progress",
@@ -84,11 +90,12 @@ describe("mergeIncomingCallEvent", () => {
           callLogId: "call-1",
         },
       ),
-    ).toEqual({
-      phase: "loading",
-      callerNumber: "+353861001001",
-      callLogId: "call-1",
-      startedAt: "2026-09-15T12:00:00.000Z",
-    });
+      {
+        phase: "loading",
+        callerNumber: "+353861001001",
+        callLogId: "call-1",
+        startedAt: "2026-09-15T12:00:00.000Z",
+      },
+    );
   });
 });

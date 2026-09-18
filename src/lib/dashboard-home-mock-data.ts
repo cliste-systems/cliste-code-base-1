@@ -1,11 +1,11 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
-import type { AnalyticsSegment } from "@/lib/dashboard-home-analytics";
-import type { HomeCaraPerformanceSnapshot } from "@/lib/dashboard-home-cara-performance";
+import type { HomeCallReviewRow } from "@/lib/dashboard-home-calls-to-review";
 import type { HomeCallTimesBucket } from "@/lib/dashboard-home-call-times";
 import type {
   HomeCaraTrainingRow,
   HomeRequestRow,
 } from "@/lib/dashboard-home-requests";
+import type { HomeTopTopicRow } from "@/lib/dashboard-home-top-topics";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 /** Kavanaghs retail demo — overview (/dashboard) preview only. */
@@ -95,90 +95,30 @@ export const DASHBOARD_HOME_MOCK = {
 
   openTrainingCount: 3,
 
-  requestTypeSegments: [
-    {
-      id: "general",
-      label: "General enquiries",
-      value: 14,
-      percent: 38,
-      shade: "#0b1220",
-    },
-    {
-      id: "pricing",
-      label: "Pricing",
-      value: 9,
-      percent: 24,
-      shade: "#475569",
-    },
-    {
-      id: "callbacks",
-      label: "Callbacks",
-      value: 7,
-      percent: 19,
-      shade: "#94a3b8",
-    },
-    {
-      id: "product",
-      label: "Product enquiries",
-      value: 7,
-      percent: 19,
-      shade: "#cbd5e1",
-    },
-  ] satisfies AnalyticsSegment[],
+  topTopics: [
+    { id: "real-rewards", label: "Real Rewards", count: 8 },
+    { id: "offers", label: "Offers & promotions", count: 6 },
+    { id: "orders", label: "Orders & click & collect", count: 4 },
+  ] satisfies HomeTopTopicRow[],
 
-  callOutcomeSegments: [
+  callsToReview: [
     {
-      id: "answered",
-      label: "Answered by Cara",
-      value: 24,
-      percent: 73,
-      shade: "#0b1220",
+      id: "mock-review-1",
+      href: `${DASHBOARD_ROUTES.calls}?call=mock-review-1`,
+      title: "087 234 5678",
+      subtitle: "Hung up right after the greeting",
+      time: "18m ago",
     },
     {
-      id: "information",
-      label: "Information provided",
-      value: 4,
-      percent: 12,
-      shade: "#475569",
+      id: "mock-review-2",
+      href: `${DASHBOARD_ROUTES.calls}?call=mock-review-2`,
+      title: "Tom",
+      subtitle: "Post-call processing issue",
+      time: "1h ago",
     },
-    {
-      id: "follow-up",
-      label: "Follow-up created",
-      value: 3,
-      percent: 9,
-      shade: "#94a3b8",
-    },
-    {
-      id: "other",
-      label: "Other",
-      value: 2,
-      percent: 6,
-      shade: "#cbd5e1",
-    },
-  ] satisfies AnalyticsSegment[],
+  ] satisfies HomeCallReviewRow[],
 
-  caraPerformance: {
-    isOnline: true,
-    statusLabel: "Live",
-    qualitySegments: [
-      {
-        id: "happy",
-        label: "Happy calls",
-        value: 29,
-        percent: 88,
-        shade: "#0b1220",
-      },
-      {
-        id: "needs-review",
-        label: "Needs review",
-        value: 4,
-        percent: 12,
-        shade: "#cbd5e1",
-      },
-    ],
-    avgDurationLabel: "1m 42s",
-    totalCalls: 33,
-  } satisfies HomeCaraPerformanceSnapshot,
+  callsToReviewCount: 2,
 
   callTimes: [
     { id: "h-9", label: "9am", value: 2 },

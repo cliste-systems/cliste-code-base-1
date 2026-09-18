@@ -73,7 +73,7 @@ export async function fetchDashboardNavBadges(
     "/dashboard/action-inbox": inboxBadge,
     "/dashboard/calls": callBadge,
     "/dashboard/call-history": callBadge,
-    [DASHBOARD_ROUTES.caraTraining]: trainingBadge,
+    [DASHBOARD_ROUTES.caraKnowledgeNeedsInput]: trainingBadge,
     [DASHBOARD_ROUTES.departments]: inboxBadge,
   };
 

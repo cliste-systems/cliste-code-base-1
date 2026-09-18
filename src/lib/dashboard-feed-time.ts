@@ -103,6 +103,22 @@ export function ticketCallerLabel(input: {
   return "Caller";
 }
 
+/** Activity page — phone number only, never caller name. */
+export function activityFeedCallerLabel(input: {
+  caller_number?: string | null;
+  caller_data_erased_at?: string | null;
+}): string {
+  if (
+    isCallerDataErased({ callerDataErasedAt: input.caller_data_erased_at }) ||
+    isErasedCallerNumber(input.caller_number)
+  ) {
+    return CALLER_DATA_ERASED_LABEL;
+  }
+  const phone = input.caller_number?.trim();
+  if (phone) return formatE164ForDisplay(phone) || phone;
+  return "Unknown caller";
+}
+
 /** First name only — Cara asks for first name on retail calls. */
 export function callerFirstName(input: {
   caller_name?: string | null;

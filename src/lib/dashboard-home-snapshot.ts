@@ -1,6 +1,11 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
-import type { AnalyticsSegment } from "@/lib/dashboard-home-analytics";
-import type { HomeCaraPerformanceSnapshot } from "@/lib/dashboard-home-cara-performance";
+import type { HomeCallReviewRow } from "@/lib/dashboard-home-calls-to-review";
+import {
+  buildHomeCallsToReviewRows,
+  countHomeCallsToReview,
+} from "@/lib/dashboard-home-calls-to-review";
+import type { HomeTopTopicRow } from "@/lib/dashboard-home-top-topics";
+import { buildHomeTopTopicRows } from "@/lib/dashboard-home-top-topics";
 import type { HomeCallTimesBucket } from "@/lib/dashboard-home-call-times";
 import type {
   HomeCaraTrainingRow,
@@ -20,13 +25,7 @@ import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
   formatDashboardFeedRelativeTime,
 } from "@/lib/dashboard-feed-time";
-import {
-  buildHomeCallOutcomeSegments,
-  buildHomeRequestTypeSegments,
-  buildHomeUsageSnapshot,
-  type TransferHealthSnapshot,
-} from "@/lib/dashboard-home-analytics";
-import { buildHomeCaraPerformance } from "@/lib/dashboard-home-cara-performance";
+import { buildHomeUsageSnapshot } from "@/lib/dashboard-home-analytics";
 import { buildHomeCallTimesBuckets } from "@/lib/dashboard-home-call-times";
 import { DASHBOARD_HOME_MOCK } from "@/lib/dashboard-home-mock-data";
 import { isDashboardHomeMockEnabled } from "@/lib/dashboard-home-mock";
@@ -62,6 +61,7 @@ type CallLogRow = {
   duration_seconds: number | null;
   ai_summary?: string | null;
   post_call_status?: string | null;
+  call_resolution?: string | null;
 };
 
 type TicketRow = {
@@ -88,11 +88,10 @@ export type DashboardHomeSnapshot = {
   openActions: number;
   caraTraining: HomeCaraTrainingRow[];
   openTrainingCount: number;
-  caraPerformance: HomeCaraPerformanceSnapshot;
-  requestTypeSegments: AnalyticsSegment[];
-  callOutcomeSegments: AnalyticsSegment[];
+  topTopics: HomeTopTopicRow[];
+  callsToReview: HomeCallReviewRow[];
+  callsToReviewCount: number;
   callTimes: HomeCallTimesBucket[];
-  transferHealth: TransferHealthSnapshot | null;
 };
 
 function countExact(res: {
@@ -225,7 +224,7 @@ export async function loadDashboardHomeSnapshot(input: {
         supabase
           .from("call_logs")
           .select(
-            "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary, post_call_status",
+            "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary, post_call_status, call_resolution",
           )
           .gte("created_at", metricRangeStartIso)
           .order("created_at", { ascending: false })
@@ -395,34 +394,30 @@ export async function loadDashboardHomeSnapshot(input: {
     ? []
     : (ticketsForRequestTypesRes.data ?? [])) as { summary: string | null }[];
 
-  const requestTypeSegmentsLive = buildHomeRequestTypeSegments(
-    ticketSummaries.map((row) => row.summary),
+  const callSummariesForTopics = callsForMetricRollups.map(
+    (row) => (row as { ai_summary?: string | null }).ai_summary,
   );
-  const callOutcomeSegmentsLive = buildHomeCallOutcomeSegments(
-    callsForMetricRollups.map((row) => row.outcome),
+
+  const topTopicsLive = buildHomeTopTopicRows({
+    callSummaries: callSummariesForTopics,
+    ticketSummaries: ticketSummaries.map((row) => row.summary),
+    trainingGaps: trainingItemRows.map((row) => row.gap_summary),
+  });
+
+  const callsToReviewLive = buildHomeCallsToReviewRows({
+    calls: callsForPanels,
+    formatTime: formatDashboardFeedRelativeTime,
+  });
+  const callsToReviewCountLive = countHomeCallsToReview(callsForPanels);
+
+  const callTimesLive = buildHomeCallTimesBuckets(
+    callsForPanels.map((row) => row.created_at),
   );
-  const transferHealthLive = null;
+
   const usageSnapshotLive = buildHomeUsageSnapshot({
     minutesUsed: billingMinutesUsed > 0 ? billingMinutesUsed : minutesUsedLive,
     includedMinutes: plan.includedMinutes,
   });
-  const caraPerformanceLive = buildHomeCaraPerformance({
-    isOnline: caraStatus.isOnline,
-    statusLabel: caraStatus.isOnline ? "Live" : "Offline",
-    calls: callsForMetricRollups.map((row) => ({
-      outcome: String(row.outcome ?? ""),
-      duration_seconds:
-        typeof row.duration_seconds === "number" ? row.duration_seconds : null,
-      ai_summary: (row as { ai_summary?: string | null }).ai_summary ?? null,
-    })),
-  });
-
-  const todayStartIso = getDashboardMetricRangeLowerBoundIso("today");
-  const callTimesLive = buildHomeCallTimesBuckets(
-    callsForPanels
-      .filter((row) => row.created_at >= todayStartIso)
-      .map((row) => row.created_at),
-  );
 
   const useHomeMock = isDashboardHomeMockEnabled(organizationSlug);
 
@@ -437,17 +432,14 @@ export async function loadDashboardHomeSnapshot(input: {
   const openTrainingCount = useHomeMock
     ? DASHBOARD_HOME_MOCK.openTrainingCount
     : openTrainingCountLive;
-  const requestTypeSegments = useHomeMock
-    ? [...DASHBOARD_HOME_MOCK.requestTypeSegments]
-    : requestTypeSegmentsLive;
-  const callOutcomeSegments = useHomeMock
-    ? [...DASHBOARD_HOME_MOCK.callOutcomeSegments]
-    : callOutcomeSegmentsLive;
-  const transferHealth = useHomeMock ? null : transferHealthLive;
+  const topTopics = useHomeMock ? [...DASHBOARD_HOME_MOCK.topTopics] : topTopicsLive;
+  const callsToReview = useHomeMock
+    ? [...DASHBOARD_HOME_MOCK.callsToReview]
+    : callsToReviewLive;
+  const callsToReviewCount = useHomeMock
+    ? DASHBOARD_HOME_MOCK.callsToReviewCount
+    : callsToReviewCountLive;
   const callTimes = useHomeMock ? [...DASHBOARD_HOME_MOCK.callTimes] : callTimesLive;
-  const caraPerformance = useHomeMock
-    ? DASHBOARD_HOME_MOCK.caraPerformance
-    : caraPerformanceLive;
   const callsAnswered = useHomeMock
     ? DASHBOARD_HOME_MOCK.hero.callsAnswered
     : callsAnsweredLive;
@@ -509,10 +501,9 @@ export async function loadDashboardHomeSnapshot(input: {
     openActions,
     caraTraining,
     openTrainingCount,
-    caraPerformance,
-    requestTypeSegments,
-    callOutcomeSegments,
+    topTopics,
+    callsToReview,
+    callsToReviewCount,
     callTimes,
-    transferHealth,
   };
 }

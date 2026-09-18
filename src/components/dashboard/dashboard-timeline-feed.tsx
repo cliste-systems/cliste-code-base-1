@@ -80,7 +80,15 @@ function homeFeedRowIcon(
 ): IconType {
   const label = badge?.trim().toLowerCase() ?? "";
 
-  if (urgent || label === "open" || label.includes("request")) {
+  if (
+    urgent ||
+    label === "open" ||
+    label.includes("request") ||
+    label.includes("enquiry") ||
+    label.includes("order") ||
+    label.includes("complaint") ||
+    label.includes("booking")
+  ) {
     return Inbox;
   }
   if (label.includes("routed")) {

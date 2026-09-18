@@ -42,7 +42,7 @@ export const RETAIL_DEPARTMENTS: RetailDepartmentDefinition[] = [
     shortLabel: "Meat counter",
     keywords:
       /meat counter|butcher|butchers|steak|striploin|sirloin|rashers|sausage|meatball|lamb chop|pork chop|quick fry steak/i,
-    storeDepartmentNames: ["Butcher"],
+    storeDepartmentNames: ["Butcher", "Meat counter"],
   },
   {
     slug: "fish-counter",

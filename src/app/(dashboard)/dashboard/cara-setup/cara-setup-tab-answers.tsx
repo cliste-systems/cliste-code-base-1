@@ -127,6 +127,8 @@ export function CaraSetupTabAnswers() {
         title={copy.caraSetup.commonQuestionsTitle}
         description="Questions callers ask most, with the answer Cara should give out loud."
         bodyClassName="p-0"
+        id="cara-common-questions"
+        className="scroll-mt-4"
         action={
           <Button
             type="button"

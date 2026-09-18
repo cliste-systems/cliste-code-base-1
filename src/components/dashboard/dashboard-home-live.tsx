@@ -95,11 +95,10 @@ export function DashboardHomeLive({
         openActions={snapshot.openActions}
         caraTraining={snapshot.caraTraining}
         openTrainingCount={snapshot.openTrainingCount}
-        caraPerformance={snapshot.caraPerformance}
-        requestTypeSegments={snapshot.requestTypeSegments}
-        callOutcomeSegments={snapshot.callOutcomeSegments}
+        topTopics={snapshot.topTopics}
+        callsToReview={snapshot.callsToReview}
+        callsToReviewCount={snapshot.callsToReviewCount}
         callTimes={snapshot.callTimes}
-        transferHealth={snapshot.transferHealth}
       />
     </DashboardHomeEnter>
   );

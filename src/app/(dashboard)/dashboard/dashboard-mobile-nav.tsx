@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
+  BookOpen,
   Building2,
   Gauge,
   GraduationCap,
-  HelpCircle,
   LifeBuoy,
   Menu,
   Inbox,
@@ -37,9 +37,9 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/call-history": Phone,
   "/dashboard/action-inbox": Inbox,
   "/dashboard/routing": Share2,
+  "/dashboard/cara-knowledge": BookOpen,
   "/dashboard/cara-training": GraduationCap,
   "/dashboard/departments": LayoutGrid,
-  "/dashboard/faqs": HelpCircle,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
   "/dashboard/support": LifeBuoy,

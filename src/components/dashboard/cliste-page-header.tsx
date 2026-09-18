@@ -37,6 +37,13 @@ const HEADER_TONES = {
     icon: "border-[#cfd9d4] bg-[#f6faf7] text-[#353D42]",
     rule: "border-[#d9e2dd]",
   },
+  knowledge: {
+    eyebrow: "Knowledge hub",
+    accent: "before:bg-[#353D42]",
+    text: "text-[#353D42]",
+    icon: "border-[#cfd9d4] bg-[#f6faf7] text-[#353D42]",
+    rule: "border-[#d9e2dd]",
+  },
   clients: {
     eyebrow: "Client dossier",
     accent: "before:bg-[#353D42]",
@@ -86,6 +93,10 @@ type ClistePageHeaderProps = {
   summaryAside?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  /** Hide the uppercase eyebrow label above the title. */
+  hideEyebrow?: boolean;
+  /** Use a flat header without the decorative background image. */
+  plain?: boolean;
 };
 
 export function ClistePageHeader({
@@ -97,39 +108,58 @@ export function ClistePageHeader({
   summaryAside,
   actions,
   className,
+  hideEyebrow = false,
+  plain = false,
 }: ClistePageHeaderProps) {
   const t = HEADER_TONES[tone];
 
   return (
     <header
       className={cn(
-        "relative overflow-hidden rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] bg-cover bg-right bg-no-repeat px-4 py-4 text-[#0b1220] shadow-[0_1px_0_rgba(17,24,29,0.05),0_16px_42px_-30px_rgba(17,24,29,0.28)] sm:px-5",
-        "before:absolute before:inset-y-0 before:left-0 before:w-1.5",
-        t.accent,
+        "relative overflow-hidden rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] px-4 py-4 text-[#0b1220] sm:px-5",
+        plain
+          ? "shadow-[0_1px_0_rgba(17,24,29,0.05)]"
+          : "bg-cover bg-right bg-no-repeat shadow-[0_1px_0_rgba(17,24,29,0.05),0_16px_42px_-30px_rgba(17,24,29,0.28)] before:absolute before:inset-y-0 before:left-0 before:w-1.5",
+        !plain && t.accent,
         className,
       )}
-      style={{ backgroundImage: `url('${HEADER_BACKGROUND}')` }}
+      style={plain ? undefined : { backgroundImage: `url('${HEADER_BACKGROUND}')` }}
     >
-      <div className="absolute inset-0 bg-white/54" aria-hidden />
-      <div
-        className="absolute inset-y-0 left-0 w-[42%] bg-gradient-to-r from-white via-white/88 to-white/0"
-        aria-hidden
-      />
+      {!plain ? (
+        <>
+          <div className="absolute inset-0 bg-white/54" aria-hidden />
+          <div
+            className="absolute inset-y-0 left-0 w-[42%] bg-gradient-to-r from-white via-white/88 to-white/0"
+            aria-hidden
+          />
+        </>
+      ) : null}
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-3.5">
-          <span
-            className={cn(
-              "flex size-11 shrink-0 items-center justify-center rounded-lg border",
-              t.icon,
-            )}
-          >
-            <Icon className="size-5" aria-hidden />
-          </span>
+          {!plain ? (
+            <span
+              className={cn(
+                "flex size-11 shrink-0 items-center justify-center rounded-lg border",
+                t.icon,
+              )}
+            >
+              <Icon className="size-5" aria-hidden />
+            </span>
+          ) : null}
           <div className="min-w-0">
-            <p className={cn("text-[11px] font-semibold uppercase tracking-[0.18em]", t.text)}>
-              {t.eyebrow}
-            </p>
-            <h1 className="mt-1 text-[25px] font-semibold leading-tight tracking-tight text-[#0b1220] sm:text-[28px]">
+            {!hideEyebrow ? (
+              <p className={cn("text-[11px] font-semibold uppercase tracking-[0.18em]", t.text)}>
+                {t.eyebrow}
+              </p>
+            ) : null}
+            <h1
+              className={cn(
+                "font-semibold leading-tight tracking-tight text-[#0b1220]",
+                hideEyebrow
+                  ? "text-[22px] sm:text-[24px]"
+                  : "mt-1 text-[25px] sm:text-[28px]",
+              )}
+            >
               {title}
             </h1>
             <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-600">

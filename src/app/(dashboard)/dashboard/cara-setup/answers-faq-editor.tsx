@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { detectCanonicalQuestion } from "@/lib/answers-boundary";
+import { faqKnowledgeEntryId } from "@/lib/cara-knowledge-index";
 import type { RoutingActionSummary } from "@/lib/cara-custom-prompt";
 import type { ServiceCatalogItem } from "@/lib/service-catalog-format";
 
@@ -65,7 +66,8 @@ export function AnswersFaqEditor({
             return (
               <li
                 key={`faq-${index}`}
-                className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm"
+                id={faqKnowledgeEntryId(faq.question)}
+                className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm"
                 role="listitem"
               >
                 <div className="border-b border-slate-100 bg-slate-50/60 px-3 py-2.5">

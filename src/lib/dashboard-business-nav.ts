@@ -26,6 +26,12 @@ export function isBusinessNavPath(pathname: string): boolean {
 }
 
 export function businessNavChildLabel(pathname: string): string | null {
+  if (
+    pathname === DASHBOARD_ROUTES.businessAnswers ||
+    pathname.startsWith(`${DASHBOARD_ROUTES.businessAnswers}/`)
+  ) {
+    return "Common questions";
+  }
   const match = BUSINESS_SIDEBAR_CHILDREN.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );

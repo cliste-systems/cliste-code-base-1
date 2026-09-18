@@ -4,6 +4,8 @@
  * shop.supervalu.ie terms (online shopping helpdesk).
  */
 
+import { formatRetailFacilitiesForPrompt } from "@/lib/retail-store-types";
+
 export const REAL_REWARDS_HELPDESK_PHONE = "0818 220 088";
 export const REAL_REWARDS_HELPDESK_LANDLINE = "01 906 8881";
 export const REAL_REWARDS_HELP_EMAIL = "realrewardshelp@supervalu.ie";
@@ -76,9 +78,11 @@ export function buildRetailStoreFactsSection(
     );
   }
 
-  const facilities = String(input.facilities ?? "").trim();
+  const facilities = formatRetailFacilitiesForPrompt(input.facilities);
   if (facilities) {
-    lines.push(`Store facilities: ${facilities}`);
+    lines.push(
+      `Store facilities: ${facilities}. Confirm only what is listed here — do not invent locations or extra facilities. If they ask about something not listed, say you are not sure and offer to check with the team.`,
+    );
   }
 
   const delivery = String(input.delivery ?? "").trim();

@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  Briefcase,
   Building2,
   Gauge,
   LayoutDashboard,
@@ -18,7 +19,10 @@ import {
   type AccountNavChild,
 } from "@/lib/dashboard-account-nav";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
-import { dashboardSidebarRowClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
+import {
+  dashboardSidebarBadgeClassName,
+  dashboardSidebarRowClassName,
+} from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 import { cn } from "@/lib/utils";
 
@@ -30,13 +34,10 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/privacy": Shield,
   "/dashboard/locations": Building2,
   "/dashboard/team": Users,
+  "/dashboard/business/profile": Briefcase,
   "/dashboard/settings": Settings,
 };
 
-/**
- * Always-expanded account links. No toggle, no chevron, no collapse.
- * Kept for older sidebar layouts that still import this module.
- */
 export function AccountSidebarNav({
   items = ACCOUNT_SIDEBAR_CHILDREN,
 }: {
@@ -73,7 +74,7 @@ export function AccountSidebarNav({
               </span>
               {showBadge ? (
                 <span
-                  className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums"
+                  className={dashboardSidebarBadgeClassName(active)}
                   aria-label={`${formatNavBadgeCount(item.badge)} pending`}
                 >
                   {formatNavBadgeCount(item.badge)}

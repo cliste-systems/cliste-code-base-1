@@ -10,10 +10,23 @@ export const DASHBOARD_ROUTES = {
   /** @deprecated Use businessProfile or caraGreeting */
   caraSetup: "/dashboard/cara-setup",
   caraGreeting: "/dashboard/cara/greeting",
-  caraTraining: "/dashboard/cara-training",
+  /** @deprecated Use caraKnowledgeNeedsInput */
+  caraTraining: "/dashboard/cara-knowledge?tab=needs-input",
+  caraKnowledge: "/dashboard/cara-knowledge",
+  caraKnowledgeNeedsInput: "/dashboard/cara-knowledge?tab=needs-input",
+  caraKnowledgeNeedsInputItem: (itemId: string) =>
+    `/dashboard/cara-knowledge?tab=needs-input&item=${encodeURIComponent(itemId)}`,
+  /** @deprecated All knowledge browsing lives on the main hub page. */
+  caraKnowledgeKnows: "/dashboard/cara-knowledge",
+  caraKnowledgeKnowsCategory: (_category: string) => "/dashboard/cara-knowledge",
+  caraKnowledgeTeach: "/dashboard/cara-knowledge?teach=1",
+  caraKnowledgeUnlearn: "/dashboard/cara-knowledge",
+  caraKnowledgeHistory: "/dashboard/cara-knowledge?tab=history",
   businessProfile: "/dashboard/business/profile",
   businessServices: "/dashboard/business/services",
-  businessFaqs: "/dashboard/faqs",
+  businessAnswers: "/dashboard/business/answers",
+  /** @deprecated Use businessAnswers or caraKnowledge */
+  businessFaqs: "/dashboard/business/answers",
   businessFiles: "/dashboard/business/files",
   usage: "/dashboard/usage",
   support: "/dashboard/support",
@@ -33,7 +46,6 @@ export const DASHBOARD_ROUTES = {
 export const AGENT_CONFIG_PATH_PREFIXES = [
   "/dashboard/cara/",
   "/dashboard/business/",
-  "/dashboard/faqs",
 ] as const;
 
 export function isAgentConfigPath(href: string): boolean {
@@ -45,12 +57,26 @@ export const AGENT_CONFIG_REVALIDATE_PATHS = [
   DASHBOARD_ROUTES.caraGreeting,
   DASHBOARD_ROUTES.businessProfile,
   DASHBOARD_ROUTES.businessServices,
-  DASHBOARD_ROUTES.businessFaqs,
+  DASHBOARD_ROUTES.businessAnswers,
   DASHBOARD_ROUTES.businessFiles,
   DASHBOARD_ROUTES.caraSetup,
+  DASHBOARD_ROUTES.caraKnowledge,
+  DASHBOARD_ROUTES.caraKnowledgeNeedsInput,
+  DASHBOARD_ROUTES.caraKnowledgeKnows,
+  DASHBOARD_ROUTES.caraKnowledgeTeach,
+  DASHBOARD_ROUTES.caraKnowledgeUnlearn,
+  DASHBOARD_ROUTES.caraKnowledgeHistory,
   `${DASHBOARD_ROUTES.caraSetup}/general`,
   `${DASHBOARD_ROUTES.caraSetup}/services`,
   `${DASHBOARD_ROUTES.caraSetup}/answers`,
+] as const;
+
+export const CARA_KNOWLEDGE_REVALIDATE_PATHS = [
+  DASHBOARD_ROUTES.caraKnowledge,
+  DASHBOARD_ROUTES.caraKnowledgeNeedsInput,
+  DASHBOARD_ROUTES.caraKnowledgeTeach,
+  DASHBOARD_ROUTES.caraKnowledgeHistory,
+  DASHBOARD_ROUTES.home,
 ] as const;
 
 /** Legacy paths → canonical (middleware + bookmarks). */
@@ -66,8 +92,15 @@ export const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
   "/dashboard/cara-setup/services": DASHBOARD_ROUTES.businessServices,
   "/dashboard/cara-setup/call-handling": DASHBOARD_ROUTES.caraGreeting,
   "/dashboard/cara/call-handling": DASHBOARD_ROUTES.caraGreeting,
-  "/dashboard/cara-setup/answers": DASHBOARD_ROUTES.businessFaqs,
-  "/dashboard/business/faqs": DASHBOARD_ROUTES.businessFaqs,
+  "/dashboard/cara-setup/answers": DASHBOARD_ROUTES.businessAnswers,
+  "/dashboard/business/faqs": DASHBOARD_ROUTES.businessAnswers,
+  "/dashboard/cara-training": DASHBOARD_ROUTES.caraKnowledgeNeedsInput,
+  "/dashboard/faqs": DASHBOARD_ROUTES.caraKnowledge,
+  "/dashboard/cara-knowledge/needs-input": DASHBOARD_ROUTES.caraKnowledgeNeedsInput,
+  "/dashboard/cara-knowledge/knows": DASHBOARD_ROUTES.caraKnowledge,
+  "/dashboard/cara-knowledge/teach": DASHBOARD_ROUTES.caraKnowledgeTeach,
+  "/dashboard/cara-knowledge/unlearn": DASHBOARD_ROUTES.caraKnowledge,
+  "/dashboard/cara-knowledge/history": DASHBOARD_ROUTES.caraKnowledgeHistory,
   "/dashboard/cara/rules": DASHBOARD_ROUTES.caraGreeting,
   "/dashboard/business/rules": DASHBOARD_ROUTES.businessProfile,
   "/dashboard/privacy": DASHBOARD_ROUTES.legalDataRequests,

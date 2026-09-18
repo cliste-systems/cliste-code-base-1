@@ -128,7 +128,11 @@ export function classifyActionCategory(summary: string | null | undefined): Acti
   if (/(confirm|confirmation|verify|double.?check|reconfirm)/.test(s)) {
     return "confirm";
   }
-  if (/(new customer|interested in|sales|lead|potential|enquir|inquir)/.test(s)) {
+  if (
+    /(new customer|interested in|sales lead|potential customer|product enquiry|sales enquiry)/.test(
+      s,
+    )
+  ) {
     return "lead";
   }
   if (/(hung up|no answer|dropped|disconnect|cut off|incomplete|unfinished|failed call|call failed)/.test(s)) {

@@ -16,3 +16,20 @@ export const dashboardQuickEnterVariants: Variants = {
     transition: dashboardQuickEnterTransition,
   },
 };
+
+/** Stagger child entrances inside lists, grids, and stacked panels. */
+export const dashboardStaggerVariants: Variants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.045,
+      delayChildren: 0.03,
+    },
+  },
+};
+
+/** Opacity-only swap for nested dashboard panels (avoids layout jump from y-offset). */
+export const dashboardPanelFadeTransition: Transition = {
+  duration: 0.2,
+  ease: ONBOARDING_EASE,
+};

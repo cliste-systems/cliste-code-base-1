@@ -92,8 +92,10 @@ const MAX_EIRCODE = 16;
 const MAX_BASE_TOWN = 80;
 const MAX_LOCATION_COUNTY = 80;
 
+import { recordCaraKnowledgeEvent } from "@/lib/cara-knowledge-events";
 import {
   AGENT_CONFIG_REVALIDATE_PATHS,
+  CARA_KNOWLEDGE_REVALIDATE_PATHS,
   DASHBOARD_ROUTES,
 } from "@/lib/dashboard-routes";
 
@@ -101,7 +103,9 @@ function revalidateCaraSetup() {
   for (const path of AGENT_CONFIG_REVALIDATE_PATHS) {
     revalidatePath(path);
   }
-  revalidatePath(DASHBOARD_ROUTES.caraTraining);
+  for (const path of CARA_KNOWLEDGE_REVALIDATE_PATHS) {
+    revalidatePath(path);
+  }
 }
 
 /**
@@ -375,6 +379,18 @@ export async function saveAgentSetup(payload: AgentSetupPayload): Promise<SaveRe
   }
 
   await regenerateCaraCustomPrompt(supabase, organizationId);
+
+  await recordCaraKnowledgeEvent(supabase, {
+    organizationId,
+    eventType: "edited",
+    title: "Knowledge updated in Business setup",
+    source: "business_setup",
+    actorId: user.id,
+    payload: {
+      faq_count: faqs.length,
+      rule_count: businessRules.length,
+    },
+  });
 
   revalidateCaraSetup();
   return { ok: true };

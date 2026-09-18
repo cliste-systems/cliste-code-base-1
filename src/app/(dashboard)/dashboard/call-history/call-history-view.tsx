@@ -50,7 +50,7 @@ import {
   CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES,
   resolveCallHistoryListStatus,
 } from "@/lib/call-history-status";
-import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
+import { dashboardFollowUpTicketHref } from "@/lib/dashboard-follow-up-hub";
 
 import {
   addBlockedCaller,
@@ -681,7 +681,13 @@ function CallDetailPanelContent({
   });
   const { copy } = useDashboardVertical();
   const followUpHref = call.followUp
-    ? call.departmentLink?.href ?? dashboardFollowUpHubHref(copy.vertical.id)
+    ? (call.departmentLink?.href ??
+        dashboardFollowUpTicketHref({
+          verticalId: copy.vertical.id,
+          ticketId: call.followUp.id,
+          departmentSlug: call.departmentLink?.slug ?? null,
+          summary: call.followUp.summary ?? call.aiSummary,
+        }))
     : null;
 
   function onConfirmBlock() {

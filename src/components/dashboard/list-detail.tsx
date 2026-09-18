@@ -38,19 +38,28 @@ export function ListDetailLayout({
 export function DetailPanelShell({
   children,
   surface = "default",
+  className,
+  layout = "flex",
 }: {
   children: ReactNode;
   /** `home` — same card chrome as `/dashboard` panels. */
   /** `embedded` — inside a split pane; no outer border or shadow. */
   surface?: "default" | "home" | "embedded";
+  className?: string;
+  /** `grid` keeps a sticky header/footer with a scrollable middle row. */
+  layout?: "flex" | "grid";
 }) {
   return (
     <section
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden",
+        "h-full min-h-0 overflow-hidden",
+        layout === "grid"
+          ? "grid grid-rows-[auto_minmax(0,1fr)_auto]"
+          : "flex flex-col",
         surface === "embedded" && "bg-[#fbfcfb]",
         surface === "home" && DASHBOARD_HOME_CARD,
         surface === "default" && DASHBOARD_CARD_SURFACE,
+        className,
       )}
     >
       {children}

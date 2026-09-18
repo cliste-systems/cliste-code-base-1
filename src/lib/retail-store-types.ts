@@ -39,6 +39,22 @@ export const RETAIL_FACILITIES = [
   { id: "dry_cleaning", label: "Dry cleaning" },
 ] as const;
 
+export function formatRetailFacilitiesForPrompt(facilities: unknown): string {
+  const ids = Array.isArray(facilities)
+    ? facilities.map(String)
+    : String(facilities ?? "")
+        .split(/[,;]/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+  if (ids.length === 0) return "";
+  return ids
+    .map((id) => {
+      const match = RETAIL_FACILITIES.find((facility) => facility.id === id);
+      return match?.label ?? id.replace(/_/g, " ");
+    })
+    .join(", ");
+}
+
 export type RetailDeliveryFacts = {
   enabled?: boolean;
   area?: string;

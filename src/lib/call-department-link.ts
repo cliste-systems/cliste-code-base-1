@@ -13,7 +13,8 @@ export type CallDepartmentLink = {
 };
 
 export function callDepartmentButtonLabel(slug: RetailDepartmentSlug): string {
-  return `Open in ${retailDepartmentBySlug(slug).shortLabel}`;
+  const workspace = departmentWorkspaceSlug(slug);
+  return `Open in ${retailDepartmentBySlug(workspace).shortLabel}`;
 }
 
 export function resolveCallDepartmentLink(input: {
@@ -32,7 +33,6 @@ export function resolveCallDepartmentLink(input: {
     summary,
     departmentSlug: input.departmentSlug,
   });
-  if (slug === "general") return null;
 
   const workspace = departmentWorkspaceSlug(slug);
   const ticketId = input.followUpTicketId?.trim();

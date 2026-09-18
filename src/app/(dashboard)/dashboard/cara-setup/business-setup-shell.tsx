@@ -7,6 +7,7 @@ import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import { DashboardFormScrollRegion } from "@/components/dashboard/dashboard-form-scroll-region";
 import { DASHBOARD_PRIMARY_BUTTON_CLASS } from "@/components/dashboard/dashboard-surface";
 import { Button } from "@/components/ui/button";
+import { useDashboardHashScroll } from "@/hooks/use-dashboard-hash-scroll";
 import { businessNavChildLabel } from "@/lib/dashboard-business-nav";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ import { useCaraSetupForm } from "./cara-setup-form-context";
 export function BusinessSetupShell({ children }: { children: React.ReactNode }) {
   const form = useCaraSetupForm();
   const pathname = usePathname();
+  useDashboardHashScroll(pathname);
   const sectionTitle = businessNavChildLabel(pathname) ?? "Business";
   const showFileCount = pathname.startsWith(DASHBOARD_ROUTES.businessFiles);
 

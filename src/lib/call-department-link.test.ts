@@ -19,12 +19,31 @@ describe("resolveCallDepartmentLink", () => {
     assert.equal(link.href, "/dashboard/departments/bakery");
   });
 
-  it("returns null for general enquiries", () => {
+  it("routes general follow-ups to Management with the ticket", () => {
+    const link = resolveCallDepartmentLink({
+      aiSummary:
+        "Caller asked about a coin machine for exchanging change; Cara took a message for the team.",
+      followUpSummary: "Check whether the store has a coin machine.",
+      followUpTicketId: "ticket-456",
+    });
+
+    assert.ok(link);
+    assert.equal(link.slug, "general");
+    assert.equal(link.buttonLabel, "Open in Management");
+    assert.equal(
+      link.href,
+      "/dashboard/departments/management?ticket=ticket-456",
+    );
+  });
+
+  it("routes general enquiries without a ticket to Management", () => {
     const link = resolveCallDepartmentLink({
       aiSummary: "Caller asked what time the shop closes today.",
     });
 
-    assert.equal(link, null);
+    assert.ok(link);
+    assert.equal(link.href, "/dashboard/departments/management");
+    assert.equal(link.buttonLabel, "Open in Management");
   });
 
   it("links to the ticket when one exists", () => {

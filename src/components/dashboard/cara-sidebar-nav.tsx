@@ -19,6 +19,7 @@ import {
   dashboardSidebarGroupClassName,
   dashboardSidebarHeaderClassName,
   dashboardSidebarSubRowClassName,
+  dashboardSidebarBadgeClassName,
 } from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,7 @@ function NavSubRow({
     >
       <span className="truncate">{label}</span>
       {showBadge ? (
-        <span className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums">
+        <span className={dashboardSidebarBadgeClassName(active)}>
           {formatNavBadgeCount(badge)}
         </span>
       ) : null}

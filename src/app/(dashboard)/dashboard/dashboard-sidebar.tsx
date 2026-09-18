@@ -3,10 +3,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  BookOpen,
   Building2,
   Gauge,
   GraduationCap,
-  HelpCircle,
   Inbox,
   LayoutDashboard,
   LayoutGrid,
@@ -26,7 +26,10 @@ import { LocationSwitcher } from "@/components/dashboard/location-switcher";
 import { DashboardProfileMenu } from "@/components/dashboard/dashboard-profile-menu";
 import type { AccountLocationRow } from "@/lib/account-locations";
 import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
-import { dashboardSidebarRowClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
+import {
+  dashboardSidebarBadgeClassName,
+  dashboardSidebarRowClassName,
+} from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { isDashboardNavItemActive } from "@/lib/dashboard-nav-active";
 import { cn } from "@/lib/utils";
 
@@ -41,9 +44,9 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard/call-history": Phone,
   "/dashboard/action-inbox": Inbox,
   "/dashboard/routing": Share2,
+  "/dashboard/cara-knowledge": BookOpen,
   "/dashboard/cara-training": GraduationCap,
   "/dashboard/departments": LayoutGrid,
-  "/dashboard/faqs": HelpCircle,
   "/dashboard/usage": Gauge,
   "/dashboard/billing": Gauge,
   "/dashboard/support": LifeBuoy,
@@ -117,7 +120,7 @@ function NavRow({
       </span>
       {showBadge ? (
         <span
-          className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums"
+          className={dashboardSidebarBadgeClassName(active)}
           aria-label={`${formatNavBadgeCount(badge)} pending`}
         >
           {formatNavBadgeCount(badge)}

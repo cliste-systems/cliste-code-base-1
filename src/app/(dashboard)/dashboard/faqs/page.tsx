@@ -1,5 +1,7 @@
-import { CaraSetupTabAnswers } from "../cara-setup/cara-setup-tab-answers";
+import { redirect } from "next/navigation";
+
+import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 export default function FaqsPage() {
-  return <CaraSetupTabAnswers />;
+  redirect(DASHBOARD_ROUTES.caraKnowledge);
 }

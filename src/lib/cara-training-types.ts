@@ -49,6 +49,9 @@ export type CaraTrainingItemRow = {
   last_seen_at: string;
   created_at: string;
   updated_at: string;
+  knowledge_folder_id?: string | null;
+  knowledge_department_ids?: string[];
+  knowledge_topic_labels?: string[];
 };
 
 export type KnowledgeGapPayload = {
@@ -77,13 +80,27 @@ export function normalizeTrainingTopic(topic: string): string {
   return topic.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** Policy-style cake/bakery knowledge — teachable despite bakery wording. */
+export function isCakePolicyKnowledge(text: string): boolean {
+  const s = String(text ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+  return (
+    /\b(how much notice|notice needed|minimum notice|advance notice|lead time|how far in advance)\b/.test(
+      s,
+    ) && /\b(cake|bakery|celebration)\b/.test(s)
+  );
+}
+
 /**
- * A routine booking/callback/order handoff is NOT a teachable knowledge gap — it
- * is already handled by the Action Inbox. Keeping these out of Training stops
- * operational tickets appearing as "I wasn't sure how to handle this".
+ * A routine booking/callback/customer order handoff is NOT a teachable knowledge gap.
+ * Policy questions (e.g. cake notice period) are not blocked here.
  */
 export function isRoutineHandoff(summary: string): boolean {
   const s = String(summary ?? "").toLowerCase();
+  if (isCakePolicyKnowledge(summary)) return false;
+
   if (
     /\b(book|booking|booked|appointment|appt|slot|reschedul|cancel|patch test|call ?back|callbacks?|ring (them|him|her|me) back)\b/.test(
       s,
@@ -91,21 +108,50 @@ export function isRoutineHandoff(summary: string): boolean {
   ) {
     return true;
   }
+
+  if (/\b(wants to order|ordering a|place an order|order for \d+\s)/.test(s)) {
+    return true;
+  }
+
   if (
-    /\b(cake|bakery|birthday cake|celebration cake|custom cake|cake order)\b/.test(
-      s,
-    )
+    /\b(birthday cake|celebration cake|custom cake)\b/.test(s) &&
+    /\b(for \d+ people|needed on|collecting|message:|icing|flavour)\b/.test(s)
   ) {
     return true;
   }
-  if (/\b(wants to order|ordering|place an order|order for)\b/.test(s)) {
+
+  if (/\border:\s*\S/.test(s) && /\b(collecting:|when:|prep for|sirloin|steak)\b/.test(s)) {
     return true;
   }
+
+  if (/\bbutcher order\b/.test(s) && /\b(order:|collecting:|prep for)\b/.test(s)) {
+    return true;
+  }
+
   return false;
 }
 
 /** Alias for clarity at ingestion sites. */
 export const isOperationalHandoff = isRoutineHandoff;
+
+/** Action Inbox ticket where Cara could not answer from setup — teachable gap, not a sales lead. */
+export function isKnowledgeEnquiryHandoff(summary: string): boolean {
+  const s = String(summary ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return false;
+  if (isRoutineHandoff(summary)) return false;
+  return (
+    /\b(coin machine|change machine|coin.*machine|exchange coins|change for cash)\b/.test(s) ||
+    /\b(does the store have|do we have|asked if we have|asked about|caller asked|not sure|could not answer|unknown topic)\b/.test(
+      s,
+    ) ||
+    /^[a-z0-9 /-]+ enquiry\b/.test(s)
+  );
+}
 
 /**
  * Opening-hours and bank-holiday topics are answered programmatically for retail

@@ -2,7 +2,10 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { parseAgentFaqs } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
+import {
+  faqsForLegacyPromptCompile,
+  parseAgentFaqs,
+} from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
 import { listBusinessFilesForOrg } from "@/lib/business-files-server";
 import {
   inferBookingFulfilmentMethod,
@@ -53,8 +56,17 @@ import {
   loadActiveBusinessHoursOverride,
   mergeHoursOverrideIntoBundle,
 } from "@/lib/business-hours-overrides";
+import {
+  applyTemporalBusinessRuleOverrides,
+  applyTemporalFaqOverrides,
+  applyTemporalServicesNotOfferedOverrides,
+  buildTemporalKnowledgePromptSection,
+} from "@/lib/cara-knowledge-temporal-prompt";
+import { resolveBusinessTimezone } from "@/lib/cara-knowledge-temporal";
+import { loadEffectiveTemporalUpdatesForOrg } from "@/lib/cara-knowledge-temporal-store";
 import { listServicesForOrg } from "@/lib/service-catalog";
 import { parseStoredServiceCatalogSupplement } from "@/lib/service-catalog-supplement";
+import { formatRetailFacilitiesForPrompt } from "@/lib/retail-store-types";
 import {
   buildRetailStoreFactsSection,
   buildSupervaluNationalKnowledgeSection,
@@ -164,6 +176,7 @@ function hoursFieldsFromOrg(org: PromptOrgRow | null | undefined): Pick<
 
   const { schedule, meta } = parseBusinessHoursBundle(org?.business_hours);
   const businessRules = parseAgentBusinessRules(org?.agent_business_rules);
+  const formattedFromSchedule = formatWeekScheduleForAgent(schedule);
   const hoursNote = recoverHoursNoteFromSources(
     meta.hoursNote,
     legacyHours,
@@ -176,8 +189,8 @@ function hoursFieldsFromOrg(org: PromptOrgRow | null | undefined): Pick<
     bankHolidays: meta.bankHolidays,
     openingHoursSchedule: schedule,
     openingHours:
-      String(org?.agent_opening_hours ?? "").trim() ||
-      formatWeekScheduleForAgent(schedule) ||
+      formattedFromSchedule ||
+      legacyHours ||
       undefined,
   };
 }
@@ -232,7 +245,7 @@ export function buildCaraSetupPromptInputFromOrg(
     caraRules: parseAgentCaraRules(org?.agent_cara_rules),
     caraConduct: parseCaraConduct(org?.agent_cara_conduct),
     quotePricesOnCalls: org?.quote_prices_on_calls === true,
-    faqs: parseAgentFaqs(org?.agent_faqs).map((f) => ({
+    faqs: faqsForLegacyPromptCompile(parseAgentFaqs(org?.agent_faqs)).map((f) => ({
       question: f.question,
       answer: f.answer,
     })),
@@ -288,6 +301,13 @@ export async function regenerateCaraCustomPrompt(
     supabase,
     organizationId,
   );
+  const temporalUpdates = await loadEffectiveTemporalUpdatesForOrg(
+    supabase,
+    organizationId,
+  );
+  const timezone = resolveBusinessTimezone(
+    String((org as PromptOrgRow | null)?.timezone ?? ""),
+  );
   const orgForPrompt = hoursOverride
     ? {
         ...(org as PromptOrgRow),
@@ -297,6 +317,21 @@ export async function regenerateCaraCustomPrompt(
         ),
       }
     : (org as PromptOrgRow | null);
+  const basePromptInput = buildCaraSetupPromptInputFromOrg(orgForPrompt);
+  const promptInput: CaraSetupPromptInput = {
+    ...basePromptInput,
+    faqs: applyTemporalFaqOverrides(basePromptInput.faqs ?? [], temporalUpdates),
+    businessRules: applyTemporalBusinessRuleOverrides(
+      basePromptInput.businessRules ?? [],
+      temporalUpdates,
+    ),
+    servicesNotOffered: applyTemporalServicesNotOfferedOverrides(
+      basePromptInput.servicesNotOffered,
+      temporalUpdates,
+    ),
+    temporalKnowledgeSection:
+      buildTemporalKnowledgePromptSection(temporalUpdates, timezone) ?? undefined,
+  };
   if (isRetail) {
     const retailBanner = String((org as PromptOrgRow | null)?.retail_banner ?? "");
     const [phoneSystem, departments] = await Promise.all([
@@ -329,7 +364,9 @@ export async function regenerateCaraCustomPrompt(
           loyaltyProgram: String(
             (org as PromptOrgRow | null)?.retail_loyalty_program ?? "",
           ),
-          facilities: String((org as PromptOrgRow | null)?.retail_facilities ?? ""),
+          facilities: formatRetailFacilitiesForPrompt(
+            (org as PromptOrgRow | null)?.retail_facilities,
+          ),
           delivery: String((org as PromptOrgRow | null)?.retail_delivery ?? ""),
           clickCollectUrl: String(
             (org as PromptOrgRow | null)?.retail_click_collect_url ?? "",
@@ -341,7 +378,7 @@ export async function regenerateCaraCustomPrompt(
       : undefined;
 
   const { prompt, compileMeta } = compileCaraPromptWithMeta({
-    ...buildCaraSetupPromptInputFromOrg(orgForPrompt),
+    ...promptInput,
     businessFiles,
     serviceCatalog: serviceCatalog.length > 0 ? serviceCatalog : undefined,
     serviceCatalogSupplement: serviceCatalogSupplement ?? undefined,

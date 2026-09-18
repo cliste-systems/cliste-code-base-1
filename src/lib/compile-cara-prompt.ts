@@ -148,6 +148,8 @@ export type CaraSetupPromptInput = {
   weeklyOffersSection?: string;
   /** Internal admin notes — must never be compiled. */
   adminNotes?: string;
+  /** Active temporary knowledge overrides and notices. */
+  temporalKnowledgeSection?: string;
   businessFiles?: BusinessFileListItem[];
   /** Platform-wide rules from staff console — defaults when omitted. */
   platformRules?: PlatformCaraRules;
@@ -738,6 +740,11 @@ function buildProtectedParts(
   }
 
   parts.push(...buildProtectedKnowledgePrecedenceParts(input));
+
+  const temporal = input.temporalKnowledgeSection?.trim();
+  if (temporal) {
+    parts.push(`Temporary updates (authoritative while active):\n${temporal}`);
+  }
 
   return parts;
 }

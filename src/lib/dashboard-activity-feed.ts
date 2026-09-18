@@ -1,13 +1,10 @@
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import {
+  activityFeedCallerLabel,
   callerLiveActivityLabel,
   formatDashboardFeedRelativeTime,
-  ticketCallerLabel,
 } from "@/lib/dashboard-feed-time";
-import {
-  formatLiveActivityCallAction,
-  formatLiveActivityTicketAction,
-} from "@/lib/dashboard-live-activity";
+import { formatActivityFeedBadge } from "@/lib/dashboard-live-activity";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 
 export type ActivityFeedSourceCall = {
@@ -25,10 +22,13 @@ export type ActivityFeedSourceTicket = {
   created_at: string;
   caller_name?: string | null;
   caller_number?: string | null;
+  caller_data_erased_at?: string | null;
+  summary?: string | null;
+  brief_summary?: string | null;
 };
 
-function callerLabelFor(row: ActivityFeedSourceCall): string {
-  return ticketCallerLabel(row);
+function ticketSummaryForBadge(row: ActivityFeedSourceTicket): string | null {
+  return row.summary?.trim() || row.brief_summary?.trim() || null;
 }
 
 /** Overview Live activity — incoming calls only, first name + number. */
@@ -70,10 +70,13 @@ export function buildDashboardActivityFeed(input: {
 
   const rows: (TimelineFeedRow & { timestamp: number })[] = [
     ...input.calls.map((row) => {
-      const action = formatLiveActivityCallAction(row.outcome, row.ai_summary);
+      const action = formatActivityFeedBadge({
+        summary: row.ai_summary,
+        outcome: row.outcome,
+      });
       return {
         id: `${row.id}-call`,
-        title: callerLabelFor(row),
+        title: activityFeedCallerLabel(row),
         time: input.formatTime(row.created_at),
         href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(row.id)}`,
         badge: action,
@@ -82,10 +85,12 @@ export function buildDashboardActivityFeed(input: {
       };
     }),
     ...input.tickets.map((row) => {
-      const action = formatLiveActivityTicketAction();
+      const action = formatActivityFeedBadge({
+        summary: ticketSummaryForBadge(row),
+      });
       return {
         id: `${row.id}-ticket`,
-        title: ticketCallerLabel(row),
+        title: activityFeedCallerLabel(row),
         time: input.formatTime(row.created_at),
         href: `${DASHBOARD_ROUTES.actionInbox}?ticket=${encodeURIComponent(row.id)}`,
         badge: action,

@@ -4,9 +4,9 @@ import { completeOpenRouterChat } from "@/lib/openrouter-chat";
 import { wrapUserContentForPrompt } from "@/lib/voice-greeting-security";
 
 import {
-  parseCaraTrainingPatch,
   type CaraTrainingPatch,
 } from "./cara-training-types";
+import type { TeachUnderstandingContext } from "./cara-training-understanding";
 
 export type CaraTrainingKnowledgeSnapshot = {
   businessName: string;
@@ -22,112 +22,43 @@ export type DraftTrainingPatchInput = {
   caraQuestion: string;
   ownerAnswer: string;
   knowledge: CaraTrainingKnowledgeSnapshot;
+  teachingContext?: TeachUnderstandingContext | null;
 };
-
-function parseDraftJson(raw: string): CaraTrainingPatch | null {
-  try {
-    const trimmed = raw.trim();
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start < 0 || end <= start) return null;
-    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as Record<
-      string,
-      unknown
-    >;
-    return parseCaraTrainingPatch(parsed);
-  } catch {
-    return null;
-  }
-}
-
-function knowledgeContextBlock(knowledge: CaraTrainingKnowledgeSnapshot): string {
-  const faqLines =
-    knowledge.faqs.length > 0
-      ? knowledge.faqs
-          .map(
-            (f) =>
-              `- Q: ${f.question.slice(0, 200)} / A: ${f.answer.slice(0, 200)}`,
-          )
-          .join("\n")
-      : "(none yet)";
-  return [
-    `Business: ${knowledge.businessName}`,
-    `Services offered: ${knowledge.servicesOffered.join(", ") || "(none)"}`,
-    `Services not offered: ${knowledge.servicesNotOffered.join(", ") || "(none)"}`,
-    `Business rules: ${knowledge.businessRules.join("; ") || "(none)"}`,
-    `Existing FAQs:\n${faqLines}`,
-  ].join("\n");
-}
 
 /**
  * Turn the owner's plain-English answer into a structured Cara Setup patch.
+ * Uses the teaching-stage understanding layer — clarified facts, not call scripts.
  */
+export type DraftTrainingPatchResult =
+  | { ok: true; patch: CaraTrainingPatch }
+  | { ok: false; needsClarification: string }
+  | { ok: false; message: string };
+
 export async function draftTrainingPatchFromOwnerAnswer(
   input: DraftTrainingPatchInput,
-): Promise<{ ok: true; patch: CaraTrainingPatch } | { ok: false; message: string }> {
-  const ownerAnswer = input.ownerAnswer.trim();
-  if (!ownerAnswer) {
-    return { ok: false, message: "Enter an answer before continuing." };
+): Promise<DraftTrainingPatchResult> {
+  const { draftTrainingUnderstandingFromAnswer } = await import(
+    "./cara-training-understanding"
+  );
+
+  const draft = await draftTrainingUnderstandingFromAnswer({
+    gapSummary: input.gapSummary,
+    callerContext: input.callerContext,
+    caraQuestion: input.caraQuestion,
+    ownerAnswer: input.ownerAnswer,
+    knowledge: input.knowledge,
+    teachingContext: input.teachingContext,
+  });
+
+  if (draft.ok) {
+    return { ok: true, patch: draft.patch };
   }
 
-  const system = `You help Cara, a phone assistant, turn a business owner's plain-English answer into ONE structured knowledge update.
-
-Current business knowledge:
-${knowledgeContextBlock(input.knowledge)}
-
-Output ONLY valid JSON (no markdown) with exactly one of these shapes:
-{"kind":"faq","question":"...","answer":"..."}
-{"kind":"service_offered","label":"..."}
-{"kind":"service_not_offered","label":"..."}
-{"kind":"business_rule","rule":"..."}
-
-Rules:
-- Pick the best target kind for the gap and owner answer.
-- FAQ: caller-style question + concise answer Cara can speak on calls.
-- service_offered / service_not_offered: short chip label (max 80 chars).
-- business_rule: one imperative sentence Cara should follow (max 200 chars).
-- Never invent prices, legal promises, or health/payment/ID collection.
-- Do not duplicate an existing FAQ question or service chip if the answer only restates what is already known — prefer updating via FAQ if it is genuinely new.
-- Use Irish/UK plain English.`;
-
-  const user = [
-    `Gap on a call: ${input.gapSummary}`,
-    input.callerContext?.trim()
-      ? `Caller context: ${wrapUserContentForPrompt("CALLER_CONTEXT", input.callerContext.trim())}`
-      : null,
-    `Cara asked the owner: ${input.caraQuestion}`,
-    `Owner answer: ${wrapUserContentForPrompt("OWNER_ANSWER", ownerAnswer)}`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
-  let raw: string;
-  try {
-    raw = await completeOpenRouterChat({
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      temperature: 0.2,
-      maxTokens: 600,
-    });
-  } catch (e) {
-    return {
-      ok: false,
-      message:
-        e instanceof Error ? e.message : "Could not draft an update right now.",
-    };
+  if ("needsClarification" in draft) {
+    return { ok: false, needsClarification: draft.needsClarification };
   }
 
-  const patch = parseDraftJson(raw);
-  if (!patch) {
-    return {
-      ok: false,
-      message: "Cara could not draft a structured update. Try rephrasing your answer.",
-    };
-  }
-
-  return { ok: true, patch };
+  return { ok: false, message: draft.message };
 }
 
 /** First clarifying question when the owner starts teaching Cara manually. */
@@ -192,10 +123,31 @@ export function actionInboxTrainingQuestion(summary: string): {
   gapSummary: string;
   caraQuestion: string;
 } {
-  const gapSummary = summary.trim().slice(0, 500) || "Caller request Cara could not resolve";
+  const trimmed = summary.trim();
+  const requestMatch = trimmed.match(/(?:^|\n)Request:\s*(.+)/i);
+  const request = requestMatch?.[1]?.trim() ?? "";
+  const header = trimmed.split("\n")[0]?.trim() ?? "";
+
+  if (/\bcoin machine|change machine|exchange coins|change for cash\b/i.test(trimmed)) {
+    return {
+      gapSummary: "Coin machine / change for cash",
+      caraQuestion:
+        "Do we have a coin or change machine in store? What should I tell callers?",
+    };
+  }
+
+  if (request) {
+    return {
+      gapSummary: request.slice(0, 200),
+      caraQuestion: `A caller asked: "${request.slice(0, 180)}". What should I tell them?`,
+    };
+  }
+
+  const gapSummary = header.slice(0, 500) || "Caller request Cara could not resolve";
   return {
     gapSummary,
-    caraQuestion:
-      "A caller asked something not in my setup — what should I tell them in this situation?",
+    caraQuestion: request
+      ? `A caller asked: "${request.slice(0, 180)}". What should I tell them?`
+      : "What reusable information should Cara know for similar calls?",
   };
 }

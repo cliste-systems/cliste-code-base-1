@@ -81,7 +81,9 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
     applyOrganizationScope(
       supabase
         .from("action_tickets")
-        .select("id, created_at, caller_name, caller_number")
+        .select(
+          "id, created_at, caller_name, caller_number, caller_data_erased_at, summary, brief_summary",
+        )
         .order("created_at", { ascending: false })
         .limit(ACTIVITY_FEED_LIMIT),
       scopedOrgIds,

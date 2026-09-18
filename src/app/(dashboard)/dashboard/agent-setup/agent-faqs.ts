@@ -25,7 +25,7 @@ export function parseAgentFaqs(raw: unknown): AgentFaq[] {
   return out;
 }
 
-/** Drop empty rows and clamp lengths before persisting. */
+/** Drop empty rows and clamp field lengths before persisting. Does not silently drop rows beyond the prompt compile cap. */
 export function cleanAgentFaqs(raw: unknown): AgentFaq[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -37,6 +37,23 @@ export function cleanAgentFaqs(raw: unknown): AgentFaq[] {
         .trim()
         .slice(0, MAX_FAQ_FIELD_LEN),
     }))
-    .filter((f) => f.question || f.answer)
-    .slice(0, MAX_FAQS);
+    .filter((f) => f.question || f.answer);
+}
+
+/** Legacy prompt compile still reads only the first MAX_FAQS entries. */
+export function faqsForLegacyPromptCompile(faqs: AgentFaq[]): AgentFaq[] {
+  return faqs.slice(0, MAX_FAQS);
+}
+
+export function faqCapacityStatus(faqCount: number): {
+  atCapacity: boolean;
+  message: string | null;
+} {
+  if (faqCount < MAX_FAQS) {
+    return { atCapacity: false, message: null };
+  }
+  return {
+    atCapacity: true,
+    message: `Cara's compiled prompt includes up to ${MAX_FAQS} FAQs. You have ${faqCount}. New FAQ answers can still be saved, but scalable retrieval beyond this cap requires the knowledge index — not unlimited prompt stuffing.`,
+  };
 }

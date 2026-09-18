@@ -7,6 +7,9 @@ export const DASHBOARD_HOME_INBOX_DISPLAY_LIMIT = 3;
 /** Rows shown in Cara training on the hybrid home board. */
 export const DASHBOARD_HOME_CARA_TRAINING_DISPLAY_LIMIT = 3;
 
+/** Rows shown in the second home analytics row. */
+export const DASHBOARD_HOME_SECOND_ROW_DISPLAY_LIMIT = 3;
+
 /** @deprecated Use DASHBOARD_HOME_INBOX_DISPLAY_LIMIT */
 export const DASHBOARD_HOME_FIRST_ROW_DISPLAY_LIMIT =
   DASHBOARD_HOME_INBOX_DISPLAY_LIMIT;

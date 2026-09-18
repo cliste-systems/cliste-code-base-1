@@ -5,15 +5,33 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyActionCategory } from "@/app/(dashboard)/dashboard/action-inbox/categories";
 import { redactCallText } from "@/lib/transcript-redaction";
 
+import {
+  classifyTrainingAdmission,
+  hasReusableQuestionEvidence,
+  isGenericCaraQuestion,
+} from "./cara-training-admission";
 import { actionInboxTrainingQuestion } from "./cara-training-draft";
 import { createTrainingItem } from "./cara-training";
-import { isRoutineHandoff, isStructuredHoursTopic, type KnowledgeGapPayload } from "./cara-training-types";
+import {
+  isKnowledgeEnquiryHandoff,
+  isRoutineHandoff,
+  isStructuredHoursTopic,
+  isCakePolicyKnowledge,
+  type KnowledgeGapPayload,
+} from "./cara-training-types";
 
 function defaultQuestionForGap(gap: KnowledgeGapPayload): string {
   const q = gap.cara_question?.trim();
-  if (q) return q;
+  if (q && !isGenericCaraQuestion(q)) return q;
   const topic = gap.topic.trim();
-  return `A caller asked about ${topic}. What should I tell them?`;
+  const admission = classifyTrainingAdmission({
+    gapSummary: topic,
+    callerContext: gap.caller_context,
+    caraQuestion: q,
+    source: "call_gap",
+  });
+  if (admission.admit) return admission.displayQuestion;
+  return `What should Cara tell callers about ${topic}?`;
 }
 
 function orgHasStructuredBusinessHours(raw: unknown): boolean {
@@ -56,11 +74,19 @@ export async function ingestCallKnowledgeGaps(
       ? redactCallText(callerContextRaw).text
       : null;
 
+    const admission = classifyTrainingAdmission({
+      gapSummary: topic,
+      callerContext,
+      caraQuestion: gap.cara_question,
+      source: "call_gap",
+    });
+    if (!admission.admit) continue;
+
     await createTrainingItem(admin, {
       organizationId,
       source: "call_gap",
       gapSummary: topic,
-      caraQuestion: defaultQuestionForGap(gap),
+      caraQuestion: admission.displayQuestion,
       callerContext,
       callLogId,
       notify: true,
@@ -79,20 +105,31 @@ export async function ingestActionInboxTraining(
   summary: string,
 ): Promise<void> {
   const category = classifyActionCategory(summary);
-  if (category !== "unclear" && category !== "follow_up") {
+  const knowledgeEnquiry = isKnowledgeEnquiryHandoff(summary);
+  if (!knowledgeEnquiry && category !== "unclear" && category !== "follow_up") {
     return;
   }
   if (isRoutineHandoff(summary)) {
     return;
   }
+  if (!hasReusableQuestionEvidence(summary)) {
+    return;
+  }
 
   const { gapSummary, caraQuestion } = actionInboxTrainingQuestion(summary);
+  const admission = classifyTrainingAdmission({
+    gapSummary,
+    callerContext: summary,
+    caraQuestion,
+    source: "action_inbox",
+  });
+  if (!admission.admit) return;
 
   await createTrainingItem(admin, {
     organizationId,
     source: "action_inbox",
     gapSummary,
-    caraQuestion,
+    caraQuestion: admission.displayQuestion,
     callerContext: summary.trim().slice(0, 500) || null,
     actionTicketId,
     notify: true,

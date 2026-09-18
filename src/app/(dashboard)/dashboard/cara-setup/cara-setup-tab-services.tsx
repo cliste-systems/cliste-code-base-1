@@ -35,6 +35,8 @@ export function CaraSetupTabServices() {
           : "Cara uses both lists on every call — what she can confirm, and what she must never promise."
       }
       bodyClassName="p-0"
+      id="cara-services-boundary"
+      className="scroll-mt-4"
     >
       {offerEmpty ? (
         <div className="border-b border-[#d9e2dd] bg-[#fbfcfb] px-5 py-3">
@@ -63,8 +65,9 @@ export function CaraSetupTabServices() {
       ) : (
         <div className="grid items-start lg:grid-cols-2">
           <div
+            id="cara-services-offered"
             className={cn(
-              "min-w-0 px-5 py-5",
+              "min-w-0 scroll-mt-4 px-5 py-5",
               "border-b border-slate-200 lg:border-b-0 lg:border-r",
             )}
           >
@@ -105,7 +108,7 @@ export function CaraSetupTabServices() {
             </Field>
           </div>
 
-          <div className="min-w-0 px-5 py-5">
+          <div id="cara-services-not-offered" className="min-w-0 scroll-mt-4 px-5 py-5">
             <div className="mb-4 flex items-start gap-2.5">
               <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                 <Ban className="size-4" aria-hidden />
@@ -141,7 +144,10 @@ export function CaraSetupTabServices() {
       )}
 
       {isSalon ? (
-        <div className="min-w-0 border-b border-slate-200 px-5 py-5">
+        <div
+          id="cara-services-not-offered"
+          className="min-w-0 scroll-mt-4 border-b border-slate-200 px-5 py-5"
+        >
           <div className="mb-4 flex items-start gap-2.5">
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
               <Ban className="size-4" aria-hidden />

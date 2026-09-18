@@ -117,7 +117,7 @@ Preferred day: Saturday (UNCONFIRMED)`;
     const preview = departmentListPreview({
       summary:
         "Customer wants the butcher to cut 10 sirloin steaks to be ready for collection after work. They asked about pricing as well.",
-      briefSummary: null,
+      briefSummary: undefined,
     });
 
     assert.equal(preview, "Order");
@@ -130,7 +130,7 @@ Preferred day: Saturday (UNCONFIRMED)`;
 
 Name: Sarah
 Phone: +353871234567`,
-      briefSummary: null,
+      briefSummary: undefined,
     });
 
     assert.equal(preview, "Order");
@@ -142,7 +142,7 @@ Phone: +353871234567`,
 
 Name: Sarah
 Issue: Delivery never arrived`,
-      briefSummary: null,
+      briefSummary: undefined,
     });
 
     assert.equal(preview, "Complaint");

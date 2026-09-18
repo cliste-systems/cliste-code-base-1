@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 
 import {
   cleanAgentFaqs,
-  MAX_FAQS,
   type AgentFaq,
 } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
 import {
@@ -17,7 +16,6 @@ import {
   formatAgentKnowledgeList,
   parseAgentKnowledgeList,
 } from "@/lib/agent-knowledge-format";
-import { deriveCaraCapabilities } from "@/lib/cara-capabilities";
 import { regenerateCaraCustomPrompt } from "@/lib/cara-prompt-from-org";
 import {
   listServicesForOrg,
@@ -29,15 +27,29 @@ import {
   dedupeCaraSetupChips,
   normalizeCaraSetupChip,
 } from "@/lib/cara-setup-chips";
-import { validateCallHandlingAdd } from "@/lib/call-handling-boundary";
+import { assignFolderForAppliedTraining } from "@/lib/cara-knowledge-folder-assignments";
+import {
+  activateTemporalDraftForTrainingItem,
+  shouldSkipPermanentPatchForTemporal,
+} from "@/lib/cara-knowledge-temporal-store";
+import { parseTemporalDraft } from "@/lib/cara-knowledge-temporal";
 
 import {
   draftTrainingPatchFromOwnerAnswer,
   type CaraTrainingKnowledgeSnapshot,
 } from "./cara-training-draft";
+import {
+  assessTrainingPatchSafetyForOrg,
+  formatTrainingSafetyBlockMessage,
+  type TrainingSafetyIssue,
+} from "./cara-training-safety";
+import { ownerInitiatedTeachMetadata } from "./cara-training-owner-initiated";
 import { notifyCaraTrainingOwner } from "./cara-training-notify";
+import { inferPatchHistoryCategory } from "@/lib/cara-knowledge-history-labels";
+import { recordCaraKnowledgeEvent } from "./cara-knowledge-events";
 import {
   AGENT_CONFIG_REVALIDATE_PATHS,
+  CARA_KNOWLEDGE_REVALIDATE_PATHS,
   DASHBOARD_ROUTES,
 } from "@/lib/dashboard-routes";
 import {
@@ -51,15 +63,83 @@ import {
   type CaraTrainingSource,
   type CaraTrainingStatus,
 } from "./cara-training-types";
+import { TRAINING_DEFERRED_MESSAGE } from "@/app/(dashboard)/dashboard/cara-training/cara-training-helpers";
+import {
+  TRAINING_DISMISS_REASON_LABELS,
+  trainingQuestionDedupeKey,
+  type TrainingDismissReason,
+} from "./cara-training-admission";
 
 export const CARA_TRAINING_OPEN_STATUSES: CaraTrainingStatus[] = [
   "awaiting_answer",
   "draft_ready",
 ];
 
+export type { TrainingSafetyIssue } from "./cara-training-safety";
+
+async function ensureTrainingPatchSafe(
+  supabase: SupabaseClient,
+  organizationId: string,
+  patch: CaraTrainingPatch,
+): Promise<
+  | { ok: true }
+  | { ok: false; safetyBlocked: true; issues: TrainingSafetyIssue[]; message: string }
+> {
+  const safety = await assessTrainingPatchSafetyForOrg(
+    supabase,
+    organizationId,
+    patch,
+  );
+  if (safety.ok) return { ok: true };
+  return {
+    ok: false,
+    safetyBlocked: true,
+    issues: safety.issues,
+    message: formatTrainingSafetyBlockMessage(safety.issues),
+  };
+}
+
+export async function checkTrainingDraftSafety(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; issues: TrainingSafetyIssue[] }> {
+  const { data: row, error } = await supabase
+    .from("cara_training_items")
+    .select("status, proposed_patch, temporal_draft")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !row) {
+    return {
+      ok: false,
+      issues: [{ id: "missing-item", message: "Training item not found." }],
+    };
+  }
+
+  const status = String(row.status ?? "");
+  const patch = parseCaraTrainingPatch(row.proposed_patch);
+  if (status !== "draft_ready" || !patch) {
+    return { ok: true };
+  }
+
+  const temporalDraft = parseTemporalDraft(row.temporal_draft);
+  if (shouldSkipPermanentPatchForTemporal(temporalDraft)) {
+    return { ok: true };
+  }
+
+  const safety = await assessTrainingPatchSafetyForOrg(
+    supabase,
+    organizationId,
+    patch,
+  );
+  if (safety.ok) return { ok: true };
+  return { ok: false, issues: safety.issues };
+}
+
 const TRAINING_REVALIDATE_PATHS = [
-  "/dashboard",
-  DASHBOARD_ROUTES.caraTraining,
+  ...CARA_KNOWLEDGE_REVALIDATE_PATHS,
   ...AGENT_CONFIG_REVALIDATE_PATHS,
 ] as const;
 
@@ -67,6 +147,65 @@ function revalidateCaraTraining() {
   for (const path of TRAINING_REVALIDATE_PATHS) {
     revalidatePath(path);
   }
+}
+
+function patchEventTitle(patch: CaraTrainingPatch): string {
+  if (patch.kind === "faq") return patch.question;
+  if (patch.kind === "service_offered" || patch.kind === "service_not_offered") {
+    return patch.label;
+  }
+  return patch.rule;
+}
+
+function patchEventCategory(patch: CaraTrainingPatch): string {
+  return inferPatchHistoryCategory(patch);
+}
+
+async function recordTrainingLearnedEvent(
+  supabase: SupabaseClient,
+  input: {
+    organizationId: string;
+    itemId: string;
+    patch: CaraTrainingPatch;
+    source: CaraTrainingSource;
+    actorId: string;
+    callLogId?: string | null;
+  },
+): Promise<void> {
+  await recordCaraKnowledgeEvent(supabase, {
+    organizationId: input.organizationId,
+    eventType: "learned",
+    category: patchEventCategory(input.patch),
+    title: patchEventTitle(input.patch),
+    source: input.source,
+    actorId: input.actorId,
+    callLogId: input.callLogId ?? null,
+    trainingItemId: input.itemId,
+  });
+}
+
+async function recordTrainingUnlearnedEvent(
+  supabase: SupabaseClient,
+  input: {
+    organizationId: string;
+    itemId: string;
+    patch: CaraTrainingPatch;
+    source: CaraTrainingSource;
+    actorId?: string | null;
+    callLogId?: string | null;
+  },
+): Promise<void> {
+  await recordCaraKnowledgeEvent(supabase, {
+    organizationId: input.organizationId,
+    eventType: "unlearned",
+    category: patchEventCategory(input.patch),
+    title: patchEventTitle(input.patch),
+    source: "unlearn",
+    actorId: input.actorId ?? null,
+    callLogId: input.callLogId ?? null,
+    trainingItemId: input.itemId,
+    payload: { training_source: input.source },
+  });
 }
 
 function rowToItem(row: Record<string, unknown>): CaraTrainingItemRow {
@@ -98,6 +237,15 @@ function rowToItem(row: Record<string, unknown>): CaraTrainingItemRow {
       : String(row.created_at ?? new Date().toISOString()),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+    knowledge_folder_id: row.knowledge_folder_id
+      ? String(row.knowledge_folder_id)
+      : null,
+    knowledge_department_ids: Array.isArray(row.knowledge_department_ids)
+      ? row.knowledge_department_ids.map(String)
+      : [],
+    knowledge_topic_labels: Array.isArray(row.knowledge_topic_labels)
+      ? row.knowledge_topic_labels.map(String)
+      : [],
   };
 }
 
@@ -126,45 +274,6 @@ async function loadKnowledgeSnapshot(
     ),
     businessRules: parseAgentBusinessRules(org?.agent_business_rules),
   };
-}
-
-function validatePatchForApply(
-  patch: CaraTrainingPatch,
-  knowledge: CaraTrainingKnowledgeSnapshot,
-): { ok: true } | { ok: false; message: string } {
-  const caps = deriveCaraCapabilities([], undefined);
-
-  switch (patch.kind) {
-    case "faq": {
-      const question = patch.question.trim();
-      const answer = patch.answer.trim();
-      if (!question || !answer) {
-        return { ok: false, message: "FAQ needs both a question and an answer." };
-      }
-      if (knowledge.faqs.length >= MAX_FAQS) {
-        return {
-          ok: false,
-          message: `You already have ${MAX_FAQS} FAQs. Remove one in Cara Setup before adding another.`,
-        };
-      }
-      return { ok: true };
-    }
-    case "service_offered":
-    case "service_not_offered": {
-      const label = normalizeCaraSetupChip(patch.label);
-      if (!label) {
-        return { ok: false, message: "Service label cannot be empty." };
-      }
-      return { ok: true };
-    }
-    case "business_rule": {
-      const validation = validateCallHandlingAdd(patch.rule, "rule", caps);
-      if (!validation.ok) {
-        return { ok: false, message: validation.block };
-      }
-      return { ok: true };
-    }
-  }
 }
 
 type OrgKnowledgeFields = {
@@ -306,6 +415,9 @@ export type CreateTrainingItemInput = {
   callLogId?: string | null;
   actionTicketId?: string | null;
   notify?: boolean;
+  knowledgeFolderId?: string | null;
+  knowledgeDepartmentIds?: string[];
+  knowledgeTopicLabels?: string[];
 };
 
 export async function createTrainingItem(
@@ -331,7 +443,10 @@ export async function createTrainingItem(
     }
   }
 
-  const normalizedTopic = normalizeTrainingTopic(gapSummary);
+  const normalizedTopic = trainingQuestionDedupeKey({
+    gapSummary,
+    caraQuestion,
+  });
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: recentOpen } = await admin
     .from("cara_training_items")
@@ -341,7 +456,11 @@ export async function createTrainingItem(
     .gte("created_at", weekAgo);
 
   for (const row of recentOpen ?? []) {
-    if (normalizeTrainingTopic(String(row.gap_summary ?? "")) === normalizedTopic) {
+    const rowKey = trainingQuestionDedupeKey({
+      gapSummary: String(row.gap_summary ?? ""),
+      caraQuestion: String((row as { cara_question?: string }).cara_question ?? ""),
+    });
+    if (rowKey === normalizedTopic) {
       const now = new Date().toISOString();
       const priorCount =
         typeof row.occurrence_count === "number" && row.occurrence_count > 0
@@ -355,6 +474,9 @@ export async function createTrainingItem(
       };
       if (callerContext) {
         patch.caller_context = callerContext;
+      }
+      if (input.callLogId?.trim()) {
+        patch.call_log_id = input.callLogId.trim();
       }
       const { error: bumpErr } = await admin
         .from("cara_training_items")
@@ -380,6 +502,9 @@ export async function createTrainingItem(
       cara_question: caraQuestion,
       call_log_id: input.callLogId ?? null,
       action_ticket_id: input.actionTicketId ?? null,
+      knowledge_folder_id: input.knowledgeFolderId ?? null,
+      knowledge_department_ids: input.knowledgeDepartmentIds ?? [],
+      knowledge_topic_labels: input.knowledgeTopicLabels ?? [],
     })
     .select("id")
     .single();
@@ -404,6 +529,78 @@ export async function createTrainingItem(
 
   revalidateCaraTraining();
   return { ok: true, itemId };
+}
+
+export async function prepareTemporalTrainingForConfirm(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+  ownerAnswer: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: row, error } = await supabase
+    .from("cara_training_items")
+    .select("*")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !row) {
+    return { ok: false, message: "Training item not found." };
+  }
+
+  const item = rowToItem(row as Record<string, unknown>);
+  if (item.status !== "awaiting_answer") {
+    return { ok: false, message: "This item is not waiting for an answer." };
+  }
+
+  const answer = ownerAnswer.trim();
+  if (!answer) {
+    return { ok: false, message: "Enter an answer." };
+  }
+
+  const temporalDraft = parseTemporalDraft(
+    (row as { temporal_draft?: unknown }).temporal_draft,
+  );
+  if (!temporalDraft) {
+    return { ok: false, message: "No temporary update is configured." };
+  }
+
+  const proposedPatch: CaraTrainingPatch =
+    temporalDraft.subjectType === "opening_hours"
+      ? {
+          kind: "faq",
+          question: "What are today's opening hours?",
+          answer: temporalDraft.body.trim() || answer,
+        }
+      : {
+          kind: "faq",
+          question: temporalDraft.title.trim() || item.gap_summary,
+          answer: temporalDraft.body.trim() || answer,
+        };
+
+  const messages: CaraTrainingOwnerMessage[] = [
+    ...item.owner_messages,
+    { role: "user", content: answer, at: new Date().toISOString() },
+  ];
+
+  const { error: updateError } = await supabase
+    .from("cara_training_items")
+    .update({
+      status: "draft_ready",
+      owner_messages: messages,
+      proposed_patch: proposedPatch,
+      target_section: "faq",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", itemId)
+    .eq("organization_id", organizationId);
+
+  if (updateError) {
+    return { ok: false, message: updateError.message };
+  }
+
+  revalidateCaraTraining();
+  return { ok: true };
 }
 
 export async function submitOwnerAnswer(
@@ -443,17 +640,41 @@ export async function submitOwnerAnswer(
   });
 
   if (!draft.ok) {
+    if ("needsClarification" in draft) {
+      return { ok: false, needsClarification: draft.needsClarification };
+    }
     return { ok: false, message: draft.message };
   }
 
-  const validation = validatePatchForApply(draft.patch, knowledge);
-  if (!validation.ok) {
-    return validation;
+  const temporalDraft = parseTemporalDraft(
+    (row as { temporal_draft?: unknown }).temporal_draft,
+  );
+  const skipPermanentPatch = shouldSkipPermanentPatchForTemporal(temporalDraft);
+  if (!skipPermanentPatch) {
+    const safety = await ensureTrainingPatchSafe(
+      supabase,
+      organizationId,
+      draft.patch,
+    );
+    if (!safety.ok) {
+      return safety;
+    }
   }
 
+  const now = new Date().toISOString();
+  const understoodAnswer =
+    draft.patch.kind === "faq" ? draft.patch.answer : answer;
+  const { formatTrainingUnderstandingAssistantMessage } = await import(
+    "./cara-training-understanding-guards"
+  );
   const messages: CaraTrainingOwnerMessage[] = [
     ...item.owner_messages,
-    { role: "user", content: answer, at: new Date().toISOString() },
+    { role: "user", content: answer, at: now },
+    {
+      role: "assistant",
+      content: formatTrainingUnderstandingAssistantMessage(understoodAnswer),
+      at: now,
+    },
   ];
 
   const targetSection = targetSectionForPatch(draft.patch);
@@ -475,6 +696,60 @@ export async function submitOwnerAnswer(
 
   revalidateCaraTraining();
   return { ok: true };
+}
+
+export async function previewOwnerInitiatedTeach(
+  supabase: SupabaseClient,
+  organizationId: string,
+  ownerDescription: string,
+  teachingContext?: import("./cara-training-understanding").TeachUnderstandingContext | null,
+): Promise<
+  | { ok: true; patch: CaraTrainingPatch }
+  | { ok: false; safetyBlocked: true; issues: TrainingSafetyIssue[]; patch: CaraTrainingPatch }
+  | { ok: false; needsClarification: string }
+  | { ok: false; message: string }
+> {
+  const trimmed = ownerDescription.trim();
+  if (!trimmed) {
+    return { ok: false, message: "Describe what Cara should know." };
+  }
+
+  const { gapSummary, caraQuestion } = ownerInitiatedTeachMetadata({
+    ownerDescription: trimmed,
+  });
+  const knowledge = await loadKnowledgeSnapshot(supabase, organizationId);
+
+  const draft = await draftTrainingPatchFromOwnerAnswer({
+    gapSummary,
+    callerContext: null,
+    caraQuestion,
+    ownerAnswer: trimmed,
+    knowledge,
+    teachingContext,
+  });
+
+  if (!draft.ok) {
+    if ("needsClarification" in draft) {
+      return { ok: false, needsClarification: draft.needsClarification };
+    }
+    return { ok: false, message: draft.message };
+  }
+
+  const safety = await ensureTrainingPatchSafe(
+    supabase,
+    organizationId,
+    draft.patch,
+  );
+  if (!safety.ok) {
+    return {
+      ok: false,
+      safetyBlocked: true,
+      issues: safety.issues,
+      patch: draft.patch,
+    };
+  }
+
+  return { ok: true, patch: draft.patch };
 }
 
 export async function confirmTrainingItem(
@@ -499,10 +774,23 @@ export async function confirmTrainingItem(
     return { ok: false, message: "No draft is ready to confirm." };
   }
 
-  const knowledge = await loadKnowledgeSnapshot(supabase, organizationId);
-  const validation = validatePatchForApply(item.proposed_patch, knowledge);
-  if (!validation.ok) {
-    return validation;
+  const temporalDraft = parseTemporalDraft(
+    (row as { temporal_draft?: unknown }).temporal_draft,
+  );
+  const skipPermanentPatch = shouldSkipPermanentPatchForTemporal(temporalDraft);
+  const ownerAnswer =
+    [...item.owner_messages].reverse().find((message) => message.role === "user")
+      ?.content ?? null;
+
+  if (!skipPermanentPatch) {
+    const safety = await ensureTrainingPatchSafe(
+      supabase,
+      organizationId,
+      item.proposed_patch,
+    );
+    if (!safety.ok) {
+      return safety;
+    }
   }
 
   const { data: org } = await supabase
@@ -513,34 +801,55 @@ export async function confirmTrainingItem(
     .eq("id", organizationId)
     .maybeSingle();
 
-  const current: OrgKnowledgeFields = {
-    agent_faqs: cleanAgentFaqs(org?.agent_faqs),
-    agent_services_departments: String(org?.agent_services_departments ?? ""),
-    agent_services_not_offered: String(org?.agent_services_not_offered ?? ""),
-    agent_business_rules: parseAgentBusinessRules(org?.agent_business_rules),
-  };
-
-  const merged = mergePatchIntoOrgFields(current, item.proposed_patch);
   const now = new Date().toISOString();
 
-  const { error: orgError } = await supabase
-    .from("organizations")
-    .update({
-      agent_faqs: merged.agent_faqs,
-      agent_services_departments: merged.agent_services_departments,
-      agent_services_not_offered: merged.agent_services_not_offered,
-      agent_business_rules: merged.agent_business_rules,
-      updated_at: now,
-    })
-    .eq("id", organizationId);
+  if (!skipPermanentPatch) {
+    const current: OrgKnowledgeFields = {
+      agent_faqs: cleanAgentFaqs(org?.agent_faqs),
+      agent_services_departments: String(org?.agent_services_departments ?? ""),
+      agent_services_not_offered: String(org?.agent_services_not_offered ?? ""),
+      agent_business_rules: parseAgentBusinessRules(org?.agent_business_rules),
+    };
 
-  if (orgError) {
-    return { ok: false, message: orgError.message };
+    const merged = mergePatchIntoOrgFields(current, item.proposed_patch);
+
+    const { error: orgError } = await supabase
+      .from("organizations")
+      .update({
+        agent_faqs: merged.agent_faqs,
+        agent_services_departments: merged.agent_services_departments,
+        agent_services_not_offered: merged.agent_services_not_offered,
+        agent_business_rules: merged.agent_business_rules,
+        updated_at: now,
+      })
+      .eq("id", organizationId);
+
+    if (orgError) {
+      return { ok: false, message: orgError.message };
+    }
   }
 
-  const regen = await regenerateCaraCustomPrompt(supabase, organizationId);
-  if (!regen.ok) {
-    return { ok: false, message: regen.message };
+  if (temporalDraft) {
+    const { createAdminClient } = await import("@/utils/supabase/admin");
+    const admin = createAdminClient();
+    const activated = await activateTemporalDraftForTrainingItem(
+      supabase,
+      admin,
+      {
+        organizationId,
+        itemId,
+        actorId: appliedByUserId,
+        ownerAnswer,
+      },
+    );
+    if (!activated.ok) {
+      return activated;
+    }
+  } else {
+    const regen = await regenerateCaraCustomPrompt(supabase, organizationId);
+    if (!regen.ok) {
+      return { ok: false, message: regen.message };
+    }
   }
 
   const { error: itemError } = await supabase
@@ -559,6 +868,31 @@ export async function confirmTrainingItem(
     return { ok: false, message: itemError.message };
   }
 
+  if (!temporalDraft) {
+    await recordTrainingLearnedEvent(supabase, {
+      organizationId,
+      itemId,
+      patch: item.proposed_patch,
+      source: item.source,
+      actorId: appliedByUserId,
+      callLogId: item.call_log_id,
+    });
+  }
+
+  await assignFolderForAppliedTraining(supabase, {
+    organizationId,
+    itemId,
+    patch: item.proposed_patch,
+    folderId: (row as { knowledge_folder_id?: string | null }).knowledge_folder_id,
+    departmentIds:
+      (row as { knowledge_department_ids?: string[] | null }).knowledge_department_ids ??
+      [],
+    topicLabels:
+      (row as { knowledge_topic_labels?: string[] | null }).knowledge_topic_labels ??
+      [],
+    actorId: appliedByUserId,
+  });
+
   revalidateCaraTraining();
   return { ok: true };
 }
@@ -567,14 +901,32 @@ export async function dismissTrainingItem(
   supabase: SupabaseClient,
   organizationId: string,
   itemId: string,
+  reason?: TrainingDismissReason,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: row } = await supabase
+    .from("cara_training_items")
+    .select("owner_messages")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
   const now = new Date().toISOString();
+  const ownerMessages = parseOwnerMessages(row?.owner_messages);
+  if (reason) {
+    ownerMessages.push({
+      role: "assistant",
+      content: `Dismissed (${reason}): ${TRAINING_DISMISS_REASON_LABELS[reason]}`,
+      at: now,
+    });
+  }
+
   const { error } = await supabase
     .from("cara_training_items")
     .update({
       status: "dismissed",
       dismissed_at: now,
       updated_at: now,
+      owner_messages: ownerMessages,
     })
     .eq("id", itemId)
     .eq("organization_id", organizationId)
@@ -588,7 +940,7 @@ export async function dismissTrainingItem(
   return { ok: true };
 }
 
-async function loadCallGapItem(
+async function loadOpenTrainingItem(
   supabase: SupabaseClient,
   organizationId: string,
   itemId: string,
@@ -607,14 +959,26 @@ async function loadCallGapItem(
   }
 
   const item = rowToItem(row as Record<string, unknown>);
-  if (item.source !== "call_gap") {
-    return { ok: false, message: "This quick action is only for call gaps." };
-  }
   if (item.status !== "awaiting_answer") {
     return { ok: false, message: "This item is not waiting for an answer." };
   }
 
   return { ok: true, item };
+}
+
+async function loadCallGapItem(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+): Promise<
+  { ok: true; item: CaraTrainingItemRow } | { ok: false; message: string }
+> {
+  const loaded = await loadOpenTrainingItem(supabase, organizationId, itemId);
+  if (!loaded.ok) return loaded;
+  if (loaded.item.source !== "call_gap") {
+    return { ok: false, message: "This quick action is only for call gaps." };
+  }
+  return loaded;
 }
 
 async function applyCallGapPatch(
@@ -624,11 +988,11 @@ async function applyCallGapPatch(
   patch: CaraTrainingPatch,
   appliedByUserId: string,
   extraOrgUpdate?: { agent_services_not_offered_raw?: string | null },
+  eventMeta?: { source: CaraTrainingSource; callLogId?: string | null },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const knowledge = await loadKnowledgeSnapshot(supabase, organizationId);
-  const validation = validatePatchForApply(patch, knowledge);
-  if (!validation.ok) {
-    return validation;
+  const safety = await ensureTrainingPatchSafe(supabase, organizationId, patch);
+  if (!safety.ok) {
+    return { ok: false, message: safety.message };
   }
 
   const { data: org } = await supabase
@@ -724,6 +1088,17 @@ async function applyCallGapPatch(
     return { ok: false, message: itemError.message };
   }
 
+  if (eventMeta) {
+    await recordTrainingLearnedEvent(supabase, {
+      organizationId,
+      itemId,
+      patch,
+      source: eventMeta.source,
+      actorId: appliedByUserId,
+      callLogId: eventMeta.callLogId ?? null,
+    });
+  }
+
   revalidateCaraTraining();
   return { ok: true };
 }
@@ -733,22 +1108,12 @@ export async function resolveCallGapYes(
   organizationId: string,
   itemId: string,
   appliedByUserId: string,
+  details?: string | null,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const loaded = await loadCallGapItem(supabase, organizationId, itemId);
-  if (!loaded.ok) return loaded;
-
-  const label = normalizeCaraSetupChip(loaded.item.gap_summary);
-  if (!label) {
-    return { ok: false, message: "Service label cannot be empty." };
-  }
-
-  return applyCallGapPatch(
-    supabase,
-    organizationId,
-    itemId,
-    { kind: "service_offered", label },
-    appliedByUserId,
-  );
+  return submitExistenceQuickAnswer(supabase, organizationId, itemId, appliedByUserId, {
+    choice: "yes",
+    details,
+  });
 }
 
 export async function resolveCallGapNo(
@@ -756,33 +1121,192 @@ export async function resolveCallGapNo(
   organizationId: string,
   itemId: string,
   appliedByUserId: string,
+  details?: string | null,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const loaded = await loadCallGapItem(supabase, organizationId, itemId);
+  return submitExistenceQuickAnswer(supabase, organizationId, itemId, appliedByUserId, {
+    choice: "no",
+    details,
+  });
+}
+
+export async function submitExistenceQuickAnswer(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+  userId: string,
+  input: {
+    choice: "yes" | "no" | "depends";
+    details?: string | null;
+  },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const loaded = await loadOpenTrainingItem(supabase, organizationId, itemId);
   if (!loaded.ok) return loaded;
 
-  const label = normalizeCaraSetupChip(loaded.item.gap_summary);
-  if (!label) {
-    return { ok: false, message: "Exclusion label cannot be empty." };
+  const question =
+    loaded.item.cara_question.trim() || loaded.item.gap_summary.trim();
+  const { formatExistenceOwnerMessage } = await import(
+    "@/app/(dashboard)/dashboard/cara-training/cara-training-helpers"
+  );
+  const rawOwnerContent = formatExistenceOwnerMessage({
+    choice: input.choice,
+    details: input.details,
+  });
+  const ownerAnswerForDraft =
+    input.choice === "depends"
+      ? input.details?.trim() || "It depends."
+      : input.details?.trim() || (input.choice === "yes" ? "Yes." : "No.");
+
+  const knowledge = await loadKnowledgeSnapshot(supabase, organizationId);
+  const { draftTrainingUnderstandingFromAnswer, formatTrainingUnderstandingAssistantMessage } =
+    await import("./cara-training-understanding");
+  const draft = await draftTrainingUnderstandingFromAnswer({
+    gapSummary: loaded.item.gap_summary,
+    callerContext: loaded.item.caller_context,
+    caraQuestion: question,
+    ownerAnswer: ownerAnswerForDraft,
+    quickChoice: input.choice,
+    knowledge,
+  });
+
+  if (!draft.ok) {
+    if ("needsClarification" in draft) {
+      return { ok: false, message: draft.needsClarification };
+    }
+    return { ok: false, message: draft.message };
   }
 
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("agent_services_not_offered_raw")
-    .eq("id", organizationId)
+  const patch = draft.patch;
+  const safety = await ensureTrainingPatchSafe(supabase, organizationId, patch);
+  if (!safety.ok) return safety;
+
+  const now = new Date().toISOString();
+  const ownerMessages: CaraTrainingOwnerMessage[] = [
+    ...loaded.item.owner_messages,
+    {
+      role: "user",
+      content: rawOwnerContent,
+      at: now,
+    },
+    {
+      role: "assistant",
+      content: formatTrainingUnderstandingAssistantMessage(draft.understoodAnswer),
+      at: now,
+    },
+  ];
+
+  const { error } = await supabase
+    .from("cara_training_items")
+    .update({
+      status: "draft_ready",
+      proposed_patch: patch,
+      target_section: targetSectionForPatch(patch),
+      owner_messages: ownerMessages,
+      updated_at: now,
+    })
+    .eq("id", itemId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidateCaraTraining();
+  return { ok: true };
+}
+
+export async function deferTrainingItem(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: row } = await supabase
+    .from("cara_training_items")
+    .select("owner_messages, status")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
-  const existingRaw = String(org?.agent_services_not_offered_raw ?? "").trim();
-  const sentence = `We don't offer ${label}.`;
-  const nextRaw = existingRaw ? `${existingRaw} ${sentence}` : sentence;
+  if (!row || row.status !== "awaiting_answer") {
+    return { ok: false, message: "Training item not found." };
+  }
 
-  return applyCallGapPatch(
-    supabase,
-    organizationId,
-    itemId,
-    { kind: "service_not_offered", label },
-    appliedByUserId,
-    { agent_services_not_offered_raw: nextRaw },
+  const ownerMessages = parseOwnerMessages(row.owner_messages);
+  if (
+    ownerMessages.some(
+      (message) =>
+        message.role === "assistant" &&
+        message.content.startsWith("Deferred —"),
+    )
+  ) {
+    return { ok: true };
+  }
+
+  const now = new Date().toISOString();
+  ownerMessages.push({
+    role: "assistant",
+    content: TRAINING_DEFERRED_MESSAGE,
+    at: now,
+  });
+
+  const { error } = await supabase
+    .from("cara_training_items")
+    .update({
+      owner_messages: ownerMessages,
+      last_seen_at: now,
+      updated_at: now,
+    })
+    .eq("id", itemId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidateCaraTraining();
+  return { ok: true };
+}
+
+export async function clearDeferredTrainingItem(
+  supabase: SupabaseClient,
+  organizationId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: row } = await supabase
+    .from("cara_training_items")
+    .select("owner_messages, status")
+    .eq("id", itemId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (!row || row.status !== "awaiting_answer") {
+    return { ok: false, message: "Training item not found." };
+  }
+
+  const ownerMessages = parseOwnerMessages(row.owner_messages).filter(
+    (message) =>
+      !(
+        message.role === "assistant" &&
+        message.content.startsWith("Deferred —")
+      ),
   );
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("cara_training_items")
+    .update({
+      owner_messages: ownerMessages,
+      last_seen_at: now,
+      updated_at: now,
+    })
+    .eq("id", itemId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidateCaraTraining();
+  return { ok: true };
 }
 
 export async function resetTrainingItemToAnswer(
@@ -814,6 +1338,7 @@ export async function revertTrainingItem(
   supabase: SupabaseClient,
   organizationId: string,
   itemId: string,
+  actorId?: string | null,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: row, error } = await supabase
     .from("cara_training_items")
@@ -903,6 +1428,15 @@ export async function revertTrainingItem(
   if (itemError) {
     return { ok: false, message: itemError.message };
   }
+
+  await recordTrainingUnlearnedEvent(supabase, {
+    organizationId,
+    itemId,
+    patch,
+    source: item.source,
+    actorId,
+    callLogId: item.call_log_id,
+  });
 
   revalidateCaraTraining();
   return { ok: true };

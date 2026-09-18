@@ -273,7 +273,7 @@ export function buildHomeCaraTrainingRows(input: {
       const summary = summaryPreview(item.gap_summary);
       return {
         id: item.id,
-        href: `${DASHBOARD_ROUTES.caraTraining}?item=${encodeURIComponent(item.id)}`,
+        href: DASHBOARD_ROUTES.caraKnowledgeNeedsInputItem(item.id),
         title: caraTrainingRowTitle(item.status),
         description: truncateHomePanelDescription(summary),
         time: input.formatTime(item.updated_at),

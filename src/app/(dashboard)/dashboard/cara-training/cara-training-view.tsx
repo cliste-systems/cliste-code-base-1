@@ -1,35 +1,29 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
+  ArrowLeft,
   BookOpen,
-  Bot,
   Check,
   Loader2,
   Plus,
   RotateCcw,
+  Search,
   Sparkles,
-  X,
 } from "lucide-react";
 
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
   DetailActionButton,
-  DetailInset,
   DetailPanelBody,
   DetailPanelFooter,
   DetailPanelShell,
-  DetailSection,
   ListDetailLayout,
 } from "@/components/dashboard/list-detail";
 import {
   DASHBOARD_CARD_SURFACE,
-  DASHBOARD_ICON_CHIP_LG,
-  DASHBOARD_ICON_CHIP_SM,
-  DASHBOARD_ICON_GLYPH_LG,
-  DASHBOARD_ICON_GLYPH_SM,
   DASHBOARD_INPUT_CLASS,
   DASHBOARD_PRIMARY_BUTTON_CLASS,
   DASHBOARD_SECONDARY_BUTTON_CLASS,
@@ -45,35 +39,63 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import {
+  trainingItemClassificationDraft,
+} from "@/lib/cara-knowledge-classification";
+import {
+  type KnowledgeFolder,
+} from "@/lib/cara-knowledge-folders";
+import {
+  applyDemoTrainingAnswer,
+  applyDemoTrainingBackToEdit,
+  applyDemoTrainingConfirm,
+  applyDemoTrainingDismiss,
+  applyDemoTrainingRevert,
+  readDemoTrainingItemOverrides,
+  isDemoTrainingItemId,
+  writeDemoTrainingItemOverrides,
+} from "@/lib/cara-training-demo-items";
 import { cn } from "@/lib/utils";
 
 import {
   answerTrainingItem,
+  checkTrainingDraftSafetyAction,
+  clearDeferredTrainingItemAction,
   confirmTrainingDraft,
+  deferTrainingItemAction,
   dismissTrainingDraft,
   editTrainingAnswer,
-  resolveCallGapNoAction,
-  resolveCallGapYesAction,
   revertAppliedTraining,
   startOwnerInitiatedTraining,
+  type TrainingSafetyIssue,
 } from "./actions";
+import { TrainingSafetyPanel } from "./training-safety-panel";
 import { CaraTrainingPatchPreview } from "./cara-training-patch-preview";
+import { TrainingAnswerField } from "./training-answer-field";
 import {
-  CARA_TRAINING_SECTION_LABELS,
-  CARA_TRAINING_SOURCE_LABELS,
+  TrainingCallFactsBar,
+  TrainingCallerExcerpt,
+} from "./training-call-context";
+import {
+  TrainingAnswerCelebration,
+  TrainingDraftReveal,
+  type TrainingAnswerCelebrateChoice,
+} from "./training-answer-celebration";
+import {
   formatTrainingDateTime,
   isOpenTrainingStatus,
-  lastOwnerAnswer,
   patchPreviewLines,
-  trainingContextSummary,
-  trainingDetailMeta,
-  trainingAnswerPlaceholder,
-  trainingQuickAnswerLabel,
-  trainingQuickResolveMode,
+  restoreOwnerAnswerForEdit,
+  sortOpenTrainingItems,
+  toggleTrainingItemDeferred,
+  trainingDisplayQuestion,
+  trainingItemCallHref,
+  trainingItemIsDeferred,
+  trainingListSubtitle,
+  trainingSourceExcerpt,
   trainingStatusLabel,
   trainingStatusVariant,
-  trainingTopicLabel,
+  understoodPreviewLines,
   type CaraTrainingListItem,
 } from "./cara-training-helpers";
 
@@ -82,6 +104,9 @@ type CaraTrainingViewProps = {
   canManage: boolean;
   initialSelectedItemId?: string | null;
   className?: string;
+  knowledgeFolders?: KnowledgeFolder[];
+  embedded?: boolean;
+  externalListSearchQuery?: string;
 };
 
 type ListTab = "open" | "learned";
@@ -101,9 +126,13 @@ export function CaraTrainingView({
   canManage,
   initialSelectedItemId = null,
   className,
+  knowledgeFolders = [],
+  embedded = false,
+  externalListSearchQuery,
 }: CaraTrainingViewProps) {
   const router = useRouter();
   const [listTab, setListTab] = useState<ListTab>(() => {
+    if (embedded) return "open";
     if (
       initialSelectedItemId &&
       items.some(
@@ -121,41 +150,220 @@ export function CaraTrainingView({
     initialSelectedItemId,
   );
   const [answerText, setAnswerText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(
+    Boolean(initialSelectedItemId),
+  );
+  const [dismissOpen, setDismissOpen] = useState(false);
   const [teachText, setTeachText] = useState("");
   const [teachOpen, setTeachOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftSafetyIssues, setDraftSafetyIssues] = useState<
+    TrainingSafetyIssue[]
+  >([]);
+  const [draftSafetyChecking, setDraftSafetyChecking] = useState(false);
+  const [celebrateAnswer, setCelebrateAnswer] = useState<{
+    itemId: string;
+    choice: TrainingAnswerCelebrateChoice;
+  } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [localItemOverrides, setLocalItemOverrides] = useState<
+    Record<string, CaraTrainingListItem>
+  >({});
+  const answerDraftByItemRef = useRef<Record<string, string>>({});
+  const previousSelectionRef = useRef<string | null>(null);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const stored = readDemoTrainingItemOverrides();
+    if (Object.keys(stored).length === 0) return;
+    setLocalItemOverrides((current) => ({ ...stored, ...current }));
+  }, []);
+
+  const displayItems = useMemo(
+    () => items.map((item) => localItemOverrides[item.id] ?? item),
+    [items, localItemOverrides],
+  );
+
+  const persistDemoOverrides = useCallback(
+    (next: Record<string, CaraTrainingListItem>) => {
+      writeDemoTrainingItemOverrides(next);
+    },
+    [],
+  );
+
+  const setItemOverride = useCallback(
+    (itemId: string, nextItem: CaraTrainingListItem | null) => {
+      setLocalItemOverrides((current) => {
+        const next = { ...current };
+        if (nextItem) {
+          next[itemId] = nextItem;
+        } else {
+          delete next[itemId];
+        }
+        if (isDemoTrainingItemId(itemId)) {
+          persistDemoOverrides(next);
+        }
+        return next;
+      });
+    },
+    [persistDemoOverrides],
+  );
+
+  useEffect(() => {
+    setLocalItemOverrides((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const item of items) {
+        if (!current[item.id] || isDemoTrainingItemId(item.id)) continue;
+        if (trainingItemIsDeferred(item)) {
+          delete next[item.id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [items]);
 
   const openItems = useMemo(
-    () => items.filter((item) => isOpenTrainingStatus(item.status)),
-    [items],
+    () =>
+      sortOpenTrainingItems(
+        displayItems.filter((item) => isOpenTrainingStatus(item.status)),
+      ),
+    [displayItems],
   );
   const appliedItems = useMemo(
-    () => items.filter((item) => item.status === "applied"),
-    [items],
+    () => displayItems.filter((item) => item.status === "applied"),
+    [displayItems],
   );
 
   const tabItems = listTab === "open" ? openItems : appliedItems;
   const isOpenQueue = listTab === "open";
+  const useExternalSearch = embedded && externalListSearchQuery !== undefined;
+  const effectiveSearchQuery = useExternalSearch
+    ? externalListSearchQuery
+    : searchQuery;
+
+  const filteredItems = useMemo(() => {
+    const q = effectiveSearchQuery.trim().toLowerCase();
+    if (!q) return tabItems;
+    return tabItems.filter((item) => {
+      const haystack = [
+        trainingDisplayQuestion(item),
+        item.gap_summary,
+        item.caller_context,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [effectiveSearchQuery, tabItems]);
 
   const resolvedSelectedId = useMemo(() => {
     if (selectedId && tabItems.some((item) => item.id === selectedId)) {
       return selectedId;
     }
-    return tabItems[0]?.id ?? null;
-  }, [selectedId, tabItems]);
+    return filteredItems[0]?.id ?? tabItems[0]?.id ?? null;
+  }, [selectedId, filteredItems, tabItems]);
 
   const selected = useMemo(
-    () => items.find((item) => item.id === resolvedSelectedId) ?? null,
-    [items, resolvedSelectedId],
+    () => displayItems.find((item) => item.id === resolvedSelectedId) ?? null,
+    [displayItems, resolvedSelectedId],
   );
+
+  useEffect(() => {
+    const item =
+      displayItems.find((entry) => entry.id === resolvedSelectedId) ?? null;
+
+    if (
+      !item ||
+      item.status !== "draft_ready" ||
+      isDemoTrainingItemId(item.id)
+    ) {
+      setDraftSafetyIssues([]);
+      setDraftSafetyChecking(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDraftSafetyChecking(true);
+    void checkTrainingDraftSafetyAction(item.id).then((result) => {
+      if (cancelled) return;
+      setDraftSafetyChecking(false);
+      setDraftSafetyIssues(result.ok ? [] : result.issues);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    resolvedSelectedId,
+    displayItems,
+    selected?.id,
+    selected?.status,
+    selected?.updated_at,
+    selected?.proposed_patch,
+  ]);
+
+  useEffect(() => {
+    const item =
+      displayItems.find((entry) => entry.id === resolvedSelectedId) ?? null;
+    const selectionChanged = previousSelectionRef.current !== resolvedSelectedId;
+    previousSelectionRef.current = resolvedSelectedId;
+
+    if (selectionChanged) {
+      const cached =
+        resolvedSelectedId != null
+          ? answerDraftByItemRef.current[resolvedSelectedId]
+          : undefined;
+      setAnswerText(
+        cached ??
+          (item?.status === "draft_ready" ? restoreOwnerAnswerForEdit(item) : ""),
+      );
+      setError(null);
+      setCelebrateAnswer(null);
+      return;
+    }
+
+    if (item?.status === "draft_ready") {
+      setAnswerText(restoreOwnerAnswerForEdit(item));
+    }
+  }, [resolvedSelectedId, displayItems]);
+
+  const handleAnswerTextChange = useCallback(
+    (value: string) => {
+      if (resolvedSelectedId) {
+        answerDraftByItemRef.current[resolvedSelectedId] = value;
+      }
+      setAnswerText(value);
+    },
+    [resolvedSelectedId],
+  );
+
+  const clearAnswerDraft = useCallback((itemId: string) => {
+    delete answerDraftByItemRef.current[itemId];
+  }, []);
+
+  useEffect(() => {
+    if (!celebrateAnswer) return;
+    const timer = window.setTimeout(() => {
+      setCelebrateAnswer((current) =>
+        current?.itemId === celebrateAnswer.itemId ? null : current,
+      );
+    }, 3200);
+    return () => window.clearTimeout(timer);
+  }, [celebrateAnswer]);
 
   const refreshAfterAction = useCallback(() => {
     router.refresh();
   }, [router]);
 
   const runAction = useCallback(
-    (fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    (
+      fn: () => Promise<{ ok: boolean; message?: string }>,
+      onSuccess?: () => void,
+    ) => {
       setError(null);
       startTransition(async () => {
         const res = await fn();
@@ -163,29 +371,76 @@ export function CaraTrainingView({
           setError(res.message ?? "Something went wrong.");
           return;
         }
+        onSuccess?.();
+        if (resolvedSelectedId) {
+          clearAnswerDraft(resolvedSelectedId);
+        }
         setAnswerText("");
         refreshAfterAction();
       });
     },
-    [refreshAfterAction],
+    [clearAnswerDraft, refreshAfterAction, resolvedSelectedId],
   );
+
+  const selectItem = (id: string) => {
+    setSelectedId(id);
+    setMobileDetailOpen(true);
+  };
 
   const handleAnswer = () => {
     if (!selected || !canManage) return;
+    const itemId = selected.id;
+    if (isDemoTrainingItemId(itemId)) {
+      const result = applyDemoTrainingAnswer(selected, answerText);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setError(null);
+      clearAnswerDraft(itemId);
+      setAnswerText("");
+      setItemOverride(itemId, result.item);
+      return;
+    }
     runAction(() => answerTrainingItem(selected.id, answerText));
   };
 
   const handleConfirm = () => {
     if (!selected || !canManage) return;
     const itemId = selected.id;
+    if (isDemoTrainingItemId(itemId)) {
+      const result = applyDemoTrainingConfirm(selected);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setError(null);
+      setItemOverride(itemId, result.item);
+      setAnswerText("");
+      setCelebrateAnswer({
+        itemId,
+        choice: "saved",
+      });
+      setListTab("learned");
+      setSelectedId(itemId);
+      return;
+    }
+    const classification = trainingItemClassificationDraft(
+      selected,
+      knowledgeFolders,
+    );
     setError(null);
     startTransition(async () => {
-      const res = await confirmTrainingDraft(itemId);
+      const res = await confirmTrainingDraft(itemId, classification);
       if (!res.ok) {
         setError(res.message ?? "Something went wrong.");
         return;
       }
       setAnswerText("");
+      setCelebrateAnswer({
+        itemId,
+        choice: "saved",
+      });
       setListTab("learned");
       setSelectedId(itemId);
       refreshAfterAction();
@@ -195,7 +450,22 @@ export function CaraTrainingView({
   const handleDismiss = () => {
     if (!selected || !canManage) return;
     const itemId = selected.id;
-    const nextId = nextSelectionId(tabItems, itemId);
+    const nextId = nextSelectionId(filteredItems, itemId);
+    setDismissOpen(false);
+    if (isDemoTrainingItemId(itemId)) {
+      const result = applyDemoTrainingDismiss(selected);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setError(null);
+      setItemOverride(itemId, result.item);
+      setAnswerText("");
+      setSelectedId(nextId);
+      setMobileDetailOpen(Boolean(nextId));
+      clearAnswerDraft(itemId);
+      return;
+    }
     setError(null);
     startTransition(async () => {
       const res = await dismissTrainingDraft(itemId);
@@ -205,51 +475,81 @@ export function CaraTrainingView({
       }
       setAnswerText("");
       setSelectedId(nextId);
+      setMobileDetailOpen(Boolean(nextId));
+      clearAnswerDraft(itemId);
       refreshAfterAction();
     });
   };
 
-  const handleGapYes = () => {
+  const handleBackToEdit = () => {
     if (!selected || !canManage) return;
     const itemId = selected.id;
+    const restoredAnswer = restoreOwnerAnswerForEdit(selected);
+    if (isDemoTrainingItemId(itemId)) {
+      const result = applyDemoTrainingBackToEdit(selected);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setError(null);
+      setItemOverride(itemId, result.item);
+      setAnswerText(restoredAnswer);
+      return;
+    }
     setError(null);
     startTransition(async () => {
-      const res = await resolveCallGapYesAction(itemId);
+      const res = await editTrainingAnswer(selected.id);
       if (!res.ok) {
         setError(res.message ?? "Something went wrong.");
         return;
       }
-      setListTab("learned");
-      setSelectedId(itemId);
+      setAnswerText(restoredAnswer);
       refreshAfterAction();
     });
   };
 
-  const handleGapNo = () => {
+  const handleDefer = () => {
     if (!selected || !canManage) return;
     const itemId = selected.id;
+    const wasDeferred = trainingItemIsDeferred(selected);
+    const nextItem = toggleTrainingItemDeferred(selected);
+
+    if (isDemoTrainingItemId(itemId)) {
+      setError(null);
+      setItemOverride(itemId, nextItem);
+      return;
+    }
+
     setError(null);
+    setItemOverride(itemId, nextItem);
     startTransition(async () => {
-      const res = await resolveCallGapNoAction(itemId);
+      const res = wasDeferred
+        ? await clearDeferredTrainingItemAction(itemId)
+        : await deferTrainingItemAction(itemId);
       if (!res.ok) {
+        setItemOverride(itemId, null);
         setError(res.message ?? "Something went wrong.");
         return;
       }
-      setListTab("learned");
-      setSelectedId(itemId);
       refreshAfterAction();
     });
-  };
-
-  const handleEditAnswer = () => {
-    if (!selected || !canManage) return;
-    runAction(() => editTrainingAnswer(selected.id));
   };
 
   const handleRevert = () => {
     if (!selected || !canManage) return;
     const itemId = selected.id;
-    const nextId = nextSelectionId(tabItems, itemId);
+    const nextId = nextSelectionId(filteredItems, itemId);
+    if (isDemoTrainingItemId(itemId)) {
+      const result = applyDemoTrainingRevert(selected);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setError(null);
+      setItemOverride(itemId, result.item);
+      setSelectedId(nextId);
+      return;
+    }
     setError(null);
     startTransition(async () => {
       const res = await revertAppliedTraining(itemId);
@@ -275,185 +575,368 @@ export function CaraTrainingView({
       setTeachText("");
       setListTab("open");
       setSelectedId(res.itemId);
+      setMobileDetailOpen(true);
       refreshAfterAction();
     });
   };
 
   const fieldClass = cn(DASHBOARD_INPUT_CLASS, "resize-none text-[13px]");
 
-  return (
-    <div className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden", className)}>
-      <div className="flex shrink-0 items-center justify-between gap-3">
-        <div
-          className="inline-flex w-full max-w-md rounded-lg border border-[#d9e2dd] bg-[#f6faf7] p-0.5"
-          role="tablist"
-          aria-label="Training queue"
-        >
-          {(
-            [
-              { id: "open" as const, label: "Needs input", count: openItems.length },
-              { id: "learned" as const, label: "Learned", count: appliedItems.length },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={listTab === tab.id}
-              onClick={() => {
-                setListTab(tab.id);
-                setSelectedId(null);
-              }}
-              className={cn(
-                "min-w-0 flex-1 rounded-md px-4 py-2 text-[13px] font-medium transition-colors",
-                listTab === tab.id
-                  ? "bg-[#11181d] text-white shadow-sm"
-                  : "text-[#5b6b65] hover:bg-white hover:text-[#11181d]",
-              )}
-            >
-              {tab.label}
-              <span
+  const listPanel = (
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden border-[#e2e8e4] bg-[#f8f9fa] max-xl:border-b xl:border-r",
+        mobileDetailOpen && "max-xl:hidden",
+      )}
+    >
+      {!embedded ? (
+        <div className="shrink-0 border-b border-[#e2e8e4] bg-white px-4 py-4 sm:px-5">
+          <h2 className="text-[15px] font-semibold text-[#11181d]">
+            {isOpenQueue ? "Needs input" : "Learned"}
+          </h2>
+          {isOpenQueue && filteredItems.length > 1 ? (
+            <label className="relative mt-3 block">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#94a3b8]"
+                aria-hidden
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search questions"
+                autoComplete="off"
+                aria-label="Search questions"
                 className={cn(
-                  "ml-1.5 tabular-nums",
-                  listTab === tab.id ? "text-white/80" : "text-slate-400",
+                  DASHBOARD_INPUT_CLASS,
+                  "h-9 w-full pl-9 text-[13px]",
                 )}
-              >
-                {tab.count}
-              </span>
-            </button>
-          ))}
+              />
+            </label>
+          ) : null}
         </div>
+      ) : null}
 
-        {canManage ? (
-          <Button
-            type="button"
-            className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-9 shrink-0 gap-1.5")}
-            onClick={() => setTeachOpen(true)}
-          >
-            <Plus className="size-4" aria-hidden />
-            Teach Cara
-          </Button>
-        ) : null}
-      </div>
-
-      <section
+      <div
         className={cn(
-          DASHBOARD_CARD_SURFACE,
-          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          "min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-2 pb-3 sm:px-3",
+          embedded && "pt-3",
+          filteredItems.length === 0 && "flex items-center justify-center",
         )}
       >
-        <ListDetailLayout
-          className="min-h-0 flex-1 gap-0 max-xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.2fr)_400px]"
-          list={
-            <div
-              className={cn(
-                "flex h-full min-h-0 flex-col overflow-hidden max-xl:border-b max-xl:border-[#dfe7e2] xl:border-r",
-                isOpenQueue
-                  ? "border-[#cfd9d4] bg-[#f6faf7] xl:border-r-[#cfd9d4]"
-                  : "border-[#dfe7e2] bg-[#fbfcfb]",
-              )}
-            >
-              <div className="shrink-0 border-b border-inherit px-4 py-3 sm:px-5">
-                <p className="text-[13px] font-semibold text-[#11181d]">
-                  {isOpenQueue ? "Training queue" : "Learned"}
-                </p>
-              </div>
+        {filteredItems.length === 0 ? (
+          <EmptyState
+            icon={isOpenQueue ? Sparkles : BookOpen}
+            title={
+              useExternalSearch &&
+              effectiveSearchQuery.trim() &&
+              tabItems.length > 0
+                ? `Nothing needs input for “${effectiveSearchQuery.trim()}”`
+                : isOpenQueue
+                  ? "All caught up"
+                  : "Nothing learned yet"
+            }
+            description={
+              useExternalSearch &&
+              effectiveSearchQuery.trim() &&
+              tabItems.length > 0
+                ? "Try different wording, or check What Cara knows if you already taught this."
+                : isOpenQueue
+                  ? "When Cara cannot answer a reusable question on a call, it will appear here."
+                  : "Confirmed answers will appear here."
+            }
+            className="w-full py-10"
+          />
+        ) : (
+              <ul
+                className="space-y-1.5"
+                role="listbox"
+                aria-label="Training questions"
+              >
+                {filteredItems.map((item) => {
+                  const row = (
+                    <TrainingListRow
+                      item={item}
+                      selected={item.id === resolvedSelectedId}
+                      onSelect={() => selectItem(item.id)}
+                    />
+                  );
+                  if (reduceMotion) {
+                    return <li key={item.id}>{row}</li>;
+                  }
+                  return (
+                    <motion.li
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.28 }}
+                    >
+                      {row}
+                    </motion.li>
+                  );
+                })}
+              </ul>
+        )}
+      </div>
+    </div>
+  );
 
-              <div
+  const detailPanel = (
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden bg-white",
+        !mobileDetailOpen && "max-xl:hidden",
+      )}
+    >
+      <TrainingDetailWorkspace
+        item={selected}
+        canManage={canManage}
+        error={error}
+        answerText={answerText}
+        pending={pending}
+        draftSafetyIssues={draftSafetyIssues}
+        draftSafetyChecking={draftSafetyChecking}
+        knowledgeFolders={knowledgeFolders}
+        showBackButton={mobileDetailOpen}
+        onBack={() => setMobileDetailOpen(false)}
+        onAnswerTextChange={handleAnswerTextChange}
+        celebrateAnswer={
+          celebrateAnswer?.itemId === selected?.id ? celebrateAnswer.choice : null
+        }
+        onAnswer={handleAnswer}
+        onConfirm={handleConfirm}
+        onDismissRequest={() => setDismissOpen(true)}
+        onDefer={handleDefer}
+        onBackToEdit={handleBackToEdit}
+        onRevert={handleRevert}
+      />
+    </div>
+  );
+
+  const queuePanel = (
+    <ListDetailLayout
+      className="min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]"
+      list={listPanel}
+      detail={detailPanel}
+    />
+  );
+
+  return (
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden", className)}>
+      {!embedded ? (
+        <div className="flex shrink-0 items-center justify-between gap-3">
+          <div
+            className="inline-flex w-full max-w-md rounded-lg border border-[#d9e2dd] bg-white p-0.5"
+            role="tablist"
+            aria-label="Training queue"
+          >
+            {(
+              [
+                { id: "open" as const, label: "Needs input", count: openItems.length },
+                { id: "learned" as const, label: "Learned", count: appliedItems.length },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={listTab === tab.id}
+                onClick={() => {
+                  setListTab(tab.id);
+                  setSelectedId(null);
+                  setMobileDetailOpen(false);
+                }}
                 className={cn(
-                  "min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-2 sm:px-3",
-                  tabItems.length === 0 && "flex items-center justify-center",
+                  "min-w-0 flex-1 rounded-md px-4 py-2 text-[13px] font-medium transition-colors",
+                  listTab === tab.id
+                    ? "bg-[#11181d] text-white shadow-sm"
+                    : "text-[#5b6b65] hover:bg-[#f8f9fa] hover:text-[#11181d]",
                 )}
               >
-                {tabItems.length === 0 ? (
-                  <EmptyState
-                    icon={isOpenQueue ? Sparkles : BookOpen}
-                    title={isOpenQueue ? "All caught up" : "Nothing learned yet"}
-                    description={
-                      isOpenQueue
-                        ? "When Cara hits a gap on a call, she'll ask you here."
-                        : "Confirmed training will appear here with where it came from."
-                    }
-                    className="w-full py-10"
-                  />
-                ) : (
-                  <ul className="space-y-2" role="listbox" aria-label="Training items">
-                    {tabItems.map((item) => (
-                      <TrainingListRow
-                        key={item.id}
-                        item={item}
-                        selected={item.id === resolvedSelectedId}
-                        onSelect={() => setSelectedId(item.id)}
-                        tinted={isOpenQueue}
-                        showOpenStatus={isOpenQueue}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          }
-          detail={
-            <TrainingDetailPanel
-              item={selected}
-              canManage={canManage}
-              error={error}
-              answerText={answerText}
-              pending={pending}
-              onAnswerTextChange={setAnswerText}
-              onAnswer={handleAnswer}
-              onConfirm={handleConfirm}
-              onDismiss={handleDismiss}
-              onGapYes={handleGapYes}
-              onGapNo={handleGapNo}
-              onEditAnswer={handleEditAnswer}
-              onRevert={handleRevert}
-            />
-          }
-        />
-      </section>
+                {tab.label}
+                <span
+                  className={cn(
+                    "ml-1.5 tabular-nums",
+                    listTab === tab.id ? "text-white/80" : "text-slate-400",
+                  )}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
 
-      <Dialog open={teachOpen} onOpenChange={setTeachOpen}>
+          {canManage ? (
+            <Button
+              type="button"
+              className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-9 shrink-0 gap-1.5")}
+              onClick={() => setTeachOpen(true)}
+            >
+              <Plus className="size-4" aria-hidden />
+              Teach Cara
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {embedded ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{queuePanel}</div>
+      ) : (
+        <section
+          className={cn(
+            DASHBOARD_CARD_SURFACE,
+            "flex min-h-0 flex-1 flex-col overflow-hidden",
+          )}
+        >
+          {queuePanel}
+        </section>
+      )}
+
+      <Dialog open={dismissOpen} onOpenChange={setDismissOpen}>
         <DialogContent className="sm:max-w-md" showCloseButton>
           <DialogHeader>
-            <DialogTitle>Teach Cara something</DialogTitle>
+            <DialogTitle>Not a learning question</DialogTitle>
             <DialogDescription>
-              Describe what callers keep asking — Cara will turn it into a draft
-              you can confirm.
+              Are you sure? This removes the item from your queue. It won&apos;t change call records.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            value={teachText}
-            onChange={(event) => setTeachText(event.target.value)}
-            placeholder="e.g. Callers keep asking if we do emergency callouts on Sundays…"
-            rows={4}
-            className={fieldClass}
-          />
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
               className={DASHBOARD_SECONDARY_BUTTON_CLASS}
               disabled={pending}
-              onClick={() => setTeachOpen(false)}
+              onClick={() => setDismissOpen(false)}
             >
               Cancel
             </Button>
             <Button
               type="button"
               className={DASHBOARD_PRIMARY_BUTTON_CLASS}
-              disabled={pending || !teachText.trim()}
-              onClick={handleTeach}
+              disabled={pending}
+              onClick={handleDismiss}
             >
               {pending ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
-                "Start"
+                "Yes, remove it"
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {!embedded ? (
+        <Dialog open={teachOpen} onOpenChange={setTeachOpen}>
+          <DialogContent className="sm:max-w-md" showCloseButton>
+            <DialogHeader>
+              <DialogTitle>Teach Cara something</DialogTitle>
+              <DialogDescription>
+                Describe what callers keep asking — Cara will draft an update for you to review.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={teachText}
+              onChange={(event) => setTeachText(event.target.value)}
+              placeholder="e.g. Callers keep asking how much notice we need for celebration cakes…"
+              rows={4}
+              className={fieldClass}
+            />
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                className={DASHBOARD_SECONDARY_BUTTON_CLASS}
+                disabled={pending}
+                onClick={() => setTeachOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className={DASHBOARD_PRIMARY_BUTTON_CLASS}
+                disabled={pending || !teachText.trim()}
+                onClick={handleTeach}
+              >
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  "Start"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </div>
+  );
+}
+
+function TrainingAnswerActionsFooter({
+  pending,
+  reviewDisabled,
+  onReview,
+  onDismiss,
+  onDefer,
+  deferred = false,
+  error = null,
+}: {
+  pending: boolean;
+  reviewDisabled: boolean;
+  onReview: () => void;
+  onDismiss: () => void;
+  onDefer?: () => void;
+  deferred?: boolean;
+  error?: string | null;
+}) {
+  return (
+    <div className="shrink-0 border-t border-[#e2e8e4] bg-white px-4 py-3 sm:px-6">
+      {error ? (
+        <p className="mb-2 text-[13px] text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex w-full flex-col gap-2">
+        <Button
+          type="button"
+          className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-10 w-full")}
+          disabled={reviewDisabled}
+          onClick={onReview}
+        >
+          {pending ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            "Review answer"
+          )}
+        </Button>
+        {onDefer ? (
+          <button
+            type="button"
+            disabled={pending}
+            aria-pressed={deferred}
+            onClick={onDefer}
+            className={cn(
+              "h-10 w-full rounded-lg border px-3 text-[13px] font-medium transition-colors disabled:opacity-40",
+              deferred
+                ? "border-amber-400 bg-amber-100 text-amber-950 shadow-sm"
+                : "border-[#e2e8e4] bg-[#f8f9fa] text-[#5b6b65] hover:border-[#b9c8c1] hover:text-[#11181d]",
+            )}
+          >
+            {deferred ? "Ready to answer" : "I'll check later"}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onDismiss}
+          className={cn(
+            "h-10 w-full rounded-lg border border-red-200 bg-red-50 px-3 text-[13px] font-medium text-red-900 transition-colors hover:bg-red-100 disabled:opacity-40",
+          )}
+        >
+          Not a learning question
+        </button>
+      </div>
     </div>
   );
 }
@@ -462,153 +945,97 @@ function TrainingListRow({
   item,
   selected,
   onSelect,
-  tinted,
-  showOpenStatus,
 }: {
   item: CaraTrainingListItem;
   selected: boolean;
   onSelect: () => void;
-  tinted: boolean;
-  showOpenStatus: boolean;
 }) {
-  const Icon = showOpenStatus ? Bot : BookOpen;
+  const deferred = trainingItemIsDeferred(item);
 
   return (
-    <li>
-      <button
-        type="button"
-        role="option"
-        aria-selected={selected}
-        onClick={onSelect}
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={cn(
+        "w-full rounded-lg border px-3 py-3 text-left transition-colors",
+        deferred
+          ? selected
+            ? "border-amber-400 bg-amber-50 shadow-[inset_3px_0_0_#f59e0b]"
+            : "border-amber-200 bg-amber-50/80 hover:border-amber-300"
+          : selected
+            ? "border-[#353D42] bg-white shadow-[inset_3px_0_0_#353D42]"
+            : "border-[#e2e8e4] bg-white hover:border-[#b9c8c1]",
+      )}
+    >
+      <span
         className={cn(
-          "flex w-full items-start gap-3 rounded-lg border bg-white/78 px-2.5 py-2.5 text-left shadow-[0_1px_0_rgba(17,24,29,0.04)] transition-colors",
-          tinted
-            ? "border-[#cfd9d4] hover:border-[#9da9a4] hover:bg-white"
-            : "border-[#dfe7e2] hover:border-[#9da9a4] hover:bg-white",
-          selected &&
-            "border-[#353D42] bg-[#f6faf7] shadow-[inset_3px_0_0_#353D42,0_1px_0_rgba(17,24,29,0.04)]",
+          "block text-[13px] font-semibold leading-snug [overflow-wrap:anywhere]",
+          deferred ? "text-amber-950" : "text-[#11181d]",
         )}
       >
-        <span className={cn("mt-0.5", DASHBOARD_ICON_CHIP_SM)}>
-          <Icon className={DASHBOARD_ICON_GLYPH_SM} aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold leading-snug text-[#0b1220]">
-            {trainingTopicLabel(item)}
-          </span>
-          <span className="mt-1 block truncate text-[11px] text-slate-500">
-            {CARA_TRAINING_SOURCE_LABELS[item.source]}
-            {showOpenStatus
-              ? ` · ${
-                  item.status === "draft_ready"
-                    ? "Ready to confirm"
-                    : "Awaiting answer"
-                }`
-              : item.applied_at
-                ? ` · ${formatTrainingDateTime(item.applied_at)}`
-                : ""}
-          </span>
-        </span>
-      </button>
-    </li>
+        {trainingDisplayQuestion(item)}
+      </span>
+      <span
+        className={cn(
+          "mt-1 block text-[12px] leading-snug [overflow-wrap:anywhere]",
+          deferred ? "text-amber-800/80" : "text-[#6b7c75]",
+        )}
+      >
+        {trainingListSubtitle(item)}
+      </span>
+    </button>
   );
 }
 
-function TrainingAnswerComposer({
-  answerText,
-  pending,
-  placeholder,
-  onAnswerTextChange,
-  onAnswer,
-  onDismiss,
-}: {
-  answerText: string;
-  pending: boolean;
-  placeholder?: string;
-  onAnswerTextChange: (value: string) => void;
-  onAnswer: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <DetailSection title="Your answer">
-      <div className="overflow-hidden rounded-lg border border-[#d9e2dd] bg-white shadow-[0_1px_0_rgba(17,24,29,0.04)]">
-        <Textarea
-          value={answerText}
-          onChange={(event) => onAnswerTextChange(event.target.value)}
-          placeholder={
-            placeholder ??
-            "e.g. We offer 10% off for first-time clients on weekdays only."
-          }
-          rows={4}
-          className={cn(
-            DASHBOARD_INPUT_CLASS,
-            "min-h-[120px] w-full resize-none rounded-none border-0 bg-transparent px-4 py-3.5 text-[14px] leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0",
-          )}
-        />
-        <div className="flex flex-col gap-3 border-t border-[#dfe7e2] bg-[#f6faf7] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[12px] leading-snug text-slate-500">
-            Plain English is fine — Cara will draft the update for you to confirm.
-          </p>
-          <div className="flex shrink-0 gap-2">
-            <DetailActionButton type="button" onClick={onDismiss} disabled={pending}>
-              Dismiss
-            </DetailActionButton>
-            <Button
-              type="button"
-              className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-9 min-w-[7.5rem]")}
-              disabled={pending || !answerText.trim()}
-              onClick={onAnswer}
-            >
-              {pending ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                "Send answer"
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </DetailSection>
-  );
-}
-
-function TrainingDetailPanel({
+function TrainingDetailWorkspace({
   item,
   canManage,
   error,
   answerText,
   pending,
+  draftSafetyIssues,
+  draftSafetyChecking,
+  knowledgeFolders,
+  showBackButton,
+  onBack,
   onAnswerTextChange,
   onAnswer,
   onConfirm,
-  onDismiss,
-  onGapYes,
-  onGapNo,
-  onEditAnswer,
+  onDismissRequest,
+  onDefer,
+  onBackToEdit,
   onRevert,
+  celebrateAnswer,
 }: {
   item: CaraTrainingListItem | null;
   canManage: boolean;
   error: string | null;
   answerText: string;
   pending: boolean;
+  draftSafetyIssues: TrainingSafetyIssue[];
+  draftSafetyChecking: boolean;
+  knowledgeFolders: KnowledgeFolder[];
+  showBackButton: boolean;
+  onBack: () => void;
   onAnswerTextChange: (value: string) => void;
   onAnswer: () => void;
   onConfirm: () => void;
-  onDismiss: () => void;
-  onGapYes: () => void;
-  onGapNo: () => void;
-  onEditAnswer: () => void;
+  onDismissRequest: () => void;
+  onDefer: () => void;
+  onBackToEdit: () => void;
   onRevert: () => void;
+  celebrateAnswer: TrainingAnswerCelebrateChoice | null;
 }) {
   if (!item) {
     return (
       <DetailPanelShell surface="embedded">
-        <div className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6">
           <EmptyState
-            icon={Bot}
-            title="Select a training item"
-            description="Pick something from the queue or history to review."
+            icon={Sparkles}
+            title="Select a question"
+            description="Choose something from the list to review the caller context and answer it."
             className="w-full py-10"
           />
         </div>
@@ -616,272 +1043,179 @@ function TrainingDetailPanel({
     );
   }
 
-  return (
-    <TrainingDetailPanelContent
-      key={item.id}
-      item={item}
-      canManage={canManage}
-      error={error}
-      answerText={answerText}
-      pending={pending}
-      onAnswerTextChange={onAnswerTextChange}
-      onAnswer={onAnswer}
-      onConfirm={onConfirm}
-      onDismiss={onDismiss}
-      onGapYes={onGapYes}
-      onGapNo={onGapNo}
-      onEditAnswer={onEditAnswer}
-      onRevert={onRevert}
-    />
-  );
-}
-
-function TrainingDetailPanelContent({
-  item,
-  canManage,
-  error,
-  answerText,
-  pending,
-  onAnswerTextChange,
-  onAnswer,
-  onConfirm,
-  onDismiss,
-  onGapYes,
-  onGapNo,
-  onEditAnswer,
-  onRevert,
-}: {
-  item: CaraTrainingListItem;
-  canManage: boolean;
-  error: string | null;
-  answerText: string;
-  pending: boolean;
-  onAnswerTextChange: (value: string) => void;
-  onAnswer: () => void;
-  onConfirm: () => void;
-  onDismiss: () => void;
-  onGapYes: () => void;
-  onGapNo: () => void;
-  onEditAnswer: () => void;
-  onRevert: () => void;
-}) {
   const previewPatch = item.proposed_patch ?? item.applied_patch;
-  const quickResolveMode =
-    item.source === "call_gap" && item.status === "awaiting_answer"
-      ? trainingQuickResolveMode(item.gap_summary)
-      : null;
-  const isCallGapQuickResolve = quickResolveMode === "service_offer";
-  const showCallGapAnswerComposer =
-    item.source === "call_gap" &&
-    item.status === "awaiting_answer" &&
-    quickResolveMode === "free_text";
   const isApplied = item.status === "applied";
   const isDraft = item.status === "draft_ready";
-  const ownerAnswer = lastOwnerAnswer(item);
-  const contextSummary = trainingContextSummary(item);
-  const HeaderIcon = isApplied ? BookOpen : Bot;
-  const hasLinks = Boolean(item.call_log_id || item.action_ticket_id);
+  const isAwaiting = item.status === "awaiting_answer";
+  const excerpt = trainingSourceExcerpt(item);
+  const question = trainingDisplayQuestion(item);
+  const deferred = trainingItemIsDeferred(item);
+  const callViewHref = trainingItemCallHref(item.call_log_id);
 
   return (
-    <DetailPanelShell surface="embedded">
-      <div className="shrink-0 border-b border-[#cfd9d4] bg-[#f6faf7] px-5 py-5">
-        <div className="flex items-start gap-3">
-          <span className={DASHBOARD_ICON_CHIP_LG}>
-            <HeaderIcon className={DASHBOARD_ICON_GLYPH_LG} aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill variant={trainingStatusVariant(item.status)} dot>
+    <DetailPanelShell surface="embedded" layout="grid">
+      <div className="shrink-0 border-b border-[#e2e8e4] bg-white px-4 py-4 sm:px-6">
+        {showBackButton ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#475569] xl:hidden"
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Back to questions
+            </button>
+          ) : null}
+
+          {isApplied ? (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <StatusPill variant={trainingStatusVariant(item.status)}>
                 {trainingStatusLabel(item.status)}
               </StatusPill>
-              {item.target_section ? (
-                <span className="text-[11px] font-medium text-slate-500">
-                  {CARA_TRAINING_SECTION_LABELS[item.target_section]}
-                </span>
-              ) : null}
             </div>
-            <h2 className="mt-2.5 text-[18px] font-semibold leading-snug tracking-tight text-[#0b1220]">
-              {trainingTopicLabel(item)}
-            </h2>
-            <p className="mt-1 text-[12px] text-slate-500">
-              {trainingDetailMeta(item)}
+          ) : null}
+
+          <h2 className="text-[20px] font-semibold leading-snug tracking-tight text-[#11181d] [overflow-wrap:anywhere]">
+            {question}
+          </h2>
+
+          {isApplied && item.occurrence_count > 1 ? (
+            <p className="mt-2 text-[12px] text-[#6b7c75]">
+              Asked on {item.occurrence_count} calls · last seen{" "}
+              {formatTrainingDateTime(item.last_seen_at || item.created_at)}
             </p>
-            {hasLinks ? (
-              <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
-                {item.call_log_id ? (
-                  <Link
-                    href={`${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(item.call_log_id)}`}
-                    className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
-                  >
-                    View call
-                  </Link>
-                ) : null}
-                {item.action_ticket_id ? (
-                  <Link
-                    href={`${DASHBOARD_ROUTES.actionInbox}?ticket=${encodeURIComponent(item.action_ticket_id)}`}
-                    className="font-medium text-[#0b1220] underline-offset-2 hover:underline"
-                  >
-                    View in Action Inbox
-                  </Link>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
+          ) : null}
+
+          {(isAwaiting || isDraft) && excerpt ? (
+            <div className="mt-3">
+              <TrainingCallerExcerpt excerpt={excerpt} />
+            </div>
+          ) : null}
       </div>
 
-      <DetailPanelBody className="space-y-4">
-        {contextSummary ? (
-          <DetailSection title="Context">
-            <p className="text-[14px] leading-relaxed text-slate-700">
-              {contextSummary}
-            </p>
-            {item.occurrence_count > 1 ? (
-              <p className="mt-2 text-[12px] text-slate-500">
-                Came up {item.occurrence_count} times on recent calls.
-              </p>
-            ) : null}
-          </DetailSection>
-        ) : item.occurrence_count > 1 ? (
-          <p className="text-[12px] text-slate-500">
-            Came up {item.occurrence_count} times on recent calls.
-          </p>
+      <DetailPanelBody
+        className={cn(
+          "min-h-0 bg-[#fbfcfb] px-4 sm:px-6",
+          isAwaiting && canManage
+            ? "flex flex-col overflow-hidden py-3"
+            : "space-y-5 overflow-y-auto py-4 sm:py-5",
+        )}
+      >
+        <AnimatePresence>
+          {celebrateAnswer ? (
+            <TrainingAnswerCelebration choice={celebrateAnswer} />
+          ) : null}
+        </AnimatePresence>
+
+        {(isAwaiting || isDraft) && (callViewHref || item.call_facts) ? (
+          <TrainingCallFactsBar
+            callViewHref={callViewHref}
+            callFacts={item.call_facts ?? null}
+          />
         ) : null}
 
         {isApplied && previewPatch ? (
-          <CaraTrainingPatchPreview
-            lines={patchPreviewLines(previewPatch)}
-            applied
+          <CaraTrainingPatchPreview lines={patchPreviewLines(previewPatch)} applied />
+        ) : null}
+
+        {isDraft && previewPatch ? (
+          <TrainingDraftReveal revealKey={`${item.id}-${item.updated_at}`}>
+            <CaraTrainingPatchPreview
+              lines={understoodPreviewLines(previewPatch)}
+              applied={false}
+              heading="What Cara understood"
+            />
+            <p className="mt-3 text-[13px] leading-relaxed text-[#475569]">
+              Cara may phrase this differently on calls, while keeping these facts.
+            </p>
+          </TrainingDraftReveal>
+        ) : null}
+
+        {isDraft && draftSafetyChecking ? (
+          <div className="flex items-center gap-2 text-[13px] text-[#475569]">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Checking this update is safe to save…
+          </div>
+        ) : null}
+
+        {isDraft ? (
+          <TrainingSafetyPanel issues={draftSafetyIssues} />
+        ) : null}
+
+        {isAwaiting && canManage ? (
+          <TrainingAnswerField
+            item={item}
+            value={answerText}
+            onChange={onAnswerTextChange}
           />
         ) : null}
 
-        {!isApplied && item.status === "awaiting_answer" ? (
-          <DetailSection title={isCallGapQuickResolve ? "Quick answer" : "Cara asks"}>
-            {isCallGapQuickResolve ? (
-              (() => {
-                const quick = trainingQuickAnswerLabel(item.gap_summary);
-                return quick.kind === "question" ? (
-                  <p className="text-[14px] leading-relaxed text-slate-700">
-                    A caller asked:{" "}
-                    <strong className="text-[#0b1220]">{quick.text}</strong>
-                  </p>
-                ) : (
-                  <p className="text-[14px] leading-relaxed text-slate-700">
-                    Do you offer{" "}
-                    <strong className="text-[#0b1220]">{quick.text}</strong>?
-                  </p>
-                );
-              })()
-            ) : (
-              <DetailInset>
-                <p className="text-[14px] leading-relaxed text-[#0b1220]">
-                  {item.cara_question}
-                </p>
-              </DetailInset>
-            )}
-          </DetailSection>
-        ) : null}
-
-        {item.status === "awaiting_answer" && canManage && !isCallGapQuickResolve ? (
-          <TrainingAnswerComposer
-            answerText={answerText}
-            pending={pending}
-            placeholder={
-              showCallGapAnswerComposer
-                ? trainingAnswerPlaceholder(item.gap_summary)
-                : undefined
-            }
-            onAnswerTextChange={onAnswerTextChange}
-            onAnswer={onAnswer}
-            onDismiss={onDismiss}
-          />
-        ) : null}
-
-        {isDraft && ownerAnswer ? (
-          <DetailSection title="You said">
-            <DetailInset>
-              <p className="text-[14px] leading-relaxed text-[#0b1220]">
-                {ownerAnswer}
-              </p>
-            </DetailInset>
-          </DetailSection>
-        ) : null}
-
-        {!isApplied && previewPatch ? (
-          <CaraTrainingPatchPreview
-            lines={patchPreviewLines(previewPatch)}
-            applied={false}
-          />
-        ) : null}
-
-        {error ? (
+        {error && !(isAwaiting && canManage) ? (
           <p className="text-[13px] text-red-600" role="alert">
             {error}
           </p>
         ) : null}
 
         {!canManage ? (
-          <p className="text-[12px] text-slate-500">
+          <p className="text-[12px] text-[#6b7c75]">
             View only — ask an owner to answer or confirm training items.
           </p>
         ) : null}
       </DetailPanelBody>
 
-      {item.status === "awaiting_answer" && canManage && isCallGapQuickResolve ? (
-        <DetailPanelFooter>
-          <Button
-            type="button"
-            className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-9")}
-            disabled={pending}
-            onClick={onGapYes}
-          >
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              "Yes, we offer this"
-            )}
-          </Button>
-          <DetailActionButton type="button" onClick={onGapNo} disabled={pending}>
-            No, we don&apos;t
-          </DetailActionButton>
-          <DetailActionButton type="button" onClick={onDismiss} disabled={pending}>
-            Dismiss
-          </DetailActionButton>
-        </DetailPanelFooter>
+      {isAwaiting && canManage ? (
+        <TrainingAnswerActionsFooter
+          pending={pending}
+          reviewDisabled={pending || deferred || !answerText.trim()}
+          onReview={onAnswer}
+          onDismiss={onDismissRequest}
+          onDefer={onDefer}
+          deferred={deferred}
+          error={error}
+        />
       ) : null}
 
       {isDraft && canManage ? (
         <DetailPanelFooter>
-          <Button
-            type="button"
-            className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-9 gap-1.5")}
-            disabled={pending}
-            onClick={onConfirm}
-          >
-            <Check className="size-4" aria-hidden />
-            Confirm
-          </Button>
-          <DetailActionButton type="button" onClick={onEditAnswer} disabled={pending}>
-            Edit answer
-          </DetailActionButton>
-          <DetailActionButton type="button" onClick={onDismiss} disabled={pending}>
-            <X className="size-3.5" aria-hidden />
-            Dismiss
-          </DetailActionButton>
+          <div className="flex w-full flex-col gap-2">
+            <Button
+              type="button"
+              className={cn(DASHBOARD_PRIMARY_BUTTON_CLASS, "h-10 w-full gap-1.5")}
+              disabled={
+                pending ||
+                draftSafetyChecking ||
+                draftSafetyIssues.length > 0
+              }
+              onClick={onConfirm}
+            >
+              <Check className="size-4" aria-hidden />
+              Save to Cara&apos;s knowledge
+            </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DetailActionButton type="button" onClick={onBackToEdit} disabled={pending}>
+                Back to edit
+              </DetailActionButton>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={onDismissRequest}
+                className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-[13px] font-medium text-red-900 transition-colors hover:bg-red-100 disabled:opacity-40"
+              >
+                Not a learning question
+              </button>
+            </div>
+          </div>
         </DetailPanelFooter>
       ) : null}
 
       {isApplied && canManage ? (
         <DetailPanelFooter>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[12px] text-slate-500">
-              Revert removes this from Cara&apos;s setup.
-            </p>
-            <DetailActionButton type="button" onClick={onRevert} disabled={pending}>
-              <RotateCcw className="size-3.5" aria-hidden />
-              Revert
-            </DetailActionButton>
-          </div>
+          <p className="mr-auto text-[12px] text-[#6b7c75]">
+            Revert removes this from Cara&apos;s setup.
+          </p>
+          <DetailActionButton type="button" onClick={onRevert} disabled={pending}>
+            <RotateCcw className="size-3.5" aria-hidden />
+            Revert
+          </DetailActionButton>
         </DetailPanelFooter>
       ) : null}
     </DetailPanelShell>

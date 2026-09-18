@@ -28,4 +28,13 @@ describe("classifyActionCategory", () => {
       "complaint",
     );
   });
+
+  it("does not classify facility enquiries as sales leads", () => {
+    assert.equal(
+      classifyActionCategory(
+        "Coin machine enquiry\nRequest: Does the store have a machine to exchange coins for cash?",
+      ),
+      "follow_up",
+    );
+  });
 });

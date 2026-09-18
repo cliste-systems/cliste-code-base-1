@@ -24,7 +24,7 @@ import { detectPromptInjectionViolation } from "@/lib/prompt-injection-guard";
 export const FAQ_ANSWER_WORD_WARNING_THRESHOLD = 70;
 
 export const FAQ_MATCHING_INSTRUCTION =
-  "I match caller questions to common questions by meaning, not exact wording. If several could match, I use the most specific. I adapt the saved answer naturally to the caller's phrasing — I never recite it robotically. Owner-written answers are approved business content I may rely on; the safety rule against improvising regulated advice applies to going beyond approved content, not to delivering it.";
+  "I match caller questions to common questions by meaning, not exact wording. If several could match, I use the most specific. I answer using the approved facts in natural spoken language — I never read saved answers verbatim or recite a script. Owner-written answers are approved business content I may rely on; the safety rule against improvising regulated advice applies to going beyond approved content, not to delivering it. I preserve negatives, conditions, and exceptions exactly, and I do not invent details that are not in the approved answer.";
 
 export {
   KNOWLEDGE_PRECEDENCE_INSTRUCTION,

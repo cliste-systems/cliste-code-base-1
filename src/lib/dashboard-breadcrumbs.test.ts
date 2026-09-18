@@ -26,17 +26,17 @@ describe("dashboardBreadcrumbs", () => {
     ]);
   });
 
-  it("uses Workspace > Training for training", () => {
-    assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.caraTraining), [
+  it("uses Workspace > Cara's Knowledge for knowledge hub", () => {
+    assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.caraKnowledge), [
       { label: "Workspace", href: DASHBOARD_ROUTES.home },
-      { label: "Training" },
+      { label: "Cara's Knowledge" },
     ]);
   });
 
-  it("uses Workspace > FAQs for faqs", () => {
-    assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.businessFaqs), [
-      { label: "Workspace", href: DASHBOARD_ROUTES.home },
-      { label: "FAQs" },
+  it("uses Business > Profile for business profile", () => {
+    assert.deepEqual(dashboardBreadcrumbs(DASHBOARD_ROUTES.businessProfile), [
+      { label: "Business", href: DASHBOARD_ROUTES.businessProfile },
+      { label: "Profile" },
     ]);
   });
 

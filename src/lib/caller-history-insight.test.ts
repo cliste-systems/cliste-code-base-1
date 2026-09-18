@@ -267,6 +267,9 @@ describe("caller-history-insight", () => {
       isBlocked: true,
       now: NOW,
     });
+    if (insight.kind === "erased") {
+      assert.fail("expected non-erased insight");
+    }
     assert.equal(insight.security.level, "high");
     assert.match(insight.overview, /high risk/i);
   });

@@ -56,7 +56,7 @@ export function DashboardHomeCaraTrainingCard({
   return (
     <Shell className={dashboardHomeCardShellClassName(embedded, className)}>
       <div className={HOME_FIRST_ROW_HEADER}>
-        <h2 className={HOME_FIRST_ROW_TITLE}>Cara training</h2>
+        <h2 className={HOME_FIRST_ROW_TITLE}>Needs your input</h2>
         <span className={HOME_FIRST_ROW_COUNT_BADGE}>{openTrainingCount}</span>
       </div>
 
@@ -73,8 +73,8 @@ export function DashboardHomeCaraTrainingCard({
           />
 
           <div className={cn(HOME_FIRST_ROW_FOOTER, "mt-auto")}>
-            <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.caraTraining}>
-              Open Cara training
+            <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.caraKnowledgeNeedsInput}>
+              Open needs your input
             </DashboardHomeFirstRowButton>
           </div>
         </>

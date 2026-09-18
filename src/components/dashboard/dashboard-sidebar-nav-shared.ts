@@ -37,6 +37,13 @@ export function dashboardSidebarHeaderClassName(onSectionRoute: boolean): string
   );
 }
 
+export function dashboardSidebarBadgeClassName(active: boolean): string {
+  return cn(
+    "shrink-0 text-[12px] font-semibold tabular-nums",
+    active ? "text-slate-500" : "text-slate-400",
+  );
+}
+
 /** @deprecated Outer section boxes removed — keep flat list like workspace nav. */
 export function dashboardSidebarGroupClassName(): string {
   return "space-y-0.5";

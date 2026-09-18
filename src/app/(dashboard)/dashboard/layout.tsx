@@ -55,14 +55,14 @@ const navItems: {
   href: string;
   label: string;
   section: "core" | "account";
+  activePrefix?: string;
   activeAliases?: string[];
 }[] = [
   { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
   { href: DASHBOARD_ROUTES.activity, label: "Activity", section: "core" },
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
   { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
-  { href: DASHBOARD_ROUTES.caraTraining, label: "Training", section: "core" },
-  { href: DASHBOARD_ROUTES.businessFaqs, label: "FAQs", section: "core" },
+  { href: DASHBOARD_ROUTES.caraKnowledge, label: "Cara's Knowledge", section: "core", activePrefix: "/dashboard/cara-knowledge" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
   {
     href: DASHBOARD_ROUTES.usage,
@@ -79,6 +79,12 @@ const navItems: {
   },
   { href: DASHBOARD_ROUTES.locations, label: "Locations", section: "account" },
   { href: DASHBOARD_ROUTES.team, label: "Team", section: "account" },
+  {
+    href: DASHBOARD_ROUTES.businessProfile,
+    label: "Profile",
+    section: "account",
+    activePrefix: DASHBOARD_ROUTES.businessProfile,
+  },
   { href: DASHBOARD_ROUTES.settings, label: "Settings", section: "account" },
 ];
 
@@ -86,11 +92,16 @@ function toNavItem(
   item: (typeof navItems)[number],
   badges: DashboardNavBadgeMap,
 ): DashboardSidebarNavItem {
-  const n = badges[item.href];
+  const badgeHref =
+    item.href === DASHBOARD_ROUTES.caraKnowledge
+      ? DASHBOARD_ROUTES.caraKnowledgeNeedsInput
+      : item.href;
+  const n = badges[badgeHref] ?? badges[item.href];
   return {
     href: item.href,
     label: item.label,
     ...(item.activeAliases ? { activeAliases: item.activeAliases } : {}),
+    ...(item.activePrefix ? { activePrefix: item.activePrefix } : {}),
     ...(typeof n === "number" && n > 0 ? { badge: n } : {}),
   };
 }

@@ -22,6 +22,7 @@ type SectionCardProps = {
   children: ReactNode;
   /** Drop the card's own border/shadow (use inside a form stack). */
   flat?: boolean;
+  id?: string;
   className?: string;
   headerClassName?: string;
   bodyClassName?: string;
@@ -40,12 +41,14 @@ export function SectionCard({
   action,
   children,
   flat = false,
+  id,
   className,
   headerClassName,
   bodyClassName,
 }: SectionCardProps) {
   return (
     <section
+      id={id}
       className={cn(
         "flex flex-col",
         !flat && DASHBOARD_CARD_SURFACE,

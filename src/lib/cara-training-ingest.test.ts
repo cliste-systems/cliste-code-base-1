@@ -41,4 +41,11 @@ describe("isRoutineHandoff", () => {
     );
     assert.equal(isRoutineHandoff("Caller wants to place an order for a celebration cake."), true);
   });
+
+  it("keeps cake notice policy as teachable knowledge", () => {
+    assert.equal(
+      isRoutineHandoff("How much notice is needed for a personalised celebration cake?"),
+      false,
+    );
+  });
 });

@@ -82,7 +82,7 @@ export function buildHomeAttentionItems(input: {
       title: "Cara needs training input",
       subtitle: summary,
       time: input.formatTime(row.updated_at),
-      href: `${DASHBOARD_ROUTES.caraTraining}?item=${encodeURIComponent(row.id)}`,
+      href: DASHBOARD_ROUTES.caraKnowledgeNeedsInputItem(row.id),
       badge: row.status === "draft_ready" ? "Confirm" : "Answer",
       urgent: true,
       timestamp: ts,

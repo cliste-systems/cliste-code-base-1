@@ -38,7 +38,8 @@ export function BusinessProfileTab() {
         icon={Sparkles}
         title="About your business"
         description="What Cara should know when she describes who you are and what you do."
-        className="w-full"
+        className="w-full scroll-mt-4"
+        id="cara-business-about"
       >
         <Field
           label="Business description"
@@ -65,6 +66,8 @@ export function BusinessProfileTab() {
         icon={Briefcase}
         title={copy.caraSetup.generalBasicsTitle}
         description="Name, type, location, Eircode, and your Cliste line — the facts callers ask about most."
+        className="scroll-mt-4"
+        id="cara-business-basics"
       >
         <Field
           label={storeNameLabel}
@@ -192,6 +195,8 @@ export function BusinessProfileTab() {
         icon={Clock}
         title="Opening hours"
         description="When you're open — Cara uses this when callers ask about times."
+        className="scroll-mt-4"
+        id="cara-opening-hours"
       >
         <OpeningHoursEditor
           value={form.openingHoursSchedule}
