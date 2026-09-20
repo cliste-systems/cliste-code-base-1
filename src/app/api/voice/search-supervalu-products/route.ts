@@ -5,6 +5,7 @@ import {
   assessSyncedOffersFreshness,
   loadLatestRetailOfferWeekEnd,
 } from "@/lib/retail-weekly-offers-search";
+import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
 import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
 import {
   formatCatalogStockNoMatchQuote,
@@ -26,6 +27,7 @@ type SearchSupervaluProductsBody = {
   called_number?: string;
   query?: string;
   intent?: CatalogQuoteIntent;
+  fulfilment?: "counter" | "prepack";
 };
 
 /**
@@ -148,6 +150,11 @@ export async function POST(request: Request) {
       ? body.intent
       : inferCatalogSearchIntent(query);
 
+  const fulfilment: SupervaluFulfilment | null =
+    body.fulfilment === "counter" || body.fulfilment === "prepack"
+      ? body.fulfilment
+      : null;
+
   const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner);
   const offersFreshness = assessSyncedOffersFreshness({
     syncedAt:
@@ -161,6 +168,7 @@ export async function POST(request: Request) {
       intent,
       supabase: admin,
       retailBanner,
+      fulfilment,
     },
   );
 
@@ -182,11 +190,13 @@ export async function POST(request: Request) {
   const { clarificationHint, matches: responseMatches } = resolveProductSearchResponse(
     query,
     mappedMatches,
+    { fulfilment },
   );
 
   return NextResponse.json({
     ok: true,
     intent,
+    fulfilment,
     clarification_hint: clarificationHint,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
     matches: responseMatches,

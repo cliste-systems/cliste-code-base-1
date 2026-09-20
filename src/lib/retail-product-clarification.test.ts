@@ -5,7 +5,7 @@ import {
   buildBroadProductClarificationHint,
   buildOfferFulfilmentClarificationHint,
   buildProductClarificationHint,
-  filterOfferMatchesByInferredFulfilment,
+  filterOfferMatchesByExplicitFulfilment,
   isBroadProductQuery,
   resolveProductSearchResponse,
 } from "./retail-product-clarification";
@@ -33,7 +33,7 @@ describe("retail product clarification", () => {
     assert.ok(hint);
     assert.match(hint ?? "", /fresh at the fish counter/i);
     assert.match(hint ?? "", /pre-pack packs in the fish aisle/i);
-    assert.match(hint ?? "", /Do not quote a specific price/i);
+    assert.match(hint ?? "", /Do not quote any prices/i);
   });
 
   it("prefers fulfilment clarification over brand clarification", () => {
@@ -59,7 +59,28 @@ describe("retail product clarification", () => {
     assert.match(hint ?? "", /pre-pack/i);
   });
 
-  it("skips fulfilment clarification when caller already chose counter", () => {
+  it("requires clarification for meat counter list when both fulfilment types exist", () => {
+    const response = resolveProductSearchResponse(
+      "what's on offer in the meat counter this week",
+      [
+        {
+          product_name: "Denny Luncheon Roll (90 g)",
+          service_area: "butcher",
+          fulfilment: "prepack",
+        },
+        {
+          product_name: "SuperValu Fresh Irish Pork Steak (1 kg)",
+          service_area: "butcher",
+          fulfilment: "counter",
+        },
+      ],
+    );
+    assert.ok(response.clarificationHint);
+    assert.match(response.clarificationHint ?? "", /Do NOT quote any prices/i);
+    assert.equal(response.matches.length, 2);
+  });
+
+  it("narrows to counter only when fulfilment was chosen explicitly", () => {
     const matches = [
       {
         product_name: "Loose Side of Salmon (700 g)",
@@ -74,15 +95,20 @@ describe("retail product clarification", () => {
         quote_text: "In the pre-pack fish aisle this week — four euro forty nine",
       },
     ];
-    const response = resolveProductSearchResponse("loose salmon counter", matches);
+    const response = resolveProductSearchResponse(
+      "salmon on offer",
+      matches,
+      { fulfilment: "counter" },
+    );
     assert.equal(response.clarificationHint, null);
     assert.equal(response.matches.length, 1);
     assert.equal(response.matches[0]?.fulfilment, "counter");
     assert.match(response.matches[0]?.quote_text ?? "", /per kilo/i);
   });
 
-  it("filters to counter matches when query mentions fish counter", () => {
-    const filtered = filterOfferMatchesByInferredFulfilment("fish counter salmon", [
+  it("narrows to counter matches when fulfilment is explicit", () => {
+    const filtered = filterOfferMatchesByExplicitFulfilment(
+      [
       {
         product_name: "Loose Side of Salmon (700 g)",
         fulfilment: "counter",
@@ -91,7 +117,9 @@ describe("retail product clarification", () => {
         product_name: "Keohane's Salmon Fillets (480 g)",
         fulfilment: "prepack",
       },
-    ]);
+    ],
+      "counter",
+    );
     assert.equal(filtered.length, 1);
     assert.equal(filtered[0]?.fulfilment, "counter");
   });

@@ -3,11 +3,11 @@ import {
   stripCatalogSearchBoilerplate,
 } from "@/lib/supervalu-catalog-search";
 import {
-  inferWeeklyOfferFulfilmentFromQuery,
   inferWeeklyOffersListIntent,
   offerSearchProductTokens,
   tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
+import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
 
 export type ClarificationMatch = {
   productName?: string;
@@ -77,23 +77,16 @@ function fulfilmentClarificationAreaHint(serviceArea: string): string {
   );
 }
 
-/** When the caller already said counter/loose/pre-pack, narrow matches before clarifying. */
-export function filterOfferMatchesByInferredFulfilment<T extends ClarificationMatch>(
+function narrowMatchesByProductTokens<T extends ClarificationMatch>(
   query: string,
   matches: T[],
 ): T[] {
-  const implied = inferWeeklyOfferFulfilmentFromQuery(query);
-  let narrowed = implied
-    ? matches.filter((match) => matchFulfilment(match) === implied)
-    : matches;
-  if (narrowed.length === 0) narrowed = matches;
-
-  if (inferWeeklyOffersListIntent(query)) return narrowed;
+  if (inferWeeklyOffersListIntent(query)) return matches;
 
   const productTokens = offerSearchProductTokens(query);
-  if (productTokens.length === 0 || narrowed.length <= 1) return narrowed;
+  if (productTokens.length === 0 || matches.length <= 1) return matches;
 
-  const byProductName = narrowed.filter((match) => {
+  const byProductName = matches.filter((match) => {
     const name = String(match.productName ?? match.product_name ?? "").toLowerCase();
     if (productTokens.length >= 2) {
       return productTokens.every((token) => {
@@ -106,13 +99,36 @@ export function filterOfferMatchesByInferredFulfilment<T extends ClarificationMa
       return name.includes(stem);
     });
   });
-  return byProductName.length > 0 ? byProductName : narrowed;
+  return byProductName.length > 0 ? byProductName : matches;
+}
+
+/** Narrow to counter or pre-pack only when the tool was called with an explicit fulfilment choice. */
+export function filterOfferMatchesByExplicitFulfilment<T extends ClarificationMatch>(
+  matches: T[],
+  explicitFulfilment?: SupervaluFulfilment | null,
+): T[] {
+  if (!explicitFulfilment) return matches;
+  const narrowed = matches.filter(
+    (match) => matchFulfilment(match) === explicitFulfilment,
+  );
+  return narrowed.length > 0 ? narrowed : matches;
+}
+
+/** @deprecated Use filterOfferMatchesByExplicitFulfilment — query text is not used for fulfilment. */
+export function filterOfferMatchesByInferredFulfilment<T extends ClarificationMatch>(
+  _query: string,
+  matches: T[],
+  explicitFulfilment?: SupervaluFulfilment | null,
+): T[] {
+  return filterOfferMatchesByExplicitFulfilment(matches, explicitFulfilment);
 }
 
 /** Counter vs pre-pack weekly offers both match — ask which before quoting. */
 export function buildOfferFulfilmentClarificationHint(
   matches: ClarificationMatch[],
+  explicitFulfilment?: SupervaluFulfilment | null,
 ): string | null {
+  if (explicitFulfilment) return null;
   if (matches.length < 2) return null;
 
   const areas = new Set(
@@ -128,7 +144,7 @@ export function buildOfferFulfilmentClarificationHint(
 
   return (
     "Both fresh counter and pre-pack options are on offer this week — ask ONE short clarifying question, for example: " +
-    `"Do you mean ${areaHint}?" Do not quote a specific price until they choose.`
+    `"Do you mean ${areaHint}?" Do NOT quote any prices or product names until they choose. Then call the tool again with fulfilment set to counter or prepack.`
   );
 }
 
@@ -138,7 +154,6 @@ export function buildBroadProductClarificationHint(
   matches: ClarificationMatch[],
 ): string | null {
   if (inferWeeklyOffersListIntent(query)) return null;
-  if (inferWeeklyOfferFulfilmentFromQuery(query)) return null;
   if (!isBroadProductQuery(query)) return null;
   if (matches.length < 2) return null;
 
@@ -155,10 +170,11 @@ export function buildBroadProductClarificationHint(
 export function buildProductClarificationHint(
   query: string,
   matches: ClarificationMatch[],
+  explicitFulfilment?: SupervaluFulfilment | null,
 ): string | null {
-  const narrowed = filterOfferMatchesByInferredFulfilment(query, matches);
+  const narrowed = filterOfferMatchesByExplicitFulfilment(matches, explicitFulfilment);
   return (
-    buildOfferFulfilmentClarificationHint(narrowed) ??
+    buildOfferFulfilmentClarificationHint(narrowed, explicitFulfilment) ??
     buildBroadProductClarificationHint(query, narrowed)
   );
 }
@@ -166,12 +182,16 @@ export function buildProductClarificationHint(
 export function resolveProductSearchResponse<T extends ClarificationMatch>(
   query: string,
   matches: T[],
+  options?: { fulfilment?: SupervaluFulfilment | null },
 ): { matches: T[]; clarificationHint: string | null } {
-  const narrowed = filterOfferMatchesByInferredFulfilment(query, matches);
+  let narrowed = filterOfferMatchesByExplicitFulfilment(
+    matches,
+    options?.fulfilment,
+  );
+  narrowed = narrowMatchesByProductTokens(query, narrowed);
   const clarificationHint =
-    buildOfferFulfilmentClarificationHint(narrowed) ??
+    buildOfferFulfilmentClarificationHint(narrowed, options?.fulfilment) ??
     buildBroadProductClarificationHint(query, narrowed);
-  // Keep matches when clarifying — empty results make Cara say "nothing on offer".
   return {
     clarificationHint,
     matches: narrowed,

@@ -299,9 +299,16 @@ export function resolveWeeklyOfferSearchFilters(
   return {
     channel: explicit?.channel ?? null,
     serviceArea: explicit?.serviceArea ?? inferWeeklyOfferServiceAreaFromQuery(query),
-    fulfilment: explicit?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
+    // Never infer counter vs pre-pack from caller phrasing — Cara clarifies, then passes fulfilment explicitly.
+    fulfilment: explicit?.fulfilment ?? null,
   };
 }
+
+const DUAL_FULFILMENT_SERVICE_AREAS = new Set<SupervaluServiceArea>([
+  "butcher",
+  "fish",
+  "deli",
+]);
 
 function rowMatchesFilters(
   row: RetailWeeklyOfferRow,
@@ -407,6 +414,39 @@ function listRetailWeeklyOffers(
     .filter((row) => rowMatchesFilters(row, filters))
     .slice(0, limit)
     .map((row, index) => rowToMatch(row, 1 - index * 0.01));
+}
+
+/** When butcher/fish/deli have both counter and pre-pack offers, sample both so Cara can clarify. */
+function listDualFulfilmentWeeklyOffers(
+  rows: RetailWeeklyOfferRow[],
+  filters: WeeklyOfferSearchFilters,
+  limit: number,
+): WeeklyOfferMatch[] {
+  if (filters.fulfilment || !filters.serviceArea) {
+    return listRetailWeeklyOffers(rows, filters, limit);
+  }
+  if (!DUAL_FULFILMENT_SERVICE_AREAS.has(filters.serviceArea)) {
+    return listRetailWeeklyOffers(rows, filters, limit);
+  }
+
+  const areaRows = rows.filter((row) =>
+    rowMatchesFilters(row, { ...filters, fulfilment: null }),
+  );
+  const counter = areaRows.filter((row) => row.fulfilment === "counter");
+  const prepack = areaRows.filter((row) => row.fulfilment === "prepack");
+  if (counter.length === 0 || prepack.length === 0) {
+    return listRetailWeeklyOffers(rows, filters, limit);
+  }
+
+  const matches: WeeklyOfferMatch[] = [];
+  const perSide = Math.max(3, Math.ceil(limit / 2));
+  for (let index = 0; index < perSide && matches.length < limit; index++) {
+    const counterRow = counter[index];
+    const prepackRow = prepack[index];
+    if (counterRow) matches.push(rowToMatch(counterRow, 1));
+    if (prepackRow && matches.length < limit) matches.push(rowToMatch(prepackRow, 1));
+  }
+  return matches;
 }
 
 export const RETAIL_WEEKLY_OFFERS_SEARCH_MAX_QUERY_CHARS = 120;
@@ -834,7 +874,7 @@ export function searchSyncedWeeklyOffersInRows(
       if (browsed.length > 0) return browsed;
     }
     if (filters.fulfilment || filters.serviceArea) {
-      return listRetailWeeklyOffers(rows, filters, listLimit);
+      return listDualFulfilmentWeeklyOffers(rows, filters, listLimit);
     }
     return sampleRetailWeeklyOffersAcrossDepartments(rows, listLimit, browseOptions);
   }

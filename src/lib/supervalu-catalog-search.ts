@@ -5,7 +5,7 @@ import {
   isPromotionalSupervaluProduct,
   normalizeSearchText,
 } from "@/lib/supervalu-offers-normalize";
-import type { SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
+import type { SupervaluFulfilment, SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
 import {
   inferWeeklyOffersListIntent,
   offerSearchProductTokens,
@@ -598,6 +598,7 @@ async function searchSupervaluCatalogLiveInternal(
     intent?: CatalogQuoteIntent;
     supabase?: SupabaseClient;
     retailBanner?: string;
+    fulfilment?: SupervaluFulfilment | null;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
@@ -605,6 +606,7 @@ async function searchSupervaluCatalogLiveInternal(
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
   const listIntent = inferWeeklyOffersListIntent(trimmed);
+  const fulfilment = options?.fulfilment ?? null;
 
   let syncedMatches: WeeklyOfferMatch[] = [];
   if (options?.supabase && options?.retailBanner) {
@@ -614,6 +616,7 @@ async function searchSupervaluCatalogLiveInternal(
       trimmed,
       {
         limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : undefined,
+        fulfilment,
       },
     );
   }
@@ -622,12 +625,8 @@ async function searchSupervaluCatalogLiveInternal(
     return syncedMatches.map(syncedOfferToCatalogMatch);
   }
 
-  const filters = resolveWeeklyOfferSearchFilters(trimmed);
-  if (
-    intent === "offer" &&
-    listIntent &&
-    (filters.fulfilment === "counter" || filters.serviceArea)
-  ) {
+  const filters = resolveWeeklyOfferSearchFilters(trimmed, { fulfilment });
+  if (intent === "offer" && listIntent && (fulfilment || filters.serviceArea)) {
     return syncedMatches.map(syncedOfferToCatalogMatch);
   }
 
@@ -652,6 +651,7 @@ export async function searchSupervaluCatalogLiveWithFallback(
     intent?: CatalogQuoteIntent;
     supabase?: SupabaseClient;
     retailBanner?: string;
+    fulfilment?: SupervaluFulfilment | null;
   },
 ): Promise<SupervaluCatalogSearchResult> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);

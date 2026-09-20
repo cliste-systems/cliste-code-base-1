@@ -540,7 +540,7 @@ describe("retail weekly offers search", () => {
     assert.match(matches[0]?.productName ?? "", /Ham/i);
   });
 
-  it("lists butcher counter offers when caller asks what is on offer at the meat counter", async () => {
+  it("lists butcher counter offers when caller chose counter after clarifying", async () => {
     const butcherRows: RetailWeeklyOfferRow[] = [
       mockOfferRow({
         id: "prepack-1",
@@ -575,6 +575,7 @@ describe("retail weekly offers search", () => {
       mockSupabaseRows(butcherRows) as never,
       "supervalu",
       "what's on offer in the meat counter this week",
+      { fulfilment: "counter" },
     );
     assert.equal(matches.length, 2);
     assert.ok(matches.every((match) => match.fulfilment === "counter"));
@@ -583,6 +584,19 @@ describe("retail weekly offers search", () => {
     );
     assert.ok(
       matches.every((match) => !/Denny Luncheon/i.test(match.productName)),
+    );
+  });
+
+  it("does not infer fulfilment from caller phrasing alone", () => {
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("what's on offer in the meat counter this week")
+        .fulfilment,
+      null,
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("meat counter steaks", { fulfilment: "counter" })
+        .fulfilment,
+      "counter",
     );
   });
 
