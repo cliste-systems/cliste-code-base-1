@@ -864,7 +864,11 @@ export function searchSyncedWeeklyOffersInRows(
   const browseOptions = { excludeMeat, filters, alcoholOnly };
 
   if (listIntent) {
-    if (browseCategories.length > 0 && !filters.fulfilment) {
+    const skipBrowseForDualFulfilment =
+      filters.serviceArea != null &&
+      DUAL_FULFILMENT_SERVICE_AREAS.has(filters.serviceArea) &&
+      !filters.fulfilment;
+    if (browseCategories.length > 0 && !filters.fulfilment && !skipBrowseForDualFulfilment) {
       const browsed = browseRetailWeeklyOffers(
         rows,
         browseCategories,
