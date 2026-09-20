@@ -9,6 +9,7 @@ import type { SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
 import {
   inferWeeklyOffersListIntent,
   offerSearchProductTokens,
+  resolveWeeklyOfferSearchFilters,
   searchSyncedWeeklyOffersByQuery,
   RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS,
   tokenizeSupervaluSearchQuery,
@@ -618,6 +619,15 @@ async function searchSupervaluCatalogLiveInternal(
   }
 
   if (intent === "offer" && listIntent && syncedMatches.length > 0) {
+    return syncedMatches.map(syncedOfferToCatalogMatch);
+  }
+
+  const filters = resolveWeeklyOfferSearchFilters(trimmed);
+  if (
+    intent === "offer" &&
+    listIntent &&
+    (filters.fulfilment === "counter" || filters.serviceArea)
+  ) {
     return syncedMatches.map(syncedOfferToCatalogMatch);
   }
 

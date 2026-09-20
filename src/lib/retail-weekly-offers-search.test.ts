@@ -540,6 +540,52 @@ describe("retail weekly offers search", () => {
     assert.match(matches[0]?.productName ?? "", /Ham/i);
   });
 
+  it("lists butcher counter offers when caller asks what is on offer at the meat counter", async () => {
+    const butcherRows: RetailWeeklyOfferRow[] = [
+      mockOfferRow({
+        id: "prepack-1",
+        product_name: "Denny Luncheon Roll (90 g)",
+        department: "Beef & Luncheon Meats",
+        fulfilment: "prepack",
+        offer_channel: "prepack",
+        current_price_eur: 1,
+        search_text: "denny luncheon roll prepack",
+      }),
+      mockOfferRow({
+        id: "counter-1",
+        product_name: "SuperValu Fresh Irish Pork Steak (1 kg)",
+        department: "Pork",
+        fulfilment: "counter",
+        offer_channel: "butcher_counter",
+        current_price_eur: 6.69,
+        search_text: "supervalu fresh irish pork steak butcher counter",
+      }),
+      mockOfferRow({
+        id: "counter-2",
+        product_name: "SuperValu Fresh Irish Carvery Lamb Shoulder (1 kg)",
+        department: "Lamb",
+        fulfilment: "counter",
+        offer_channel: "butcher_counter",
+        current_price_eur: 9,
+        search_text: "supervalu fresh irish carvery lamb shoulder butcher counter",
+      }),
+    ];
+
+    const matches = await searchRetailWeeklyOffers(
+      mockSupabaseRows(butcherRows) as never,
+      "supervalu",
+      "what's on offer in the meat counter this week",
+    );
+    assert.equal(matches.length, 2);
+    assert.ok(matches.every((match) => match.fulfilment === "counter"));
+    assert.ok(
+      matches.some((match) => /Pork Steak/i.test(match.productName)),
+    );
+    assert.ok(
+      matches.every((match) => !/Denny Luncheon/i.test(match.productName)),
+    );
+  });
+
   it("infers browse/list intent for general offer questions", () => {
     assert.equal(inferWeeklyOffersListIntent("best offers"), true);
     assert.equal(inferWeeklyOffersListIntent("what offers do you have apart from meat"), true);

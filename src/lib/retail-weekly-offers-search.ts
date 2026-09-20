@@ -824,11 +824,17 @@ export function searchSyncedWeeklyOffersInRows(
   const browseOptions = { excludeMeat, filters, alcoholOnly };
 
   if (listIntent) {
-    if (browseCategories.length > 0) {
-      return browseRetailWeeklyOffers(rows, browseCategories, listLimit, browseOptions);
+    if (browseCategories.length > 0 && !filters.fulfilment) {
+      const browsed = browseRetailWeeklyOffers(
+        rows,
+        browseCategories,
+        listLimit,
+        browseOptions,
+      );
+      if (browsed.length > 0) return browsed;
     }
-    if (filters.serviceArea) {
-      return sampleRetailWeeklyOffersAcrossDepartments(rows, listLimit, browseOptions);
+    if (filters.fulfilment || filters.serviceArea) {
+      return listRetailWeeklyOffers(rows, filters, listLimit);
     }
     return sampleRetailWeeklyOffersAcrossDepartments(rows, listLimit, browseOptions);
   }
