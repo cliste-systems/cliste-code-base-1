@@ -1,10 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatInTimeZone } from "date-fns-tz";
 
 import {
   fetchSupervaluFullStoreOffers,
   fetchSupervaluMeatPilotOffers,
   countOffersByServiceArea,
 } from "@/lib/supervalu-offers-fetch";
+import {
+  currentSupervaluOfferWeek,
+} from "@/lib/supervalu-offers-normalize";
 import {
   persistSupervaluNationalOffers,
   toSupervaluOffersSyncResult,
@@ -27,7 +31,11 @@ export {
 
 export type SyncSupervaluNationalOffersOptions = {
   storeId?: string;
-  /** When true, skip sync if latest batch already meets the minimum count. */
+  /** Cron: skip when today's sync already loaded the current offer week. */
+  skipIfAlreadySyncedToday?: boolean;
+  /** Cron safety net: only sync when the DB is still on a prior offer week. */
+  retryOnlyIfStaleWeek?: boolean;
+  /** @deprecated Use retryOnlyIfStaleWeek on the Friday safety-net cron. */
   retryOnlyIfLowCount?: boolean;
   /** Use legacy meat-only fetch instead of full-store snapshot. */
   meatPilotOnly?: boolean;
@@ -35,26 +43,78 @@ export type SyncSupervaluNationalOffersOptions = {
   skipPromptRecompile?: boolean;
 };
 
+const DUBLIN = "Europe/Dublin";
+
+export type SupervaluOfferSyncMeta = {
+  syncedAt: string | null;
+  offerCount: number;
+  offerWeekStart: string | null;
+  offerWeekEnd: string | null;
+};
+
+/** True when the stored batch is from a previous SuperValu offer week. */
+export function isSupervaluOfferWeekStale(
+  meta: Pick<SupervaluOfferSyncMeta, "offerWeekStart" | "offerWeekEnd">,
+  reference = new Date(),
+): boolean {
+  const week = currentSupervaluOfferWeek(reference);
+  const start = String(meta.offerWeekStart ?? "").trim();
+  if (!start || start !== week.start) return true;
+  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  const end = String(meta.offerWeekEnd ?? "").trim();
+  return !end || end < today;
+}
+
+/** Thursday repeat crons: skip when we already synced the current week today. */
+export function shouldSkipThursdayOffersSync(
+  meta: SupervaluOfferSyncMeta,
+  reference = new Date(),
+): boolean {
+  if (isSupervaluOfferWeekStale(meta, reference)) return false;
+  if (meta.offerCount < SUPERVALU_MIN_FULL_STORE_OFFER_COUNT) return false;
+  if (!meta.syncedAt) return false;
+  const syncedDay = formatInTimeZone(new Date(meta.syncedAt), DUBLIN, "yyyy-MM-dd");
+  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  return syncedDay === today;
+}
+
+function skippedSyncResult(
+  reason: string,
+  meta: SupervaluOfferSyncMeta,
+): SupervaluOffersSyncResult {
+  return {
+    ok: true,
+    syncBatchId: reason,
+    offerCount: meta.offerCount,
+    organizationsUpdated: 0,
+    offerWeekStart: meta.offerWeekStart ?? "",
+    offerWeekEnd: meta.offerWeekEnd ?? "",
+    syncedAt: meta.syncedAt ?? new Date().toISOString(),
+  };
+}
+
 export async function syncSupervaluNationalOffers(
   supabase: SupabaseClient,
   options?: SyncSupervaluNationalOffersOptions,
 ): Promise<SupervaluOffersSyncResult> {
-  if (options?.retryOnlyIfLowCount) {
-    const meta = await loadLatestSupervaluOfferSyncMeta(supabase);
+  const meta = await loadLatestSupervaluOfferSyncMeta(supabase);
+
+  if (options?.retryOnlyIfStaleWeek) {
+    if (!isSupervaluOfferWeekStale(meta)) {
+      return skippedSyncResult("skipped-current-week", meta);
+    }
+  } else if (options?.retryOnlyIfLowCount) {
     if (
       meta.syncedAt &&
-      meta.offerCount >= SUPERVALU_MIN_FULL_STORE_OFFER_COUNT
+      meta.offerCount >= SUPERVALU_MIN_FULL_STORE_OFFER_COUNT &&
+      !isSupervaluOfferWeekStale(meta)
     ) {
-      return {
-        ok: true,
-        syncBatchId: "skipped-retry",
-        offerCount: meta.offerCount,
-        organizationsUpdated: 0,
-        offerWeekStart: meta.offerWeekStart ?? "",
-        offerWeekEnd: meta.offerWeekEnd ?? "",
-        syncedAt: meta.syncedAt,
-      };
+      return skippedSyncResult("skipped-retry", meta);
     }
+  }
+
+  if (options?.skipIfAlreadySyncedToday && shouldSkipThursdayOffersSync(meta)) {
+    return skippedSyncResult("skipped-already-synced-today", meta);
   }
 
   const offers = options?.meatPilotOnly
@@ -115,12 +175,7 @@ export async function syncSupervaluNationalOffers(
 
 export async function loadLatestSupervaluOfferSyncMeta(
   supabase: SupabaseClient,
-): Promise<{
-  syncedAt: string | null;
-  offerCount: number;
-  offerWeekStart: string | null;
-  offerWeekEnd: string | null;
-}> {
+): Promise<SupervaluOfferSyncMeta> {
   const { data, error } = await supabase
     .from("retail_weekly_offers")
     .select("synced_at, offer_week_start, offer_week_end")

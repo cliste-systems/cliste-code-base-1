@@ -22,17 +22,21 @@ async function authorize(request: Request): Promise<boolean> {
  * Weekly cron: sync national SuperValu offers into retail_weekly_offers,
  * then recompile Cara prompts for SuperValu retail orgs.
  *
- * Scheduled Thursday 08:00 Europe/Dublin via vercel.json (07:00 UTC).
+ * Runs several times each Thursday (Dublin) so new-week offers are live
+ * before stores open — not deferred to Friday.
  */
 export async function GET(request: Request) {
-  return run(request, false);
+  return run(request, "thursday");
 }
 
 export async function POST(request: Request) {
-  return run(request, false);
+  return run(request, "thursday");
 }
 
-async function run(request: Request, retryOnlyIfLowCount: boolean) {
+async function run(
+  request: Request,
+  mode: "thursday" | "stale-week-retry",
+) {
   if (!(await authorize(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -49,7 +53,10 @@ async function run(request: Request, retryOnlyIfLowCount: boolean) {
   }
 
   try {
-    const result = await syncSupervaluNationalOffers(admin, { retryOnlyIfLowCount });
+    const result = await syncSupervaluNationalOffers(admin, {
+      skipIfAlreadySyncedToday: mode === "thursday",
+      retryOnlyIfStaleWeek: mode === "stale-week-retry",
+    });
     if (!result.ok) {
       console.error("[cron] supervalu-offers-sync", result.message);
       return NextResponse.json(result, { status: 502 });

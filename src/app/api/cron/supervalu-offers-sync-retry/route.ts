@@ -6,14 +6,15 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Friday retry cron — only syncs if the latest batch has fewer than 350 offers.
+ * Friday safety net — only runs when offers are still on a prior week.
+ * Customer-facing updates must happen on Thursday; this is ops recovery only.
  *
  * Scheduled Friday 07:00 Europe/Dublin via vercel.json (06:00 UTC).
  */
 export async function GET(request: Request) {
-  return runSupervaluOffersSyncCron(request, true);
+  return runSupervaluOffersSyncCron(request, "stale-week-retry");
 }
 
 export async function POST(request: Request) {
-  return runSupervaluOffersSyncCron(request, true);
+  return runSupervaluOffersSyncCron(request, "stale-week-retry");
 }
