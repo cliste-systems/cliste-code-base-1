@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Friday retry cron — only syncs if the latest batch has fewer than 50 offers.
+ * Friday retry cron — only syncs if the latest batch has fewer than 350 offers.
  *
  * Scheduled Friday 07:00 Europe/Dublin via vercel.json (06:00 UTC).
  */

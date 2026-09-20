@@ -99,7 +99,7 @@ export default async function DepartmentWorkspacePage({
     supabase
       .from("action_tickets")
       .select(
-        "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
+        "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status, engineer_test_call",
       )
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })

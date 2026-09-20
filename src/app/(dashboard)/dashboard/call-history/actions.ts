@@ -21,6 +21,7 @@ import {
 } from "@/lib/caller-data-erasure";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import { createCallRecordingSignedUrl } from "@/lib/call-recordings-server";
+import { isEngineerTestCallRow, ENGINEER_TEST_CALL_CALLER_LABEL } from "@/lib/engineer-test-call";
 import { resolveCallLogIdForTicket } from "@/lib/resolve-ticket-call-log";
 import type { PostCallStatus } from "@/lib/post-call-processing-types";
 
@@ -47,6 +48,7 @@ export type CallDetailDialogPayload = {
   transcriptReview: string | null;
   postCallStatus: PostCallStatus;
   hasRecording: boolean;
+  engineerTestCall: boolean;
 };
 
 export type CallRecordingPlaybackResult =
@@ -100,6 +102,7 @@ export async function fetchCallerHistoryInsight(input: {
       )
       .eq("organization_id", organizationId)
       .eq("caller_number", callerE164)
+      .eq("engineer_test_call", false)
       .order("created_at", { ascending: false })
       .limit(CALLER_HISTORY_CALL_LIMIT),
     supabase
@@ -185,13 +188,17 @@ export async function fetchCallRecordingPlaybackUrl(
   const { supabase, organizationId } = await requireDashboardSession();
   const { data, error } = await supabase
     .from("call_logs")
-    .select("audio_storage_path")
+    .select("audio_storage_path, engineer_test_call")
     .eq("id", id)
     .eq("organization_id", organizationId)
     .maybeSingle();
 
+  if (error || isEngineerTestCallRow(data ?? {})) {
+    return { ok: false, message: "Recording not available for this call." };
+  }
+
   const storagePath = data?.audio_storage_path?.trim();
-  if (error || !storagePath) {
+  if (!storagePath) {
     return { ok: false, message: "Recording not available for this call." };
   }
 
@@ -215,6 +222,12 @@ export async function fetchCallHistoryDetail(
 ): Promise<CallHistoryDetailPayload> {
   const detail = await loadCallDetailRow(callId);
   if (!detail) return null;
+  if (detail.engineerTestCall) {
+    return {
+      transcriptVerbatim: "",
+      transcriptReview: null,
+    };
+  }
 
   return {
     transcriptVerbatim: detail.transcriptVerbatim,
@@ -257,7 +270,7 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
   const { data, error } = await supabase
     .from("call_logs")
     .select(
-      "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status, audio_storage_path",
+      "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, transcript, transcript_review, created_at, post_call_status, audio_storage_path, engineer_test_call",
     )
     .eq("id", id)
     .eq("organization_id", organizationId)
@@ -265,25 +278,27 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
 
   if (error || !data) return null;
 
+  const engineerTestCall = isEngineerTestCallRow(data);
+
   const mapped = mapCallLogToRow({
     id: String(data.id),
     caller_number: String(data.caller_number ?? ""),
     duration_seconds: Math.max(0, Number(data.duration_seconds ?? 0)),
     outcome: String(data.outcome ?? ""),
-    transcript: data.transcript ?? null,
-    transcript_review: data.transcript_review ?? null,
+    transcript: engineerTestCall ? null : data.transcript ?? null,
+    transcript_review: engineerTestCall ? null : data.transcript_review ?? null,
     ai_summary: data.ai_summary ?? null,
     created_at: String(data.created_at ?? ""),
   });
 
   const outcome = normalizeCallOutcome(String(data.outcome ?? ""));
-  const aiSummary = data.ai_summary?.trim() || null;
+  const aiSummary = engineerTestCall ? null : data.ai_summary?.trim() || null;
 
   return {
     id: mapped.id,
     dateTimeLabel: mapped.dateTimeLabel,
-    callerDisplay: mapped.callerDisplay || "Unknown number",
-    callerName: data.caller_name?.trim() || null,
+    callerDisplay: engineerTestCall ? ENGINEER_TEST_CALL_CALLER_LABEL : mapped.callerDisplay || "Unknown number",
+    callerName: engineerTestCall ? null : data.caller_name?.trim() || null,
     durationLabel: mapped.durationLabel || "—",
     durationSeconds: Math.max(0, Number(data.duration_seconds ?? 0)),
     outcome,
@@ -293,6 +308,7 @@ async function loadCallDetailRow(callId: string): Promise<CallDetailDialogPayloa
     transcriptVerbatim: mapped.transcriptVerbatim,
     transcriptReview: mapped.transcriptReview,
     postCallStatus: (data.post_call_status as PostCallStatus) ?? "complete",
-    hasRecording: Boolean(data.audio_storage_path?.trim()),
+    hasRecording: engineerTestCall ? false : Boolean(data.audio_storage_path?.trim()),
+    engineerTestCall,
   };
 }

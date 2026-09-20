@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 
 import {
   buildRetailWeeklyOffersPromptSection,
+  assessSyncedOffersFreshness,
   formatWeeklyOfferQuote,
   inferWeeklyOfferChannelFromQuery,
   inferWeeklyOfferFulfilmentFromQuery,
   inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
+  isRetailOfferWeekActive,
   resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
 } from "./retail-weekly-offers-search";
@@ -23,6 +25,7 @@ import {
 function mockOfferRow(
   partial: Partial<RetailWeeklyOfferRow> & Pick<RetailWeeklyOfferRow, "id" | "product_name" | "search_text">,
 ): RetailWeeklyOfferRow {
+  const activeWeek = currentSupervaluOfferWeek();
   return {
     organization_id: null,
     retail_banner: "supervalu",
@@ -41,8 +44,8 @@ function mockOfferRow(
     is_alcohol: false,
     brand: null,
     sku: null,
-    offer_week_start: "2026-09-04",
-    offer_week_end: "2026-09-10",
+    offer_week_start: activeWeek.start,
+    offer_week_end: activeWeek.end,
     source_url: null,
     synced_at: "2026-09-10T06:00:00.000Z",
     ...partial,
@@ -359,6 +362,34 @@ describe("supervalu offers sync helpers", () => {
     const week = currentSupervaluOfferWeek(new Date("2026-09-10T12:00:00Z"));
     assert.equal(week.start, "2026-09-10");
     assert.equal(week.end, "2026-09-16");
+  });
+
+  it("drops expired offer weeks from active filter", () => {
+    const row = mockOfferRow({
+      id: "expired",
+      product_name: "Irish Striploin Steak",
+      search_text: "striploin",
+      offer_week_start: "2026-09-10",
+      offer_week_end: "2026-09-16",
+    });
+    assert.equal(
+      isRetailOfferWeekActive(row, new Date("2026-09-20T12:00:00Z")),
+      false,
+    );
+    assert.equal(
+      isRetailOfferWeekActive(row, new Date("2026-09-16T12:00:00Z")),
+      true,
+    );
+  });
+
+  it("flags stale synced offers when week ended", () => {
+    const freshness = assessSyncedOffersFreshness({
+      syncedAt: "2026-09-13T13:01:42.811Z",
+      offerWeekEnd: "2026-09-16",
+      reference: new Date("2026-09-20T12:00:00Z"),
+    });
+    assert.equal(freshness.stale, true);
+    assert.match(freshness.message ?? "", /out of date/i);
   });
 });
 

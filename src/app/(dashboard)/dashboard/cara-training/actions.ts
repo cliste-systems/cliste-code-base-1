@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { requireDashboardAdmin } from "@/lib/dashboard-admin";
+import { ENGINEER_TEST_TRAINING_BLOCK_MESSAGE } from "@/lib/engineer-test-call";
+import { trainingItemFromEngineerTest } from "@/lib/engineer-test-artifact-guard";
 import { ownerInitiatedTeachMetadata } from "@/lib/cara-training-owner-initiated";
 import {
   checkTrainingDraftSafety,
@@ -35,12 +37,29 @@ import { saveTrainingTemporalDraft } from "@/lib/cara-knowledge-temporal-store";
 
 type ActionResult = { ok: true } | { ok: false; message: string };
 
+async function blockEngineerTestTraining(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  itemId: string,
+): Promise<ActionResult | null> {
+  if (await trainingItemFromEngineerTest(supabase, organizationId, itemId)) {
+    return { ok: false, message: ENGINEER_TEST_TRAINING_BLOCK_MESSAGE };
+  }
+  return null;
+}
+
 export async function answerTrainingItem(
   itemId: string,
   answerText: string,
 ): Promise<ActionResult> {
   const session = await requireDashboardAdmin();
   const supabase = await createClient();
+  const blocked = await blockEngineerTestTraining(
+    supabase,
+    session.organizationId,
+    itemId,
+  );
+  if (blocked) return blocked;
   return submitOwnerAnswer(
     supabase,
     session.organizationId,
@@ -55,6 +74,12 @@ export async function confirmTrainingDraft(
 ): Promise<ActionResult> {
   const session = await requireDashboardAdmin();
   const supabase = await createClient();
+  const blocked = await blockEngineerTestTraining(
+    supabase,
+    session.organizationId,
+    itemId,
+  );
+  if (blocked) return blocked;
   if (classification) {
     const { setTrainingKnowledgeClassification } = await import(
       "@/lib/cara-knowledge-folder-assignments"
@@ -81,6 +106,12 @@ export async function dismissTrainingDraft(
 ): Promise<ActionResult> {
   const session = await requireDashboardAdmin();
   const supabase = await createClient();
+  const blocked = await blockEngineerTestTraining(
+    supabase,
+    session.organizationId,
+    itemId,
+  );
+  if (blocked) return blocked;
   return dismissTrainingItem(supabase, session.organizationId, itemId, reason);
 }
 

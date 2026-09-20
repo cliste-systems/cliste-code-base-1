@@ -16,10 +16,11 @@ async function main() {
   const searchArgIndex = process.argv.indexOf("--search");
   const searchQuery =
     searchArgIndex >= 0 ? String(process.argv[searchArgIndex + 1] ?? "").trim() : "";
+  const recompilePrompts = process.argv.includes("--recompile");
 
   const admin = createAdminClient();
   const result = await syncSupervaluNationalOffers(admin, {
-    skipPromptRecompile: true,
+    skipPromptRecompile: !recompilePrompts,
   });
   if (!result.ok) {
     console.error("Sync failed:", result.message);

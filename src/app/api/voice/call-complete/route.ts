@@ -18,6 +18,7 @@ import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
 import type { CallCloseDiagnosticsPayload } from "@/lib/call-testing-types";
 import { persistCallTestReport } from "@/lib/call-testing-persist";
 import { resolveTestCallContext } from "@/lib/call-testing-resolve";
+import { resolveEngineerTestCall } from "@/lib/engineer-test-call";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { stripToolLinesFromTranscript } from "@/lib/transcript-display";
 import { captureObservedError } from "@/lib/observability";
@@ -71,6 +72,7 @@ type VoiceCallCompleteBody = {
   /** When true, worker confirms AI + recording/transcription disclosure was spoken. */
   disclosure_confirmed?: boolean;
   is_test_call?: boolean;
+  engineer_test_call?: boolean;
   test_profile_id?: string | null;
   variant_label?: string | null;
   diagnostics?: CallCloseDiagnosticsPayload | null;
@@ -354,7 +356,7 @@ export async function POST(request: Request) {
     confirmed: body.disclosure_confirmed === true,
     organizationId: orgId,
     calledNumber: calledNumberRaw || undefined,
-    skip: outcome === "blocked" || body.is_test_call === true,
+    skip: outcome === "blocked" || body.is_test_call === true || body.engineer_test_call === true,
   });
 
   // Server-side redaction.
@@ -407,6 +409,11 @@ export async function POST(request: Request) {
     workerMarkedTest: body.is_test_call === true,
   });
   const isTestCall = testCallContext.isTestCall;
+  const isEngineerTestCall = resolveEngineerTestCall({
+    engineerTestCall: body.engineer_test_call === true,
+    callerNumber,
+    roomName,
+  });
   const persistCalledNumber = testCallContext.effectiveCalledNumber || calledNumberRaw;
 
   const { data: insertedCall, error: callErr } = await admin
@@ -425,6 +432,7 @@ export async function POST(request: Request) {
       transfer_connected: transferConnected,
       verification_call: verificationCall,
       is_test_call: isTestCall,
+      engineer_test_call: isEngineerTestCall,
       called_number: persistCalledNumber || null,
       ...(callSid ? { call_sid: callSid } : {}),
       ...(roomName ? { room_name: roomName } : {}),
@@ -475,7 +483,7 @@ export async function POST(request: Request) {
     body.audio_storage_path,
     orgId,
     callLogId,
-    body.disclosure_confirmed === true,
+    body.disclosure_confirmed === true && !isEngineerTestCall,
   );
   if (audioStoragePath) {
     const { error: audioPatchErr } = await admin
@@ -700,7 +708,7 @@ export async function POST(request: Request) {
 
   if (shouldRunCallCompleteSideEffects(outcome) && !isTestCall) {
     after(async () => {
-      if (outcome === "action_created") {
+      if (outcome === "action_created" && !isEngineerTestCall) {
       const notifySummary =
         summaryRedacted.text?.trim() ||
         reviewRedacted.text?.trim() ||
@@ -810,11 +818,16 @@ async function respondIdempotentCallComplete(input: {
     patch.post_call_expected_ticket = input.body.post_call_expected_ticket === true;
   }
   if (!input.existingAudioPath?.trim()) {
+    const isEngineerTestCall = resolveEngineerTestCall({
+      engineerTestCall: input.body.engineer_test_call === true,
+      callerNumber: input.body.caller_number,
+      roomName: input.body.room_name ?? null,
+    });
     const audioPath = resolveValidatedAudioStoragePath(
       input.body.audio_storage_path,
       input.orgId,
       input.callLogId,
-      input.body.disclosure_confirmed === true,
+      input.body.disclosure_confirmed === true && !isEngineerTestCall,
     );
     if (audioPath) {
       patch.audio_storage_path = audioPath;
@@ -833,7 +846,8 @@ async function respondIdempotentCallComplete(input: {
   if (
     shouldRunCallCompleteSideEffects(input.outcome) &&
     input.knowledgeGaps.length > 0 &&
-    input.body.is_test_call !== true
+    input.body.is_test_call !== true &&
+    input.body.engineer_test_call !== true
   ) {
     after(async () => {
       try {
@@ -896,6 +910,19 @@ async function respondIdempotentCallComplete(input: {
         business_name: orgRow?.name as string | null,
       },
     });
+  }
+
+  if (
+    resolveEngineerTestCall({
+      engineerTestCall: input.body.engineer_test_call === true,
+      callerNumber: input.body.caller_number,
+      roomName: input.body.room_name ?? null,
+    })
+  ) {
+    await input.admin
+      .from("call_logs")
+      .update({ engineer_test_call: true })
+      .eq("id", input.callLogId);
   }
 
   revalidateAfterWrite();

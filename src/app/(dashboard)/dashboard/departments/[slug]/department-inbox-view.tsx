@@ -24,11 +24,18 @@ import {
   resolveTicketAttentionLevel,
 } from "@/lib/call-attention-level";
 import { callerSmsEligibility } from "@/lib/caller-line-sms";
+import {
+  ENGINEER_TEST_CALL_BADGE_LABEL,
+  ENGINEER_TEST_CALL_DETAIL_TITLE,
+  ENGINEER_TEST_TICKET_BLOCK_MESSAGE,
+} from "@/lib/engineer-test-call";
 import { cn } from "@/lib/utils";
 
 import { markTicketReopen, markTicketResolved } from "../../action-inbox/actions";
 import {
   copyDetailsText,
+  departmentInboxListMetaLine,
+  departmentInboxListPrimaryLine,
   departmentListPreview,
   displayActionTicketSummary,
   hasKnownCallerName,
@@ -233,12 +240,6 @@ export function DepartmentInboxView({
   );
 }
 
-function callerLine(row: ActionInboxItem): string {
-  const name = hasKnownCallerName(row) ? row.callerName : "Unknown caller";
-  const phone = row.callerDisplay.trim() || "No phone";
-  return `${name} ${phone}`;
-}
-
 function DepartmentListRow({
   row,
   selected,
@@ -251,12 +252,20 @@ function DepartmentListRow({
   tinted: boolean;
 }) {
   const preview = departmentListPreview(row);
+  const engineerTestCall = row.engineerTestCall;
   const attentionLevel = resolveTicketAttentionLevel(row.category, row.status);
-  const attention = attentionRowAccent(attentionLevel, row.category);
-  const attentionTag = resolveAttentionTag({
-    level: attentionLevel,
-    category: row.category,
-  });
+  const attention = engineerTestCall
+    ? {
+        rowAccentClass: "border-l-2 border-l-slate-200",
+        selectedRowAccentClass: "border-l-2 border-l-slate-400",
+      }
+    : attentionRowAccent(attentionLevel, row.category);
+  const attentionTag = engineerTestCall
+    ? null
+    : resolveAttentionTag({
+        level: attentionLevel,
+        category: row.category,
+      });
 
   return (
     <li>
@@ -280,9 +289,13 @@ function DepartmentListRow({
       >
         <div className="flex items-start justify-between gap-2">
           <p className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-[#0b1220]">
-            {callerLine(row)}
+            {departmentInboxListPrimaryLine(row)}
           </p>
-          {attentionTag ? (
+          {engineerTestCall ? (
+            <span className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-700 uppercase">
+              {ENGINEER_TEST_CALL_BADGE_LABEL}
+            </span>
+          ) : attentionTag ? (
             <span
               className={cn(
                 "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
@@ -296,7 +309,17 @@ function DepartmentListRow({
         <p className="mt-1.5 line-clamp-2 text-[13px] leading-snug text-slate-600">
           {preview}
         </p>
-        <p className="mt-1.5 text-[12px] text-slate-500 tabular-nums">{row.createdAtLabel}</p>
+        <p className="mt-1.5 text-[12px] text-slate-500 tabular-nums">
+          {engineerTestCall ? (
+            <>
+              {departmentInboxListMetaLine(row)}
+              <span className="text-slate-300"> · </span>
+              {row.createdAtLabel}
+            </>
+          ) : (
+            row.createdAtLabel
+          )}
+        </p>
       </button>
     </li>
   );
@@ -353,6 +376,7 @@ function DepartmentDetailContent({
   const hasPhone = item.callerNumber.trim().length > 0;
   const tel = hasPhone ? `tel:${item.callerNumber.replace(/[^\d+]/g, "")}` : null;
   const isOpen = item.status === "open";
+  const engineerTestCall = item.engineerTestCall;
   const summaryText = displayActionTicketSummary(item.summary, undefined, {
     underReview: isUnderReviewTicket(item),
   });
@@ -384,6 +408,46 @@ function DepartmentDetailContent({
     setTextBackNotice(null);
     setTextBackOpen(false);
   }, [item.id]);
+
+  if (engineerTestCall) {
+    return (
+      <DetailPanelShell surface="embedded">
+        <div className="shrink-0 border-b border-[#dfe7e2] bg-[#f6faf7] px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <h2 className="text-[18px] font-semibold tracking-tight text-[#11181d]">
+              {ENGINEER_TEST_CALL_DETAIL_TITLE}
+            </h2>
+            <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-[12px] text-[#6b7c75]">
+              <span className="whitespace-nowrap tabular-nums">{item.createdAtLabel}</span>
+              <StatusPill className="border-slate-200 bg-slate-50 text-slate-700">
+                Not billed
+              </StatusPill>
+              <StatusPill className="border-slate-200 bg-slate-50 text-slate-700">
+                {ENGINEER_TEST_CALL_BADGE_LABEL}
+              </StatusPill>
+            </div>
+          </div>
+
+          <p className="mt-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[13px] leading-relaxed text-slate-700">
+            {ENGINEER_TEST_TICKET_BLOCK_MESSAGE}
+          </p>
+
+          {requestSummary ? (
+            <DepartmentRequestSummaryCard
+              summary={requestSummary}
+              callerName={item.callerName}
+              callerDisplay={item.callerDisplay}
+              callerTel={tel}
+              showCallerName={hasKnownCallerName(item)}
+              className="border-slate-200 bg-white"
+            />
+          ) : (
+            <p className="mt-4 text-[15px] leading-relaxed text-[#11181d]">{summaryText}</p>
+          )}
+        </div>
+      </DetailPanelShell>
+    );
+  }
 
   return (
     <DetailPanelShell surface="embedded">
@@ -452,14 +516,15 @@ function DepartmentDetailContent({
                 Mark done
               </DetailActionButton>
             </form>
-          ) : (
+          ) : null}
+          {!isOpen ? (
             <form action={markTicketReopen}>
               <input type="hidden" name="ticketId" value={item.id} />
               <DetailActionButton type="submit" className="min-h-11 px-5 text-[14px] font-semibold">
                 Reopen
               </DetailActionButton>
             </form>
-          )}
+          ) : null}
           {hasPhone ? (
             <DetailActionButton
               type="button"

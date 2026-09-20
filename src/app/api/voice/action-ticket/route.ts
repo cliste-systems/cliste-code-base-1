@@ -11,6 +11,7 @@ import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import { redactCallText } from "@/lib/transcript-redaction";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { isEngineerTestCallerNumber } from "@/lib/engineer-test-call";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +156,17 @@ export async function POST(request: Request) {
   });
   const briefSummary = buildActionTicketBriefSummary(summaryText);
   const callLogId = String(body.call_log_id ?? "").trim() || null;
+  let engineerTestCall = isEngineerTestCallerNumber(callerNumber);
+  if (callLogId) {
+    const { data: callLogRow } = await admin
+      .from("call_logs")
+      .select("engineer_test_call")
+      .eq("id", callLogId)
+      .maybeSingle();
+    if (callLogRow?.engineer_test_call === true) {
+      engineerTestCall = true;
+    }
+  }
   const deliveryStatus =
     body.delivery_status === "pending_review" ||
     body.delivery_status === "failed" ||
@@ -172,6 +184,7 @@ export async function POST(request: Request) {
       brief_summary: briefSummary,
       department_slug: departmentSlug,
       status: "open",
+      engineer_test_call: engineerTestCall,
       ...(callLogId ? { call_log_id: callLogId } : {}),
       delivery_status: deliveryStatus,
     })
@@ -187,12 +200,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    await notifyActionInboxOwner(admin, orgId, {
-      summary: summaryText,
-      callerNumber,
-      callerName,
-      departmentSlug,
-    });
+    if (!engineerTestCall) {
+      await notifyActionInboxOwner(admin, orgId, {
+        summary: summaryText,
+        callerNumber,
+        callerName,
+        departmentSlug,
+      });
+    }
   } catch (e) {
     console.error("[voice/action-ticket] notify failed", e);
   }

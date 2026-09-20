@@ -26,6 +26,11 @@ import { getCachedDashboardOrganizationRow } from "@/lib/dashboard-organization-
 import { normalizeBlockedCallerE164 } from "@/lib/blocked-callers";
 import { buildCallsPageHref } from "@/lib/calls-page-href";
 
+import {
+  ENGINEER_TEST_CALL_CALLER_LABEL,
+  ENGINEER_TEST_CALL_SUMMARY,
+  isEngineerTestCallRow,
+} from "@/lib/engineer-test-call";
 import { assignOpenTicketsToCalls } from "@/lib/call-history-follow-up";
 import { resolveCallHistoryNeedsAttention, normalizeCallResolution } from "@/lib/call-history-status";
 import { resolveCallDepartmentLink } from "@/lib/call-department-link";
@@ -35,6 +40,7 @@ import { classifyActionCategory } from "../action-inbox/categories";
 
 import {
   buildCallHistoryMetricsFromSummaryRows,
+  collapseEngineerTestCallsForList,
   type CallFollowUp,
   type CallHistoryListItem,
   callSummaryForDisplay,
@@ -63,6 +69,7 @@ type CallLogListRow = {
   caller_data_erased_at?: string | null;
   caller_data_erased_by_label?: string | null;
   caller_data_erased_reason?: string | null;
+  engineer_test_call?: boolean | null;
 };
 
 type CallLogMetricsRow = {
@@ -120,6 +127,7 @@ function toListItem(
     attentionLevel !== "routine" && summaryForCategory
       ? classifyActionCategory(summaryForCategory)
       : null;
+  const engineerTestCall = isEngineerTestCallRow(row);
   const item: CallHistoryListItem = {
     id: mapped.id,
     createdAt: row.created_at,
@@ -151,7 +159,22 @@ function toListItem(
     callerDataErasedAt: row.caller_data_erased_at ?? null,
     callerDataErasedByLabel: row.caller_data_erased_by_label ?? null,
     callerDataErasedReason: row.caller_data_erased_reason ?? null,
+    engineerTestCall,
   };
+  if (engineerTestCall) {
+    item.callerDisplay = ENGINEER_TEST_CALL_CALLER_LABEL;
+    item.callerName = null;
+    item.aiSummary = null;
+    item.hasRecording = false;
+    item.attentionLevel = "routine";
+    item.hasOpenAction = false;
+    item.followUp = null;
+    item.departmentLink = null;
+    item.actionCategory = null;
+    item.outcomeLabel = "Test";
+    item.summaryPreview = ENGINEER_TEST_CALL_SUMMARY;
+    return item;
+  }
   item.summaryPreview = callSummaryForDisplay(item, {
     businessName,
     callerIsBlocked:
@@ -246,13 +269,14 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         .from("call_logs")
         .select("outcome, duration_seconds")
         .eq("organization_id", organizationId)
-        .eq("is_test_call", false),
+        .eq("is_test_call", false)
+        .eq("engineer_test_call", false),
     ),
     applyDayFilters(
       supabase
         .from("call_logs")
         .select(
-          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason",
+          "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call",
         )
         .eq("organization_id", organizationId)
         .eq("is_test_call", false)
@@ -262,9 +286,10 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     applyDayFilters(
       supabase
         .from("call_logs")
-        .select("id, caller_number, created_at, outcome, ai_summary, call_resolution, post_call_status")
+        .select("id, caller_number, created_at, outcome, ai_summary, call_resolution, post_call_status, engineer_test_call")
         .eq("organization_id", organizationId)
-        .eq("is_test_call", false),
+        .eq("is_test_call", false)
+        .eq("engineer_test_call", false),
     ),
     supabase
       .from("action_tickets")
@@ -328,7 +353,7 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
     const { data: deepLinkedRow } = await supabase
       .from("call_logs")
       .select(
-        "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason",
+        "id, caller_number, caller_name, duration_seconds, outcome, ai_summary, call_resolution, created_at, post_call_status, audio_storage_path, caller_data_erased_at, caller_data_erased_by_label, caller_data_erased_reason, engineer_test_call",
       )
       .eq("id", initialSelectedCallId)
       .eq("organization_id", organizationId)
@@ -347,6 +372,15 @@ export default async function CallHistoryPage({ searchParams }: CallHistoryPageP
         ...calls.filter((call) => call.id !== deepLinkedCall.id),
       ];
     }
+  }
+
+  const collapsed = collapseEngineerTestCallsForList(calls);
+  calls = collapsed.calls;
+  if (collapsed.hiddenEngineerTestCount > 0 && metrics.totalCalls > 0) {
+    metrics.totalCalls = Math.max(
+      1,
+      metrics.totalCalls - collapsed.hiddenEngineerTestCount,
+    );
   }
 
   return (

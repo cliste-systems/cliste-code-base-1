@@ -6,6 +6,32 @@ import {
 } from "@/lib/dashboard-feed-time";
 import { formatActivityFeedBadge } from "@/lib/dashboard-live-activity";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import {
+  ENGINEER_TEST_CALL_BRAND,
+  ENGINEER_TEST_CALL_LIST_LABEL,
+  ENGINEER_TEST_CALL_ROW_SUBTITLE,
+  isEngineerTestCallRow,
+} from "@/lib/engineer-test-call";
+
+function isEngineerTestActivityCall(row: ActivityFeedSourceCall): boolean {
+  return isEngineerTestCallRow({
+    engineer_test_call: row.engineer_test_call,
+    caller_number: row.caller_number,
+  });
+}
+
+/** One HelloCara Engineer row in live activity (latest test, rest hidden). */
+function collapseEngineerTestCallsForLiveActivity(
+  calls: ActivityFeedSourceCall[],
+): ActivityFeedSourceCall[] {
+  const sorted = [...calls].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  const engineer = sorted.filter((row) => isEngineerTestActivityCall(row));
+  const rest = sorted.filter((row) => !isEngineerTestActivityCall(row));
+  if (engineer.length <= 1) return sorted;
+  return [engineer[0]!, ...rest];
+}
 
 export type ActivityFeedSourceCall = {
   id: string;
@@ -15,6 +41,7 @@ export type ActivityFeedSourceCall = {
   caller_name?: string | null;
   caller_data_erased_at?: string | null;
   ai_summary?: string | null;
+  engineer_test_call?: boolean | null;
 };
 
 export type ActivityFeedSourceTicket = {
@@ -40,14 +67,24 @@ export function buildHomeLiveActivityFeed(input: {
   const limit = input.limit ?? 200;
   const formatTime = input.formatTime ?? formatDashboardFeedRelativeTime;
 
-  return [...input.calls]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    )
+  const collapsed = collapseEngineerTestCallsForLiveActivity(input.calls);
+  const engineerCount = input.calls.filter((row) =>
+    isEngineerTestActivityCall(row),
+  ).length;
+
+  return collapsed
     .slice(0, limit)
     .map((row) => {
-      const label = callerLiveActivityLabel(row);
+      const engineerTestCall = isEngineerTestActivityCall(row);
+      const label = engineerTestCall
+        ? {
+            title: ENGINEER_TEST_CALL_LIST_LABEL,
+            subtitle:
+              engineerCount > 1
+                ? `${engineerCount} test calls today`
+                : ENGINEER_TEST_CALL_ROW_SUBTITLE,
+          }
+        : callerLiveActivityLabel(row);
       return {
         id: `${row.id}-call`,
         title: label.title,
@@ -70,13 +107,17 @@ export function buildDashboardActivityFeed(input: {
 
   const rows: (TimelineFeedRow & { timestamp: number })[] = [
     ...input.calls.map((row) => {
-      const action = formatActivityFeedBadge({
-        summary: row.ai_summary,
-        outcome: row.outcome,
-      });
+      const action = row.engineer_test_call
+        ? ENGINEER_TEST_CALL_BRAND
+        : formatActivityFeedBadge({
+            summary: row.ai_summary,
+            outcome: row.outcome,
+          });
       return {
         id: `${row.id}-call`,
-        title: activityFeedCallerLabel(row),
+        title: row.engineer_test_call
+          ? ENGINEER_TEST_CALL_LIST_LABEL
+          : activityFeedCallerLabel(row),
         time: input.formatTime(row.created_at),
         href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(row.id)}`,
         badge: action,

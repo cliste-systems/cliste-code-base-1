@@ -53,6 +53,7 @@ import {
 import type { ActionTicketDeliveryStatus } from "@/lib/post-call-processing-types";
 import { ActionInboxView } from "./action-inbox-view";
 import { DashboardHeaderDateControls } from "../dashboard-header-date-controls";
+import { isEngineerTestCallRow } from "@/lib/engineer-test-call";
 
 type ActionInboxPageProps = {
   searchParams?: Promise<{ ticket?: string; date?: string; range?: string }>;
@@ -69,6 +70,7 @@ type TicketRow = {
   status: string;
   created_at: string;
   delivery_status?: string | null;
+  engineer_test_call?: boolean | null;
 };
 
 type CallRow = {
@@ -162,6 +164,7 @@ function toInboxItem(
     departmentLabel: retailDepartmentLabel(departmentSlug),
     deliveryStatus,
     underReview: isUnderReviewTicket({ underReview: false, deliveryStatus }),
+    engineerTestCall: isEngineerTestCallRow(row),
   };
 }
 
@@ -214,7 +217,7 @@ export default async function ActionInboxPage({
     supabase
       .from("action_tickets")
       .select(
-        "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status",
+        "id, call_log_id, caller_number, caller_name, summary, brief_summary, department_slug, status, created_at, delivery_status, engineer_test_call",
       )
       .eq("organization_id", organizationId)
       .gte("created_at", lowerInclusive)

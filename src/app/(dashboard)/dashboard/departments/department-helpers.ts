@@ -6,6 +6,7 @@ import {
 } from "@/lib/caller-data-erasure";
 import { classifyActionDepartment } from "@/lib/classify-action-department";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
+import { isEngineerTestCallRow } from "@/lib/engineer-test-call";
 import {
   isRetailDepartmentSlug,
   retailDepartmentBySlug,
@@ -42,6 +43,7 @@ export type DepartmentTicketRow = {
   status: string;
   created_at: string;
   delivery_status?: string | null;
+  engineer_test_call?: boolean | null;
 };
 
 export type DepartmentOverviewCard = {
@@ -138,6 +140,7 @@ export function toDepartmentInboxItem(
     departmentLabel: retailDepartmentLabel(departmentSlug),
     deliveryStatus,
     underReview: isUnderReviewTicket({ underReview: false, deliveryStatus }),
+    engineerTestCall: isEngineerTestCallRow(row),
   };
 }
 

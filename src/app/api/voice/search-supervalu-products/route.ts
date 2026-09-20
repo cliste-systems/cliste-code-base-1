@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
-import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
+import {
+  assessSyncedOffersFreshness,
+  loadLatestRetailOfferWeekEnd,
+} from "@/lib/retail-weekly-offers-search";
 import {
   formatCatalogStockNoMatchQuote,
   inferCatalogSearchIntent,
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
 
   const { data: orgRow, error: orgErr } = await admin
     .from("organizations")
-    .select("is_active, niche, retail_banner")
+    .select("is_active, niche, retail_banner, offers_synced_at")
     .eq("id", orgId)
     .maybeSingle();
   if (orgErr) {
@@ -144,6 +147,13 @@ export async function POST(request: Request) {
       ? body.intent
       : inferCatalogSearchIntent(query);
 
+  const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner);
+  const offersFreshness = assessSyncedOffersFreshness({
+    syncedAt:
+      typeof orgRow.offers_synced_at === "string" ? orgRow.offers_synced_at : null,
+    offerWeekEnd: latestOfferWeekEnd,
+  });
+
   const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
     query,
     {
@@ -177,6 +187,7 @@ export async function POST(request: Request) {
     ok: true,
     intent,
     clarification_hint: clarificationHint,
+    offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
     matches: responseMatches,
     no_match_quote:
       mappedMatches.length === 0

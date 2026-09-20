@@ -6,13 +6,86 @@ import type {
   SupervaluOfferChannel,
   SupervaluServiceArea,
 } from "@/lib/supervalu-offers-types";
-import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
+import {
+  currentSupervaluOfferWeek,
+  normalizeSearchText,
+} from "@/lib/supervalu-offers-normalize";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   formatSpokenDiscountLabel,
   formatSpokenEurAmount,
   formatSpokenInteger,
   speakEmbeddedEurAmounts,
 } from "@/lib/spoken-eur-price";
+
+const DUBLIN = "Europe/Dublin";
+
+/** True when the offer week has not ended yet (Dublin calendar date). */
+export function isRetailOfferWeekActive(
+  row: Pick<RetailWeeklyOfferRow, "offer_week_end">,
+  reference = new Date(),
+): boolean {
+  const end = String(row.offer_week_end ?? "").trim();
+  if (!end) return false;
+  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  return end >= today;
+}
+
+export function filterRetailWeeklyOffersToActiveWeek(
+  rows: RetailWeeklyOfferRow[],
+  reference = new Date(),
+): RetailWeeklyOfferRow[] {
+  return rows.filter((row) => isRetailOfferWeekActive(row, reference));
+}
+
+export function activeRetailOfferWeekKey(reference = new Date()): string {
+  return currentSupervaluOfferWeek(reference).start;
+}
+
+export type SyncedOffersFreshness = {
+  stale: boolean;
+  syncedAt: string | null;
+  offerWeekStart: string | null;
+  offerWeekEnd: string | null;
+  message: string | null;
+};
+
+/** Warn voice lookup when synced offers are from a past week or sync is old. */
+export function assessSyncedOffersFreshness(input: {
+  syncedAt: string | null;
+  offerWeekEnd: string | null;
+  reference?: Date;
+}): SyncedOffersFreshness {
+  const reference = input.reference ?? new Date();
+  const today = formatInTimeZone(reference, DUBLIN, "yyyy-MM-dd");
+  const week = currentSupervaluOfferWeek(reference);
+  const offerWeekEnd = input.offerWeekEnd?.trim() || null;
+  const syncedAt = input.syncedAt?.trim() || null;
+
+  const weekExpired = offerWeekEnd != null && offerWeekEnd < today;
+  const syncAgeMs = syncedAt ? reference.getTime() - new Date(syncedAt).getTime() : null;
+  const syncOld = syncAgeMs != null && syncAgeMs > 7 * 86_400_000;
+
+  if (!weekExpired && !syncOld) {
+    return {
+      stale: false,
+      syncedAt,
+      offerWeekStart: week.start,
+      offerWeekEnd: week.end,
+      message: null,
+    };
+  }
+
+  return {
+    stale: true,
+    syncedAt,
+    offerWeekStart: week.start,
+    offerWeekEnd: offerWeekEnd ?? week.end,
+    message:
+      "Synced weekly offers may be out of date — prefer live catalog prices from this lookup. " +
+      "If offers differ, say prices and promotions can change and quote only what this tool returns now.",
+  };
+}
 
 export type WeeklyOfferSearchFilters = {
   channel?: SupervaluOfferChannel | null;
@@ -677,8 +750,9 @@ function rowToMatch(row: RetailWeeklyOfferRow, score: number): WeeklyOfferMatch 
 export async function loadRetailWeeklyOffersForBanner(
   supabase: SupabaseClient,
   retailBanner: string,
-  options?: { serviceArea?: SupervaluServiceArea | null },
+  options?: { serviceArea?: SupervaluServiceArea | null; reference?: Date },
 ): Promise<RetailWeeklyOfferRow[]> {
+  const reference = options?.reference ?? new Date();
   const pageSize = 1000;
   const rows: RetailWeeklyOfferRow[] = [];
   let from = 0;
@@ -702,13 +776,33 @@ export async function loadRetailWeeklyOffersForBanner(
     const { data, error } = await query;
     if (error) throw new Error(error.message);
 
-    const batch = (data ?? []) as RetailWeeklyOfferRow[];
+    const batch = filterRetailWeeklyOffersToActiveWeek(
+      (data ?? []) as RetailWeeklyOfferRow[],
+      reference,
+    );
     rows.push(...batch);
     if (batch.length < pageSize) break;
     from += pageSize;
   }
 
   return rows;
+}
+
+/** Latest offer_week_end stored for a banner (null when none synced). */
+export async function loadLatestRetailOfferWeekEnd(
+  supabase: SupabaseClient,
+  retailBanner: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("retail_weekly_offers")
+    .select("offer_week_end")
+    .eq("retail_banner", retailBanner)
+    .order("offer_week_end", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const end = String(data?.offer_week_end ?? "").trim();
+  return end || null;
 }
 
 /** Product-token search on synced weekly offers, with category/list browse fallback. */

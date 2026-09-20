@@ -98,6 +98,7 @@ export async function resolveTicketCallLinks(
     .select("id, caller_number, created_at")
     .eq("organization_id", organizationId)
     .eq("is_test_call", false)
+    .eq("engineer_test_call", false)
     .gte("created_at", windowStart)
     .lte("created_at", windowEnd)
     .order("created_at", { ascending: false });

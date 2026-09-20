@@ -1,4 +1,7 @@
-import type { StatusVariant } from "@/components/dashboard/dashboard-surface";
+import {
+  ENGINEER_TEST_CALL_LIST_LABEL,
+  ENGINEER_TEST_CALL_SUMMARY,
+} from "@/lib/engineer-test-call";
 import { resolveCallerDisplayName, isUnknownCallerLabel } from "@/lib/caller-identity";
 import type { CallFollowUpLink } from "@/lib/call-history-follow-up";
 import {
@@ -56,9 +59,13 @@ export type CallHistoryListItem = {
   callerDataErasedAt: string | null;
   callerDataErasedByLabel: string | null;
   callerDataErasedReason: string | null;
+  engineerTestCall: boolean;
+  /** When multiple engineer tests are collapsed for one day. */
+  engineerTestCallCount?: number;
 };
 
 export function callNeedsPostCallReviewBanner(item: CallHistoryListItem): boolean {
+  if (item.engineerTestCall) return false;
   return isPostCallAttentionStatus(item.postCallStatus);
 }
 
@@ -74,9 +81,12 @@ export function callDisplayName(
 export function callListPrimaryLine(
   item: Pick<
     CallHistoryListItem,
-    "callerName" | "callerDisplay" | "callerDataErasedAt"
+    "callerName" | "callerDisplay" | "callerDataErasedAt" | "engineerTestCall"
   >,
 ): string {
+  if (item.engineerTestCall) {
+    return ENGINEER_TEST_CALL_LIST_LABEL;
+  }
   if (isCallerDataErased(item)) return "Caller data erased";
   const name = callDisplayName(item);
   const phone = item.callerDisplay.trim() || "Unknown number";
@@ -122,6 +132,9 @@ export function callSummaryForDisplay(
   item: CallHistoryListItem,
   options: { businessName?: string; callerIsBlocked?: boolean },
 ): string | null {
+  if (item.engineerTestCall) {
+    return ENGINEER_TEST_CALL_SUMMARY;
+  }
   if (isCallerDataErased(item)) {
     return "Personal data for this call has been removed.";
   }
@@ -294,7 +307,10 @@ export function matchesOutcomeFilter(
 export function matchesSearch(item: CallHistoryListItem, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
+  if (item.engineerTestCall) return true;
   const hay = [
+    ENGINEER_TEST_CALL_LIST_LABEL,
+    "engineer test",
     item.callerName ?? "",
     item.callerDisplay,
     item.callerId,
@@ -410,6 +426,7 @@ export function buildCallHistoryMetricsFromSummaryRows(
     callerDataErasedAt: null,
     callerDataErasedByLabel: null,
     callerDataErasedReason: null,
+    engineerTestCall: false,
   }));
   const base = buildCallHistoryMetrics(stubItems);
   return {
@@ -417,4 +434,36 @@ export function buildCallHistoryMetricsFromSummaryRows(
     totalCalls: rows.length,
     needsAttentionCount,
   };
+}
+
+/** One engineer-test row per day in the call list (keeps the latest test). */
+export function collapseEngineerTestCallsForList(
+  items: CallHistoryListItem[],
+): { calls: CallHistoryListItem[]; hiddenEngineerTestCount: number } {
+  const engineer = items.filter((item) => item.engineerTestCall);
+  const rest = items.filter((item) => !item.engineerTestCall);
+  if (engineer.length <= 1) {
+    return { calls: items, hiddenEngineerTestCount: 0 };
+  }
+
+  const latest = engineer[0]!;
+  const collapsed: CallHistoryListItem = {
+    ...latest,
+    engineerTestCallCount: engineer.length,
+    summaryPreview:
+      engineer.length > 1
+        ? `${engineer.length} test calls today. Not billed — no recording or transcript.`
+        : ENGINEER_TEST_CALL_SUMMARY,
+    outcomeLabel: "Test",
+    attentionLevel: "routine",
+    hasOpenAction: false,
+    followUp: null,
+    departmentLink: null,
+    actionCategory: null,
+  };
+
+  const calls = [collapsed, ...rest].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  return { calls, hiddenEngineerTestCount: engineer.length - 1 };
 }

@@ -75,6 +75,12 @@ import {
   type OutcomeFilterValue,
 } from "./call-history-helpers";
 import {
+  ENGINEER_TEST_CALL_BADGE_LABEL,
+  ENGINEER_TEST_CALL_DETAIL_TITLE,
+  ENGINEER_TEST_CALL_ROW_SUBTITLE,
+  ENGINEER_TEST_CALL_SUMMARY,
+} from "@/lib/engineer-test-call";
+import {
   formatCallerDataErasedAt,
   CALLER_DATA_ERASED_BADGE_CLASS,
   CALLER_DATA_ERASED_ROW_ACCENT,
@@ -198,7 +204,8 @@ export function CallHistoryView({
     };
   }, [selectedBase, detailById]);
 
-  const ensureDetailLoaded = useCallback((id: string) => {
+  const ensureDetailLoaded = useCallback((id: string, engineerTestCall?: boolean) => {
+    if (engineerTestCall) return;
     void fetchCallHistoryDetail(id).then((detail) => {
       if (!detail) return;
       setDetailById((prev) => {
@@ -217,13 +224,13 @@ export function CallHistoryView({
   }, [searchParams, initialSelectedCallId]);
 
   useEffect(() => {
-    if (resolvedSelectedId) {
-      ensureDetailLoaded(resolvedSelectedId);
+    if (resolvedSelectedId && selectedBase) {
+      ensureDetailLoaded(resolvedSelectedId, selectedBase.engineerTestCall);
     }
-  }, [resolvedSelectedId, ensureDetailLoaded]);
+  }, [resolvedSelectedId, selectedBase, ensureDetailLoaded]);
 
   const detailLoading = Boolean(
-    selectedBase && !detailById[selectedBase.id],
+    selectedBase && !selectedBase.engineerTestCall && !detailById[selectedBase.id],
   );
 
   const copySummary = useCallback(async () => {
@@ -432,18 +439,26 @@ function CallListRow({
 }) {
   const primary = callListPrimaryLine(row);
   const time = callListTimeLabel(row.createdAt);
-  const callStatus = resolveCallHistoryListStatus({
-    outcome: row.outcome,
-    aiSummary: row.aiSummary,
-    postCallStatus: row.postCallStatus,
-    followUpSummary: row.followUp?.summary ?? null,
-    hasOpenAction: row.hasOpenAction,
-    callResolution: row.callResolution,
-  });
+  const engineerTestCall = row.engineerTestCall;
+  const callStatus = engineerTestCall
+    ? { tone: "neutral" as const, label: ENGINEER_TEST_CALL_BADGE_LABEL }
+    : resolveCallHistoryListStatus({
+        outcome: row.outcome,
+        aiSummary: row.aiSummary,
+        postCallStatus: row.postCallStatus,
+        followUpSummary: row.followUp?.summary ?? null,
+        hasOpenAction: row.hasOpenAction,
+        callResolution: row.callResolution,
+      });
   const callerDataErased = isCallerDataErased(row);
-  const statusAccent = callerDataErased
-    ? CALLER_DATA_ERASED_ROW_ACCENT
-    : CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES[callStatus.tone];
+  const statusAccent = engineerTestCall
+    ? {
+        rowAccentClass: "border-l-2 border-l-slate-200",
+        selectedRowAccentClass: "border-l-2 border-l-slate-400",
+      }
+    : callerDataErased
+      ? CALLER_DATA_ERASED_ROW_ACCENT
+      : CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES[callStatus.tone];
   const mediaRetentionExpired =
     !callerDataErased && isCallMediaRetentionExpired(row.createdAt);
 
@@ -474,15 +489,25 @@ function CallListRow({
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[12px] text-slate-500">
-            <span className="tabular-nums">{row.durationLabel}</span>
-            <span className="text-slate-300"> · </span>
-            {row.outcomeLabel}
-            {mediaRetentionExpired ? (
+            {engineerTestCall ? (
               <>
-                <span className="text-slate-300"> · </span>
-                <span className="text-slate-400">Media deleted</span>
+                {row.engineerTestCallCount != null && row.engineerTestCallCount > 1
+                  ? `${row.engineerTestCallCount} test calls today`
+                  : ENGINEER_TEST_CALL_ROW_SUBTITLE}
               </>
-            ) : null}
+            ) : (
+              <>
+                <span className="tabular-nums">{row.durationLabel}</span>
+                <span className="text-slate-300"> · </span>
+                {row.outcomeLabel}
+                {mediaRetentionExpired ? (
+                  <>
+                    <span className="text-slate-300"> · </span>
+                    <span className="text-slate-400">Media deleted</span>
+                  </>
+                ) : null}
+              </>
+            )}
           </p>
           {callerDataErased ? (
             <span
@@ -492,6 +517,10 @@ function CallListRow({
               )}
             >
               Erased
+            </span>
+          ) : row.engineerTestCall ? (
+            <span className="shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
+              {ENGINEER_TEST_CALL_BADGE_LABEL}
             </span>
           ) : (
             <span
@@ -650,7 +679,9 @@ function CallDetailPanelContent({
 
   const callerE164 = normalizeBlockedCallerE164(call.callerId);
   const callerDataErased = isCallerDataErased(call);
+  const engineerTestCall = call.engineerTestCall;
   const canManageBlock =
+    !engineerTestCall &&
     callerE164 != null &&
     call.callerId.trim() !== ANONYMOUS_CALLER_E164 &&
     !callerDataErased;
@@ -753,9 +784,13 @@ function CallDetailPanelContent({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <h2 className="text-[18px] font-semibold tracking-tight text-[#11181d]">
-              {callerDataErased ? "Caller data erased" : phone}
+              {callerDataErased
+                ? "Caller data erased"
+                : engineerTestCall
+                  ? ENGINEER_TEST_CALL_DETAIL_TITLE
+                  : phone}
             </h2>
-            {showCallerName && !callerDataErased ? (
+            {showCallerName && !callerDataErased && !engineerTestCall ? (
               <p className="mt-0.5 text-[13px] text-[#5b6b65]">{name}</p>
             ) : null}
           </div>
@@ -767,6 +802,10 @@ function CallDetailPanelContent({
             </span>
             {callerDataErased ? (
               <StatusPill className={CALLER_DATA_ERASED_BADGE_CLASS}>Erased</StatusPill>
+            ) : engineerTestCall ? (
+              <StatusPill className="border-slate-200 bg-slate-50 text-slate-700">
+                Not billed
+              </StatusPill>
             ) : (
               <StatusPill className={CALL_HISTORY_STATUS_BADGE_CLASSES[callStatus.tone]}>
                 {callStatus.label}
@@ -786,16 +825,18 @@ function CallDetailPanelContent({
           </div>
         ) : null}
 
-        <DetailSectionRow title="Summary">
+        <DetailSectionRow title={engineerTestCall ? "About this test" : "Summary"}>
           <p className="text-[14px] leading-relaxed text-[#11181d]">
             {summary ??
-              (callerDataErased
-                ? "Personal data for this call has been removed."
-                : "No summary available.")}
+              (engineerTestCall
+                ? ENGINEER_TEST_CALL_SUMMARY
+                : callerDataErased
+                  ? "Personal data for this call has been removed."
+                  : "No summary available.")}
           </p>
         </DetailSectionRow>
 
-        {mediaRetentionExpiredMessage ? (
+        {!engineerTestCall && mediaRetentionExpiredMessage ? (
           <div className="border-b border-[#eef3f0] bg-slate-50 px-5 py-3 text-[13px] leading-relaxed text-slate-600">
             {mediaRetentionExpiredMessage}
           </div>
@@ -834,6 +875,7 @@ function CallDetailPanelContent({
           </DetailSectionRow>
         ) : null}
 
+        {!engineerTestCall ? (
         <DetailSectionRow title="Recording" contentClassName="mt-1.5">
           {callerDataErased ? (
             <p className="text-[13px] text-slate-500">
@@ -854,7 +896,9 @@ function CallDetailPanelContent({
             />
           )}
         </DetailSectionRow>
+        ) : null}
 
+        {!engineerTestCall ? (
         <DetailSectionRow title="Transcript">
           {callerDataErased ? (
             <p className="text-[13px] text-slate-500">
@@ -872,8 +916,10 @@ function CallDetailPanelContent({
             <p className="text-[13px] text-slate-500">No transcript available.</p>
           )}
         </DetailSectionRow>
+        ) : null}
       </DetailPanelBody>
 
+      {!engineerTestCall ? (
       <DetailPanelFooter>
         <div className="flex w-full flex-wrap items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -947,6 +993,7 @@ function CallDetailPanelContent({
           ) : null}
         </div>
       </DetailPanelFooter>
+      ) : null}
 
       {blockMsg ? (
         <p className="px-5 pb-3 text-[12px] text-slate-600">{blockMsg}</p>

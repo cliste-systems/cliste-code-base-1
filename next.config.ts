@@ -49,6 +49,9 @@ function buildContentSecurityPolicy(): string {
       "https://*.supabase.co",
       "https://*.supabase.in",
       "wss://*.supabase.co",
+      // Admin demo calls + LiveKit voice sessions.
+      "wss://*.livekit.cloud",
+      "https://*.livekit.cloud",
       // Turnstile siteverify + telemetry beacons.
       "https://challenges.cloudflare.com",
       // Maps tile/route XHRs.
@@ -106,7 +109,7 @@ const securityHeaders = [
       "gyroscope=()",
       "interest-cohort=()",
       "magnetometer=()",
-      "microphone=()",
+      "microphone=(self)",
       "midi=()",
       "payment=(self \"https://js.stripe.com\" \"https://hooks.stripe.com\")",
       "publickey-credentials-get=(self)",

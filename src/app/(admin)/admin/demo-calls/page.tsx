@@ -28,8 +28,7 @@ export default async function DemoCallsAdminPage() {
     <AdminPageShell
       icon={Headphones}
       title="Demo calls"
-      description="Simulate inbound calls to demo lines in your browser — same voice worker, prompts, and tools as a real phone call, without Twilio/PSTN charges."
-      maxWidth="6xl"
+      description="Simulate inbound calls in your browser — same voice worker, prompts, and tools as a real phone call, without Twilio/PSTN charges."
     >
       {loadError ? (
         <AdminErrorCard title="Could not load demo lines">{loadError}</AdminErrorCard>

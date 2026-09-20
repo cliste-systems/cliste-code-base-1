@@ -7,6 +7,10 @@ import {
 } from "@/lib/post-call-processing-types";
 import { stripDemoRehearsalMarker } from "@/lib/dashboard-mock-cleanup";
 import {
+  ENGINEER_TEST_CALL_LIST_LABEL,
+  ENGINEER_TEST_CALL_ROW_SUBTITLE,
+} from "@/lib/engineer-test-call";
+import {
   departmentRequestTypeLabel,
   formatDepartmentListPreview,
   parseDepartmentRequestSummary,
@@ -51,6 +55,7 @@ export type ActionInboxItem = {
   departmentLabel: string;
   deliveryStatus: ActionTicketDeliveryStatus;
   underReview: boolean;
+  engineerTestCall: boolean;
 };
 
 export type ActionInboxMetrics = {
@@ -195,6 +200,25 @@ function phoneDigitsKey(phone: string): string {
   return digits.length >= 6 ? digits : "";
 }
 
+export function departmentInboxListPrimaryLine(
+  item: Pick<
+    ActionInboxItem,
+    "engineerTestCall" | "callerName" | "callerDisplay" | "callerNumber"
+  >,
+): string {
+  if (item.engineerTestCall) return ENGINEER_TEST_CALL_LIST_LABEL;
+  const name = hasKnownCallerName(item) ? item.callerName : "Unknown caller";
+  const phone = item.callerDisplay.trim() || "No phone";
+  return `${name} ${phone}`;
+}
+
+export function departmentInboxListMetaLine(
+  item: Pick<ActionInboxItem, "engineerTestCall" | "createdAtLabel">,
+): string {
+  if (item.engineerTestCall) return ENGINEER_TEST_CALL_ROW_SUBTITLE;
+  return item.createdAtLabel;
+}
+
 /** Caller line for inbox UI — never repeats the same number twice. */
 export function inboxCallerMetaLine(
   item: Pick<
@@ -263,6 +287,7 @@ export function matchesActionSearch(item: ActionInboxItem, query: string): boole
     item.categoryTitle,
     item.categoryShort,
     item.departmentLabel,
+    item.engineerTestCall ? ENGINEER_TEST_CALL_LIST_LABEL : "",
   ]
     .join(" ")
     .toLowerCase();

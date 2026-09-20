@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildDashboardActivityFeed } from "./dashboard-activity-feed";
+import { buildDashboardActivityFeed, buildHomeLiveActivityFeed } from "./dashboard-activity-feed";
 import { activityFeedCallerLabel } from "./dashboard-feed-time";
 import { formatActivityFeedBadge } from "./dashboard-live-activity";
 
@@ -53,7 +53,6 @@ describe("buildDashboardActivityFeed", () => {
         {
           id: "t1",
           created_at: "2026-09-17T12:00:00.000Z",
-          caller_name: "Brendan",
           caller_number: "+353872715938",
           summary: "Birthday cake order for Friday collection.",
         },
@@ -63,5 +62,42 @@ describe("buildDashboardActivityFeed", () => {
 
     assert.equal(rows[0]?.title, "+353 87 271 5938");
     assert.equal(rows[0]?.badge, "Order");
+  });
+});
+
+describe("buildHomeLiveActivityFeed", () => {
+  it("collapses engineer test calls to one row", () => {
+    const rows = buildHomeLiveActivityFeed({
+      calls: [
+        {
+          id: "e1",
+          created_at: "2026-09-20T17:12:00.000Z",
+          outcome: "answered",
+          caller_number: "+353870000001",
+          engineer_test_call: true,
+        },
+        {
+          id: "e2",
+          created_at: "2026-09-20T17:08:00.000Z",
+          outcome: "answered",
+          caller_number: "+353870000001",
+          engineer_test_call: true,
+        },
+        {
+          id: "c1",
+          created_at: "2026-09-20T16:00:00.000Z",
+          outcome: "action_created",
+          caller_number: "+353872715938",
+          caller_name: "Brendan",
+        },
+      ],
+      formatTime: () => "2 mins ago",
+      limit: 10,
+    });
+
+    assert.equal(rows.filter((row) => row.title === "HelloCara Engineer").length, 1);
+    assert.equal(rows[0]?.title, "HelloCara Engineer");
+    assert.equal(rows[0]?.subtitle, "2 test calls today");
+    assert.equal(rows[1]?.title, "Brendan");
   });
 });

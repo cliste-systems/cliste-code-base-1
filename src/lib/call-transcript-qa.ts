@@ -59,6 +59,15 @@ const UNANSWERED_CALLER_PATTERNS = [
   /\bstill there\b/i,
 ];
 
+/** Call-centre / AI slop that should not appear in Cara speech. */
+const BANNED_ASSISTANT_PHRASES: { pattern: RegExp; label: string }[] = [
+  { pattern: /\bthanks for that\b/i, label: '"thanks for that"' },
+  { pattern: /\bjust a quick note\b/i, label: '"just a quick note"' },
+  { pattern: /\bjust a quick heads-up\b/i, label: '"just a quick heads-up"' },
+  { pattern: /\bhow can I assist\b/i, label: '"how can I assist"' },
+  { pattern: /\bhappy to help you with that\b/i, label: '"happy to help you with that"' },
+];
+
 export function assessTranscriptQuality(input: {
   transcript: string | null | undefined;
   transcriptReview?: string | null;
@@ -141,6 +150,17 @@ export function assessTranscriptQuality(input: {
       break;
     }
     duplicateAssistant.add(norm);
+  }
+
+  for (const { pattern, label } of BANNED_ASSISTANT_PHRASES) {
+    if (
+      assistants.some((line) =>
+        pattern.test(line.replace(ASSISTANT_PREFIX, "")),
+      )
+    ) {
+      issues.push(`Assistant used ${label} — sounds like call-centre slop.`);
+      break;
+    }
   }
 
   const wrongContextDetected = wrongSalonCue;

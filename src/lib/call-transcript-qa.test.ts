@@ -31,4 +31,24 @@ Assistant: We close at 9pm.`,
     assert.equal(result.acceptable, true);
     assert.equal(result.needsReview, false);
   });
+
+  it("flags thanks for that and duplicate closings", () => {
+    const transcript = `Assistant: Gotcha, thanks for that. Are you all sorted?
+Caller: Yeah, that's perfect.
+Assistant: Lovely, Brendan — thanks for calling Kavanaghs SuperValu Donegal Town. Take care now!
+Assistant: Lovely, Brendan — thanks for calling Kavanaghs SuperValu Donegal Town. Take care now!`;
+    const result = assessTranscriptQuality({
+      transcript,
+      transcriptReview: transcript,
+      businessName: "Kavanaghs SuperValu Donegal Town",
+      durationSeconds: 74,
+    });
+    assert.equal(result.needsReview, true);
+    assert.ok(
+      result.issues.some((issue) => /thanks for that/i.test(issue)),
+    );
+    assert.ok(
+      result.issues.some((issue) => /duplicate assistant/i.test(issue)),
+    );
+  });
 });

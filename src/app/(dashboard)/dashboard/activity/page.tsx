@@ -67,7 +67,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
       supabase
         .from("call_logs")
         .select(
-          "id, created_at, outcome, caller_number, caller_name, caller_data_erased_at, ai_summary",
+          "id, created_at, outcome, caller_number, caller_name, caller_data_erased_at, ai_summary, engineer_test_call",
         )
         .order("created_at", { ascending: false })
         .limit(ACTIVITY_FEED_LIMIT),

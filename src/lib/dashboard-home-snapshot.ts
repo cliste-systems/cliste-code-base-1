@@ -62,6 +62,7 @@ type CallLogRow = {
   ai_summary?: string | null;
   post_call_status?: string | null;
   call_resolution?: string | null;
+  engineer_test_call?: boolean | null;
 };
 
 type TicketRow = {
@@ -186,6 +187,7 @@ export async function loadDashboardHomeSnapshot(input: {
         supabase
           .from("call_logs")
           .select("id", { count: "exact", head: true })
+          .eq("engineer_test_call", false)
           .gte("created_at", metricRangeStartIso),
         scopedOrgIds,
       ),
@@ -214,6 +216,7 @@ export async function loadDashboardHomeSnapshot(input: {
         supabase
           .from("call_logs")
           .select("outcome, duration_seconds, ai_summary, transfer_connected")
+          .eq("engineer_test_call", false)
           .gte("created_at", metricRangeStartIso),
         scopedOrgIds,
       ),
@@ -224,7 +227,7 @@ export async function loadDashboardHomeSnapshot(input: {
         supabase
           .from("call_logs")
           .select(
-            "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary, post_call_status, call_resolution",
+            "id, created_at, outcome, caller_number, caller_name, duration_seconds, ai_summary, post_call_status, call_resolution, engineer_test_call",
           )
           .gte("created_at", metricRangeStartIso)
           .order("created_at", { ascending: false })
@@ -268,6 +271,7 @@ export async function loadDashboardHomeSnapshot(input: {
       .from("call_logs")
       .select("id, created_at, caller_number, caller_name, outcome")
       .eq("organization_id", organizationId)
+      .eq("engineer_test_call", false)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -309,6 +313,10 @@ export async function loadDashboardHomeSnapshot(input: {
   const callsForPanels = (
     callsForPanelsRes.error ? [] : (callsForPanelsRes.data ?? [])
   ) as CallLogRow[];
+
+  const customerCallsForPanels = callsForPanels.filter(
+    (row) => row.engineer_test_call !== true,
+  );
 
   const callsForMetricRollups = callsForMetricRollupsRes.error
     ? []
@@ -362,7 +370,7 @@ export async function loadDashboardHomeSnapshot(input: {
 
   const needsAttentionLive = mergeHomeNeedsAttentionRows({
     tickets: openTicketRows,
-    calls: callsForPanels as HomeAttentionCallRow[],
+    calls: customerCallsForPanels as HomeAttentionCallRow[],
     formatTime: formatDashboardFeedRelativeTime,
     limit: DASHBOARD_HOME_ATTENTION_ROW_LIMIT,
   });
@@ -405,13 +413,13 @@ export async function loadDashboardHomeSnapshot(input: {
   });
 
   const callsToReviewLive = buildHomeCallsToReviewRows({
-    calls: callsForPanels,
+    calls: customerCallsForPanels,
     formatTime: formatDashboardFeedRelativeTime,
   });
-  const callsToReviewCountLive = countHomeCallsToReview(callsForPanels);
+  const callsToReviewCountLive = countHomeCallsToReview(customerCallsForPanels);
 
   const callTimesLive = buildHomeCallTimesBuckets(
-    callsForPanels.map((row) => row.created_at),
+    customerCallsForPanels.map((row) => row.created_at),
   );
 
   const usageSnapshotLive = buildHomeUsageSnapshot({
