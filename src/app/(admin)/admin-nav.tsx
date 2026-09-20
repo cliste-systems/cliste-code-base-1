@@ -5,14 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
-  AlertTriangle,
-  Bug,
-  FlaskConical,
+  Headphones,
   LayoutGrid,
   LifeBuoy,
   Phone,
-  ScrollText,
-  Shield,
   Users,
 } from "lucide-react";
 
@@ -36,29 +32,9 @@ const baseNav = [
     exact: false,
   },
   {
-    href: "/admin/call-testing",
-    label: "Call testing",
-    icon: FlaskConical,
-    exact: false,
-  },
-  {
-    href: "/admin/post-call-health",
-    label: "Post-call health",
-    icon: AlertTriangle,
-    exact: false,
-  },
-  {
-    href: "/admin/platform-health",
-    label: "Platform health",
-    icon: Bug,
-    exact: false,
-  },
-  { href: "/admin/users", label: "Identity & access", icon: Users, exact: false },
-  { href: "/admin/security", label: "Security", icon: Shield, exact: false },
-  {
-    href: "/admin/platform-rules",
-    label: "Platform rules",
-    icon: ScrollText,
+    href: "/admin/demo-calls",
+    label: "Demo calls",
+    icon: Headphones,
     exact: false,
   },
   {

@@ -2,12 +2,9 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  AlertTriangle,
-  Bug,
   Clock3,
   LifeBuoy,
   Phone,
-  ShieldAlert,
   Users,
 } from "lucide-react";
 
@@ -149,10 +146,6 @@ export type AdminGlobalMetricsBoardProps = {
   periodLabel: string;
   periodRangeLabel: string;
   calls: number;
-  pipelineIncidents: number;
-  postCallFailures: number;
-  platformCritical: number;
-  authFailures: number;
   support: number;
   organizations: number;
   minutesUsed: string;
@@ -171,10 +164,6 @@ export function AdminGlobalMetricsBoard({
   periodLabel,
   periodRangeLabel,
   calls,
-  pipelineIncidents,
-  postCallFailures,
-  platformCritical,
-  authFailures,
   support,
   organizations,
   minutesUsed,
@@ -214,7 +203,7 @@ export function AdminGlobalMetricsBoard({
           </Suspense>
         </div>
 
-        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-4 sm:divide-y-0 lg:divide-x">
+        <div className="grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
           <HeadlineMetric
             label={`Calls · ${periodLabel.toLowerCase()}`}
             value={formatInt(calls)}
@@ -235,53 +224,13 @@ export function AdminGlobalMetricsBoard({
             value={organizations > 0 ? (calls / organizations).toFixed(1) : "—"}
             icon={Clock3}
           />
-        </div>
-
-        <div className="border-t border-white/10">
-          <p className="px-4 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45 sm:px-5">
-            Ops health
-          </p>
-          <div className="mt-1 grid grid-cols-2 divide-y divide-white/10 sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
-            <HeadlineMetric
-              label="Pipeline · 7d"
-              value={formatInt(pipelineIncidents)}
-              icon={AlertTriangle}
-              href="/admin/security?view=pipeline"
-              tone={pipelineIncidents > 0 ? "urgent" : "default"}
-              size="compact"
-            />
-            <HeadlineMetric
-              label="Post-call · 7d"
-              value={formatInt(postCallFailures)}
-              icon={AlertTriangle}
-              href="/admin/post-call-health"
-              tone={postCallFailures > 0 ? "urgent" : "default"}
-              size="compact"
-            />
-            <HeadlineMetric
-              label="Platform · 7d"
-              value={formatInt(platformCritical)}
-              icon={Bug}
-              href="/admin/platform-health"
-              tone={platformCritical > 0 ? "urgent" : "default"}
-              size="compact"
-            />
-            <HeadlineMetric
-              label="Auth fails · 24h"
-              value={formatInt(authFailures)}
-              icon={ShieldAlert}
-              href="/admin/security"
-              tone={authFailures > 0 ? "urgent" : "default"}
-              size="compact"
-            />
-            <HeadlineMetric
-              label="Open support"
-              value={formatInt(support)}
-              icon={LifeBuoy}
-              href="/admin/support"
-              size="compact"
-            />
-          </div>
+          <HeadlineMetric
+            label="Open support"
+            value={formatInt(support)}
+            icon={LifeBuoy}
+            href="/admin/support"
+            tone={support > 0 ? "urgent" : "default"}
+          />
         </div>
       </div>
 

@@ -916,5 +916,4 @@ function revalidateAfterWrite() {
   revalidatePath("/dashboard/cara-knowledge/needs-input");
   revalidatePath("/dashboard/cara-knowledge/knows");
   revalidatePath("/dashboard/cara-knowledge/history");
-  revalidatePath("/admin/call-testing");
 }

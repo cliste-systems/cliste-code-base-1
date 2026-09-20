@@ -14,8 +14,6 @@ import { formatMinutes } from "@/app/(dashboard)/dashboard/billing/usage-helpers
 import { AdminGlobalMetricsBoard } from "./admin-global-metrics-board";
 import { AdminTenantsPanel } from "./admin-tenants-panel";
 import { loadProvisioningStagesByOrgId } from "@/lib/load-provisioning-pipeline";
-import { countPostCallHealthIssues } from "@/lib/post-call-health";
-import { countPlatformEventsSince } from "@/lib/platform-health";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +40,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   let orgCount = 0;
   let callsInRange = 0;
   let openSupportTickets = 0;
-  let pipelineIncidents7d = 0;
-  let postCallFailures7d = 0;
-  let platformCritical7d = 0;
-  let authFailures24h = 0;
   let minutesInRange = 0;
   let callOutcomes = buildHomeCallOutcomeSegments([]);
   let topTenants: { orgId: string; name: string; calls: number }[] = [];
@@ -67,21 +61,10 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   }[] = [];
   let loadError: string | null = null;
 
-  const dayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const weekAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
   try {
     const admin = createAdminClient();
 
-    const [
-      orgsRes,
-      callsRes,
-      supportRes,
-      pipelineRes,
-      authFailsRes,
-      listRes,
-      callsDetailRes,
-    ] = await Promise.all([
+    const [orgsRes, callsRes, supportRes, listRes, callsDetailRes] = await Promise.all([
       admin.from("organizations").select("id", { count: "exact", head: true }),
       admin
         .from("call_logs")
@@ -92,15 +75,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
         .eq("status", "open"),
-      admin
-        .from("voice_pipeline_incidents")
-        .select("id", { count: "exact", head: true })
-        .gte("occurred_at", weekAgoIso),
-      admin
-        .from("security_auth_events")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", dayAgoIso)
-        .in("outcome", ["failure", "rate_limited"]),
       admin
         .from("organizations")
         .select("id, name, slug, tier, niche, created_at")
@@ -124,12 +98,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
     orgCount = orgsRes.count ?? 0;
     callsInRange = callsRes.count ?? 0;
     openSupportTickets = supportRes.error ? 0 : (supportRes.count ?? 0);
-    pipelineIncidents7d = pipelineRes.error ? 0 : (pipelineRes.count ?? 0);
-    postCallFailures7d = await countPostCallHealthIssues().catch(() => 0);
-    platformCritical7d = await countPlatformEventsSince(weekAgoIso, "critical").catch(
-      () => 0,
-    );
-    authFailures24h = authFailsRes.error ? 0 : (authFailsRes.count ?? 0);
     organizations = listRes.data ?? [];
 
     const stageByOrg = await loadProvisioningStagesByOrgId(
@@ -214,10 +182,6 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
           periodLabel={periodShort}
           periodRangeLabel={periodRangeLabel}
           calls={callsInRange}
-          pipelineIncidents={pipelineIncidents7d}
-          postCallFailures={postCallFailures7d}
-          platformCritical={platformCritical7d}
-          authFailures={authFailures24h}
           support={openSupportTickets}
           organizations={orgCount}
           minutesUsed={formatMinutes(minutesInRange)}
