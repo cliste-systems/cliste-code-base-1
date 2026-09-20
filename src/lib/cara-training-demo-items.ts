@@ -183,11 +183,12 @@ const twoDaysAgo = "2026-09-15T09:40:00.000Z";
 const lastWeek = "2026-09-10T14:20:00.000Z";
 
 function demoItem(
-  overrides: Omit<CaraTrainingListItem, "organization_id"> &
-    Partial<Pick<CaraTrainingListItem, "organization_id">>,
+  overrides: Partial<CaraTrainingListItem> &
+    Pick<CaraTrainingListItem, "id" | "status" | "source" | "gap_summary" | "caller_context" | "cara_question">,
 ): CaraTrainingListItem {
   return {
     organization_id: "demo-org",
+    call_log_id: null,
     action_ticket_id: null,
     owner_messages: [],
     proposed_patch: null,
@@ -196,8 +197,12 @@ function demoItem(
     applied_at: null,
     applied_by: null,
     dismissed_at: null,
+    occurrence_count: 1,
+    last_seen_at: now,
+    created_at: now,
+    updated_at: now,
     ...overrides,
-  };
+  } satisfies CaraTrainingListItem;
 }
 
 const demoCallLogId = (suffix: string) =>

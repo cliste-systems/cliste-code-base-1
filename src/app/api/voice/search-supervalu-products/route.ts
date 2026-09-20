@@ -5,6 +5,7 @@ import {
   assessSyncedOffersFreshness,
   loadLatestRetailOfferWeekEnd,
 } from "@/lib/retail-weekly-offers-search";
+import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
 import {
   formatCatalogStockNoMatchQuote,
   inferCatalogSearchIntent,

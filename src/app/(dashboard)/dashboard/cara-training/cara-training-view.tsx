@@ -702,7 +702,7 @@ export function CaraTrainingView({
         onBack={() => setMobileDetailOpen(false)}
         onAnswerTextChange={handleAnswerTextChange}
         celebrateAnswer={
-          celebrateAnswer?.itemId === selected?.id ? celebrateAnswer.choice : null
+          celebrateAnswer?.itemId === selected?.id ? celebrateAnswer?.choice ?? null : null
         }
         onAnswer={handleAnswer}
         onConfirm={handleConfirm}

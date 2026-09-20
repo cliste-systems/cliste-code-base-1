@@ -3,11 +3,11 @@ import {
   MAX_FAQS,
   type AgentFaq,
 } from "@/app/(dashboard)/dashboard/agent-setup/agent-faqs";
+import { validateCallHandlingAdd } from "@/lib/call-handling-boundary";
 import {
-  validateCallHandlingAdd,
+  deriveCaraCapabilities,
   type CaraCapabilities,
-} from "@/lib/call-handling-boundary";
-import { deriveCaraCapabilities } from "@/lib/cara-capabilities";
+} from "@/lib/cara-capabilities";
 import {
   lintCaraKnowledge,
   type KnowledgeLintIssue,
@@ -166,7 +166,7 @@ function validatePatchBasics(
       if (injection) {
         issues.push({
           id: "training-faq-injection",
-          message: injection,
+          message: injection.message,
         });
       }
       break;
@@ -194,7 +194,7 @@ function validatePatchBasics(
       if (injection) {
         issues.push({
           id: "training-rule-injection",
-          message: injection,
+          message: injection.message,
         });
       }
       break;

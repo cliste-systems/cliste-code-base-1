@@ -75,9 +75,9 @@ export function AccountSidebarNav({
               {showBadge ? (
                 <span
                   className={dashboardSidebarBadgeClassName(active)}
-                  aria-label={`${formatNavBadgeCount(item.badge)} pending`}
+                  aria-label={`${formatNavBadgeCount(item.badge ?? 0)} pending`}
                 >
-                  {formatNavBadgeCount(item.badge)}
+                  {formatNavBadgeCount(item.badge ?? 0)}
                 </span>
               ) : null}
             </Link>

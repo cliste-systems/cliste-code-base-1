@@ -490,9 +490,9 @@ export function parseExistenceOwnerMessage(content: string): {
   const trimmed = content.trim();
   if (trimmed === "Yes.") return { choice: "yes", details: "" };
   if (trimmed === "No.") return { choice: "no", details: "" };
-  const yesMatch = trimmed.match(/^Yes\s*[—-]\s*(.+)$/is);
+  const yesMatch = trimmed.match(/^Yes\s*[—-]\s*([\s\S]+)$/i);
   if (yesMatch) return { choice: "yes", details: yesMatch[1]?.trim() ?? "" };
-  const noMatch = trimmed.match(/^No\s*[—-]\s*(.+)$/is);
+  const noMatch = trimmed.match(/^No\s*[—-]\s*([\s\S]+)$/i);
   if (noMatch) return { choice: "no", details: noMatch[1]?.trim() ?? "" };
   if (/^it depends\.?$/i.test(trimmed)) {
     return { choice: "depends", details: "" };
