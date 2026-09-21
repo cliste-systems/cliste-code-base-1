@@ -150,24 +150,35 @@ export async function searchNationalRetailCatalog(
   const tokens = offerSearchProductTokens(input.query);
   if (tokens.length === 0) return [];
 
-  const broad = tokens[0]!.replace(/s$/, "");
-  let query = supabase
-    .from("retail_catalog_products")
-    .select(
-      "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
-    )
-    .eq("retail_banner", input.retailBanner)
-    .eq("is_national", true)
-    .gte("national_store_count", 3)
-    .ilike("search_text", `%${broad}%`)
-    .limit(80);
+  const candidateTokens = [...tokens]
+    .map((token) => token.replace(/s$/, ""))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
 
-  if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+  let candidateRows: NationalCatalogRow[] = [];
+  for (const candidate of candidateTokens) {
+    let query = supabase
+      .from("retail_catalog_products")
+      .select(
+        "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
+      )
+      .eq("retail_banner", input.retailBanner)
+      .eq("is_national", true)
+      .gte("national_store_count", 3)
+      .ilike("search_text", `%${candidate}%`)
+      .limit(80);
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+    if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
 
-  return ((data ?? []) as NationalCatalogRow[])
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    if ((data ?? []).length > 0) {
+      candidateRows = (data ?? []) as NationalCatalogRow[];
+      break;
+    }
+  }
+
+  return candidateRows
     .map((row) => {
       const score = scoreSupervaluSearchText(
         normalizeSearchText(row.search_text),
