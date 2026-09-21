@@ -88,7 +88,7 @@ with candidates as (
     coalesce(
       nullif(rp.source_metadata->>'save_amount_eur','')::numeric,
       replace(((regexp_match(coalesce(rp.label,''), '(?i)save\s+€\s*([0-9]+(?:[.,][0-9]{1,2})?)'))[1]), ',', '.')::numeric,
-      (((regexp_match(coalesce(rp.label,''), '(?i)save\s+([0-9]{1,2})\s*c\b'))[1])::numeric / 100)
+      (((regexp_match(coalesce(rp.label,''), '(?i)save\s+([0-9]{1,2})\s*c'))[1])::numeric / 100)
     ) as save_amount_eur
   from public.retail_promotions rp
   join public.retail_store_products sp on sp.id=rp.store_product_id
@@ -154,7 +154,7 @@ filtered as (
       )
       or (
         p_mechanic='fixed_price'
-        and coalesce(c.label,'') ~* '^\s*only\b'
+        and coalesce(c.label,'') ~* '^\s*only(?:\s|$)'
         and (
           p_amount_eur is null
           or abs(coalesce(c.offer_price_eur,c.display_price_eur)-p_amount_eur) <= 0.02
