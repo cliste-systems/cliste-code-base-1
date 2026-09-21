@@ -216,7 +216,13 @@ export async function POST(request: Request) {
     clarificationHint,
     clarificationKind,
     matches: responseMatches,
-  } = resolveProductSearchResponse(query, mappedMatches, { fulfilment, intent });
+  } = structuredPromotionQuery
+    ? {
+        clarificationHint: null,
+        clarificationKind: null,
+        matches: mappedMatches,
+      }
+    : resolveProductSearchResponse(query, mappedMatches, { fulfilment, intent });
 
   // A national catalogue match is not evidence that this specific store carries
   // the product. Resolve explicit store-level assortment decisions separately.
