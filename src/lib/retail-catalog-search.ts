@@ -59,7 +59,7 @@ export async function searchStoredRetailCatalog(
   let query = supabase
     .from("retail_catalog_products")
     .select(
-      "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to))",
+      "id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to))",
     )
     .eq("retail_banner", input.retailBanner)
     .eq("retail_store_products.source_store_id", input.sourceStoreId)
@@ -131,6 +131,7 @@ type NationalCatalogRow = {
   product_name: string;
   brand: string | null;
   department: string;
+  category_breadcrumb: string | null;
   service_area: string;
   fulfilment: string;
   is_alcohol: boolean;
@@ -140,7 +141,7 @@ type NationalCatalogRow = {
 };
 
 function catalogCategoryDirectnessScore(
-  row: Pick<NationalCatalogRow, "department" | "category_breadcrumb" | "product_name">,
+  row: { department: string; category_breadcrumb?: string | null; product_name: string },
   tokens: string[],
 ): number {
   if (tokens.length === 0) return 0;
@@ -212,11 +213,12 @@ export async function searchNationalRetailCatalog(
 
   return candidateRows
     .map((row) => {
-      const score = scoreSupervaluSearchText(
-        normalizeSearchText(row.search_text),
-        tokens,
-        row.department,
-      );
+      const score =
+        scoreSupervaluSearchText(
+          normalizeSearchText(row.search_text),
+          tokens,
+          row.department,
+        ) + catalogCategoryDirectnessScore(row, tokens);
       return {
         productName: row.product_name,
         department: row.department,
