@@ -16,6 +16,7 @@ import {
   searchSupervaluCatalogLiveWithFallback,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
   type CatalogQuoteIntent,
+  type SupervaluCatalogMatch,
 } from "@/lib/supervalu-catalog-search";
 import {
   authorizeVoiceWebhook,
@@ -31,6 +32,7 @@ import {
 import {
   formatStoreAssortmentQuote,
   parseRetailStoreAssortmentStatus,
+  type RetailStoreAssortmentStatus,
 } from "@/lib/retail-store-assortment";
 
 export const dynamic = "force-dynamic";
@@ -179,7 +181,7 @@ export async function POST(request: Request) {
 
   const structuredPromotionQuery =
     intent === "offer" && shouldUseStructuredPromotionSearch(query);
-  let structuredPromotionMatches = [];
+  let structuredPromotionMatches: SupervaluCatalogMatch[] = [];
   if (structuredPromotionQuery) {
     try {
       structuredPromotionMatches = await searchStructuredNationalPromotions(admin, {
@@ -320,7 +322,13 @@ export async function POST(request: Request) {
     }
   }
 
-  const storeAwareRawMatches = responseMatches.flatMap((match) => {
+  type StoreAwareMatch = (typeof responseMatches)[number] & {
+    store_assortment_status: RetailStoreAssortmentStatus;
+    quote_text: string;
+  };
+  const storeAwareRawMatches: StoreAwareMatch[] = [];
+
+  for (const match of responseMatches) {
     const sku = String(match.sku ?? "").trim();
     const nameKey = String(match.product_name ?? "").trim().toLowerCase();
     const productId =
@@ -336,32 +344,29 @@ export async function POST(request: Request) {
     // Cara one scope note for the whole result set rather than repeating an
     // assortment disclaimer after every product.
     if (structuredPromotionQuery) {
-      if (storeStatus === "not_stocked") return [];
-      return [
-        {
-          ...match,
-          store_assortment_status: storeStatus,
-          quote_text:
-            storeStatus === "stocked"
-              ? `${match.quote_text} This store has confirmed it normally stocks this product.`
-              : match.quote_text,
-        },
-      ];
-    }
-
-    return [
-      {
+      if (storeStatus === "not_stocked") continue;
+      storeAwareRawMatches.push({
         ...match,
         store_assortment_status: storeStatus,
-        quote_text: formatStoreAssortmentQuote({
-          productName: match.product_name,
-          status: storeStatus,
-          intent,
-          originalQuote: match.quote_text,
-        }),
-      },
-    ];
-  });
+        quote_text:
+          storeStatus === "stocked"
+            ? `${match.quote_text} This store has confirmed it normally stocks this product.`
+            : match.quote_text,
+      });
+      continue;
+    }
+
+    storeAwareRawMatches.push({
+      ...match,
+      store_assortment_status: storeStatus,
+      quote_text: formatStoreAssortmentQuote({
+        productName: match.product_name,
+        status: storeStatus,
+        intent,
+        originalQuote: match.quote_text,
+      }),
+    });
+  }
 
   const storeAwareBySpokenOffer = new Map<
     string,
