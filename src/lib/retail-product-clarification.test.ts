@@ -394,4 +394,19 @@ describe("retail product clarification", () => {
     assert.ok(response.clarificationHint);
   });
 
+
+  it("keeps own-brand modifiers from wiping out the actual product matches", () => {
+    const response = resolveProductSearchResponse(
+      "fresh SuperValu brand avocado",
+      [
+        { product_name: "SuperValu Signature Tastes Ripe & Ready Avocado", department: "Avocados", service_area: "produce", fulfilment: "prepack" },
+        { product_name: "SuperValu Organic Avocados", department: "Organic", service_area: "produce", fulfilment: "prepack" },
+        { product_name: "SuperValu Signature Tastes Mini Hass Avocados", department: "Avocados", service_area: "produce", fulfilment: "prepack" },
+      ],
+      { intent: "price" },
+    );
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 3);
+  });
+
 });
