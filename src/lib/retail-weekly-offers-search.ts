@@ -1210,7 +1210,7 @@ export function searchSyncedWeeklyOffersInRows(
   // Example: "Bird's Eye fish fingers on offer" contains the word "fish",
   // but it is a specific product family, not a request to browse salmon/cod/prawns.
   if (specificMatches.length > 0) {
-    const tokens = offerSearchProductTokens(trimmed);
+    const tokens = productIdentityTokens(trimmed);
     return specificMatches
       .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
       .sort(
@@ -1226,7 +1226,7 @@ export function searchSyncedWeeklyOffersInRows(
   // generic browse heuristics. This covers product families such as fish
   // fingers, cereals, yogurts, shampoo, frozen pizza, pet food, etc.
   if (categoryMatches.length > 0) {
-    const tokens = offerSearchProductTokens(trimmed);
+    const tokens = productIdentityTokens(trimmed);
     return categoryMatches
       .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
       .sort(
