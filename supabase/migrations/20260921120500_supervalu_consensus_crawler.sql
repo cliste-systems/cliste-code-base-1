@@ -208,8 +208,8 @@ begin
     select sp.product_id,rp.promotion_type,rp.loyalty_required,
            coalesce(rp.loyalty_program,'') loyalty_program,
            coalesce(rp.label,'') label,
-           coalesce(rp.offer_price_eur,sp.display_price_eur) offer_price_eur,
-           coalesce(rp.regular_price_eur,sp.regular_price_eur) regular_price_eur,
+           case when rp.promotion_type='multibuy' then null when rp.loyalty_required then rp.offer_price_eur else sp.display_price_eur end offer_price_eur,
+           coalesce(sp.regular_price_eur,rp.regular_price_eur) regular_price_eur,
            rp.valid_from,rp.valid_to,
            count(distinct sp.source_store_id) stores
     from public.retail_promotions rp
@@ -217,8 +217,8 @@ begin
     where sp.source_price_source='supervalu_public_storefront'
     group by sp.product_id,rp.promotion_type,rp.loyalty_required,
              coalesce(rp.loyalty_program,''),coalesce(rp.label,''),
-             coalesce(rp.offer_price_eur,sp.display_price_eur),
-             coalesce(rp.regular_price_eur,sp.regular_price_eur),
+             case when rp.promotion_type='multibuy' then null when rp.loyalty_required then rp.offer_price_eur else sp.display_price_eur end,
+             coalesce(sp.regular_price_eur,rp.regular_price_eur),
              rp.valid_from,rp.valid_to
     having count(distinct sp.source_store_id)>=3
   )
@@ -232,8 +232,8 @@ begin
     and rp.loyalty_required=o.loyalty_required
     and coalesce(rp.loyalty_program,'')=o.loyalty_program
     and coalesce(rp.label,'')=o.label
-    and coalesce(rp.offer_price_eur,sp.display_price_eur)=o.offer_price_eur
-    and coalesce(rp.regular_price_eur,sp.regular_price_eur)=o.regular_price_eur
+    and case when rp.promotion_type='multibuy' then null when rp.loyalty_required then rp.offer_price_eur else sp.display_price_eur end=o.offer_price_eur
+    and coalesce(sp.regular_price_eur,rp.regular_price_eur)=o.regular_price_eur
     and rp.valid_from=o.valid_from
     and rp.valid_to=o.valid_to;
 
@@ -244,8 +244,8 @@ begin
     select sp.product_id,rp.promotion_type,rp.loyalty_required,
            coalesce(rp.loyalty_program,'') loyalty_program,
            coalesce(rp.label,'') label,
-           coalesce(rp.offer_price_eur,sp.display_price_eur) offer_price_eur,
-           coalesce(rp.regular_price_eur,sp.regular_price_eur) regular_price_eur,
+           case when rp.promotion_type='multibuy' then null when rp.loyalty_required then rp.offer_price_eur else sp.display_price_eur end offer_price_eur,
+           coalesce(sp.regular_price_eur,rp.regular_price_eur) regular_price_eur,
            rp.valid_from,rp.valid_to,
            count(distinct sp.source_store_id) stores,
            max(sp.price_per_unit) filter (where sp.price_per_unit is not null) price_per_unit
@@ -255,8 +255,8 @@ begin
       and rp.scope='national'
     group by sp.product_id,rp.promotion_type,rp.loyalty_required,
              coalesce(rp.loyalty_program,''),coalesce(rp.label,''),
-             coalesce(rp.offer_price_eur,sp.display_price_eur),
-             coalesce(rp.regular_price_eur,sp.regular_price_eur),
+             case when rp.promotion_type='multibuy' then null when rp.loyalty_required then rp.offer_price_eur else sp.display_price_eur end,
+             coalesce(sp.regular_price_eur,rp.regular_price_eur),
              rp.valid_from,rp.valid_to
   ),
   ranked as (
@@ -329,5 +329,43 @@ revoke all on function public.refresh_supervalu_national_scope()
   from public,anon,authenticated;
 grant execute on function public.refresh_supervalu_national_scope()
   to service_role;
+
+create or replace function public.normalize_supervalu_promotion_price()
+returns trigger
+language plpgsql
+security invoker
+set search_path=public,pg_temp
+as $
+declare
+  v_display numeric;
+begin
+  if new.loyalty_required=false
+     and new.promotion_type<>'multibuy'
+     and coalesce(new.label,'') ~* '^save\\s*€'
+  then
+    select sp.display_price_eur
+      into v_display
+    from public.retail_store_products sp
+    where sp.id=new.store_product_id;
+
+    if v_display is not null then
+      new.offer_price_eur:=v_display;
+    end if;
+  end if;
+  return new;
+end;
+$;
+
+revoke all on function public.normalize_supervalu_promotion_price()
+  from public,anon,authenticated;
+
+drop trigger if exists retail_promotions_normalize_supervalu_price
+  on public.retail_promotions;
+create trigger retail_promotions_normalize_supervalu_price
+before insert or update of
+  offer_price_eur,label,promotion_type,loyalty_required,store_product_id
+on public.retail_promotions
+for each row
+execute function public.normalize_supervalu_promotion_price();
 
 select public.refresh_supervalu_national_scope();
