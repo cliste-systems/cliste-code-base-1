@@ -250,26 +250,6 @@ export function DashboardLiveRefresh({
         {
           event: "INSERT",
           schema: "public",
-          table: "action_tickets",
-          filter,
-        },
-        scheduleRealtimeRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "action_tickets",
-          filter,
-        },
-        scheduleRealtimeRefresh,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
           table: "appointments",
           filter,
         },
