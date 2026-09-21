@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchSupervaluGatewaySearch } from "@/lib/supervalu-gateway";
-import { searchStoredRetailCatalog } from "@/lib/retail-catalog-search";
+import {
+  searchNationalRetailCatalog,
+  searchStoredRetailCatalog,
+} from "@/lib/retail-catalog-search";
 import {
   isPromotionalSupervaluProduct,
   normalizeSearchText,
@@ -644,6 +647,7 @@ async function searchSupervaluCatalogLiveInternal(
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
   const listIntent = inferWeeklyOffersListIntent(trimmed);
 
+  let nationalStoredMatches: SupervaluCatalogMatch[] = [];
   if (options?.supabase && options?.retailBanner && options?.storeId) {
     const stored = await searchStoredRetailCatalog(options.supabase, {
       retailBanner: options.retailBanner,
@@ -654,6 +658,14 @@ async function searchSupervaluCatalogLiveInternal(
       limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
     });
     if (stored.length > 0) return filterCatalogMatchesByQuery(trimmed, stored);
+  } else if (options?.supabase && options?.retailBanner) {
+    nationalStoredMatches = await searchNationalRetailCatalog(options.supabase, {
+      retailBanner: options.retailBanner,
+      query: trimmed,
+      intent,
+      fulfilment: options.fulfilment,
+      limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
+    });
   }
   const filters = resolveWeeklyOfferSearchFilters(trimmed, {
     fulfilment: options?.fulfilment,
@@ -679,6 +691,24 @@ async function searchSupervaluCatalogLiveInternal(
 
   if (intent === "offer" && listIntent && (fulfilment || filters.serviceArea)) {
     return syncedMatches.map(syncedOfferToCatalogMatch);
+  }
+
+  // No explicit store source means "national only". Never silently fall back to
+  // a default storefront such as 5550: that can leak local butcher/bakery lines
+  // and local promotions into another SuperValu store's answers.
+  if (!options?.storeId && options?.supabase && options?.retailBanner) {
+    const mergedNational = mergeGatewayWithSyncedOffers(
+      nationalStoredMatches,
+      syncedMatches,
+      intent,
+    );
+    let filteredNational = filterCatalogMatchesByQuery(trimmed, mergedNational);
+    if (fulfilment) {
+      filteredNational = filteredNational.filter(
+        (match) => match.fulfilment === fulfilment,
+      );
+    }
+    return filteredNational;
   }
 
   const gatewayMatches = await searchSupervaluCatalogLiveSingle(trimmed, {

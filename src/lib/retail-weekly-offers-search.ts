@@ -816,7 +816,8 @@ export async function loadRetailWeeklyOffersForBanner(
     let query = supabase
       .from("retail_weekly_offers")
       .select("*")
-      .eq("retail_banner", retailBanner);
+      .eq("retail_banner", retailBanner)
+      .eq("is_national", true);
 
     if (options?.serviceArea) {
       query = query.eq("service_area", options.serviceArea);

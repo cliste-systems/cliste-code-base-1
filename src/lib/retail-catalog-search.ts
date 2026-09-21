@@ -120,3 +120,85 @@ export async function searchStoredRetailCatalog(
     .sort((a, b) => b.score - a.score || a.productName.localeCompare(b.productName))
     .slice(0, input.limit ?? 8);
 }
+
+
+type NationalCatalogRow = {
+  id: string;
+  sku: string;
+  product_name: string;
+  brand: string | null;
+  department: string;
+  service_area: string;
+  fulfilment: string;
+  is_alcohol: boolean;
+  search_text: string;
+  national_store_count: number;
+  national_regular_price_eur: number | null;
+};
+
+export async function searchNationalRetailCatalog(
+  supabase: SupabaseClient,
+  input: {
+    retailBanner: string;
+    query: string;
+    intent: CatalogQuoteIntent;
+    fulfilment?: SupervaluFulfilment | null;
+    limit?: number;
+  },
+): Promise<SupervaluCatalogMatch[]> {
+  if (input.intent === "offer") return [];
+  const tokens = offerSearchProductTokens(input.query);
+  if (tokens.length === 0) return [];
+
+  const broad = tokens[0]!.replace(/s$/, "");
+  let query = supabase
+    .from("retail_catalog_products")
+    .select(
+      "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
+    )
+    .eq("retail_banner", input.retailBanner)
+    .eq("is_national", true)
+    .gte("national_store_count", 3)
+    .ilike("search_text", `%${broad}%`)
+    .limit(80);
+
+  if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as NationalCatalogRow[])
+    .map((row) => {
+      const score = scoreSupervaluSearchText(
+        normalizeSearchText(row.search_text),
+        tokens,
+        row.department,
+      );
+      return {
+        productName: row.product_name,
+        department: row.department,
+        sku: row.sku,
+        currentPriceEur: row.national_regular_price_eur,
+        wasPriceEur: null,
+        discountLabel: null,
+        isOnOffer: false,
+        score,
+        quoteText: formatCatalogStockQuote({
+          productName: row.product_name,
+          department: row.department,
+          currentPriceEur: row.national_regular_price_eur,
+          wasPriceEur: null,
+          discountLabel: null,
+          isOnOffer: false,
+          intent: input.intent,
+        }),
+        serviceArea: row.service_area,
+        fulfilment: row.fulfilment,
+        isAlcohol: row.is_alcohol,
+        source: "catalog" as const,
+      };
+    })
+    .filter((row) => row.score >= 0.5)
+    .sort((a, b) => b.score - a.score || a.productName.localeCompare(b.productName))
+    .slice(0, input.limit ?? 8);
+}

@@ -166,9 +166,7 @@ export async function POST(request: Request) {
   });
 
   const sourceStoreId =
-    String(orgRow.retail_source_store_id ?? "").trim() ||
-    process.env.SUPERVALU_STOREFRONT_STORE_ID?.trim() ||
-    "5550";
+    String(orgRow.retail_source_store_id ?? "").trim() || null;
 
   const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
     query,
@@ -177,7 +175,7 @@ export async function POST(request: Request) {
       supabase: admin,
       retailBanner,
       fulfilment,
-      storeId: sourceStoreId,
+      storeId: sourceStoreId ?? undefined,
     },
   );
 
@@ -220,7 +218,7 @@ export async function POST(request: Request) {
       supabase: admin,
       retailBanner,
       fulfilment: alternateFulfilment,
-      storeId: sourceStoreId,
+      storeId: sourceStoreId ?? undefined,
     });
     const alternateMapped = alternateRaw.map((match) => ({
       product_name: match.productName,
