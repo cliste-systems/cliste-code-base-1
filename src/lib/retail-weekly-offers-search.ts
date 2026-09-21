@@ -184,17 +184,18 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
     return true;
   }
 
-  // A concrete product/brand/family wins over department words. This is the
-  // critical distinction between "Birds Eye fish fingers on offer?" and
-  // "what fish is on offer?".
-  if (
-    productTokens.length >= 1 &&
-    inferWeeklyOffersBrowseCategories(trimmed).length < 2
-  ) {
+  // A short concrete product/brand/family phrase wins over department words.
+  // This is the critical distinction between "Birds Eye fish fingers on
+  // offer?" and "what fish is on offer?". Longer multi-category shopping-list
+  // style requests can still be treated as a browse below.
+  if (productTokens.length >= 1 && productTokens.length <= 3) {
     return false;
   }
 
-  if (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2) {
+  if (
+    productTokens.length >= 4 ||
+    (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2)
+  ) {
     return true;
   }
 
