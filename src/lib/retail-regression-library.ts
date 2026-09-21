@@ -638,10 +638,11 @@ const groups: ScenarioGroup[] = [
     ],
     followups: ["Fresh ones, cheapest SuperValu one if there is one."],
     expectations: {
-      summary: "Keep avocado context through the refinement and perform a price lookup.",
+      summary: "Keep avocado context, honor the explicit cheapest selection, and do not ask another type/brand question.",
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "price",
       queryMustIncludeAny: ["avocado", "avocados"],
+      lastTurnMustNotAskClarifyingQuestion: true,
     },
   },
   {
