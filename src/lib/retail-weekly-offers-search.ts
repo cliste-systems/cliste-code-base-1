@@ -156,6 +156,29 @@ export type WeeklyOfferSearchFilters = {
   fulfilment?: SupervaluFulfilment | null;
 };
 
+const WEEKLY_OFFER_CATEGORY_HINTS = new Set([
+  "milk",
+  "bread",
+  "crisps",
+  "chocolate",
+  "fruit",
+  "yogurt",
+  "cheese",
+  "butter",
+  "tea",
+  "coffee",
+  "biscuits",
+  "sweets",
+  "confectionery",
+  "drinks",
+  "household",
+  "frozen",
+  "ham",
+  "wine",
+  "beer",
+  "potatoes",
+]);
+
 /** Caller wants a rundown of synced offers, not one specific product. */
 export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
@@ -173,7 +196,6 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   ) {
     return true;
   }
-
   if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
   if (
     tokens.length === 1 &&
@@ -219,29 +241,9 @@ export function inferWeeklyOffersExcludeMeat(query: string): boolean {
 export function inferWeeklyOffersBrowseCategories(query: string): string[] {
   const trimmed = query.trim().toLowerCase();
   const tokens = tokenizeSupervaluSearchQuery(trimmed);
-  const categoryHints = new Set([
-    "milk",
-    "bread",
-    "crisps",
-    "chocolate",
-    "fruit",
-    "yogurt",
-    "cheese",
-    "butter",
-    "tea",
-    "coffee",
-    "biscuits",
-    "sweets",
-    "confectionery",
-    "drinks",
-    "household",
-    "frozen",
-    "ham",
-    "wine",
-    "beer",
-    "potatoes",
-  ]);
-  const fromTokens = tokens.filter((token) => categoryHints.has(token));
+  const fromTokens = tokens.filter((token) =>
+    WEEKLY_OFFER_CATEGORY_HINTS.has(token),
+  );
   if (fromTokens.length >= 2) return fromTokens.slice(0, 5);
   if (/deli|ham|cooked meat/i.test(trimmed)) return ["ham", "salami"];
   if (/wine|beer|off[- ]licence|spirits|alcohol|alcoholic|liquor|liqueur|cider/i.test(trimmed)) {
@@ -379,13 +381,26 @@ export function resolveWeeklyOfferSearchFilters(
   query: string,
   explicit?: WeeklyOfferSearchFilters,
 ): WeeklyOfferSearchFilters {
+  const inferredFulfilment = inferWeeklyOfferFulfilmentFromQuery(query);
+  const hasExplicitAreaWording =
+    /\b(?:counter|department|aisle|section|off[- ]licence|fishmonger|butcher)\b/i.test(
+      query,
+    );
+  const inferredServiceArea = inferWeeklyOfferServiceAreaFromQuery(query);
+  const useInferredServiceArea =
+    hasExplicitAreaWording ||
+    inferredFulfilment != null ||
+    !isSpecificProductOfferQuery(query);
+
   return {
     channel: explicit?.channel ?? null,
-    serviceArea: explicit?.serviceArea ?? inferWeeklyOfferServiceAreaFromQuery(query),
+    serviceArea:
+      explicit?.serviceArea ??
+      (useInferredServiceArea ? inferredServiceArea : null),
     // Respect explicit caller meaning ("meat counter", "pre-pack aisle", "per kilo").
     // Ambiguous product-only requests still return null so Cara can clarify once.
     fulfilment:
-      explicit?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
+      explicit?.fulfilment ?? inferredFulfilment,
   };
 }
 
@@ -704,6 +719,8 @@ const FULFILMENT_QUERY_TOKENS = new Set([
   "meat",
   "shop",
   "store",
+  "back",
+  "wall",
   "section",
   "department",
   "seafood",
@@ -725,18 +742,48 @@ const FULFILMENT_QUERY_TOKENS = new Set([
   "backstore",
 ]);
 
-export function offerSearchProductTokens(query: string): string[] {
-  return tokenizeSupervaluSearchQuery(query).filter(
+const DUAL_USE_PRODUCT_AREA_TOKENS = new Set([
+  "fish",
+  "meat",
+  "seafood",
+  "fruit",
+  "veg",
+  "vegetables",
+  "produce",
+  "bakery",
+  "grocery",
+  "dairy",
+  "frozen",
+  "household",
+  "alcohol",
+  "wine",
+  "beer",
+  "spirits",
+]);
+
+function productTokensFromTokenList(tokens: string[]): string[] {
+  const coreTokens = tokens.filter(
     (token) =>
       !FULFILMENT_QUERY_TOKENS.has(token) &&
       !/^\d+(?:\.\d+)?$/.test(token),
   );
+  if (coreTokens.length === 0) return [];
+  return tokens.filter(
+    (token) =>
+      !/^\d+(?:\.\d+)?$/.test(token) &&
+      (!FULFILMENT_QUERY_TOKENS.has(token) ||
+        DUAL_USE_PRODUCT_AREA_TOKENS.has(token)),
+  );
+}
+
+export function offerSearchProductTokens(query: string): string[] {
+  return productTokensFromTokenList(tokenizeSupervaluSearchQuery(query));
 }
 
 function preferProductNameMatches<
   T extends { row: RetailWeeklyOfferRow; score: number },
 >(matches: T[], tokens: string[]): T[] {
-  const productTokens = tokens.filter((token) => !FULFILMENT_QUERY_TOKENS.has(token));
+  const productTokens = productTokensFromTokenList(tokens);
   if (productTokens.length === 0 || matches.length <= 1) return matches;
 
   const nameIncludesToken = (productName: string, token: string) =>
@@ -1031,8 +1078,8 @@ export function searchSyncedWeeklyOffersInRows(
 
   const filters = resolveWeeklyOfferSearchFilters(trimmed, options);
   const excludeMeat = inferWeeklyOffersExcludeMeat(trimmed);
-  const alcoholOnly = inferAlcoholOnlyFromQuery(trimmed);
   const listIntent = inferWeeklyOffersListIntent(trimmed);
+  const alcoholOnly = listIntent && inferAlcoholOnlyFromQuery(trimmed);
   const browseCategories = inferWeeklyOffersBrowseCategories(trimmed);
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
@@ -1071,13 +1118,20 @@ export function searchSyncedWeeklyOffersInRows(
   // fingers, cereals, yogurts, shampoo, frozen pizza, pet food, etc.
   if (categoryMatches.length > 0) {
     const tokens = offerSearchProductTokens(trimmed);
-    return categoryMatches
+    const scoredCategoryMatches = categoryMatches
       .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
       .sort(
         (a, b) =>
           b.score - a.score ||
           a.row.product_name.localeCompare(b.row.product_name),
-      )
+      );
+    const productNameMatches = preferProductNameMatches(
+      scoredCategoryMatches,
+      tokens,
+    );
+    return (productNameMatches.length > 0
+      ? productNameMatches
+      : scoredCategoryMatches)
       .slice(0, tokenLimit)
       .map((entry) => rowToMatch(entry.row, entry.score));
   }

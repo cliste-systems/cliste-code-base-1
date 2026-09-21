@@ -460,6 +460,145 @@ describe("retail weekly offers search", () => {
     assert.ok(matches.every((match) => /cereal/i.test(match.department)));
   });
 
+  it("searches a branded fish-finger product instead of browsing the fish department", () => {
+    const rows = [
+      mockOfferRow({
+        id: "birds-eye-8",
+        sku: "1022450001",
+        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
+        brand: "Birds Eye",
+        department: "Fish Fingers",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 2.5,
+        was_price_eur: 3.15,
+        search_text: "birds eye crispy fish fingers 8 pack fish fingers",
+      }),
+      mockOfferRow({
+        id: "birds-eye-14",
+        sku: "1023963003",
+        product_name: "Birds Eye Fish Fingers 14 Pack (350 g)",
+        brand: "Birds Eye",
+        department: "Fish Fingers",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 4.5,
+        was_price_eur: 6.4,
+        search_text: "birds eye fish fingers 14 pack fish fingers",
+      }),
+      mockOfferRow({
+        id: "salmon",
+        product_name: "Keohane's Salmon Fillets (480 g)",
+        department: "Prepack Fresh Fish",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 9,
+        search_text: "keohanes salmon fillets prepack fresh fish",
+      }),
+      mockOfferRow({
+        id: "chicken-fingers",
+        product_name: "Birds Eye Chicken Fingers 10 Pack (250 g)",
+        brand: "Birds Eye",
+        department: "Chicken & Turkey",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 3,
+        search_text: "birds eye chicken fingers 10 pack chicken turkey",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(
+      rows,
+      "Bird's Eye fish fingers",
+    );
+
+    assert.equal(matches.length, 2);
+    assert.ok(matches.every((match) => /Birds Eye.*Fish Fingers/i.test(match.productName)));
+  });
+
+  it("keeps unrelated branded category phrases as product searches", () => {
+    const rows = [
+      mockOfferRow({
+        id: "cadbury",
+        product_name: "Cadbury Dairy Milk Chocolate (110 g)",
+        brand: "Cadbury",
+        department: "Chocolate Bars",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 2,
+        search_text: "cadbury dairy milk chocolate chocolate bars",
+      }),
+      mockOfferRow({
+        id: "milk",
+        product_name: "Avonmore Fresh Milk (2 L)",
+        department: "Milk",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 3.5,
+        search_text: "avonmore fresh milk dairy",
+      }),
+      mockOfferRow({
+        id: "yogurt",
+        product_name: "Activia Strawberry Yogurt 4 Pack",
+        department: "Yogurt",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 3,
+        search_text: "activia strawberry yogurt dairy",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(
+      rows,
+      "Cadbury Dairy Milk chocolate on offer",
+    );
+
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Cadbury Dairy Milk/i);
+  });
+
+  it("does not turn department words inside specific product names into filters", () => {
+    const rows = [
+      mockOfferRow({
+        id: "wine-gums",
+        product_name: "Maynards Bassetts Wine Gums Bag (110 g)",
+        department: "Sweets",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 1,
+        was_price_eur: 1.25,
+        search_text: "maynards bassetts wine gums bag sweets",
+      }),
+      mockOfferRow({
+        id: "wine",
+        product_name: "Brancott Estate Sauvignon Blanc (75 cl)",
+        department: "Wine",
+        service_area: "off_licence",
+        fulfilment: "prepack",
+        current_price_eur: 12,
+        is_alcohol: true,
+        search_text: "brancott estate sauvignon blanc wine off licence",
+      }),
+      mockOfferRow({
+        id: "squares",
+        product_name: "Kellogg's Rice Krispies Squares Totally Chocolatey (36 g)",
+        department: "Cereal Bars",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 1.45,
+        search_text: "kelloggs rice krispies squares totally chocolatey cereal bars",
+      }),
+    ];
+
+    const wineGums = searchSyncedWeeklyOffersInRows(rows, "wine gums");
+    const squares = searchSyncedWeeklyOffersInRows(rows, "Squares bars");
+
+    assert.equal(wineGums.length, 1);
+    assert.match(wineGums[0]?.productName ?? "", /Wine Gums/i);
+    assert.equal(squares.length, 1);
+    assert.match(squares[0]?.productName ?? "", /Rice Krispies Squares/i);
+  });
+
 
   it("keeps a branded fish-finger offer specific instead of browsing generic fish", () => {
     const rows = [
@@ -928,6 +1067,13 @@ describe("retail weekly offers search", () => {
 
   it("does not treat specific product offer questions as list intent", () => {
     assert.equal(inferWeeklyOffersListIntent("is striploin steak on offer"), false);
+    assert.equal(inferWeeklyOffersListIntent("Bird's Eye fish fingers"), false);
+    assert.equal(inferWeeklyOffersListIntent("fish fingers on offer"), false);
+    assert.equal(
+      inferWeeklyOffersListIntent("Cadbury Dairy Milk chocolate on offer"),
+      false,
+    );
+    assert.equal(inferWeeklyOffersListIntent("milk and bread offers"), true);
     assert.equal(inferWeeklyOffersListIntent("what offers in the meat counter this week"), true);
   });
 

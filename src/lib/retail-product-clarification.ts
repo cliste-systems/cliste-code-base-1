@@ -18,6 +18,8 @@ export type ClarificationMatch = {
   service_area?: string | null;
   serviceArea?: string | null;
   fulfilment?: string | null;
+  current_price_eur?: number | null;
+  score?: number | null;
 };
 
 export type ProductClarificationKind = "fulfilment" | "refinement";
@@ -75,6 +77,118 @@ function matchServiceArea(match: ClarificationMatch): string {
     .toLowerCase();
 }
 
+function matchProductName(match: ClarificationMatch): string {
+  return String(match.productName ?? match.product_name ?? "").trim();
+}
+
+function queryRequestsFresh(query: string): boolean {
+  return /\bfresh|loose|whole|produce|fruit|veg|vegetable\b/i.test(query);
+}
+
+function queryRequestsOwnBrand(query: string): boolean {
+  return /\bsupervalu|own\s*brand|own[- ]label|store\s*brand|shops?\s*own\b/i.test(
+    query,
+  );
+}
+
+function queryRequestsCheapest(query: string): boolean {
+  return /\bcheapest|lowest|least expensive|best price|cheap(?:est)?\b/i.test(
+    query,
+  );
+}
+
+const INGREDIENT_FORM_WORDS = new Set([
+  "oil",
+  "butter",
+  "sauce",
+  "dressing",
+  "spread",
+  "dip",
+  "smashed",
+  "crushed",
+  "flavoured",
+  "flavored",
+  "seasoning",
+  "marinade",
+  "paste",
+  "powder",
+]);
+
+const SEARCH_PREFERENCE_TOKENS = new Set([
+  "fresh",
+  "loose",
+  "whole",
+  "supervalu",
+  "brand",
+  "own",
+  "cheapest",
+  "cheap",
+  "lowest",
+  "price",
+]);
+
+function literalProductTokens(query: string): string[] {
+  return offerSearchProductTokens(query).filter(
+    (token) => !SEARCH_PREFERENCE_TOKENS.has(token),
+  );
+}
+
+function normalizedWords(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function productFormScore(query: string, match: ClarificationMatch): number {
+  const productTokens = literalProductTokens(query);
+  if (productTokens.length === 0) return 0;
+
+  const nameWords = normalizedWords(matchProductName(match));
+  const departmentWords = normalizedWords(String(match.department ?? ""));
+  let score = 0;
+
+  for (const token of productTokens) {
+    const stem = token.replace(/s$/, "");
+    const nameIndex = nameWords.findIndex(
+      (word) =>
+        word === token ||
+        word === stem ||
+        retailSearchTokenMatchesText(word, token),
+    );
+    if (nameIndex >= 0) {
+      score += 4;
+      const next = nameWords[nameIndex + 1] ?? "";
+      if (INGREDIENT_FORM_WORDS.has(next)) score -= 3;
+      continue;
+    }
+    if (
+      departmentWords.some(
+        (word) =>
+          word === token ||
+          word === stem ||
+          retailSearchTokenMatchesText(word, token),
+      )
+    ) {
+      score += 2;
+    }
+  }
+
+  if (queryRequestsFresh(query)) {
+    const text = `${matchProductName(match)} ${match.department ?? ""} ${matchServiceArea(match)}`.toLowerCase();
+    if (/\bfresh|loose|whole|produce|fruit|veg|vegetable\b/.test(text)) score += 3;
+    if (nameWords.some((word) => INGREDIENT_FORM_WORDS.has(word))) score -= 3;
+  }
+
+  if (queryRequestsOwnBrand(query)) {
+    if (/^supervalu\b/i.test(matchProductName(match))) score += 3;
+    else score -= 1;
+  }
+
+  return score;
+}
+
 function fulfilmentClarificationAreaHint(serviceArea: string): string | null {
   return COUNTER_PREPACK_AREA_HINTS[serviceArea] ?? null;
 }
@@ -101,7 +215,7 @@ function narrowMatchesByProductTokens<T extends ClarificationMatch>(
 ): T[] {
   if (inferWeeklyOffersListIntent(query)) return matches;
 
-  const productTokens = catalogProductTokens(query);
+  const productTokens = literalProductTokens(query);
   if (productTokens.length === 0 || matches.length <= 1) return matches;
 
   const byProductName = matches.filter((match) => {
@@ -259,18 +373,43 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     matches,
     options?.fulfilment,
   );
-
   // A broad offer category can legitimately return several different product
   // names ("toiletries" -> shampoo, deodorant, shower gel). Detect that before
   // product-name narrowing, otherwise the generic category token can erase the
   // very evidence Cara needs in order to ask one useful refinement question.
+  if (narrowed.length > 1) {
+    const scored = narrowed.map((match) => ({
+      match,
+      formScore: productFormScore(query, match),
+    }));
+    const bestFormScore = Math.max(...scored.map((entry) => entry.formScore));
+    if (bestFormScore >= 3) {
+      narrowed = scored
+        .filter((entry) => entry.formScore >= bestFormScore - 1)
+        .map((entry) => entry.match);
+    }
+  }
   const broadOfferHint =
     options?.intent === "offer"
       ? buildBroadOfferBrowseClarificationHint(query, narrowed)
       : null;
-
-  if (!broadOfferHint && !queryMatchesDepartmentScope(query, narrowed)) {
-    narrowed = narrowMatchesByProductTokens(query, narrowed);
+  if (!queryMatchesDepartmentScope(query, narrowed)) {
+    const productNarrowed = narrowMatchesByProductTokens(query, narrowed);
+    if (productNarrowed.length > 0 || !broadOfferHint) {
+      narrowed = productNarrowed;
+    }
+  }
+  if (queryRequestsCheapest(query)) {
+    narrowed = [...narrowed].sort((a, b) => {
+      const aPrice = Number(a.current_price_eur);
+      const bPrice = Number(b.current_price_eur);
+      const aFinite = Number.isFinite(aPrice) && aPrice > 0;
+      const bFinite = Number.isFinite(bPrice) && bPrice > 0;
+      if (aFinite && bFinite && aPrice !== bPrice) return aPrice - bPrice;
+      if (aFinite !== bFinite) return aFinite ? -1 : 1;
+      return Number(b.score ?? 0) - Number(a.score ?? 0);
+    });
+    if (narrowed.length > 1) narrowed = narrowed.slice(0, 1);
   }
   const fulfilmentHint = buildOfferFulfilmentClarificationHint(
     narrowed,

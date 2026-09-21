@@ -751,12 +751,23 @@ export async function searchSupervaluCatalogLiveWithFallback(
   const searchQuery = normalized || trimmed;
   const ownLabelRequested = queryRequestsSupervaluOwnLabel(trimmed);
 
-  // Treat own-brand as a constraint, not another search token. Searching
-  // "SuperValu avocado" directly can fill the candidate window with unrelated
-  // SuperValu products before the actual avocado rows are ranked.
+  // Treat own-brand as a structured constraint. The stored-catalog search uses
+  // the product words for retrieval and applies SuperValu as a brand filter, so
+  // unrelated SuperValu rows cannot fill the candidate window.
   if (ownLabelRequested) {
     const productOnly = catalogProductTokens(searchQuery).join(" ").trim();
     if (productOnly) {
+      const directOwnMatches = await searchSupervaluCatalogLiveInternal(
+        searchQuery,
+        options,
+      );
+      const confirmedOwnMatches = directOwnMatches.filter((match) =>
+        /\bsupervalu\b/i.test(match.productName),
+      );
+      if (confirmedOwnMatches.length > 0) {
+        return { matches: confirmedOwnMatches, ownBrandFallbackQuote: null };
+      }
+
       const alternatives = await searchSupervaluCatalogLiveInternal(productOnly, options);
       const ownMatches = alternatives.filter((match) => /\bsupervalu\b/i.test(match.productName));
       if (ownMatches.length > 0) {

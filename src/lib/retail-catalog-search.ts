@@ -10,6 +10,17 @@ import {
   type SupervaluCatalogMatch,
 } from "@/lib/supervalu-catalog-search";
 
+const OWN_LABEL_QUERY_TOKENS = new Set(["supervalu", "own", "brand"]);
+const INGREDIENT_FORM_DEPARTMENTS = new Set([
+  "spreadable butter",
+  "tuna",
+  "sardines, mackerel & other fish",
+  "crackers & savoury biscuits",
+  "cheese accompaniments",
+  "cooking cheese",
+  "premium italian",
+]);
+
 type CatalogRow = {
   id: string;
   sku: string;
@@ -40,6 +51,53 @@ type CatalogRow = {
     }>;
   }>;
 };
+
+function queryRequestsSupervaluBrand(query: string): boolean {
+  return /\bsupervalu\b|\bsuper\s+value\b|\bown[\s-]?brand\b/i.test(query);
+}
+
+function productSearchTokens(query: string): string[] {
+  return offerSearchProductTokens(query).filter(
+    (token) => !OWN_LABEL_QUERY_TOKENS.has(token),
+  );
+}
+
+function catalogRankingBoost(input: {
+  query: string;
+  productName: string;
+  brand?: string | null;
+  department?: string | null;
+}): number {
+  const tokens = productSearchTokens(input.query);
+  const normalizedName = normalizeSearchText(input.productName);
+  const normalizedDepartment = normalizeSearchText(input.department ?? "");
+  const phrase = tokens.join(" ");
+  let boost = 0;
+
+  if (phrase && normalizedName.includes(phrase)) boost += 3;
+  if (phrase && normalizedDepartment.includes(phrase)) boost += 4;
+  if (tokens.length > 0 && tokens.every((token) => normalizedDepartment.includes(token))) {
+    boost += 3;
+  }
+  if (tokens.length > 0 && tokens.every((token) => normalizedName.includes(token))) {
+    boost += 2;
+  }
+  if (queryRequestsSupervaluBrand(input.query)) {
+    if (
+      /^supervalu$/i.test(String(input.brand ?? "")) ||
+      /^\s*supervalu\b/i.test(input.productName)
+    ) {
+      boost += 5;
+    } else {
+      boost -= 4;
+    }
+  }
+  if (INGREDIENT_FORM_DEPARTMENTS.has(normalizedDepartment) && normalizedDepartment !== phrase) {
+    boost -= 3;
+  }
+
+  return boost;
+}
 
 export async function searchStoredRetailCatalog(
   supabase: SupabaseClient,
@@ -183,7 +241,9 @@ export async function searchNationalRetailCatalog(
   const tokens = offerSearchProductTokens(input.query);
   if (tokens.length === 0) return [];
 
-  const candidateTokens = [...tokens]
+  const productTokens = productSearchTokens(input.query);
+  const candidateSource = productTokens.length > 0 ? productTokens : tokens;
+  const candidateTokens = [...candidateSource]
     .map((token) => token.replace(/s$/, ""))
     .filter(Boolean)
     .sort((a, b) => b.length - a.length);
@@ -199,14 +259,28 @@ export async function searchNationalRetailCatalog(
       .eq("is_national", true)
       .gte("national_store_count", 3)
       .ilike("search_text", `%${candidate}%`)
-      .limit(80);
+      .limit(200);
 
     if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    if ((data ?? []).length > 0) {
-      candidateRows = (data ?? []) as NationalCatalogRow[];
+    const rows = (data ?? []) as NationalCatalogRow[];
+    const relevantRows = rows.filter((row) => {
+      if (
+        queryRequestsSupervaluBrand(input.query) &&
+        !(
+          /^supervalu$/i.test(String(row.brand ?? "")) ||
+          /^\s*supervalu\b/i.test(row.product_name)
+        )
+      ) {
+        return false;
+      }
+      const text = normalizeSearchText(`${row.product_name} ${row.department}`);
+      return productTokens.length === 0 || productTokens.every((token) => text.includes(token));
+    });
+    if (relevantRows.length > 0) {
+      candidateRows = relevantRows;
       break;
     }
   }
@@ -218,7 +292,14 @@ export async function searchNationalRetailCatalog(
           normalizeSearchText(row.search_text),
           tokens,
           row.department,
-        ) + catalogCategoryDirectnessScore(row, tokens);
+        ) +
+        catalogCategoryDirectnessScore(row, tokens) +
+        catalogRankingBoost({
+          query: input.query,
+          productName: row.product_name,
+          brand: row.brand,
+          department: row.department,
+        });
       return {
         productName: row.product_name,
         department: row.department,
