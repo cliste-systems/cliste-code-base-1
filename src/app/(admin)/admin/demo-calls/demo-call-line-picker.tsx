@@ -82,7 +82,7 @@ type DemoCallLinePickerProps = {
   selectedE164: string | null;
   onSelectedE164Change: (e164: string | null) => void;
   disabled?: boolean;
-  toolbarAction: React.ReactNode;
+  toolbarAction?: React.ReactNode;
 };
 
 export function DemoCallLinePicker({
