@@ -3,6 +3,7 @@ export const DASHBOARD_ROUTES = {
   home: "/dashboard",
   activity: "/dashboard/activity",
   calls: "/dashboard/calls",
+  /** @deprecated Action Inbox retired; kept for legacy redirects. */
   actionInbox: "/dashboard/action-inbox",
   departments: "/dashboard/departments",
   department: (slug: string) => `/dashboard/departments/${slug}`,
@@ -81,6 +82,7 @@ export const CARA_KNOWLEDGE_REVALIDATE_PATHS = [
 
 /** Legacy paths → canonical (middleware + bookmarks). */
 export const LEGACY_DASHBOARD_REDIRECTS: Record<string, string> = {
+  "/dashboard/action-inbox": DASHBOARD_ROUTES.calls,
   "/dashboard/legal/accept": DASHBOARD_ROUTES.legalAccept,
   "/dashboard/call-history": DASHBOARD_ROUTES.calls,
   "/dashboard/contacts": DASHBOARD_ROUTES.calls,
