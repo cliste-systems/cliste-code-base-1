@@ -54,7 +54,7 @@ describe("retail promotion query parsing", () => {
     assert.equal(parsed.totalEur, 5);
   });
 
-  it("supports percentage, money-off, half-price and fixed-price mechanics", () => {
+  it("supports percentage, money-off, half-price, fixed-price and cents mechanics", () => {
     assert.equal(
       parseRetailPromotionQuery("what is half price this week?").mechanic,
       "half_price",
@@ -68,9 +68,24 @@ describe("retail promotion query parsing", () => {
       2,
     );
     assert.equal(
+      parseRetailPromotionQuery("anything save 50c?").amountEur,
+      0.5,
+    );
+    assert.equal(
+      parseRetailPromotionQuery("anything only 79c in fruit?").amountEur,
+      0.79,
+    );
+    assert.equal(
       parseRetailPromotionQuery("anything only €3 in frozen?").amountEur,
       3,
     );
+  });
+
+  it("accepts retailer badges that omit the euro symbol in multibuy wording", () => {
+    const parsed = parseRetailPromotionQuery("what is 2 for 2.70 on?");
+    assert.equal(parsed.mechanic, "multibuy");
+    assert.equal(parsed.quantity, 2);
+    assert.equal(parsed.totalEur, 2.7);
   });
 
   it("treats named campaigns as data lookups rather than invented answers", () => {
