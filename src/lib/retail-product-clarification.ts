@@ -18,6 +18,7 @@ export type ClarificationMatch = {
   service_area?: string | null;
   serviceArea?: string | null;
   fulfilment?: string | null;
+  current_price_eur?: number | null;
 };
 
 export type ProductClarificationKind = "fulfilment" | "refinement";
@@ -259,6 +260,29 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     matches,
     options?.fulfilment,
   );
+
+  const wantsCheapest =
+    options?.intent === "price" &&
+    /\b(?:cheapest|lowest\s+price|least\s+expensive|best\s+value|budget)\b/i.test(
+      query,
+    );
+  if (wantsCheapest && narrowed.length > 1) {
+    const priced = narrowed
+      .map((match, index) => ({
+        match,
+        index,
+        price: Number(match.current_price_eur),
+      }))
+      .filter((entry) => Number.isFinite(entry.price) && entry.price > 0)
+      .sort((a, b) => a.price - b.price || a.index - b.index);
+    if (priced.length > 0) {
+      return {
+        matches: [priced[0]!.match],
+        clarificationHint: null,
+        clarificationKind: null,
+      };
+    }
+  }
 
   // A broad offer category can legitimately return several different product
   // names ("toiletries" -> shampoo, deodorant, shower gel). Detect that before
