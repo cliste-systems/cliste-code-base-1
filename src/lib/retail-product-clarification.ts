@@ -74,11 +74,8 @@ function matchServiceArea(match: ClarificationMatch): string {
     .toLowerCase();
 }
 
-function fulfilmentClarificationAreaHint(serviceArea: string): string {
-  return (
-    COUNTER_PREPACK_AREA_HINTS[serviceArea] ??
-    "fresh at the counter, or the pre-pack packs in the aisle"
-  );
+function fulfilmentClarificationAreaHint(serviceArea: string): string | null {
+  return COUNTER_PREPACK_AREA_HINTS[serviceArea] ?? null;
 }
 
 function queryMatchesDepartmentScope(
@@ -155,6 +152,7 @@ export function buildOfferFulfilmentClarificationHint(
 
   const serviceArea = [...areas][0] ?? "";
   const areaHint = fulfilmentClarificationAreaHint(serviceArea);
+  if (!areaHint) return null;
 
   return (
     "Both fresh counter and pre-pack options are on offer this week — ask ONE short clarifying question, for example: " +
@@ -197,6 +195,7 @@ export function buildBroadOfferBrowseClarificationHint(
 export function buildBroadProductClarificationHint(
   query: string,
   matches: ClarificationMatch[],
+  options?: { allowDepartmentBrowse?: boolean },
 ): string | null {
   if (inferWeeklyOffersListIntent(query)) return null;
   if (!isBroadProductQuery(query)) return null;
@@ -205,7 +204,7 @@ export function buildBroadProductClarificationHint(
   // If the caller's words match the returned department/category itself,
   // this is a browse request ("cereals", "yogurts", "crisps"), not an
   // ambiguous individual product. Return the category offers directly.
-  if (queryMatchesDepartmentScope(query, matches)) {
+  if (options?.allowDepartmentBrowse !== false && queryMatchesDepartmentScope(query, matches)) {
     return null;
   }
 
@@ -269,7 +268,11 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
   const refinementHint =
     options?.intent === "offer"
       ? buildBroadOfferBrowseClarificationHint(query, narrowed)
-      : buildBroadProductClarificationHint(query, narrowed);
+      : buildBroadProductClarificationHint(query, narrowed, {
+          // A broad PRICE question usually needs one more detail (type/size/brand)
+          // before reading several prices. Stock/range browse can still return a category.
+          allowDepartmentBrowse: options?.intent !== "price",
+        });
   const clarificationHint = fulfilmentHint ?? refinementHint;
   const clarificationKind: ProductClarificationKind | null = fulfilmentHint
     ? "fulfilment"
