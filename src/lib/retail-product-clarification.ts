@@ -19,6 +19,8 @@ export type ClarificationMatch = {
   fulfilment?: string | null;
 };
 
+export type ProductClarificationKind = "fulfilment" | "refinement";
+
 const COUNTER_PREPACK_AREA_HINTS: Record<string, string> = {
   butcher:
     "fresh at the butcher counter, priced per kilo, or the pre-pack packs in the meat aisle",
@@ -160,6 +162,37 @@ export function buildOfferFulfilmentClarificationHint(
   );
 }
 
+/**
+ * Broad offer browse: confirm offers exist, then narrow before reading a random list.
+ *
+ * This is deliberately category-agnostic. The caller's own words drive the
+ * follow-up ("what type are you after?") rather than hardcoded department rules.
+ */
+export function buildBroadOfferBrowseClarificationHint(
+  query: string,
+  matches: ClarificationMatch[],
+): string | null {
+  if (!isBroadProductQuery(query)) return null;
+  if (matches.length < 3) return null;
+
+  const labels = distinctProductLabels(matches);
+  const departments = new Set(
+    matches
+      .map((match) => String(match.department ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  // Two near-identical results are small enough to answer directly. Once the
+  // result set is genuinely broad/diverse, make the conversation narrow first.
+  if (labels.length < 3 && departments.size < 2) return null;
+
+  return (
+    "Matching offers exist, but the caller's request is broad. " +
+    "Confirm naturally that there are offers, then ask ONE short narrowing question about what type, category, or brand they are after, using the caller's own words. " +
+    "Do NOT list product names or prices yet. Wait for their answer, then search again using that refinement."
+  );
+}
+
 /** When several types/brands match a broad query, Cara should ask one clarifying question first. */
 export function buildBroadProductClarificationHint(
   query: string,
@@ -217,7 +250,11 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     fulfilment?: SupervaluFulfilment | null;
     intent?: "offer" | "price" | "stock";
   },
-): { matches: T[]; clarificationHint: string | null } {
+): {
+  matches: T[];
+  clarificationHint: string | null;
+  clarificationKind: ProductClarificationKind | null;
+} {
   let narrowed = filterOfferMatchesByExplicitFulfilment(
     matches,
     options?.fulfilment,
@@ -229,13 +266,19 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     narrowed,
     options?.fulfilment,
   );
-  const clarificationHint =
-    fulfilmentHint ??
-    (options?.intent === "offer"
-      ? null
-      : buildBroadProductClarificationHint(query, narrowed));
+  const refinementHint =
+    options?.intent === "offer"
+      ? buildBroadOfferBrowseClarificationHint(query, narrowed)
+      : buildBroadProductClarificationHint(query, narrowed);
+  const clarificationHint = fulfilmentHint ?? refinementHint;
+  const clarificationKind: ProductClarificationKind | null = fulfilmentHint
+    ? "fulfilment"
+    : refinementHint
+      ? "refinement"
+      : null;
   return {
     clarificationHint,
+    clarificationKind,
     matches: narrowed,
   };
 }
