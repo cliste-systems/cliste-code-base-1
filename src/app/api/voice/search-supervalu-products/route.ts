@@ -320,7 +320,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const storeAwareMatches = responseMatches.flatMap((match) => {
+  const storeAwareRawMatches = responseMatches.flatMap((match) => {
     const sku = String(match.sku ?? "").trim();
     const nameKey = String(match.product_name ?? "").trim().toLowerCase();
     const productId =
@@ -362,6 +362,26 @@ export async function POST(request: Request) {
       },
     ];
   });
+
+  const storeAwareBySpokenOffer = new Map<
+    string,
+    (typeof storeAwareRawMatches)[number]
+  >();
+  for (const match of storeAwareRawMatches) {
+    const spokenKey = [
+      String(match.product_name ?? "").trim().toLowerCase(),
+      String(match.discount_label ?? "").trim().toLowerCase(),
+    ].join("|");
+    const existing = storeAwareBySpokenOffer.get(spokenKey);
+    if (
+      !existing ||
+      (existing.store_assortment_status !== "stocked" &&
+        match.store_assortment_status === "stocked")
+    ) {
+      storeAwareBySpokenOffer.set(spokenKey, match);
+    }
+  }
+  const storeAwareMatches = [...storeAwareBySpokenOffer.values()];
 
   let noMatchQuote: string | null =
     mappedMatches.length === 0
