@@ -149,7 +149,13 @@ function syncRepo(repo) {
   return true;
 }
 
-for (const repo of repos) syncRepo(repo);
+const initialSyncOk = repos.map((repo) => syncRepo(repo)).every(Boolean);
+if (!initialSyncOk) {
+  console.error(
+    "[local-sync] Initial sync needs attention. Fix the issue above, then run npm run dev:local again.",
+  );
+  process.exit(1);
+}
 
 const child = spawn("npm", ["run", "dev:text-rehearsal"], {
   cwd: dashboardRepo,
