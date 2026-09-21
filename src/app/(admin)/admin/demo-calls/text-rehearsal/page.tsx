@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import { Headphones } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 
 import { AdminErrorCard, AdminPageShell } from "@/components/admin/admin-page-shell";
 import { loadAdminDemoCallLines } from "@/lib/admin-demo-call";
 import { PRODUCT_NAME } from "@/lib/company-details";
 
-import { DemoCallsView } from "./demo-calls-view";
+import { TextRehearsalView } from "../text-rehearsal-view";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: `${PRODUCT_NAME} Admin — Demo calls`,
+  title: `${PRODUCT_NAME} Admin — Text rehearsal`,
 };
 
-export default async function DemoCallsAdminPage() {
+export default async function TextRehearsalAdminPage() {
   let loadError: string | null = null;
   let lines: Awaited<ReturnType<typeof loadAdminDemoCallLines>> = [];
 
@@ -25,11 +25,11 @@ export default async function DemoCallsAdminPage() {
   }
 
   return (
-    <AdminPageShell icon={Headphones} title="Demo calls">
+    <AdminPageShell icon={MessageSquareText} title="Text rehearsal" fillViewport>
       {loadError ? (
         <AdminErrorCard title="Could not load demo lines">{loadError}</AdminErrorCard>
       ) : (
-        <DemoCallsView lines={lines} />
+        <TextRehearsalView lines={lines} />
       )}
     </AdminPageShell>
   );

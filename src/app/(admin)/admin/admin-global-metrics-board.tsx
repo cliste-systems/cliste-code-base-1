@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 
 import type { AnalyticsSegment } from "@/lib/dashboard-home-analytics";
+import { adminCustomerPath, adminSupportPath } from "@/lib/admin-route-paths";
+import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 import { AdminMetricRangeToggle } from "./admin-metric-range-toggle";
@@ -70,7 +72,7 @@ function HeadlineMetric({
 
   const shellClass = cn(
     "block min-w-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/30",
-    href && "hover:bg-white/5",
+    href && cn(adminNavLinkBaseClass, "hover:bg-white/5"),
     compact && urgent && "bg-red-500/10",
   );
 
@@ -228,7 +230,7 @@ export function AdminGlobalMetricsBoard({
             label="Open support"
             value={formatInt(support)}
             icon={LifeBuoy}
-            href="/admin/support"
+            href={adminSupportPath()}
             tone={support > 0 ? "urgent" : "default"}
           />
         </div>
@@ -255,8 +257,11 @@ export function AdminGlobalMetricsBoard({
               {topTenants.map((tenant) => (
                 <li key={tenant.orgId}>
                   <Link
-                    href={`/admin/organizations/${tenant.orgId}`}
-                    className="group block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
+                    href={adminCustomerPath(tenant.orgId)}
+                    className={cn(
+                      adminNavLinkBaseClass,
+                      "group block rounded-lg",
+                    )}
                   >
                     <div className="flex items-center justify-between gap-2 text-sm">
                       <span className="truncate font-medium text-[#0b1220] group-hover:underline">

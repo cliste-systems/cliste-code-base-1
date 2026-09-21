@@ -114,6 +114,12 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   ) {
     return true;
   }
+  if (
+    offerSearchProductTokens(trimmed).length >= 2 &&
+    inferWeeklyOffersBrowseCategories(trimmed).length < 2
+  ) {
+    return false;
+  }
   if (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2) {
     return true;
   }
@@ -170,7 +176,7 @@ export function inferWeeklyOffersBrowseCategories(query: string): string[] {
   if (/bakery|bread|scone|croissant|baguette/i.test(trimmed)) {
     return ["bread", "croissant", "scone"];
   }
-  if (/provisions|ambient|household|tea|coffee|biscuits|back store|backstore/i.test(trimmed)) {
+  if (/\b(?:provisions|ambient|household|tea|coffee|biscuits|back store|backstore)\b/i.test(trimmed)) {
     return ["tea", "coffee", "biscuits", "household"];
   }
   if (/dairy|milk|yogurt|cheese|butter/i.test(trimmed)) {
@@ -370,6 +376,13 @@ function browseRetailWeeklyOffers(
   }
 
   return matches;
+}
+
+function isSpecificProductOfferQuery(query: string): boolean {
+  return (
+    offerSearchProductTokens(query).length > 0 &&
+    !inferWeeklyOffersListIntent(query)
+  );
 }
 
 function sampleRetailWeeklyOffersAcrossDepartments(
@@ -586,7 +599,7 @@ function preferProductNameMatches<
   const nameMatches = matches.filter((entry) =>
     productTokens.some((token) => nameIncludesToken(entry.row.product_name, token)),
   );
-  return nameMatches.length > 0 ? nameMatches : matches;
+  return nameMatches;
 }
 
 export type WeeklyOfferMatch = {
@@ -906,10 +919,10 @@ export function searchSyncedWeeklyOffersInRows(
   matches = preferProductNameMatches(matches, tokens);
 
   if (matches.length === 0) {
-    if (filters.serviceArea) {
+    if (filters.serviceArea && !isSpecificProductOfferQuery(trimmed)) {
       return sampleRetailWeeklyOffersAcrossDepartments(rows, tokenLimit, browseOptions);
     }
-    if (browseCategories.length > 0) {
+    if (browseCategories.length > 0 && !isSpecificProductOfferQuery(trimmed)) {
       return browseRetailWeeklyOffers(rows, browseCategories, tokenLimit, browseOptions);
     }
   }

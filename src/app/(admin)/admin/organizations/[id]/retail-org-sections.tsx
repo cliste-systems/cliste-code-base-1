@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { adminCustomerCaraTrainingPath } from "@/lib/admin-route-paths";
+import { adminPrimaryButtonClass } from "@/components/admin/admin-interactive";
+
 import type { TenantProvisioningStep } from "@/lib/tenant-provisioning-status";
 
 export function ProvisioningStepsRail({
@@ -65,8 +68,8 @@ export function CaraTrainingLinkCard({
         ) : null}
       </div>
       <Link
-        href={`/admin/customers/${organizationId}/cara-training`}
-        className="mt-4 inline-flex rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+        href={adminCustomerCaraTrainingPath(organizationId)}
+        className={`${adminPrimaryButtonClass} mt-4 rounded-lg px-4 py-2`}
       >
         Open Cara training
       </Link>

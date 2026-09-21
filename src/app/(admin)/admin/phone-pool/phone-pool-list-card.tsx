@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { AdminListCard } from "@/components/admin/admin-list-card";
+import { adminSecondaryButtonClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 import { triggerPhonePoolRefill } from "./actions";
@@ -52,7 +53,7 @@ export function PhonePoolListCard({
           }
         })
       }
-      className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className={adminSecondaryButtonClass}
     >
       <RefreshCw
         className={cn("size-3.5", pending && "animate-spin")}

@@ -13,6 +13,10 @@ import {
   adminTableTdClass,
   adminTableThClass,
 } from "@/components/admin/admin-table";
+import Link from "next/link";
+
+import { adminCustomerPath } from "@/lib/admin-route-paths";
+import { adminTextLinkClass } from "@/components/admin/admin-interactive";
 import { poolHealthCheck, twilioIsConfigured } from "@/lib/phone-pool";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -134,9 +138,16 @@ export default async function PhonePoolAdminPage() {
                     <AdminBadge className="capitalize">{r.status}</AdminBadge>
                   </td>
                   <td className={`text-gray-600 ${adminTableTdClass}`}>
-                    {r.organization_id
-                      ? (orgNameIndex.get(r.organization_id) ?? "(linked)")
-                      : "—"}
+                    {r.organization_id ? (
+                      <Link
+                        href={adminCustomerPath(r.organization_id)}
+                        className={adminTextLinkClass}
+                      >
+                        {orgNameIndex.get(r.organization_id) ?? "(linked)"}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className={`whitespace-nowrap text-gray-500 ${adminTableTdClass}`}>
                     {formatAgeLabel(r)}

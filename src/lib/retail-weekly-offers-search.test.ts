@@ -698,6 +698,11 @@ describe("retail weekly offers search", () => {
     assert.match(matches[0]?.productName ?? "", /Striploin/i);
   });
 
+  it("does not treat specific product offer questions as list intent", () => {
+    assert.equal(inferWeeklyOffersListIntent("is striploin steak on offer"), false);
+    assert.equal(inferWeeklyOffersListIntent("what offers in the meat counter this week"), true);
+  });
+
   it("scores striploin queries highest", async () => {
     const matches = await searchRetailWeeklyOffers(
       mockSupabaseRows(rows) as never,

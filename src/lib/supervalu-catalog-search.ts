@@ -435,6 +435,42 @@ export function formatCatalogStockNoMatchQuote(query: string): string {
   ].join(" ");
 }
 
+export function formatOfferFulfilmentMissQuote(input: {
+  query: string;
+  requestedFulfilment: SupervaluFulfilment;
+  alternateMatches: Array<{ quoteText: string }>;
+}): string {
+  const product = input.query.trim();
+  const channel =
+    input.requestedFulfilment === "counter"
+      ? "at the butcher counter this week"
+      : "in the pre-pack aisle this week";
+  const alternateChannel =
+    input.requestedFulfilment === "counter"
+      ? "in the pre-pack aisle this week"
+      : "at the butcher counter this week";
+
+  if (input.alternateMatches.length === 0) {
+    return [
+      `No synced weekly offer for "${product}" ${channel} on the list I checked.`,
+      "Do not say we never sell that product or that the butcher counter does not carry it — only that it is not on this week's synced offer list for that section.",
+      "Offer a team callback if they need someone to check the counter in person.",
+    ].join(" ");
+  }
+
+  const quotes = input.alternateMatches
+    .map((match) => match.quoteText.trim())
+    .filter(Boolean)
+    .join("\n\n");
+
+  return [
+    `No synced weekly offer for "${product}" ${channel} on the list I checked.`,
+    `There IS a synced offer ${alternateChannel} — if that is what they meant, quote only this:`,
+    quotes,
+    "Do not say we do not sell that product at the counter — say this week's synced offer list does not include it for the section they asked about.",
+  ].join("\n\n");
+}
+
 function catalogSearchCoreQuery(query: string): string {
   const trimmed = query.trim();
   const productQuery = stripCatalogSearchBoilerplate(trimmed) || trimmed;
@@ -636,7 +672,12 @@ async function searchSupervaluCatalogLiveInternal(
   });
 
   const merged = mergeGatewayWithSyncedOffers(gatewayMatches, syncedMatches, intent);
-  return filterCatalogMatchesByQuery(trimmed, merged);
+  let filtered = filterCatalogMatchesByQuery(trimmed, merged);
+  if (fulfilment) {
+    const fulfilmentMatches = filtered.filter((match) => match.fulfilment === fulfilment);
+    filtered = fulfilmentMatches;
+  }
+  return filtered;
 }
 
 export type SupervaluCatalogSearchResult = {

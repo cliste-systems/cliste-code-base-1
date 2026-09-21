@@ -255,4 +255,25 @@ describe("retail product clarification", () => {
     assert.ok(hint);
     assert.match(hint ?? "", /clarifying question/i);
   });
+
+  it("does not clarify unrelated butcher counter items for a sirloin query", () => {
+    const response = resolveProductSearchResponse(
+      "sirloin",
+      [
+        {
+          product_name: "SuperValu Fresh Irish Pork Steak (1 kg)",
+          service_area: "butcher",
+          fulfilment: "counter",
+        },
+        {
+          product_name: "SuperValu Fresh Irish Beef Eye of Round (1 kg)",
+          service_area: "butcher",
+          fulfilment: "counter",
+        },
+      ],
+      { fulfilment: "counter" },
+    );
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 0);
+  });
 });

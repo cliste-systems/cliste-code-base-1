@@ -16,6 +16,8 @@ import {
 } from "@/lib/organization-niche";
 import { createAdminClient } from "@/utils/supabase/admin";
 
+import { adminCustomerPath, adminCustomersPath } from "@/lib/admin-route-paths";
+import { adminMutedLinkClass } from "@/components/admin/admin-interactive";
 import { AccountPlanForm } from "@/app/(admin)/admin/organizations/[id]/account-plan-form";
 import { GoLiveCard } from "@/app/(admin)/admin/organizations/[id]/go-live-card";
 import { IrishPhoneCard } from "@/app/(admin)/admin/organizations/[id]/irish-phone-card";
@@ -168,8 +170,8 @@ export default async function AdminClientDetailPage({ params }: PageProps) {
   const header = (
     <div>
       <Link
-        href="/admin/customers"
-        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900"
+        href={adminCustomersPath()}
+        className={`${adminMutedLinkClass} mb-4`}
       >
         <ChevronLeft className="size-4" aria-hidden />
         Customers

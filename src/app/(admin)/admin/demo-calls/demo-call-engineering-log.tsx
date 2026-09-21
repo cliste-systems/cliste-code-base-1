@@ -87,6 +87,7 @@ export function useDemoCallEngineeringLog(input: {
   roomName: string | null;
   sessionStartedAt: number | null;
   enabled: boolean;
+  pollSessionLog?: boolean;
 }) {
   const [entries, setEntries] = useState<DemoCallLogEntry[]>([]);
   const [metrics, setMetrics] = useState({
@@ -183,6 +184,7 @@ export function useDemoCallEngineeringLog(input: {
   );
 
   useEffect(() => {
+    if (input.pollSessionLog === false) return;
     if (!input.enabled || !input.roomName) return;
     let cancelled = false;
 
@@ -205,7 +207,7 @@ export function useDemoCallEngineeringLog(input: {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [ingestServerLog, input.enabled, input.roomName]);
+  }, [ingestServerLog, input.enabled, input.pollSessionLog, input.roomName]);
 
   return {
     entries,
@@ -362,6 +364,50 @@ export function DemoCallEngineeringLogPanel({
           )}
         </div>
       </div>
+    </AdminSectionCard>
+  );
+}
+
+export function TextRehearsalIssueLog({
+  entries,
+  showWhenEmpty = false,
+  className,
+}: {
+  entries: DemoCallLogEntry[];
+  showWhenEmpty?: boolean;
+  className?: string;
+}) {
+  const issues = useMemo(
+    () => entries.filter((entry) => entry.level === "warn" || entry.level === "error"),
+    [entries],
+  );
+
+  if (issues.length === 0 && !showWhenEmpty) return null;
+
+  return (
+    <AdminSectionCard
+      title="Issues"
+      description="Errors and warnings only. Tool calls appear in the transcript above."
+      contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+      className={cn("flex min-h-0 flex-col", className)}
+    >
+      {issues.length === 0 ? (
+        <p className="px-5 py-3 text-sm text-gray-500">No issues yet.</p>
+      ) : (
+        <ul className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto px-5 py-3">
+          {issues.map((entry) => (
+            <li key={entry.id} className="py-2.5 text-sm leading-snug">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="font-mono text-xs text-gray-500">
+                  {formatElapsed(entry.atMs)}
+                </span>
+                <span className="text-xs text-gray-400">[{entry.tag}]</span>
+              </div>
+              <p className={cn("mt-0.5", logLevelClass(entry.level))}>{entry.message}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </AdminSectionCard>
   );
 }

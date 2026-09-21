@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import type { AdminGlobalMetricPeriod } from "@/lib/admin-metric-range";
+import { adminSegmentedTabButtonClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 const OPTIONS: { value: AdminGlobalMetricPeriod; label: string }[] = [
@@ -54,7 +55,8 @@ export function AdminMetricRangeToggle({
             type="button"
             onClick={() => setPeriod(value)}
             className={cn(
-              "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+              adminSegmentedTabButtonClass,
+              "rounded-full px-3.5 py-1.5 text-xs",
               isDark
                 ? active
                   ? "bg-white text-[#0b1220] shadow-sm"

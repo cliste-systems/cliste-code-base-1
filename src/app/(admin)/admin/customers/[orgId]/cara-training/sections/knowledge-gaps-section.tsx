@@ -3,7 +3,10 @@
 import Link from "next/link";
 
 import type { CaraTrainingGapItem } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
+import { adminCustomerCaraTrainingPath } from "@/lib/admin-route-paths";
+import { adminTextLinkClass } from "@/components/admin/admin-interactive";
 import { CaraTrainingInternalBanner } from "@/components/admin/cara-training-field";
+import { cn } from "@/lib/utils";
 
 import { SectionCard } from "./section-card";
 
@@ -58,14 +61,14 @@ export function KnowledgeGapsSection({ organizationId, gaps }: Props) {
         </ul>
       )}
       <p className="text-muted-foreground text-xs">
-        Answer learnable gaps in the{" "}
+        Answer learnable gaps in{" "}
         <Link
-          href={`/dashboard/cara-training`}
-          className="font-medium text-slate-700 underline"
+          href={adminCustomerCaraTrainingPath(organizationId)}
+          className={cn(adminTextLinkClass, "text-slate-700 underline")}
         >
-          tenant Cara training inbox
-        </Link>{" "}
-        (org {organizationId.slice(0, 8)}…).
+          Cara training for this store
+        </Link>
+        .
       </p>
     </SectionCard>
   );

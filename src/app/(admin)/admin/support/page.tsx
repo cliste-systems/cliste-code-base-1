@@ -5,10 +5,16 @@ import { LifeBuoy } from "lucide-react";
 import { AdminBadge } from "@/components/admin/admin-badge";
 import { AdminListCard } from "@/components/admin/admin-list-card";
 import {
+  adminSecondaryButtonClass,
+  adminTextLinkClass,
+} from "@/components/admin/admin-interactive";
+import {
   AdminErrorCard,
   AdminPageShell,
 } from "@/components/admin/admin-page-shell";
+import { adminSupportTicketPath } from "@/lib/admin-route-paths";
 import { PRODUCT_NAME } from "@/lib/company-details";
+import { cn } from "@/lib/utils";
 import {
   adminTableBodyClass,
   adminTableClass,
@@ -107,7 +113,7 @@ export default async function AdminSupportPage() {
           Requests submitted from each client&apos;s{" "}
           <Link
             href="/dashboard/support"
-            className="font-medium text-gray-700 underline-offset-2 hover:underline"
+            className={cn(adminTextLinkClass, "text-gray-700")}
           >
             Support
           </Link>{" "}
@@ -186,8 +192,8 @@ export default async function AdminSupportPage() {
                     <td className={`text-right ${adminTableTdClass}`}>
                       <div className="flex flex-col items-end gap-1.5">
                         <Link
-                          href={`/admin/support/${t.id}`}
-                          className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                          href={adminSupportTicketPath(t.id)}
+                          className={`${adminSecondaryButtonClass} justify-center px-2.5 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200`}
                         >
                           View
                         </Link>

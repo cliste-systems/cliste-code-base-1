@@ -1,5 +1,6 @@
 "use client";
 
+import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 import type { StoreSetupStepId, StoreSetupStepStatus } from "@/lib/admin-store-readiness";
 
@@ -35,7 +36,8 @@ export function ReadinessRail({
                 type="button"
                 onClick={() => onSelect(step.id)}
                 className={cn(
-                  "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors",
+                  adminNavLinkBaseClass,
+                  "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-sm",
                   active ? "bg-muted" : "hover:bg-muted/60",
                 )}
               >

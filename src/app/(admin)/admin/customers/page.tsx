@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 
 import { AdminBadge, adminTableMutedClass } from "@/components/admin/admin-badge";
 import { AdminListCard } from "@/components/admin/admin-list-card";
+import { adminTextLinkClass } from "@/components/admin/admin-interactive";
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
 import { AdminSegmentedTabs } from "@/components/admin/admin-segmented-tabs";
 import { AdminSetupStatusBadge } from "@/components/admin/admin-setup-status-badge";
@@ -20,12 +21,16 @@ import {
   adminTableThDateClass,
 } from "@/components/admin/admin-table";
 import { PRODUCT_NAME } from "@/lib/company-details";
+import { cn } from "@/lib/utils";
 import { isAdminClientLive } from "@/lib/admin-client-setup-status";
 import {
   clientProvisionSourceLabel,
   parseClientProvisionFilter,
 } from "@/lib/client-provision-source";
-import { loadAdminClients } from "@/lib/load-admin-clients";
+import {
+  adminCustomerPath,
+  adminCustomersPath,
+} from "@/lib/admin-route-paths";
 import {
   ORGANIZATION_NICHE_ADMIN_LABELS,
   parseOrganizationNiche,
@@ -68,12 +73,12 @@ function formatStatusLabel(
 }
 
 const FILTER_TABS = [
-  { value: "all", label: "All", href: "/admin/customers" },
-  { value: "managed", label: "Managed", href: "/admin/customers?type=managed" },
+  { value: "all", label: "All", href: adminCustomersPath() },
+  { value: "managed", label: "Managed", href: adminCustomersPath("managed") },
   {
     value: "self_serve",
     label: "Self-serve",
-    href: "/admin/customers?type=self_serve",
+    href: adminCustomersPath("self_serve"),
   },
 ] as const;
 
@@ -149,8 +154,8 @@ export default async function AdminCustomersPage({
                   <tr key={row.orgId} className={adminTableRowClass}>
                     <td className={adminTableTdClass}>
                       <Link
-                        href={`/admin/customers/${row.orgId}`}
-                        className="font-medium text-gray-900 hover:underline"
+                        href={adminCustomerPath(row.orgId)}
+                        className={cn(adminTextLinkClass, "text-gray-900")}
                       >
                         {displayCustomerName(row.name)}
                       </Link>
@@ -205,7 +210,7 @@ export default async function AdminCustomersPage({
                       <TenantRowActions
                         organizationId={row.orgId}
                         organizationName={row.name}
-                        customerHref={`/admin/customers/${row.orgId}`}
+                        customerHref={adminCustomerPath(row.orgId)}
                       />
                     </td>
                   </tr>

@@ -1,5 +1,11 @@
 import Link from "next/link";
 
+import { adminCustomerPath, adminCustomersPath } from "@/lib/admin-route-paths";
+import {
+  adminNavLinkBaseClass,
+  adminTextLinkClass,
+} from "@/components/admin/admin-interactive";
+
 import {
   ORGANIZATION_NICHE_ADMIN_LABELS,
   parseOrganizationNiche,
@@ -49,7 +55,7 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
             <p className="text-sm font-medium text-slate-600">No tenants yet</p>
             <p className="mt-1 max-w-[200px] text-xs leading-relaxed text-slate-500">
               Browse{" "}
-              <Link href="/admin/customers" className="font-medium text-[#0b1220] underline-offset-2 hover:underline">
+              <Link href={adminCustomersPath()} className={adminTextLinkClass}>
                 Customers
               </Link>{" "}
               to provision and manage accounts.
@@ -63,8 +69,8 @@ export function AdminTenantsPanel({ organizations }: AdminTenantsPanelProps) {
                 className="flex items-center gap-2 px-3 py-2.5 sm:px-4"
               >
                 <Link
-                  href={`/admin/customers/${org.id}`}
-                  className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
+                  href={adminCustomerPath(org.id)}
+                  className={`${adminNavLinkBaseClass} min-w-0 flex-1 rounded-md`}
                 >
                   <p className="truncate text-[13px] font-medium text-[#0b1220] hover:underline">
                     {org.name}

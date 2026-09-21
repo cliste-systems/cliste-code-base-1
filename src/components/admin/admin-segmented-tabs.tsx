@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 type SegmentedTab = {
@@ -34,7 +35,8 @@ export function AdminSegmentedTabs({
             role="tab"
             aria-selected={active}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              adminNavLinkBaseClass,
+              "rounded-md px-3 py-1.5 text-sm font-medium",
               active
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-600 hover:text-gray-900",

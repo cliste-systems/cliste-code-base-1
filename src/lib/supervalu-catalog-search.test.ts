@@ -6,6 +6,7 @@ import {
   filterCatalogMatchesByQuery,
   formatCatalogStockNoMatchQuote,
   formatCatalogStockQuote,
+  formatOfferFulfilmentMissQuote,
   formatOwnBrandFallbackQuote,
   inferCatalogOfferBrowseCategories,
   inferCatalogSearchIntent,
@@ -267,5 +268,22 @@ describe("supervalu catalog search", () => {
       ]).length,
       1,
     );
+  });
+
+  it("formats fulfilment miss quotes with alternate synced offers", () => {
+    const quote = formatOfferFulfilmentMissQuote({
+      query: "sirloin",
+      requestedFulfilment: "counter",
+      alternateMatches: [
+        {
+          quoteText:
+            "In the pre-pack meat aisle this week. SuperValu Signature Tastes Wagyu Sirloin Steak. twenty percent off.",
+        },
+      ],
+    });
+    assert.match(quote, /No synced weekly offer for "sirloin" at the butcher counter/i);
+    assert.match(quote, /pre-pack aisle/i);
+    assert.match(quote, /Wagyu Sirloin/i);
+    assert.doesNotMatch(quote, /never sell/i);
   });
 });

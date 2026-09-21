@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
+import { adminCustomerPath } from "@/lib/admin-route-paths";
+import { adminMutedLinkClass } from "@/components/admin/admin-interactive";
 import { loadAdminClientDetail } from "@/lib/load-admin-clients";
 
 import { loadCaraTrainingData } from "@/app/(admin)/admin/organizations/[id]/cara-training/cara-training-actions";
@@ -25,8 +27,8 @@ export default async function ClientCaraTrainingPage({ params }: PageProps) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 p-6 md:p-8">
         <Link
-          href={`/admin/customers/${orgId}`}
-          className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900"
+          href={adminCustomerPath(orgId)}
+          className={adminMutedLinkClass}
         >
           <ChevronLeft className="size-4" aria-hidden />
           Back to customer
@@ -50,8 +52,8 @@ export default async function ClientCaraTrainingPage({ params }: PageProps) {
     <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
       <div>
         <Link
-          href={`/admin/customers/${orgId}`}
-          className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900"
+          href={adminCustomerPath(orgId)}
+          className={`${adminMutedLinkClass} mb-4`}
         >
           <ChevronLeft className="size-4" aria-hidden />
           Back to customer

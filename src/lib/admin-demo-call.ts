@@ -161,7 +161,22 @@ export async function resolveAdminDemoCallLine(
   const raw = calledNumber?.trim() ?? "";
   if (!raw) return null;
   const lines = await loadAdminDemoCallLines();
-  return lines.find((line) => line.e164 === raw) ?? null;
+  const normalized = normalizeDemoLineE164(raw);
+  return (
+    lines.find((line) => line.e164 === raw || line.e164 === normalized) ?? null
+  );
+}
+
+/** Match assigned pool numbers regardless of spacing/formatting. */
+function normalizeDemoLineE164(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("353") && digits.length >= 11) {
+    return `+${digits}`;
+  }
+  if (digits.startsWith("0") && digits.length >= 10) {
+    return `+353${digits.slice(1)}`;
+  }
+  return value.trim();
 }
 
 export type StartAdminDemoCallInput = {
@@ -201,12 +216,78 @@ function resolveAgentName(): string {
   return process.env.LIVEKIT_AGENT_NAME?.trim() || "cliste-voice-node";
 }
 
-function buildDispatchMetadata(calledNumber: string): string {
+function buildDispatchMetadata(line: AdminDemoCallLine): string {
   return JSON.stringify({
-    phone_number: calledNumber,
+    phone_number: line.e164,
+    organization_id: line.orgId,
+    organization_slug: line.orgSlug,
     caller_number: ADMIN_SIM_CALLER_E164,
     source: "admin_simulator",
   });
+}
+
+function buildTextRehearsalMetadata(line: AdminDemoCallLine): string {
+  return JSON.stringify({
+    phone_number: line.e164,
+    organization_id: line.orgId,
+    organization_slug: line.orgSlug,
+    caller_number: ADMIN_SIM_CALLER_E164,
+    source: "text_rehearsal",
+    skip_greeting: true,
+  });
+}
+
+export async function startAdminTextRehearsalCall(
+  input: StartAdminDemoCallInput,
+): Promise<StartAdminDemoCallResult> {
+  const line = await resolveAdminDemoCallLine(input.calledNumber);
+  if (!line) {
+    throw new Error("Invalid demo line — choose an assigned store number.");
+  }
+
+  const { apiKey, apiSecret } = resolveLiveKitCredentials();
+  const host = livekitHttpHostFromEnv();
+  const livekitUrl = resolveLiveKitWsUrl();
+  const agentName = resolveAgentName();
+  const roomName = `text-rehearsal-${randomUUID()}`;
+  const metadata = buildTextRehearsalMetadata(line);
+
+  const roomClient = new RoomServiceClient(host, apiKey, apiSecret);
+  const dispatchClient = new AgentDispatchClient(host, apiKey, apiSecret);
+
+  await roomClient.createRoom({
+    name: roomName,
+    metadata,
+    emptyTimeout: 120,
+    departureTimeout: 30,
+    maxParticipants: 4,
+  });
+
+  await dispatchClient.createDispatch(roomName, agentName, { metadata });
+
+  const identity = `text-rehearsal-${input.staffIdentity.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40)}-${randomUUID().slice(0, 8)}`;
+
+  const token = new AccessToken(apiKey, apiSecret, {
+    identity,
+    name: "Text rehearsal",
+    ttl: "45m",
+  });
+  token.addGrant({
+    roomJoin: true,
+    room: roomName,
+    canPublish: false,
+    canSubscribe: false,
+    canPublishData: true,
+  });
+
+  return {
+    livekitUrl,
+    roomName,
+    token: await token.toJwt(),
+    calledNumber: line.e164,
+    callerNumber: ADMIN_SIM_CALLER_E164,
+    orgName: line.orgName,
+  };
 }
 
 export async function startAdminDemoCall(
@@ -222,7 +303,7 @@ export async function startAdminDemoCall(
   const livekitUrl = resolveLiveKitWsUrl();
   const agentName = resolveAgentName();
   const roomName = `admin-demo-${randomUUID()}`;
-  const metadata = buildDispatchMetadata(line.e164);
+  const metadata = buildDispatchMetadata(line);
 
   const roomClient = new RoomServiceClient(host, apiKey, apiSecret);
   const dispatchClient = new AgentDispatchClient(host, apiKey, apiSecret);

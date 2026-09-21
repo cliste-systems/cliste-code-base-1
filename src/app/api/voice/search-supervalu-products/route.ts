@@ -4,11 +4,13 @@ import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
   assessSyncedOffersFreshness,
   loadLatestRetailOfferWeekEnd,
+  offerSearchProductTokens,
 } from "@/lib/retail-weekly-offers-search";
 import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
 import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
 import {
   formatCatalogStockNoMatchQuote,
+  formatOfferFulfilmentMissQuote,
   inferCatalogSearchIntent,
   searchSupervaluCatalogLiveWithFallback,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
@@ -193,6 +195,52 @@ export async function POST(request: Request) {
     { fulfilment },
   );
 
+  let noMatchQuote: string | null =
+    mappedMatches.length === 0
+      ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
+      : null;
+
+  if (
+    responseMatches.length === 0 &&
+    fulfilment &&
+    intent === "offer" &&
+    offerSearchProductTokens(query).length > 0
+  ) {
+    const alternateFulfilment: SupervaluFulfilment =
+      fulfilment === "counter" ? "prepack" : "counter";
+    const { matches: alternateRaw } = await searchSupervaluCatalogLiveWithFallback(query, {
+      intent,
+      supabase: admin,
+      retailBanner,
+      fulfilment: alternateFulfilment,
+    });
+    const alternateMapped = alternateRaw.map((match) => ({
+      product_name: match.productName,
+      department: match.department,
+      sku: match.sku,
+      current_price_eur: match.currentPriceEur,
+      was_price_eur: match.wasPriceEur,
+      discount_label: match.discountLabel,
+      is_on_offer: match.isOnOffer,
+      service_area: match.serviceArea ?? null,
+      fulfilment: match.fulfilment ?? null,
+      is_alcohol: match.isAlcohol === true,
+      score: match.score,
+      quote_text: match.quoteText,
+      source: match.source ?? null,
+    }));
+    const { matches: alternateMatches } = resolveProductSearchResponse(query, alternateMapped, {
+      fulfilment: alternateFulfilment,
+    });
+    noMatchQuote = formatOfferFulfilmentMissQuote({
+      query,
+      requestedFulfilment: fulfilment,
+      alternateMatches: alternateMatches.map((match) => ({
+        quoteText: match.quote_text,
+      })),
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     intent,
@@ -200,9 +248,6 @@ export async function POST(request: Request) {
     clarification_hint: clarificationHint,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
     matches: responseMatches,
-    no_match_quote:
-      mappedMatches.length === 0
-        ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
-        : null,
+    no_match_quote: noMatchQuote,
   });
 }

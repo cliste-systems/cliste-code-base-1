@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3001",
+    "dev:text-rehearsal": "concurrently -k -n dashboard,worker -c blue,green \"LIVEKIT_AGENT_NAME=cliste-voice-local npm run dev\" \"LIVEKIT_AGENT_NAME=cliste-voice-local CLISTE_APP_URL=http://localhost:3001 npm --prefix ../cliste-code-base-2 run dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -53,6 +54,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.4",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "^16.3.5",

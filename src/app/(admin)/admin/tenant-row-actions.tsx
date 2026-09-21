@@ -1,5 +1,6 @@
 "use client";
 
+import { adminIconButtonClass } from "@/components/admin/admin-interactive";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
@@ -21,6 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogIn, MoreHorizontal, Settings2, Trash2 } from "lucide-react";
 
+import { adminCustomerPath } from "@/lib/admin-route-paths";
+
 import {
   createSupportDashboardLink,
   deleteOrganization,
@@ -35,7 +38,7 @@ type TenantRowActionsProps = {
 export function TenantRowActions({
   organizationId,
   organizationName,
-  customerHref = `/admin/customers/${organizationId}`,
+  customerHref = adminCustomerPath(organizationId),
 }: TenantRowActionsProps) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -78,7 +81,7 @@ export function TenantRowActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0b1220]"
+          className={`${adminIconButtonClass} size-8`}
           aria-label={`Actions for ${organizationName}`}
         >
           <MoreHorizontal className="size-4" aria-hidden />

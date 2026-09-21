@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
+import { adminMutedLinkClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
@@ -20,7 +21,7 @@ export const ADMIN_PAGE_X_PADDING = "px-6";
 type AdminPageShellProps = {
   icon: IconType;
   title: string;
-  description: ReactNode;
+  description?: ReactNode;
   actions?: ReactNode;
   maxWidth?: AdminPageShellMaxWidth;
   backHref?: string;
@@ -59,7 +60,7 @@ export function AdminPageShell({
       {backHref ? (
         <Link
           href={backHref}
-          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900"
+          className={cn(adminMutedLinkClass, "shrink-0")}
         >
           <ChevronLeft className="size-4" aria-hidden />
           {backLabel ?? "Back"}
@@ -72,7 +73,9 @@ export function AdminPageShell({
             <Icon className="h-5 w-5 text-gray-500" aria-hidden />
             {title}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">{description}</p>
+          {description ? (
+            <p className="mt-1 text-sm text-gray-500">{description}</p>
+          ) : null}
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </header>

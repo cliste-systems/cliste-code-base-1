@@ -8,37 +8,53 @@ import {
   Headphones,
   LayoutGrid,
   LifeBuoy,
+  MessageSquareText,
   Phone,
   Users,
 } from "lucide-react";
 
 import { isPublicSignupEnabled } from "@/lib/public-signup";
+import {
+  adminCustomersPath,
+  adminDemoCallsPath,
+  adminOverviewPath,
+  adminPhonePoolPath,
+  adminSupportPath,
+  adminTextRehearsalPath,
+} from "@/lib/admin-route-paths";
+import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 import { AdminSignOutButton } from "./admin-sign-out-button";
 
 const baseNav = [
-  { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
+  { href: adminOverviewPath(), label: "Overview", icon: LayoutGrid, exact: true },
   {
-    href: "/admin/customers",
+    href: adminCustomersPath(),
     label: "Customers",
     icon: Users,
     exact: false,
   },
   {
-    href: "/admin/phone-pool",
+    href: adminPhonePoolPath(),
     label: "Phone pool",
     icon: Phone,
     exact: false,
   },
   {
-    href: "/admin/demo-calls",
+    href: adminDemoCallsPath(),
     label: "Demo calls",
     icon: Headphones,
-    exact: false,
+    exact: true,
   },
   {
-    href: "/admin/support",
+    href: adminTextRehearsalPath(),
+    label: "Text rehearsal",
+    icon: MessageSquareText,
+    exact: true,
+  },
+  {
+    href: adminSupportPath(),
     label: "Support tickets",
     icon: LifeBuoy,
     exact: false,
@@ -78,7 +94,8 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
               key={href}
               href={href}
               className={cn(
-                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40",
+                adminNavLinkBaseClass,
+                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px]",
                 active
                   ? "bg-slate-100 font-medium text-[#0b1220]"
                   : "font-normal text-slate-600 hover:bg-slate-50 hover:text-[#0b1220]",

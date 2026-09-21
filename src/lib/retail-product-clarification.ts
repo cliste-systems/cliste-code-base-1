@@ -99,7 +99,7 @@ function narrowMatchesByProductTokens<T extends ClarificationMatch>(
       return name.includes(stem);
     });
   });
-  return byProductName.length > 0 ? byProductName : matches;
+  return byProductName;
 }
 
 /** Narrow to counter or pre-pack only when the tool was called with an explicit fulfilment choice. */
@@ -159,6 +159,18 @@ export function buildBroadProductClarificationHint(
 
   const labels = distinctProductLabels(matches);
   if (labels.length < 2) return null;
+
+  const productTokens = offerSearchProductTokens(query);
+  if (productTokens.length > 0) {
+    const relevant = matches.filter((match) => {
+      const name = String(match.productName ?? match.product_name ?? "").toLowerCase();
+      return productTokens.some((token) => {
+        const stem = token.replace(/s$/, "");
+        return name.includes(stem);
+      });
+    });
+    if (relevant.length < 2) return null;
+  }
 
   const examples = labels.slice(0, 4).join("; ");
   return (

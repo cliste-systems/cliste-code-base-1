@@ -49,7 +49,7 @@ export default async function AdminShellLayout({
               <div className="shrink-0 border-b border-slate-100 px-4 py-5">
                 <Link
                   href="/admin"
-                  className="flex items-center gap-3 rounded-lg outline-none transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:ring-slate-400/40"
+                  className="flex cursor-pointer items-center gap-3 rounded-lg outline-none transition-colors hover:opacity-90 focus-visible:ring-2 focus-visible:ring-slate-400/40"
                 >
                   <ClisteLogoMark size={36} priority className="shrink-0" />
                   <div className="min-w-0 flex-col">
