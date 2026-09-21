@@ -170,6 +170,12 @@ const RETAIL_PACK: VerticalPack = {
         section: "core",
         afterHref: DASHBOARD_ROUTES.businessFaqs,
       },
+      {
+        href: DASHBOARD_ROUTES.products,
+        label: "Products",
+        section: "core",
+        afterHref: DASHBOARD_ROUTES.departments,
+      },
     ],
     hiddenHrefs: [
       DASHBOARD_ROUTES.actionInbox,
