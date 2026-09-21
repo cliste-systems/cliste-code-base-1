@@ -11,6 +11,30 @@ import {
 } from "./retail-product-clarification";
 
 describe("retail product clarification", () => {
+  it("returns multiple matching offers without asking for another brand clarification", () => {
+    const response = resolveProductSearchResponse(
+      "Kelloggs",
+      [
+        {
+          product_name: "Kellogg's Corn Flakes (450 g)",
+          department: "Cereals",
+          service_area: "grocery",
+          fulfilment: "prepack",
+        },
+        {
+          product_name: "Kellogg's Rice Krispies (430 g)",
+          department: "Family Cereals",
+          service_area: "grocery",
+          fulfilment: "prepack",
+        },
+      ],
+      { intent: "offer" },
+    );
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 2);
+  });
+
+
   it("does not ask for a brand when the query is the department itself", () => {
     const response = resolveProductSearchResponse("cereals", [
       {
