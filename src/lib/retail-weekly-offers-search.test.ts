@@ -408,6 +408,28 @@ describe("supervalu offers sync helpers", () => {
   });
 });
 
+describe("retail offer intent routing", () => {
+  it("does not turn branded fish-finger questions into generic fish browsing", () => {
+    assert.equal(
+      inferWeeklyOffersListIntent(
+        "are the Bird's Eye fish fingers on offer this week?",
+      ),
+      false,
+    );
+  });
+
+  it("keeps genuine department offer questions as browsing", () => {
+    assert.equal(inferWeeklyOffersListIntent("what fish is on offer this week?"), true);
+    assert.equal(inferWeeklyOffersListIntent("any fish offers this week?"), true);
+    assert.equal(inferWeeklyOffersListIntent("what alcohol is on offer?"), true);
+  });
+
+  it("keeps specific butcher products specific even though butcher is a service area", () => {
+    assert.equal(inferWeeklyOffersListIntent("is sirloin on offer this week?"), false);
+    assert.equal(inferWeeklyOffersListIntent("any fillet steaks on offer?"), false);
+  });
+});
+
 describe("retail weekly offers search", () => {
   it("treats a real department query like cereals as a browse, not one ambiguous product", () => {
     const rows = [
