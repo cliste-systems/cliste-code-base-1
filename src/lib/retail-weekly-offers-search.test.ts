@@ -11,7 +11,7 @@ import {
   inferWeeklyOffersListIntent,
   isRetailOfferWeekActive,
   resolveWeeklyOfferSearchFilters,
-  searchRetailWeeklyOffers,
+  searchRetailWeeklyOffers,\n  scoreSupervaluSearchText,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
 import {
@@ -406,6 +406,22 @@ describe("supervalu offers sync helpers", () => {
 });
 
 describe("retail weekly offers search", () => {
+  it("scores minor STT spelling slips against the intended product word", () => {
+    const fillet = scoreSupervaluSearchText(
+      "supervalu signature tastes hereford irish fillet steak",
+      ["filled", "steak"],
+      "Beef Steaks",
+    );
+    const striploin = scoreSupervaluSearchText(
+      "supervalu signature tastes irish striploin steak",
+      ["filled", "steak"],
+      "Beef Steaks",
+    );
+    assert.ok(fillet > 0.85);
+    assert.ok(fillet > striploin + 0.25);
+  });
+
+
   const rows: RetailWeeklyOfferRow[] = [
     mockOfferRow({
       id: "1",
