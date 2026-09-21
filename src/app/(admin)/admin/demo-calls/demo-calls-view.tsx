@@ -96,7 +96,9 @@ function ActiveCallPanel({
   const connectionState = useConnectionState();
   const [agentJoined, setAgentJoined] = useState(false);
   const [microphoneReady, setMicrophoneReady] = useState(false);
+  const [workerMissing, setWorkerMissing] = useState(false);
   const micEnableStartedRef = useRef(false);
+  const workerWarnLoggedRef = useRef(false);
 
   useEffect(() => {
     const syncParticipants = () => {
@@ -110,6 +112,25 @@ function ActiveCallPanel({
       room.off(RoomEvent.ParticipantDisconnected, syncParticipants);
     };
   }, [room]);
+
+  useEffect(() => {
+    if (agentJoined || connectionState !== ConnectionState.Connected) {
+      setWorkerMissing(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setWorkerMissing(true);
+      if (!workerWarnLoggedRef.current) {
+        workerWarnLoggedRef.current = true;
+        log.append(
+          "warn",
+          "worker",
+          "No voice worker joined this room. For local demo calls, run npm run dev:local from cliste-code-base-1 so the dashboard and local Cara worker start together.",
+        );
+      }
+    }, 8_000);
+    return () => window.clearTimeout(timer);
+  }, [agentJoined, connectionState, log]);
 
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return;
@@ -179,6 +200,17 @@ function ActiveCallPanel({
           {session.orgName ?? "Store"} · {formatIrishE164Display(session.calledNumber)}
         </span>
       </div>
+
+      {workerMissing ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Cara&apos;s voice worker has not joined.</p>
+          <p className="mt-1 text-amber-800">
+            Local demo calls need the full local stack. Stop this server and run{" "}
+            <code className="font-mono text-xs">npm run dev:local</code> from{" "}
+            <code className="font-mono text-xs">cliste-code-base-1</code>.
+          </p>
+        </div>
+      ) : null}
 
       <button
         type="button"
