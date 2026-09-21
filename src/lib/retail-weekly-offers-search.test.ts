@@ -989,6 +989,98 @@ describe("retail weekly offers search", () => {
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("meat department steaks"), "butcher");
   });
 
+  it("normalizes simple plurals for category scope without turning wine gums into alcohol", () => {
+    assert.equal(resolveWeeklyOfferSearchFilters("wines").serviceArea, "off_licence");
+    assert.equal(inferWeeklyOffersListIntent("wines on offer"), true);
+    assert.equal(resolveWeeklyOfferSearchFilters("wine gums").serviceArea, null);
+  });
+
+  it("filters obviously misclassified tea and juice out of produce browsing", () => {
+    const rows = [
+      mockOfferRow({
+        id: "berry-tea",
+        product_name: "Barry's Tea Berry Burst 20 Bags (50 g)",
+        department: "Green, Fruit & Herbal Tea",
+        category_breadcrumb: "/categories/tea/green-fruit-herbal-tea-id-O301526",
+        service_area: "produce",
+        fulfilment: "prepack",
+        current_price_eur: 3,
+        search_text: "barrys tea berry burst green fruit herbal tea",
+      }),
+      mockOfferRow({
+        id: "rubicon",
+        product_name: "Rubicon Mango (1 L)",
+        department: "Tropical & Mixed Fruit",
+        category_breadcrumb: "/categories/chill-long-life-juice/tropical-mixed-fruit-id-O411168",
+        service_area: "produce",
+        fulfilment: "prepack",
+        current_price_eur: 1.75,
+        search_text: "rubicon mango tropical mixed fruit juice",
+      }),
+      mockOfferRow({
+        id: "berries",
+        product_name: "SuperValu Signature Tastes Blueberries (125 g)",
+        department: "Berries",
+        category_breadcrumb: "/categories/fruit/berries-id-O302620",
+        service_area: "produce",
+        fulfilment: "prepack",
+        current_price_eur: 2.5,
+        search_text: "supervalu blueberries berries fruit",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(rows, "fruit and veg offers");
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Blueberries/i);
+  });
+
+  it("does not classify incidental fruit words in tea, juice, or fruit bread as produce", () => {
+    const tea = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Barry's Tea Berry Burst 20 Bags (50 g)",
+        priceNumeric: 3,
+        sellBy: "Each",
+        defaultCategory: [
+          { categoryBreadcrumb: "Grocery/Tea/Green, Fruit & Herbal Tea" },
+        ],
+        attributes: { altCategory: "Green, Fruit & Herbal Tea" },
+      },
+      productName: "Barry's Tea Berry Burst 20 Bags (50 g)",
+      department: "Green, Fruit & Herbal Tea",
+    });
+    assert.notEqual(tea.serviceArea, "produce");
+
+    const juice = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Rubicon Mango (1 L)",
+        priceNumeric: 1.75,
+        sellBy: "Each",
+        defaultCategory: [
+          { categoryBreadcrumb: "Grocery/Chill Long Life Juice/Tropical & Mixed Fruit" },
+        ],
+        attributes: { altCategory: "Tropical & Mixed Fruit" },
+      },
+      productName: "Rubicon Mango (1 L)",
+      department: "Tropical & Mixed Fruit",
+    });
+    assert.notEqual(juice.serviceArea, "produce");
+
+    const fruit = classifySupervaluOfferServiceArea({
+      product: {
+        name: "SuperValu Blueberries (125 g)",
+        priceNumeric: 2.5,
+        sellBy: "Each",
+        defaultCategory: [
+          { categoryBreadcrumb: "Grocery/Fruit/Berries" },
+        ],
+        attributes: { altCategory: "Berries" },
+      },
+      productName: "SuperValu Blueberries (125 g)",
+      department: "Berries",
+    });
+    assert.equal(fruit.serviceArea, "produce");
+  });
+
   it("only narrows fulfilment when the caller explicitly chose counter or pre-pack", () => {
     assert.equal(inferWeeklyOfferFulfilmentFromQuery("deli offers"), null);
     assert.equal(inferWeeklyOfferFulfilmentFromQuery("butcher offers"), null);
