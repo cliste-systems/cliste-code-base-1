@@ -11,6 +11,7 @@ import {
   normalizeSearchText,
 } from "@/lib/supervalu-offers-normalize";
 import { formatInTimeZone } from "date-fns-tz";
+import { retailSearchTokenMatchesText, retailSearchTokenSimilarity } from "@/lib/retail-search-fuzzy";
 import {
   formatSpokenDiscountLabel,
   formatSpokenEurAmount,
@@ -501,7 +502,7 @@ export function scoreSupervaluSearchText(
   if (tokens.length === 0) return 0;
   let score = 0;
   for (const token of tokens) {
-    if (searchText.includes(token)) score += 1;
+    score += retailSearchTokenSimilarity(searchText, token);
   }
   if (/butcher|beef|meat|steak|striploin|lamb|poultry|chicken|deli|ham/i.test(department)) {
     score += 0.15;
@@ -586,10 +587,8 @@ function preferProductNameMatches<
   const productTokens = tokens.filter((token) => !FULFILMENT_QUERY_TOKENS.has(token));
   if (productTokens.length === 0 || matches.length <= 1) return matches;
 
-  const nameIncludesToken = (productName: string, token: string) => {
-    const stem = token.replace(/s$/, "");
-    return normalizeSearchText(productName).includes(stem);
-  };
+  const nameIncludesToken = (productName: string, token: string) =>
+    retailSearchTokenMatchesText(productName, token);
 
   if (productTokens.length >= 2) {
     const strictMatches = matches.filter((entry) =>
