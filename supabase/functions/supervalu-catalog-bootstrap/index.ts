@@ -122,11 +122,32 @@ function promoRows(card: any, storeProductId: string, week: {start:string,end:st
     if (multi) promotionType = "multibuy";
     else if (loyalty) promotionType = "loyalty";
     else if (/save\s+\d+\s*%/i.test(label)) promotionType = "percentage";
-    let offerPrice = multi ? null : eur(label);
-    if (offerPrice == null && loyalty && card.displayPrice != null && card.displayPrice !== card.regularPrice) {
+
+    // Badge amounts are not always selling prices. For example "Save €2"
+    // means a €2 saving, while the actual selling price is the card's display
+    // price. Only loyalty badges explicitly encode a separate offer price.
+    const saveAmountMatch = label.match(/\bsave\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i);
+    const savePercentMatch = label.match(/\bsave\s*([0-9]+(?:[.,][0-9]+)?)\s*%/i);
+    const badgePrice = eur(label);
+    let offerPrice: number | null = null;
+    if (multi) {
+      offerPrice = null;
+    } else if (loyalty) {
+      offerPrice = badgePrice;
+      if (offerPrice == null && card.displayPrice != null && card.displayPrice !== card.regularPrice) {
+        offerPrice = card.displayPrice;
+      }
+    } else {
       offerPrice = card.displayPrice;
     }
+
     const metadata: Record<string, unknown> = { source: "supervalu_public_storefront" };
+    if (saveAmountMatch) {
+      metadata.save_amount_eur = Number(saveAmountMatch[1].replace(",", "."));
+    }
+    if (savePercentMatch) {
+      metadata.save_percent = Number(savePercentMatch[1].replace(",", "."));
+    }
     if (multi) {
       metadata.multibuy_quantity = Number(multi[1]);
       metadata.multibuy_total_eur = Number(multi[2].replace(",", "."));
