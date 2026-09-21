@@ -67,6 +67,7 @@ const PROMOTION_NOISE = new Set([
   "today",
   "this",
   "what",
+  "which",
   "whats",
   "what's",
   "any",
@@ -139,7 +140,7 @@ export type RetailPromotionMechanic =
   | "save_amount"
   | "fixed_price"
   | "named"
-  | "generic";
+  | "unstructured";
 
 export type ParsedRetailPromotionQuery = {
   mechanic: RetailPromotionMechanic;
@@ -250,7 +251,7 @@ export function parseRetailPromotionQuery(
     /(?:buy\s+)?(\d+)\s+for\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*euro)?\b/i,
   );
   const loyaltyRequired =
-    /\breal\s+rewards?\b|\brewards?\s+price\b|\bmembers?\s+(?:price|offer|deal)s?\b/i.test(
+    /\breal\s+rewards?\b|\bwith\s+(?:real\s+)?rewards?\b|\brewards?\s+(?:price|offer|deal)s?\b|\bmembers?\s+(?:price|offer|deal)s?\b/i.test(
       normalized,
     );
   const halfPrice = /\bhalf\s+price\b|\b50\s*%\s*off\b/i.test(normalized);
@@ -279,7 +280,7 @@ export function parseRetailPromotionQuery(
           ? "great value"
           : null;
 
-  let mechanic: RetailPromotionMechanic = "generic";
+  let mechanic: RetailPromotionMechanic = "unstructured";
   if (multibuy || mixMatch) mechanic = "multibuy";
   else if (halfPrice) mechanic = "half_price";
   else if (savePercent) mechanic = "save_percent";
@@ -309,7 +310,7 @@ export function parseRetailPromotionQuery(
 }
 
 export function shouldUseStructuredPromotionSearch(query: string): boolean {
-  return parseRetailPromotionQuery(query).mechanic !== "generic";
+  return parseRetailPromotionQuery(query).mechanic !== "unstructured";
 }
 
 function parseLabelMultibuy(
@@ -384,7 +385,7 @@ export async function searchStructuredNationalPromotions(
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const parsed = parseRetailPromotionQuery(input.query);
-  if (parsed.mechanic === "generic") return [];
+  if (parsed.mechanic === "unstructured") return [];
 
   const { data, error } = await supabase.rpc(
     "search_retail_promotions_consensus",
