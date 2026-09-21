@@ -465,10 +465,8 @@ function formatPromotionQuote(input: {
     input.promotionType === "multibuy" ||
     Boolean(input.label && parseLabelMultibuy(input.label));
   if (multibuy) {
-    const individual = input.displayPriceEur ?? input.regularPriceEur;
-    if (individual != null) {
-      parts.push(`individually ${formatSpokenEurAmount(individual)}`);
-    }
+    // The bundle total is the verified mechanic. Individual shelf prices can
+    // vary by storefront, so do not turn them into part of the quoted deal.
   } else {
     if (
       input.offerPriceEur != null &&
@@ -496,168 +494,92 @@ export async function searchStructuredNationalPromotions(
   const parsed = parseRetailPromotionQuery(input.query);
   if (parsed.mechanic === "generic") return [];
 
-  const today = formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd");
-  let query = supabase
-    .from("retail_promotions")
-    .select(
-      `id,promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,description,valid_from,valid_to,national_store_count,source_metadata,
-       retail_store_products!inner(
-         id,product_id,source_store_id,regular_price_eur,display_price_eur,price_per_unit,
-         retail_catalog_products!inner(
-           id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,is_national,search_text
-         )
-       )`,
-    )
-    .lte("valid_from", today)
-    .gte("valid_to", today)
-    .eq(
-      "retail_store_products.retail_catalog_products.retail_banner",
-      input.retailBanner,
-    )
-    .eq(
-      "retail_store_products.retail_catalog_products.is_national",
-      true,
-    )
-    .order("valid_to", { ascending: false })
-    .limit(MAX_PROMOTION_ROWS);
+  const { data, error } = await supabase.rpc(
+    "search_retail_promotions_consensus",
+    {
+      p_retail_banner: input.retailBanner,
+      p_mechanic: parsed.mechanic,
+      p_loyalty_required: parsed.loyaltyRequired,
+      p_quantity: parsed.quantity,
+      p_total_eur: parsed.totalEur,
+      p_percent: parsed.percent,
+      p_amount_eur: parsed.amountEur,
+      p_named_phrase: parsed.namedPhrase,
+      p_service_area: parsed.serviceArea,
+      p_fulfilment: parsed.fulfilment,
+      p_subject_tokens: parsed.subjectTokens,
+      p_reference_date: formatInTimeZone(new Date(), DUBLIN, "yyyy-MM-dd"),
+      p_limit: Math.max(
+        1,
+        Math.min(
+          input.limit ?? RETAIL_PROMOTION_LIST_MAX_RESULTS,
+          RETAIL_PROMOTION_LIST_MAX_RESULTS,
+        ),
+      ),
+    },
+  );
 
-  if (parsed.mechanic === "multibuy") {
-    query = query.eq("promotion_type", "multibuy");
-    if (parsed.quantity != null) {
-      query = query.ilike("label", `%${parsed.quantity}%for%`);
-    }
-  } else if (parsed.mechanic === "loyalty") {
-    query = query.eq("loyalty_required", true);
-  } else if (parsed.mechanic === "half_price") {
-    query = query.ilike("label", "%half%price%");
-  } else if (parsed.mechanic === "save_percent" && parsed.percent != null) {
-    query = query.ilike("label", `%${parsed.percent}%`);
-  } else if (parsed.mechanic === "save_amount" && parsed.amountEur != null) {
-    query = query.ilike("label", "%save%");
-  } else if (parsed.mechanic === "fixed_price" && parsed.amountEur != null) {
-    query = query.ilike("label", "%only%");
-  } else if (parsed.mechanic === "named" && parsed.namedPhrase) {
-    const phrase = parsed.namedPhrase.replace(/[%(),]/g, " ").trim();
-    query = query.or(
-      `label.ilike.%${phrase}%,description.ilike.%${phrase}%`,
-    );
-  }
-
-  if (parsed.loyaltyRequired) {
-    query = query.eq("loyalty_required", true);
-  }
-  if (parsed.serviceArea) {
-    query = query.eq(
-      "retail_store_products.retail_catalog_products.service_area",
-      parsed.serviceArea,
-    );
-  }
-  if (parsed.fulfilment) {
-    query = query.eq(
-      "retail_store_products.retail_catalog_products.fulfilment",
-      parsed.fulfilment,
-    );
-  }
-  for (const token of parsed.subjectTokens.slice(0, 3)) {
-    query = query.ilike(
-      "retail_store_products.retail_catalog_products.search_text",
-      `%${token}%`,
-    );
-  }
-
-  const { data, error } = await query;
   if (error) {
     throw new Error(error.message);
   }
 
-  // Build consensus directly from independent storefront observations.
-  // Do not rely on retail_promotions.scope here: multibuy promotions historically
-  // failed national-scope promotion because their bundle offer price is null.
-  const byPromotion = new Map<
-    string,
-    {
-      row: RetailPromotionRow;
-      storeProduct: StoreProductRow;
-      product: CatalogProductRow;
-      sourceStores: Set<string>;
-    }
-  >();
+  type ConsensusRow = {
+    product_name: string;
+    department: string;
+    sku: string | null;
+    service_area: string;
+    fulfilment: string;
+    is_alcohol: boolean;
+    promotion_type: string;
+    loyalty_required: boolean;
+    label: string | null;
+    description: string | null;
+    offer_price_eur: number | string | null;
+    regular_price_eur: number | string | null;
+    display_price_eur: number | string | null;
+    price_per_unit: string | null;
+    source_store_count: number | string;
+  };
 
-  for (const raw of (data ?? []) as unknown as RetailPromotionRow[]) {
-    if (!rowMatchesMechanic(raw, parsed)) continue;
-    const storeProduct = firstJoin(raw.retail_store_products);
-    const product = firstJoin(storeProduct?.retail_catalog_products ?? null);
-    if (!storeProduct || !product || product.is_national !== true) continue;
-    if (!rowMatchesSubject(raw, product, parsed.subjectTokens)) continue;
+  return ((data ?? []) as ConsensusRow[]).map((row) => {
+    const offerPriceEur = numberValue(row.offer_price_eur);
+    const regularPriceEur = numberValue(row.regular_price_eur);
+    const displayPriceEur = numberValue(row.display_price_eur);
+    const stores = numberValue(row.source_store_count) ?? 3;
 
-    const labelKey = normalizeSearchText(
-      `${raw.promotion_type} ${raw.loyalty_required ? "loyalty" : ""} ${raw.label ?? raw.description ?? ""}`,
-    );
-    const key = `${product.id}|${labelKey}`;
-    const existing = byPromotion.get(key);
-    if (existing) {
-      existing.sourceStores.add(storeProduct.source_store_id);
-      continue;
-    }
-    byPromotion.set(key, {
-      row: raw,
-      storeProduct,
-      product,
-      sourceStores: new Set([storeProduct.source_store_id]),
-    });
-  }
-
-  const limit = Math.max(
-    1,
-    Math.min(input.limit ?? RETAIL_PROMOTION_LIST_MAX_RESULTS, RETAIL_PROMOTION_LIST_MAX_RESULTS),
-  );
-
-  return [...byPromotion.values()]
-    .filter((entry) => entry.sourceStores.size >= 3)
-    .sort(
-      (a, b) =>
-        b.sourceStores.size - a.sourceStores.size ||
-        a.product.department.localeCompare(b.product.department) ||
-        a.product.product_name.localeCompare(b.product.product_name),
-    )
-    .slice(0, limit)
-    .map(({ row, storeProduct, product, sourceStores }) => {
-      const offerPriceEur = numberValue(row.offer_price_eur);
-      const regularPriceEur =
-        numberValue(storeProduct.regular_price_eur) ??
-        numberValue(row.regular_price_eur);
-      const displayPriceEur = numberValue(storeProduct.display_price_eur);
-      return {
-        productName: product.product_name,
-        department: product.department,
-        sku: product.sku,
-        currentPriceEur:
-          offerPriceEur ?? displayPriceEur ?? regularPriceEur,
-        wasPriceEur:
-          offerPriceEur != null &&
-          regularPriceEur != null &&
-          regularPriceEur > offerPriceEur
-            ? regularPriceEur
-            : null,
-        discountLabel: row.label ?? row.description,
-        isOnOffer: true,
-        score: Math.min(1, 0.7 + sourceStores.size / 100),
-        quoteText: formatPromotionQuote({
-          productName: product.product_name,
-          label: row.label ?? row.description,
-          promotionType: row.promotion_type,
-          loyaltyRequired: row.loyalty_required === true,
-          offerPriceEur,
-          regularPriceEur,
-          displayPriceEur,
-          pricePerUnit: storeProduct.price_per_unit,
-        }),
-        serviceArea: product.service_area,
-        fulfilment: product.fulfilment,
-        isAlcohol: product.is_alcohol === true,
-        source: "synced" as const,
-      };
-    });
+    return {
+      productName: row.product_name,
+      department: row.department,
+      sku: row.sku,
+      currentPriceEur:
+        row.promotion_type === "multibuy"
+          ? displayPriceEur ?? regularPriceEur
+          : offerPriceEur ?? displayPriceEur ?? regularPriceEur,
+      wasPriceEur:
+        offerPriceEur != null &&
+        regularPriceEur != null &&
+        regularPriceEur > offerPriceEur
+          ? regularPriceEur
+          : null,
+      discountLabel: row.label ?? row.description,
+      isOnOffer: true,
+      score: Math.min(1, 0.7 + stores / 100),
+      quoteText: formatPromotionQuote({
+        productName: row.product_name,
+        label: row.label ?? row.description,
+        promotionType: row.promotion_type,
+        loyaltyRequired: row.loyalty_required === true,
+        offerPriceEur,
+        regularPriceEur,
+        displayPriceEur,
+        pricePerUnit: row.price_per_unit,
+      }),
+      serviceArea: row.service_area,
+      fulfilment: row.fulfilment,
+      isAlcohol: row.is_alcohol === true,
+      source: "synced" as const,
+    };
+  });
 }
 
 export function formatStructuredPromotionNoMatchQuote(query: string): string {
