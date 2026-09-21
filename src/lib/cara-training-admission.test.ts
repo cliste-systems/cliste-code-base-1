@@ -5,6 +5,7 @@ import {
   classifyTrainingAdmission,
   hasReusableQuestionEvidence,
   isCustomerOperationalRequest,
+  isStructuredRetailDynamicTopic,
   trainingQuestionDedupeKey,
 } from "./cara-training-admission";
 import { isRoutineHandoff } from "./cara-training-types";
@@ -66,6 +67,63 @@ describe("cara-training-admission", () => {
     if (!result.admit) {
       assert.equal(result.reason, "operational");
     }
+  });
+
+  it("rejects retail offer wording as structured dynamic data", () => {
+    for (const text of [
+      "Weekly offers",
+      "current special offers",
+      "weekly deals",
+      "Ham offers",
+      "Ham discounts",
+      "Ham Promotions",
+      "current promotions",
+      "Cereal offers",
+      "Any Kellogg's cereals currently on offer?",
+    ]) {
+      assert.equal(isStructuredRetailDynamicTopic(text), true, text);
+      const result = classifyTrainingAdmission({
+        gapSummary: text,
+        callerContext: text,
+        caraQuestion: `What should Cara say about ${text}?`,
+        source: "call_gap",
+        niche: "retail",
+      });
+      assert.equal(result.admit, false, text);
+      if (!result.admit) assert.equal(result.reason, "structured_dynamic");
+    }
+  });
+
+  it("rejects retail catalogue price and stock lookups but keeps stable store knowledge", () => {
+    for (const text of [
+      "How much are Kellogg's Corn Flakes?",
+      "Do you stock oat milk?",
+      "Is the sirloin in stock?",
+    ]) {
+      const result = classifyTrainingAdmission({
+        gapSummary: text,
+        callerContext: text,
+        source: "call_gap",
+        niche: "retail",
+      });
+      assert.equal(result.admit, false, text);
+    }
+
+    const facility = classifyTrainingAdmission({
+      gapSummary: "coin machine",
+      callerContext: "Do you have a coin machine?",
+      source: "call_gap",
+      niche: "retail",
+    });
+    assert.equal(facility.admit, true);
+
+    const cakePolicy = classifyTrainingAdmission({
+      gapSummary: "cake notice",
+      callerContext: "How much notice is needed for a personalised cake?",
+      source: "call_gap",
+      niche: "retail",
+    });
+    assert.equal(cakePolicy.admit, true);
   });
 
   it("keeps different coin-machine questions separate for dedupe", () => {

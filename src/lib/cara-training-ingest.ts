@@ -54,7 +54,7 @@ export async function ingestCallKnowledgeGaps(
 
   const { data: org } = await admin
     .from("organizations")
-    .select("business_hours")
+    .select("business_hours, niche, retail_banner")
     .eq("id", organizationId)
     .maybeSingle();
 
@@ -79,6 +79,7 @@ export async function ingestCallKnowledgeGaps(
       callerContext,
       caraQuestion: gap.cara_question,
       source: "call_gap",
+      niche: String(org?.niche ?? ""),
     });
     if (!admission.admit) continue;
 
@@ -116,12 +117,19 @@ export async function ingestActionInboxTraining(
     return;
   }
 
+  const { data: org } = await admin
+    .from("organizations")
+    .select("niche")
+    .eq("id", organizationId)
+    .maybeSingle();
+
   const { gapSummary, caraQuestion } = actionInboxTrainingQuestion(summary);
   const admission = classifyTrainingAdmission({
     gapSummary,
     callerContext: summary,
     caraQuestion,
     source: "action_inbox",
+    niche: String(org?.niche ?? ""),
   });
   if (!admission.admit) return;
 

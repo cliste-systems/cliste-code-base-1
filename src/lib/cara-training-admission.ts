@@ -35,6 +35,7 @@ export type TrainingAdmissionRejectReason =
   | "operational"
   | "insufficient_evidence"
   | "structured_hours"
+  | "structured_dynamic"
   | "live_stock"
   | "customer_specific";
 
@@ -73,6 +74,48 @@ export function isGenericCaraQuestion(question: string): boolean {
     q.includes("a caller asked something not in my setup") ||
     q.includes("what should i tell them in this situation")
   );
+}
+
+/**
+ * Retail data that belongs to structured/live systems rather than permanent
+ * owner-authored knowledge. This is intentionally intent-based, not a list of
+ * product names or departments, so arbitrary caller wording/products still
+ * route to the catalogue/offer/stock source of truth.
+ */
+export function isStructuredRetailDynamicTopic(text: string): boolean {
+  const s = normalizeEvidenceText(text).toLowerCase();
+  if (!s) return false;
+
+  // Promotions and offer mechanics are inherently time-varying.
+  if (
+    /\b(offer|offers|promo|promos|promotion|promotions|special|specials|deal|deals|discount|discounts|sale|sales|reduced|reduction|half[ -]?price|rewards? price|real rewards|weekly (?:offer|offers|deal|deals|special|specials)|on the cheap)\b/.test(
+      s,
+    )
+  ) {
+    return true;
+  }
+
+  // Current product availability belongs to catalogue/stock systems.
+  if (
+    /\b(in stock|stock level|stock left|sold out|availability|available today|have any left|do you stock|do ye stock|do you carry|do ye carry)\b/.test(
+      s,
+    )
+  ) {
+    return true;
+  }
+
+  // Retail product pricing belongs to the structured catalogue. Do not block
+  // policy questions such as "how much notice" for cakes.
+  if (
+    !/\b(notice|lead time|how far in advance|advance notice)\b/.test(s) &&
+    /\b(how much(?: is| are| does)?|price|prices|cost|costs|priced at|per kg|per kilo)\b/.test(
+      s,
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /** Customer-specific operational work — belongs in Action Inbox, not reusable knowledge. */
@@ -206,6 +249,7 @@ export function classifyTrainingAdmission(input: {
   callerContext?: string | null;
   caraQuestion?: string | null;
   source: CaraTrainingSource;
+  niche?: string | null;
 }): TrainingAdmissionResult {
   const evidence = combinedEvidence(input);
 
@@ -215,6 +259,13 @@ export function classifyTrainingAdmission(input: {
 
   if (isStructuredHoursTopic(evidence)) {
     return { admit: false, reason: "structured_hours" };
+  }
+
+  if (
+    String(input.niche ?? "").trim().toLowerCase() === "retail" &&
+    isStructuredRetailDynamicTopic(evidence)
+  ) {
+    return { admit: false, reason: "structured_dynamic" };
   }
 
   if (/\b(in stock today|have any left today|sold out today|stock left now)\b/i.test(evidence)) {

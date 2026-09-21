@@ -706,7 +706,11 @@ export async function POST(request: Request) {
     }
   }
 
-  if (shouldRunCallCompleteSideEffects(outcome) && !isTestCall) {
+  if (
+    shouldRunCallCompleteSideEffects(outcome) &&
+    !isTestCall &&
+    !isEngineerTestCall
+  ) {
     after(async () => {
       if (outcome === "action_created" && !isEngineerTestCall) {
       const notifySummary =
