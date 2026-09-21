@@ -292,11 +292,23 @@ function meaningfulOfferTokens(query: string): string[] {
   );
 }
 
+function semanticSetHasToken(set: Set<string>, token: string): boolean {
+  if (set.has(token)) return true;
+  if (token.length > 4 && token.endsWith("ies")) {
+    const singular = `${token.slice(0, -3)}y`;
+    if (set.has(singular)) return true;
+  }
+  if (token.length > 3 && token.endsWith("s")) {
+    return set.has(token.slice(0, -1));
+  }
+  return false;
+}
+
 function isCategoryOnlyOfferBrowse(query: string): boolean {
   const tokens = meaningfulOfferTokens(query);
   return (
     tokens.length > 0 &&
-    tokens.every((token) => OFFER_BROWSE_CATEGORY_TOKENS.has(token))
+    tokens.every((token) => semanticSetHasToken(OFFER_BROWSE_CATEGORY_TOKENS, token))
   );
 }
 
@@ -310,7 +322,7 @@ function isStoreAreaOnlyQuery(query: string): boolean {
   const tokens = meaningfulOfferTokens(query);
   return (
     tokens.length > 0 &&
-    tokens.every((token) => STORE_AREA_SEMANTIC_TOKENS.has(token))
+    tokens.every((token) => semanticSetHasToken(STORE_AREA_SEMANTIC_TOKENS, token))
   );
 }
 
@@ -563,6 +575,32 @@ const DUAL_FULFILMENT_SERVICE_AREAS = new Set<SupervaluServiceArea>([
   "deli",
 ]);
 
+function rowMatchesServiceAreaSemantics(
+  row: RetailWeeklyOfferRow,
+  serviceArea: SupervaluServiceArea,
+): boolean {
+  if (serviceArea !== "produce") return true;
+
+  const category = String(row.category_breadcrumb ?? "").toLowerCase();
+  if (category) {
+    // Use the actual catalogue path, not an incidental word in a department
+    // name. "Green, Fruit & Herbal Tea", fruit juice, fruit bread and dried
+    // fruit must never become fresh fruit & veg just because they contain
+    // the word "fruit".
+    return /\/categories\/(?:fruit|vegetables|fruit-vegetables)(?:\/|-)/i.test(
+      category,
+    );
+  }
+
+  const department = String(row.department ?? "").toLowerCase();
+  if (/\b(?:tea|coffee|juice|drinks?|bread|nuts?|seeds?|dried fruit)\b/i.test(department)) {
+    return false;
+  }
+  return /\b(?:berries|grapes?|citrus|bananas?|apples?|pears?|rhubarb|kiwis?|peaches?|plums?|nectarines?|prepared fruit|exotic fruit|vegetables?|potatoes?|carrots?|broccoli|cauliflower|cabbage|onions?|garlic|mushrooms?|leeks?|celery|peppers?)\b/i.test(
+    department,
+  );
+}
+
 function rowMatchesFilters(
   row: RetailWeeklyOfferRow,
   filters: WeeklyOfferSearchFilters,
@@ -571,6 +609,12 @@ function rowMatchesFilters(
   if (options?.excludeMeat && row.service_area !== "grocery") return false;
   if (options?.alcoholOnly && row.is_alcohol !== true) return false;
   if (filters.serviceArea && row.service_area !== filters.serviceArea) return false;
+  if (
+    filters.serviceArea &&
+    !rowMatchesServiceAreaSemantics(row, filters.serviceArea)
+  ) {
+    return false;
+  }
   if (filters.fulfilment && row.fulfilment !== filters.fulfilment) return false;
   if (
     !filters.serviceArea &&
