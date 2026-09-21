@@ -339,4 +339,59 @@ describe("retail product clarification", () => {
     assert.equal(response.clarificationHint, null);
     assert.equal(response.matches.length, 0);
   });
+
+  it("asks a broad alcohol offer caller to narrow before listing products", () => {
+    const response = resolveProductSearchResponse(
+      "alcohol",
+      [
+        { product_name: "Sparkling Offer A", department: "Champagne & Sparkling", service_area: "off_licence", fulfilment: "prepack" },
+        { product_name: "Red Wine Offer B", department: "Red Wine", service_area: "off_licence", fulfilment: "prepack" },
+        { product_name: "Lager Offer C", department: "Lager", service_area: "off_licence", fulfilment: "prepack" },
+        { product_name: "Gin Offer D", department: "Gin", service_area: "off_licence", fulfilment: "prepack" },
+      ],
+      { intent: "offer" },
+    );
+    assert.equal(response.clarificationKind, "refinement");
+    assert.ok(response.clarificationHint);
+    assert.match(response.clarificationHint ?? "", /confirm naturally that there are offers/i);
+    assert.match(response.clarificationHint ?? "", /narrowing question/i);
+    assert.doesNotMatch(response.clarificationHint ?? "", /Sparkling Offer A|Red Wine Offer B/);
+  });
+
+  it("uses the same broad-offer refinement outside off-licence", () => {
+    const response = resolveProductSearchResponse(
+      "toiletries",
+      [
+        { product_name: "Shampoo Offer A", department: "Hair Care", service_area: "grocery", fulfilment: "prepack" },
+        { product_name: "Deodorant Offer B", department: "Deodorant", service_area: "grocery", fulfilment: "prepack" },
+        { product_name: "Shower Gel Offer C", department: "Bath & Shower", service_area: "grocery", fulfilment: "prepack" },
+      ],
+      { intent: "offer" },
+    );
+    assert.equal(response.clarificationKind, "refinement");
+    assert.ok(response.clarificationHint);
+  });
+
+  it("never invents counter-vs-prepack clarification for produce", () => {
+    const hint = buildOfferFulfilmentClarificationHint([
+      { product_name: "Loose Avocado", service_area: "produce", fulfilment: "counter" },
+      { product_name: "Avocado 2 Pack", service_area: "produce", fulfilment: "prepack" },
+    ]);
+    assert.equal(hint, null);
+  });
+
+  it("asks one refinement for a broad price question with several real category matches", () => {
+    const response = resolveProductSearchResponse(
+      "avocado",
+      [
+        { product_name: "SuperValu Ripe Avocado", department: "Avocados", service_area: "produce", fulfilment: "prepack" },
+        { product_name: "SuperValu Organic Avocados", department: "Avocados", service_area: "produce", fulfilment: "prepack" },
+        { product_name: "Donnelly Fresh Avocado Net", department: "Avocados", service_area: "produce", fulfilment: "prepack" },
+      ],
+      { intent: "price" },
+    );
+    assert.equal(response.clarificationKind, "refinement");
+    assert.ok(response.clarificationHint);
+  });
+
 });
