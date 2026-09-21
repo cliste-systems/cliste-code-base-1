@@ -10,6 +10,7 @@ import {
   inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
   isRetailOfferWeekActive,
+  isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
   scoreSupervaluSearchText,
@@ -407,6 +408,39 @@ describe("supervalu offers sync helpers", () => {
 });
 
 describe("retail weekly offers search", () => {
+  it("rejects Save euro rows when the saving amount is mistaken for the selling price", () => {
+    assert.equal(
+      isRetailOfferPriceSemanticallyValid(
+        mockOfferRow({
+          id: "bad-wagyu",
+          product_name: "SuperValu Signature Tastes Wagyu Sirloin Steak (227 g)",
+          search_text: "wagyu sirloin steak",
+          current_price_eur: 2,
+          was_price_eur: 7.99,
+          discount_label: "Save €2",
+        }),
+      ),
+      false,
+    );
+  });
+
+  it("accepts Save euro rows only when price maths reconciles", () => {
+    assert.equal(
+      isRetailOfferPriceSemanticallyValid(
+        mockOfferRow({
+          id: "good-wagyu",
+          product_name: "SuperValu Signature Tastes Wagyu Sirloin Steak (227 g)",
+          search_text: "wagyu sirloin steak",
+          current_price_eur: 7.99,
+          was_price_eur: 9.99,
+          discount_label: "Save €2",
+        }),
+      ),
+      true,
+    );
+  });
+
+
   it("scores minor STT spelling slips against the intended product word", () => {
     const fillet = scoreSupervaluSearchText(
       "supervalu signature tastes hereford irish fillet steak",
