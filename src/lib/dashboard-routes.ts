@@ -6,6 +6,7 @@ export const DASHBOARD_ROUTES = {
   /** @deprecated Action Inbox retired; kept for legacy redirects. */
   actionInbox: "/dashboard/action-inbox",
   departments: "/dashboard/departments",
+  products: "/dashboard/products",
   department: (slug: string) => `/dashboard/departments/${slug}`,
   routing: "/dashboard/routing",
   /** @deprecated Use businessProfile or caraGreeting */
