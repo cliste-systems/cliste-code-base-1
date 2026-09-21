@@ -11,7 +11,8 @@ import {
   inferWeeklyOffersListIntent,
   isRetailOfferWeekActive,
   resolveWeeklyOfferSearchFilters,
-  searchRetailWeeklyOffers,\n  scoreSupervaluSearchText,
+  searchRetailWeeklyOffers,
+  scoreSupervaluSearchText,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
 import {
