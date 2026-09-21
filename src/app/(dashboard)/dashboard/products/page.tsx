@@ -293,7 +293,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   {hasMixedCounterAndPrepack(area) ? (
                     <label>
                       <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Butcher / counter type
+                        Counter / prepacked
                       </span>
                       <select
                         name="type"
