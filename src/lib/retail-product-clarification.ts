@@ -7,6 +7,7 @@ import {
   offerSearchProductTokens,
   tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
+import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
 
 export type ClarificationMatch = {
@@ -87,17 +88,11 @@ function narrowMatchesByProductTokens<T extends ClarificationMatch>(
   if (productTokens.length === 0 || matches.length <= 1) return matches;
 
   const byProductName = matches.filter((match) => {
-    const name = String(match.productName ?? match.product_name ?? "").toLowerCase();
+    const name = String(match.productName ?? match.product_name ?? "");
     if (productTokens.length >= 2) {
-      return productTokens.every((token) => {
-        const stem = token.replace(/s$/, "");
-        return name.includes(stem);
-      });
+      return productTokens.every((token) => retailSearchTokenMatchesText(name, token));
     }
-    return productTokens.some((token) => {
-      const stem = token.replace(/s$/, "");
-      return name.includes(stem);
-    });
+    return productTokens.some((token) => retailSearchTokenMatchesText(name, token));
   });
   return byProductName;
 }
