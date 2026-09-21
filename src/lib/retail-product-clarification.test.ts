@@ -395,6 +395,32 @@ describe("retail product clarification", () => {
   });
 
 
+  it("resolves an explicit cheapest price request without another clarification", () => {
+    const response = resolveProductSearchResponse(
+      "cheapest SuperValu avocado",
+      [
+        {
+          product_name: "SuperValu Signature Tastes Mini Hass Avocados",
+          department: "Avocados",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 2.59,
+        },
+        {
+          product_name: "SuperValu Signature Tastes Ripe & Ready Avocado",
+          department: "Avocados",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 0.99,
+        },
+      ],
+      { intent: "price" },
+    );
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 1);
+    assert.match(response.matches[0]?.product_name ?? "", /Ripe & Ready/i);
+  });
+
   it("keeps own-brand modifiers from wiping out the actual product matches", () => {
     const response = resolveProductSearchResponse(
       "fresh SuperValu brand avocado",
