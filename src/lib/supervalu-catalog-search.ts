@@ -162,7 +162,7 @@ export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
 export function stripCatalogSearchBoilerplate(query: string): string {
   return query
     .replace(
-      /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
+      /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|cheapest|lowest price|least expensive|best value|budget|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
       " ",
     )
     .replace(
@@ -741,26 +741,30 @@ export async function searchSupervaluCatalogLiveWithFallback(
 
   const normalized = normalizeCatalogBrandQuery(trimmed);
   const searchQuery = normalized || trimmed;
-  let matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
+  const ownLabelRequested = queryRequestsSupervaluOwnLabel(trimmed);
 
-  if (matches.length > 0 || !queryRequestsSupervaluOwnLabel(searchQuery)) {
-    return { matches, ownBrandFallbackQuote: null };
+  // Treat own-brand as a constraint, not another search token. Searching
+  // "SuperValu avocado" directly can fill the candidate window with unrelated
+  // SuperValu products before the actual avocado rows are ranked.
+  if (ownLabelRequested) {
+    const productOnly = catalogProductTokens(searchQuery).join(" ").trim();
+    if (productOnly) {
+      const alternatives = await searchSupervaluCatalogLiveInternal(productOnly, options);
+      const ownMatches = alternatives.filter((match) => /\bsupervalu\b/i.test(match.productName));
+      if (ownMatches.length > 0) {
+        return { matches: ownMatches, ownBrandFallbackQuote: null };
+      }
+      if (alternatives.length > 0) {
+        return {
+          matches: [],
+          ownBrandFallbackQuote: formatOwnBrandFallbackQuote(productOnly, alternatives),
+        };
+      }
+    }
   }
 
-  const productOnly = catalogProductTokens(searchQuery).join(" ").trim();
-  if (!productOnly || productOnly.toLowerCase() === searchQuery.toLowerCase()) {
-    return { matches: [], ownBrandFallbackQuote: null };
-  }
-
-  const alternatives = await searchSupervaluCatalogLiveInternal(productOnly, options);
-  if (alternatives.length === 0) {
-    return { matches: [], ownBrandFallbackQuote: null };
-  }
-
-  return {
-    matches: [],
-    ownBrandFallbackQuote: formatOwnBrandFallbackQuote(productOnly, alternatives),
-  };
+  const matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
+  return { matches, ownBrandFallbackQuote: null };
 }
 
 export async function searchSupervaluCatalogLive(
