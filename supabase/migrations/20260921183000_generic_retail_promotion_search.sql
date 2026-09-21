@@ -120,7 +120,7 @@ filtered as (
     (not p_loyalty_required or c.loyalty_required=true)
     and (
       p_mechanic is null
-      or p_mechanic='generic'
+      or p_mechanic='unstructured'
       or (
         p_mechanic='multibuy'
         and (
