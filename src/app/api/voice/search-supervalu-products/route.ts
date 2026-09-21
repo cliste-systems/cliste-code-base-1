@@ -179,12 +179,30 @@ export async function POST(request: Request) {
 
   const structuredPromotionQuery =
     intent === "offer" && shouldUseStructuredPromotionSearch(query);
-  const structuredPromotionMatches = structuredPromotionQuery
-    ? await searchStructuredNationalPromotions(admin, {
+  let structuredPromotionMatches = [];
+  if (structuredPromotionQuery) {
+    try {
+      structuredPromotionMatches = await searchStructuredNationalPromotions(admin, {
         retailBanner,
         query,
-      })
-    : [];
+      });
+    } catch (error) {
+      console.error("[voice/search-supervalu-products] promotion lookup", {
+        query,
+        retailBanner,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          promotion_query: true,
+          error:
+            "Promotion data lookup is temporarily unavailable. Do not guess or fall back to unrelated offers.",
+        },
+        { status: 503 },
+      );
+    }
+  }
 
   const catalogResult = structuredPromotionQuery
     ? { matches: structuredPromotionMatches, ownBrandFallbackQuote: null }
