@@ -61,7 +61,6 @@ const navItems: {
   { href: DASHBOARD_ROUTES.home, label: "Home", section: "core" },
   { href: DASHBOARD_ROUTES.activity, label: "Activity", section: "core" },
   { href: DASHBOARD_ROUTES.calls, label: "Calls", section: "core" },
-  { href: DASHBOARD_ROUTES.actionInbox, label: "Action Inbox", section: "core" },
   { href: DASHBOARD_ROUTES.caraKnowledge, label: "Cara's Knowledge", section: "core", activePrefix: "/dashboard/cara-knowledge" },
   { href: DASHBOARD_ROUTES.routing, label: "Call flow", section: "core" },
   {
