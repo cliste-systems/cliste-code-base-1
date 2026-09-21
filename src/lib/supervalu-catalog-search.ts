@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchSupervaluGatewaySearch } from "@/lib/supervalu-gateway";
+import { searchStoredRetailCatalog } from "@/lib/retail-catalog-search";
 import {
   isPromotionalSupervaluProduct,
   normalizeSearchText,
@@ -257,7 +258,7 @@ export type SupervaluCatalogMatch = {
   serviceArea?: string;
   fulfilment?: string;
   isAlcohol?: boolean;
-  source?: "synced" | "gateway";
+  source?: "synced" | "gateway" | "catalog";
 };
 
 function parseGatewayPriceEur(product: SupervaluGatewayProduct): number | null {
@@ -642,6 +643,18 @@ async function searchSupervaluCatalogLiveInternal(
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
   const listIntent = inferWeeklyOffersListIntent(trimmed);
+
+  if (options?.supabase && options?.retailBanner && options?.storeId) {
+    const stored = await searchStoredRetailCatalog(options.supabase, {
+      retailBanner: options.retailBanner,
+      sourceStoreId: options.storeId,
+      query: trimmed,
+      intent,
+      fulfilment: options.fulfilment,
+      limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
+    });
+    if (stored.length > 0) return filterCatalogMatchesByQuery(trimmed, stored);
+  }
   const filters = resolveWeeklyOfferSearchFilters(trimmed, {
     fulfilment: options?.fulfilment,
   });

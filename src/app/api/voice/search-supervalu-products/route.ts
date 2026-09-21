@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 
   const { data: orgRow, error: orgErr } = await admin
     .from("organizations")
-    .select("is_active, niche, retail_banner, offers_synced_at")
+    .select("is_active, niche, retail_banner, offers_synced_at, retail_source_store_id, catalog_synced_at")
     .eq("id", orgId)
     .maybeSingle();
   if (orgErr) {
@@ -165,6 +165,11 @@ export async function POST(request: Request) {
     offerWeekEnd: latestOfferWeekEnd,
   });
 
+  const sourceStoreId =
+    String(orgRow.retail_source_store_id ?? "").trim() ||
+    process.env.SUPERVALU_STOREFRONT_STORE_ID?.trim() ||
+    "5550";
+
   const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
     query,
     {
@@ -172,6 +177,7 @@ export async function POST(request: Request) {
       supabase: admin,
       retailBanner,
       fulfilment,
+      storeId: sourceStoreId,
     },
   );
 
@@ -214,6 +220,7 @@ export async function POST(request: Request) {
       supabase: admin,
       retailBanner,
       fulfilment: alternateFulfilment,
+      storeId: sourceStoreId,
     });
     const alternateMapped = alternateRaw.map((match) => ({
       product_name: match.productName,

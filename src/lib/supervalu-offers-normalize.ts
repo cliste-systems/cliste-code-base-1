@@ -151,11 +151,18 @@ export function classifySupervaluOfferServiceArea(input: {
     return { serviceArea: "deli", fulfilment: "counter" };
   }
 
+  const clearlyNonMeatPudding =
+    /rice pudding|dessert|custard/i.test(dept) ||
+    /food cupboard\/desserts|rice pudding/i.test(crumb);
+
   if (
-    crumb.includes("meat & poultry") ||
-    crumb.includes("/butcher") ||
-    dept.includes("butcher") ||
-    /beef|lamb|pork|poultry|steak|rashers|sausage|pudding|meat/i.test(dept)
+    !clearlyNonMeatPudding &&
+    (
+      crumb.includes("meat & poultry") ||
+      crumb.includes("/butcher") ||
+      dept.includes("butcher") ||
+      /beef|lamb|pork|poultry|steak|rashers|sausage|black pudding|white pudding|meat/i.test(dept)
+    )
   ) {
     if (/^\d+\s+for\s+/i.test(label)) {
       return { serviceArea: "butcher", fulfilment: "counter" };
