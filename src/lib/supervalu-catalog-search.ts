@@ -82,6 +82,11 @@ export function filterCatalogMatchesByQuery(
 ): SupervaluCatalogMatch[] {
   if (matches.length === 0) return matches;
 
+  // Browse/list queries are already scoped by the offer search. Do not treat
+  // section words such as "off licence" or "dairy wall" as product-name
+  // requirements and accidentally discard valid category results.
+  if (inferWeeklyOffersListIntent(query)) return matches;
+
   const productTokens = catalogProductTokens(query);
   if (productTokens.length === 0) {
     return matches;
@@ -108,7 +113,10 @@ export function filterCatalogMatchesByQuery(
     return applyOwnLabelFilter(broadMatches);
   }
 
-  return matches;
+  // A specific product query with zero token overlap must not leak unrelated
+  // browse/gateway results back to Cara. Returning [] is safer than letting an
+  // irrelevant candidate become a spoken answer.
+  return [];
 }
 
 function shortCatalogProductLabel(productName: string): string {
@@ -142,7 +150,7 @@ export function formatOwnBrandFallbackQuote(
 export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
   const q = query.toLowerCase();
   if (
-    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
+    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b|\b(?:buy\s+)?\d+\s+for\s+(?:€\s*)?\d+|\breal\s+rewards?\b|\brewards?\s+price\b|\bhalf\s+price\b|\bsave\s+(?:€\s*)?\d+|\b\d+\s*%\s*off\b|\bmix\s*(?:&|and)\s*match\b|\bsuper\s*7\b/i.test(
       q,
     )
   ) {

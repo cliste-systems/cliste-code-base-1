@@ -160,14 +160,20 @@ export type WeeklyOfferSearchFilters = {
 export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
+
+  const tokens = queryTokens(trimmed);
+  const productTokens = offerSearchProductTokens(trimmed);
+
+  // These phrases explicitly ask for a browse/list and do not depend on a
+  // department word embedded inside a product name.
   if (
-    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b|\b(?:what )?(?:alcohol|wine|beer|spirits|dairy|ambient|fruit|veg|produce|bakery|deli|fish|butcher|grocery|provisions|frozen|household)\b.*\b(?:on offer|offers?|this week|specials?)\b/i.test(
+    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offers?\b|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b/i.test(
       trimmed,
     )
   ) {
     return true;
   }
-  const tokens = queryTokens(trimmed);
+
   if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
   if (
     tokens.length === 1 &&
@@ -177,22 +183,30 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   ) {
     return true;
   }
-  if (
-    offerSearchProductTokens(trimmed).length >= 2 &&
-    inferWeeklyOffersBrowseCategories(trimmed).length < 2
-  ) {
+
+  // A short concrete product/brand/family phrase wins over department words.
+  // This is the critical distinction between "Birds Eye fish fingers on
+  // offer?" and "what fish is on offer?". Longer multi-category shopping-list
+  // style requests can still be treated as a browse below.
+  if (productTokens.length >= 1 && productTokens.length <= 3) {
     return false;
   }
-  if (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2) {
+
+  if (
+    productTokens.length >= 4 ||
+    (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2)
+  ) {
     return true;
   }
+
   if (
     inferWeeklyOfferServiceAreaFromQuery(trimmed) &&
     /\b(?:offers?|specials?|deals?|promos?|on offer|this week)\b/i.test(trimmed) &&
-    offerSearchProductTokens(trimmed).length === 0
+    productTokens.length === 0
   ) {
     return true;
   }
+
   return false;
 }
 
@@ -457,6 +471,39 @@ function categoryMetadataText(row: RetailWeeklyOfferRow): string {
 }
 
 /**
+ * Prefer concrete product/brand matches before generic department browsing.
+ * This is data-driven: the caller can say any brand/product combination and
+ * we match it against the synced catalogue text rather than maintaining a
+ * list of special-case phrases.
+ */
+function specificOfferMatches(
+  rows: RetailWeeklyOfferRow[],
+  query: string,
+  filters: WeeklyOfferSearchFilters,
+  options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
+): RetailWeeklyOfferRow[] {
+  const tokens = offerSearchProductTokens(query);
+  if (tokens.length === 0) return [];
+
+  const scoped = rows.filter((row) => {
+    if (!rowMatchesFilters(row, filters, options)) return false;
+
+    // Product intent must come from the product identity itself. Department,
+    // breadcrumb and search_text can contain generic words such as "steaks"
+    // for an unrelated fish-goujon row; category matching is handled
+    // separately below.
+    const productIdentity = normalizeSearchText(
+      `${row.product_name} ${row.brand ?? ""}`,
+    );
+    return tokens.every((token) =>
+      retailSearchTokenMatchesText(productIdentity, token),
+    );
+  });
+
+  return scoped;
+}
+
+/**
  * Generic category/department browse detection from the actual catalogue.
  * This avoids a hardcoded category list: cereals, yogurts, crisps, shampoo,
  * frozen pizza, pet food, etc. all work when the query matches department
@@ -680,7 +727,9 @@ const FULFILMENT_QUERY_TOKENS = new Set([
 
 export function offerSearchProductTokens(query: string): string[] {
   return tokenizeSupervaluSearchQuery(query).filter(
-    (token) => !FULFILMENT_QUERY_TOKENS.has(token),
+    (token) =>
+      !FULFILMENT_QUERY_TOKENS.has(token) &&
+      !/^\d+(?:\.\d+)?$/.test(token),
   );
 }
 
@@ -988,6 +1037,12 @@ export function searchSyncedWeeklyOffersInRows(
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
   const browseOptions = { excludeMeat, filters, alcoholOnly };
+  const specificMatches = specificOfferMatches(
+    rows,
+    trimmed,
+    filters,
+    { excludeMeat, alcoholOnly },
+  );
   const categoryMatches = categoryBrowseMatches(
     rows,
     trimmed,
@@ -995,10 +1050,26 @@ export function searchSyncedWeeklyOffersInRows(
     { excludeMeat, alcoholOnly },
   );
 
-  // A caller asking for a real department/category ("cereals", "yogurts",
-  // "crisps", etc.) wants offers from that category, not a fake product-name
-  // clarification. Detect it from catalogue metadata instead of hardcoding.
-  if (!listIntent && categoryMatches.length > 0) {
+  // Concrete brand/product evidence wins before heuristic list/browse routing.
+  // Example: "Bird's Eye fish fingers on offer" contains the word "fish",
+  // but it is a specific product family, not a request to browse salmon/cod/prawns.
+  if (specificMatches.length > 0) {
+    const tokens = offerSearchProductTokens(trimmed);
+    return specificMatches
+      .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.row.product_name.localeCompare(b.row.product_name),
+      )
+      .slice(0, tokenLimit)
+      .map((entry) => rowToMatch(entry.row, entry.score));
+  }
+
+  // A real department/category match from catalogue metadata also wins before
+  // generic browse heuristics. This covers product families such as fish
+  // fingers, cereals, yogurts, shampoo, frozen pizza, pet food, etc.
+  if (categoryMatches.length > 0) {
     const tokens = offerSearchProductTokens(trimmed);
     return categoryMatches
       .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))

@@ -118,7 +118,20 @@ async function probeActionTicketWebhook(
 
 async function probeOfferSearch(appUrl: string, secret: string): Promise<boolean> {
   const base = appUrl.replace(/\/$/, "");
-  try {
+
+  type ProductSearchBody = {
+    ok?: boolean;
+    promotion_query?: boolean;
+    no_match_quote?: string | null;
+    matches?: Array<{
+      product_name?: string;
+      is_on_offer?: boolean;
+      discount_label?: string | null;
+    }>;
+    error?: string;
+  };
+
+  const lookup = async (query: string, intent: "offer" | "stock" = "offer") => {
     const res = await fetch(`${base}/api/voice/search-supervalu-products`, {
       method: "POST",
       headers: {
@@ -127,25 +140,75 @@ async function probeOfferSearch(appUrl: string, secret: string): Promise<boolean
       },
       body: JSON.stringify({
         called_number: RETAIL_LINE_E164,
-        query: "quick fry steak",
+        query,
+        intent,
       }),
     });
-    const body = (await res.json().catch(() => ({}))) as {
-      ok?: boolean;
-      matches?: Array<{ is_on_offer?: boolean }>;
-    };
-    if (!res.ok || !body.ok) {
-      console.log(`✗ Offer search probe: HTTP ${res.status}`);
-      return false;
-    }
-    const onOffer = (body.matches ?? []).some((m) => m.is_on_offer === true);
+    const body = (await res.json().catch(() => ({}))) as ProductSearchBody;
+    return { res, body };
+  };
+
+  try {
+    let ok = true;
+
+    const quickFry = await lookup("quick fry steak");
+    const quickFryHit =
+      quickFry.res.ok &&
+      quickFry.body.ok === true &&
+      (quickFry.body.matches?.some((m) => m.is_on_offer === true) ?? false);
     console.log(
-      `${onOffer ? "✓" : "⚠"} Offer search probe: ${body.matches?.length ?? 0} matches${onOffer ? " (on-offer hit for quick fry steak)" : " — try quick fry steak phrasing on demo"}`,
+      `${quickFryHit ? "✓" : "✗"} Offer probe — quick fry steak (${quickFry.body.matches?.length ?? 0} matches)`,
     );
-    return (body.matches?.length ?? 0) > 0;
+    ok = ok && quickFryHit;
+
+    const birdsEye = await lookup("Birds Eye fish fingers");
+    const birdsEyeHit =
+      birdsEye.res.ok &&
+      birdsEye.body.ok === true &&
+      (birdsEye.body.matches?.some((m) =>
+        /birds? eye.*fish finger/i.test(String(m.product_name ?? "")),
+      ) ?? false);
+    console.log(
+      `${birdsEyeHit ? "✓" : "✗"} Offer probe — Birds Eye fish fingers stays product-specific`,
+    );
+    ok = ok && birdsEyeHit;
+
+    const multibuy = await lookup("3 for €10 fruit and veg");
+    const multibuyHit =
+      multibuy.res.ok &&
+      multibuy.body.ok === true &&
+      multibuy.body.promotion_query === true &&
+      (multibuy.body.matches?.some((m) =>
+        /3\s+for\s+€?10/i.test(String(m.discount_label ?? "")),
+      ) ?? false);
+    console.log(
+      `${multibuyHit ? "✓" : "✗"} Promotion probe — 3 for €10 fruit and veg (${multibuy.body.matches?.length ?? 0} matches)`,
+    );
+    ok = ok && multibuyHit;
+
+    // Named campaigns must never fall back to random products. Super 7 may or
+    // may not be active in source data on the day this script runs.
+    const super7 = await lookup("Super 7 offers");
+    const super7Safe =
+      super7.res.ok &&
+      super7.body.ok === true &&
+      super7.body.promotion_query === true &&
+      (
+        (super7.body.matches?.length ?? 0) === 0
+          ? Boolean(super7.body.no_match_quote)
+          : super7.body.matches!.every((m) =>
+              /super\s*7/i.test(String(m.discount_label ?? "")),
+            )
+      );
+    console.log(
+      `${super7Safe ? "✓" : "✗"} Promotion probe — named campaign never degrades to unrelated offers`,
+    );
+    ok = ok && super7Safe;
+
+    return ok;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.log(`✗ Offer search probe: ${msg}`);
+    console.log(`✗ Retail search probes: ${msg}`);
     return false;
   }
 }

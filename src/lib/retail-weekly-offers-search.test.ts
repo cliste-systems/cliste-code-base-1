@@ -13,6 +13,7 @@ import {
   isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
+  searchSyncedWeeklyOffersInRows,
   scoreSupervaluSearchText,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
@@ -407,6 +408,28 @@ describe("supervalu offers sync helpers", () => {
   });
 });
 
+describe("retail offer intent routing", () => {
+  it("does not turn branded fish-finger questions into generic fish browsing", () => {
+    assert.equal(
+      inferWeeklyOffersListIntent(
+        "are the Bird's Eye fish fingers on offer this week?",
+      ),
+      false,
+    );
+  });
+
+  it("keeps genuine department offer questions as browsing", () => {
+    assert.equal(inferWeeklyOffersListIntent("what fish is on offer this week?"), true);
+    assert.equal(inferWeeklyOffersListIntent("any fish offers this week?"), true);
+    assert.equal(inferWeeklyOffersListIntent("what alcohol is on offer?"), true);
+  });
+
+  it("keeps specific butcher products specific even though butcher is a service area", () => {
+    assert.equal(inferWeeklyOffersListIntent("is sirloin on offer this week?"), false);
+    assert.equal(inferWeeklyOffersListIntent("any fillet steaks on offer?"), false);
+  });
+});
+
 describe("retail weekly offers search", () => {
   it("treats a real department query like cereals as a browse, not one ambiguous product", () => {
     const rows = [
@@ -437,6 +460,118 @@ describe("retail weekly offers search", () => {
     assert.ok(matches.every((match) => /cereal/i.test(match.department)));
   });
 
+
+  it("keeps a branded fish-finger offer specific instead of browsing generic fish", () => {
+    const rows = [
+      mockOfferRow({
+        id: "birds-eye-8",
+        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
+        brand: "Birds Eye",
+        department: "Fish Fingers",
+        category_breadcrumb: "/categories/frozen-fish-seafood/fish-fingers",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 2.5,
+        was_price_eur: 3.15,
+        discount_label: "Rewards Price Only €2.50",
+        search_text:
+          "birds eye crispy fish fingers fish fingers frozen fish seafood",
+      }),
+      mockOfferRow({
+        id: "salmon",
+        product_name: "Keohane's Salmon Fillets (480 g)",
+        department: "Prepack Fresh Fish",
+        category_breadcrumb: "/categories/fish-seafood/prepack-fresh-fish",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 9,
+        search_text: "keohanes salmon fillets fish seafood",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(
+      rows,
+      "are the Bird's Eye fish fingers on offer this week?",
+    );
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Birds Eye.*Fish Fingers/i);
+  });
+
+  it("treats an actual product-family department like fish fingers as the category", () => {
+    const rows = [
+      mockOfferRow({
+        id: "fish-finger-1",
+        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
+        brand: "Birds Eye",
+        department: "Fish Fingers",
+        category_breadcrumb: "/categories/frozen-fish-seafood/fish-fingers",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 2.5,
+        search_text: "birds eye crispy fish fingers",
+      }),
+      mockOfferRow({
+        id: "fish-finger-2",
+        product_name: "Birds Eye Fish Fingers 14 Pack (350 g)",
+        brand: "Birds Eye",
+        department: "Fish Fingers",
+        category_breadcrumb: "/categories/frozen-fish-seafood/fish-fingers",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 4.5,
+        search_text: "birds eye fish fingers 14 pack",
+      }),
+      mockOfferRow({
+        id: "cod",
+        product_name: "Loose Cod Fillet",
+        department: "Fish Counter",
+        service_area: "fish",
+        fulfilment: "counter",
+        current_price_eur: 12,
+        search_text: "loose cod fish counter",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(
+      rows,
+      "any fish fingers on offer?",
+    );
+    assert.equal(matches.length, 2);
+    assert.ok(matches.every((match) => /Fish Fingers/i.test(match.department)));
+  });
+
+  it("keeps brand refinement inside the caller's cereal request", () => {
+    const rows = [
+      mockOfferRow({
+        id: "kelloggs",
+        product_name: "Kellogg's Corn Flakes (450 g)",
+        brand: "Kellogg's",
+        department: "Cereals",
+        category_breadcrumb: "/categories/breakfast-cereals/cereals",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 2.79,
+        was_price_eur: 2.99,
+        discount_label: "Rewards Price Only €2.79",
+        search_text: "kelloggs corn flakes cereals breakfast cereals",
+      }),
+      mockOfferRow({
+        id: "weetabix",
+        product_name: "Weetabix 24 Pack (430 g)",
+        brand: "Weetabix",
+        department: "Cereals",
+        category_breadcrumb: "/categories/breakfast-cereals/cereals",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 4,
+        search_text: "weetabix cereals breakfast cereals",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(rows, "kelloggs cereals");
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Kellogg/i);
+  });
 
   it("rejects Save euro rows when the saving amount is mistaken for the selling price", () => {
     assert.equal(
@@ -680,11 +815,11 @@ describe("retail weekly offers search", () => {
     );
   });
 
-  it("does not infer fulfilment from caller phrasing alone", () => {
+  it("respects explicit fulfilment in caller phrasing or tool input", () => {
     assert.equal(
       resolveWeeklyOfferSearchFilters("what's on offer in the meat counter this week")
         .fulfilment,
-      null,
+      "counter",
     );
     assert.equal(
       resolveWeeklyOfferSearchFilters("meat counter steaks", { fulfilment: "counter" })
