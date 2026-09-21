@@ -48,20 +48,24 @@
       "schedule": "20 2 * * *"
     },
     {
-      "path": "/api/cron/supervalu-catalog-sync",
+      "path": "/api/cron/supervalu-catalog-sync-thursday-early",
       "schedule": "20 0 * * 4"
     },
     {
-      "path": "/api/cron/supervalu-catalog-sync",
+      "path": "/api/cron/supervalu-catalog-sync-thursday-morning",
       "schedule": "20 6 * * 4"
     },
     {
-      "path": "/api/cron/supervalu-catalog-sync",
+      "path": "/api/cron/supervalu-catalog-sync-thursday-late",
       "schedule": "20 8 * * 4"
     },
     {
-      "path": "/api/cron/supervalu-catalog-sync",
+      "path": "/api/cron/supervalu-catalog-sync-retry",
       "schedule": "20 6 * * 5"
+    },
+    {
+      "path": "/api/cron/supervalu-catalog-sync-bootstrap",
+      "schedule": "* * * * *"
     }
   ]
 }

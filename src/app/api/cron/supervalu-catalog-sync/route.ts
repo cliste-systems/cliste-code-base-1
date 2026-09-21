@@ -17,7 +17,7 @@ async function authorize(request: Request): Promise<boolean> {
   return Boolean(candidate) && timingSafeEqualUtf8(candidate, secret);
 }
 
-async function run(request: Request) {
+export async function runSupervaluCatalogSyncCron(request: Request) {
   if (!(await authorize(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -41,5 +41,5 @@ async function run(request: Request) {
   return NextResponse.json({ ok, results }, { status: ok ? 200 : 502 });
 }
 
-export const GET = run;
-export const POST = run;
+export const GET = runSupervaluCatalogSyncCron;
+export const POST = runSupervaluCatalogSyncCron;

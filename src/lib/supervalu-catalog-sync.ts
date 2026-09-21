@@ -186,11 +186,22 @@ async function fetchCategory(categoryId: string, department: string, storeId: st
 }
 
 export async function fetchSupervaluFullCatalog(storeId = SUPERVALU_STOREFRONT_STORE_ID): Promise<CatalogProduct[]> {
+  // Crawl aisles concurrently in small batches so a full 20k-ish catalogue
+  // comfortably fits inside the serverless execution window without hammering
+  // SuperValu's gateway with unbounded parallel requests.
   const bySku = new Map<string, CatalogProduct>();
-  for (const root of ROOT_CATEGORIES) {
-    const products = await fetchCategory(root.categoryId, root.department, storeId);
-    for (const product of products) bySku.set(product.sku, product);
+  const concurrency = 4;
+
+  for (let i = 0; i < ROOT_CATEGORIES.length; i += concurrency) {
+    const roots = ROOT_CATEGORIES.slice(i, i + concurrency);
+    const batches = await Promise.all(
+      roots.map((root) => fetchCategory(root.categoryId, root.department, storeId)),
+    );
+    for (const products of batches) {
+      for (const product of products) bySku.set(product.sku, product);
+    }
   }
+
   return [...bySku.values()].sort((a, b) => a.productName.localeCompare(b.productName));
 }
 
