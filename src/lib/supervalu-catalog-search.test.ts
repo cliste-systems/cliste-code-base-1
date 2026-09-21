@@ -142,6 +142,35 @@ describe("supervalu catalog search", () => {
     );
   });
 
+  it("fuzzy-filters a minor STT slip to fillet steak", () => {
+    const matches = filterCatalogMatchesByQuery("filled steak", [
+      {
+        productName: "SuperValu Signature Tastes Hereford Irish Fillet Steak (370 g)",
+        department: "Beef Steaks",
+        sku: "1347278000",
+        currentPriceEur: 15.99,
+        wasPriceEur: 18.99,
+        discountLabel: "Rewards Price Only €15.99",
+        isOnOffer: true,
+        score: 0.95,
+        quoteText: "fillet",
+      },
+      {
+        productName: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        department: "Butcher",
+        sku: "1019164002",
+        currentPriceEur: 16.74,
+        wasPriceEur: 24.99,
+        discountLabel: "Save 33%",
+        isOnOffer: true,
+        score: 0.55,
+        quoteText: "sirloin",
+      },
+    ]);
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Fillet Steak/i);
+  });
+
   it("filters SuperValu fish queries to fish-finger products only", () => {
     const matches = filterCatalogMatchesByQuery("SuperValu fish fingers", [
       {
