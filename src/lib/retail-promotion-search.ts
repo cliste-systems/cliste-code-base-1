@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimeZone } from "date-fns-tz";
 
 import {
+  offerSearchProductIdentityTokens,
   resolveWeeklyOfferSearchFilters,
   tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
@@ -222,8 +223,8 @@ function parseMoneyExpression(value: string): number | null {
   return bare ? parseMoney(bare[1]) : null;
 }
 
-function promotionSubjectTokens(query: string): string[] {
-  const normalized = normalizeNumberWords(query)
+function promotionScopeText(query: string): string {
+  return normalizeNumberWords(query)
     .replace(/(?:buy\s+)?\d+\s+for\s+(?:€\s*)?\d+(?:[.,]\d{1,2})?(?:\s*euro)?/gi, " ")
     .replace(/save\s+(?:(?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)/gi, " ")
     .replace(/save\s+\d+(?:[.,]\d+)?\s*%/gi, " ")
@@ -231,21 +232,38 @@ function promotionSubjectTokens(query: string): string[] {
     .replace(/only\s+(?:(?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)/gi, " ")
     .replace(/half\s+price/gi, " ")
     .replace(/super\s*7/gi, " ")
-    .replace(/mix\s*(?:&|and)\s*match/gi, " ");
+    .replace(/mix\s*(?:&|and)\s*match/gi, " ")
+    .replace(/\breal\s+rewards?\b|\brewards?\s+(?:price|offers?|deals?)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  return tokenizeSupervaluSearchQuery(normalized).filter(
+function promotionSubjectTokens(
+  scopeText: string,
+  serviceArea: SupervaluServiceArea | null,
+): string[] {
+  const tokens = offerSearchProductIdentityTokens(scopeText).filter(
     (token) =>
       !/^\d+(?:\.\d+)?$/.test(token) &&
-      !PROMOTION_NOISE.has(token) &&
-      !AREA_NOISE.has(token),
+      !PROMOTION_NOISE.has(token),
   );
+
+  // If the scope has already been captured structurally (fruit & veg ->
+  // produce, wine -> off-licence), do not also require every product name to
+  // contain those area words. For product phrases such as "wine gums" or
+  // "fish fingers", no area is inferred, so the complete product identity is
+  // preserved here.
+  return serviceArea
+    ? tokens.filter((token) => !AREA_NOISE.has(token))
+    : tokens;
 }
 
 export function parseRetailPromotionQuery(
   query: string,
 ): ParsedRetailPromotionQuery {
   const normalized = normalizeNumberWords(query);
-  const filters = resolveWeeklyOfferSearchFilters(query);
+  const scopeText = promotionScopeText(query);
+  const filters = resolveWeeklyOfferSearchFilters(scopeText);
 
   const multibuy = normalized.match(
     /(?:buy\s+)?(\d+)\s+for\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*euro)?\b/i,
@@ -305,7 +323,7 @@ export function parseRetailPromotionQuery(
     namedPhrase,
     serviceArea: filters.serviceArea ?? null,
     fulfilment: filters.fulfilment ?? null,
-    subjectTokens: promotionSubjectTokens(query),
+    subjectTokens: promotionSubjectTokens(scopeText, filters.serviceArea ?? null),
   };
 }
 
