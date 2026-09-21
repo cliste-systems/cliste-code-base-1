@@ -430,6 +430,131 @@ describe("retail offer intent routing", () => {
   });
 });
 
+describe("semantic product versus store-area routing", () => {
+  it("does not route product names containing alcohol words into off-licence", () => {
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("are wine gums on offer?").serviceArea,
+      null,
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("any cider vinegar crisps on offer?").serviceArea,
+      null,
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("beer battered fish on offer?").serviceArea,
+      null,
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("what wine is on offer?").serviceArea,
+      "off_licence",
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("anything in the wine aisle on offer?").serviceArea,
+      "off_licence",
+    );
+  });
+
+  it("treats category-only phrases as browsing and mixed phrases as products", () => {
+    assert.equal(inferWeeklyOffersListIntent("what fish is on offer this week?"), true);
+    assert.equal(inferWeeklyOffersListIntent("wine and beer offers"), true);
+    assert.equal(inferWeeklyOffersListIntent("milk bread crisps chocolate offers"), true);
+    assert.equal(inferWeeklyOffersListIntent("Birds Eye fish fingers on offer"), false);
+    assert.equal(inferWeeklyOffersListIntent("wine gums on offer"), false);
+    assert.equal(inferWeeklyOffersListIntent("Cadbury Dairy Milk on offer"), false);
+    assert.equal(inferWeeklyOffersListIntent("cider vinegar crisps on offer"), false);
+  });
+
+  it("keeps overlapping department words attached to the complete product identity", () => {
+    const rows = [
+      mockOfferRow({
+        id: "wine-gums",
+        product_name: "Maynards Bassetts Wine Gums Bag (110 g)",
+        brand: "Maynards Bassetts",
+        department: "Sweets",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 1,
+        discount_label: "Rewards Price Only €1",
+        search_text: "maynards bassetts wine gums bag sweets",
+      }),
+      mockOfferRow({
+        id: "wine",
+        product_name: "House White Wine (750 ml)",
+        department: "Wine",
+        service_area: "off_licence",
+        fulfilment: "prepack",
+        current_price_eur: 8,
+        is_alcohol: true,
+        search_text: "house white wine alcohol",
+      }),
+      mockOfferRow({
+        id: "cider-vinegar",
+        product_name: "Keogh's Atlantic Sea Salt & Irish Cider Vinegar Crisps (125 g)",
+        brand: "Keogh's",
+        department: "Crisps & Snacks",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        current_price_eur: 2.5,
+        discount_label: "Rewards Price Only €2.50",
+        search_text: "keoghs cider vinegar crisps snacks",
+      }),
+      mockOfferRow({
+        id: "cider",
+        product_name: "Irish Cider 8 Pack",
+        department: "Cider",
+        service_area: "off_licence",
+        fulfilment: "prepack",
+        current_price_eur: 12,
+        is_alcohol: true,
+        search_text: "irish cider alcohol",
+      }),
+    ];
+
+    const gums = searchSyncedWeeklyOffersInRows(rows, "wine gums on offer?");
+    assert.equal(gums.length, 1);
+    assert.match(gums[0]?.productName ?? "", /Wine Gums/i);
+
+    const vinegar = searchSyncedWeeklyOffersInRows(
+      rows,
+      "cider vinegar crisps on offer?",
+    );
+    assert.equal(vinegar.length, 1);
+    assert.match(vinegar[0]?.productName ?? "", /Cider Vinegar Crisps/i);
+  });
+
+  it("does not use phrase length as a proxy for browse intent", () => {
+    const rows = [
+      mockOfferRow({
+        id: "birds-eye",
+        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
+        brand: "Birds Eye",
+        department: "Fish Fingers",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 2.5,
+        discount_label: "Rewards Price Only €2.50",
+        search_text: "birds eye crispy fish fingers frozen seafood",
+      }),
+      mockOfferRow({
+        id: "salmon",
+        product_name: "Fresh Salmon Fillets",
+        department: "Fish",
+        service_area: "fish",
+        fulfilment: "prepack",
+        current_price_eur: 8,
+        search_text: "fresh salmon fillets fish",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(
+      rows,
+      "Birds Eye crispy fish fingers on offer",
+    );
+    assert.equal(matches.length, 1);
+    assert.match(matches[0]?.productName ?? "", /Birds Eye.*Fish Fingers/i);
+  });
+});
+
 describe("retail weekly offers search", () => {
   it("treats a real department query like cereals as a browse, not one ambiguous product", () => {
     const rows = [
