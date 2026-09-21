@@ -141,6 +141,29 @@ export type ParsedRetailPromotionQuery = {
   subjectTokens: string[];
 };
 
+type CatalogProductRow = {
+  id: string;
+  sku: string;
+  product_name: string;
+  brand: string | null;
+  department: string;
+  category_breadcrumb: string | null;
+  service_area: string;
+  fulfilment: string;
+  is_alcohol: boolean;
+  search_text: string;
+};
+
+type StoreProductRow = {
+  id: string;
+  product_id: string;
+  source_store_id: string;
+  regular_price_eur: number | string | null;
+  display_price_eur: number | string | null;
+  price_per_unit: string | null;
+  retail_catalog_products: CatalogProductRow | CatalogProductRow[] | null;
+};
+
 type RetailPromotionRow = {
   id: string;
   promotion_type: string;
@@ -153,84 +176,8 @@ type RetailPromotionRow = {
   valid_from: string;
   valid_to: string;
   national_store_count: number | string | null;
-  retail_store_products:
-    | {
-        id: string;
-        product_id: string;
-        source_store_id: string;
-        regular_price_eur: number | string | null;
-        display_price_eur: number | string | null;
-        price_per_unit: string | null;
-        retail_catalog_products:
-          | {
-              id: string;
-              sku: string;
-              product_name: string;
-              brand: string | null;
-              department: string;
-              category_breadcrumb: string | null;
-              service_area: string;
-              fulfilment: string;
-              is_alcohol: boolean;
-              search_text: string;
-            }
-          | Array<{
-              id: string;
-              sku: string;
-              product_name: string;
-              brand: string | null;
-              department: string;
-              category_breadcrumb: string | null;
-              service_area: string;
-              fulfilment: string;
-              is_alcohol: boolean;
-              search_text: string;
-            }>
-          | null;
-      }
-    | Array<{
-        id: string;
-        product_id: string;
-        source_store_id: string;
-        regular_price_eur: number | string | null;
-        display_price_eur: number | string | null;
-        price_per_unit: string | null;
-        retail_catalog_products:
-          | {
-              id: string;
-              sku: string;
-              product_name: string;
-              brand: string | null;
-              department: string;
-              category_breadcrumb: string | null;
-              service_area: string;
-              fulfilment: string;
-              is_alcohol: boolean;
-              search_text: string;
-            }
-          | Array<{
-              id: string;
-              sku: string;
-              product_name: string;
-              brand: string | null;
-              department: string;
-              category_breadcrumb: string | null;
-              service_area: string;
-              fulfilment: string;
-              is_alcohol: boolean;
-              search_text: string;
-            }>
-          | null;
-      }>
-    | null;
+  retail_store_products: StoreProductRow | StoreProductRow[] | null;
 };
-
-type CatalogProduct = NonNullable<
-  Exclude<
-    NonNullable<RetailPromotionRow["retail_store_products"]>,
-    Array<unknown>
-  >["retail_catalog_products"]
->;
 
 function firstJoin<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -414,7 +361,7 @@ function rowMatchesMechanic(
 
 function rowSubjectText(
   row: RetailPromotionRow,
-  product: NonNullable<ReturnType<typeof firstJoin<CatalogProduct>>>,
+  product: CatalogProductRow,
 ): string {
   return normalizeSearchText(
     [
@@ -433,7 +380,7 @@ function rowSubjectText(
 
 function rowMatchesSubject(
   row: RetailPromotionRow,
-  product: NonNullable<ReturnType<typeof firstJoin<CatalogProduct>>>,
+  product: CatalogProductRow,
   subjectTokens: string[],
 ): boolean {
   if (subjectTokens.length === 0) return true;
@@ -580,16 +527,8 @@ export async function searchStructuredNationalPromotions(
     string,
     {
       row: RetailPromotionRow;
-      storeProduct: NonNullable<
-        ReturnType<
-          typeof firstJoin<
-            NonNullable<RetailPromotionRow["retail_store_products"]> extends Array<infer U>
-              ? U
-              : NonNullable<RetailPromotionRow["retail_store_products"]>
-          >
-        >
-      >;
-      product: NonNullable<ReturnType<typeof firstJoin<CatalogProduct>>>;
+      storeProduct: StoreProductRow;
+      product: CatalogProductRow;
       stores: number;
     }
   >();
