@@ -54,6 +54,13 @@ const groups: ScenarioGroup[] = [
       requiredIntent: "stock",
       queryMustInclude: ["wine", "gums"],
       forbiddenServiceAreas: ["off_licence", "off licence", "alcohol"],
+      assistantMustNotInclude: [
+        "we definitely have",
+        "definitely in stock",
+        "guaranteed in stock",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -212,7 +219,12 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "stock",
       queryMustInclude: ["weetabix"],
-      assistantMustNotInclude: ["definitely on the shelf", "guaranteed in stock right now"],
+      assistantMustNotInclude: [
+        "definitely on the shelf",
+        "guaranteed in stock right now",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -232,7 +244,12 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "stock",
       queryMustIncludeAny: ["gluten free", "gluten-free"],
-      assistantMustNotInclude: ["definitely on the shelf", "guaranteed in stock right now"],
+      assistantMustNotInclude: [
+        "definitely on the shelf",
+        "guaranteed in stock right now",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -252,6 +269,12 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "stock",
       queryMustIncludeAny: ["formula", "baby", "infant"],
+      assistantMustNotInclude: [
+        "we definitely have",
+        "definitely in stock",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
