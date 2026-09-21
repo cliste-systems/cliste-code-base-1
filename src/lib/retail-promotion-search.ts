@@ -189,6 +189,10 @@ function normalizeNumberWords(value: string): string {
   out = out
     .replace(/\b(?:a\s+)?tenner\b/gi, "€10")
     .replace(/\b(?:a\s+)?fiver\b/gi, "€5")
+    .replace(
+      /\b([0-9]+)\s+euros?\s+([0-9]{1,2})(?:\s+cents?)?\b/gi,
+      "€$1.$2",
+    )
     .replace(/\b([0-9]+(?:[.,][0-9]{1,2})?)\s+quid\b/gi, "€$1")
     .replace(/\b([0-9]+(?:[.,][0-9]{1,2})?)\s+euros?\b/gi, "€$1")
     .replace(/\b([0-9]{1,2})\s+cents?\b/gi, "$1c")
@@ -262,7 +266,7 @@ export function parseRetailPromotionQuery(
       )
     : null;
   const loyaltyPriceAmount = normalized.match(
-    /\brewards?\s+price(?:\s+only)?\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
+    /\brewards?\s+price(?:\s+only)?(?:\s+of)?\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
   );
   const mixMatch = /\bmix\s*(?:&|and)\s*match\b/i.test(normalized);
   const namedPhrase = /\bsuper\s*7\b/i.test(normalized)
