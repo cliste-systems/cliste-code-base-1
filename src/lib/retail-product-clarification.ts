@@ -79,6 +79,22 @@ function fulfilmentClarificationAreaHint(serviceArea: string): string {
   );
 }
 
+function queryMatchesDepartmentScope(
+  query: string,
+  matches: ClarificationMatch[],
+): boolean {
+  const tokens = offerSearchProductTokens(query);
+  if (tokens.length === 0 || tokens.length > 3 || matches.length < 2) return false;
+  return (
+    matches.filter((match) => {
+      const department = String(match.department ?? "");
+      return tokens.every((token) =>
+        retailSearchTokenMatchesText(department, token),
+      );
+    }).length >= 2
+  );
+}
+
 function narrowMatchesByProductTokens<T extends ClarificationMatch>(
   query: string,
   matches: T[],
@@ -156,16 +172,7 @@ export function buildBroadProductClarificationHint(
   // If the caller's words match the returned department/category itself,
   // this is a browse request ("cereals", "yogurts", "crisps"), not an
   // ambiguous individual product. Return the category offers directly.
-  const categoryTokens = offerSearchProductTokens(query);
-  if (
-    categoryTokens.length > 0 &&
-    matches.filter((match) => {
-      const department = String(match.department ?? "");
-      return categoryTokens.every((token) =>
-        retailSearchTokenMatchesText(department, token),
-      );
-    }).length >= 2
-  ) {
+  if (queryMatchesDepartmentScope(query, matches)) {
     return null;
   }
 
@@ -212,7 +219,9 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     matches,
     options?.fulfilment,
   );
-  narrowed = narrowMatchesByProductTokens(query, narrowed);
+  if (!queryMatchesDepartmentScope(query, narrowed)) {
+    narrowed = narrowMatchesByProductTokens(query, narrowed);
+  }
   const clarificationHint =
     buildOfferFulfilmentClarificationHint(narrowed, options?.fulfilment) ??
     buildBroadProductClarificationHint(query, narrowed);
