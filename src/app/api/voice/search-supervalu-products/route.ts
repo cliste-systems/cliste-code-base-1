@@ -194,11 +194,11 @@ export async function POST(request: Request) {
     quote_text: match.quoteText,
     source: match.source ?? null,
   }));
-  const { clarificationHint, matches: responseMatches } = resolveProductSearchResponse(
-    query,
-    mappedMatches,
-    { fulfilment, intent },
-  );
+  const {
+    clarificationHint,
+    clarificationKind,
+    matches: responseMatches,
+  } = resolveProductSearchResponse(query, mappedMatches, { fulfilment, intent });
 
   let noMatchQuote: string | null =
     mappedMatches.length === 0
@@ -253,8 +253,9 @@ export async function POST(request: Request) {
     intent,
     fulfilment,
     clarification_hint: clarificationHint,
+    clarification_kind: clarificationKind,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
-    matches: responseMatches,
+    matches: clarificationHint ? [] : responseMatches,
     no_match_quote: noMatchQuote,
   });
 }
