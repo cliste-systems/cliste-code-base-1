@@ -151,6 +151,7 @@ type CatalogProductRow = {
   service_area: string;
   fulfilment: string;
   is_alcohol: boolean;
+  is_national: boolean;
   search_text: string;
 };
 
@@ -459,19 +460,21 @@ export async function searchStructuredNationalPromotions(
        retail_store_products!inner(
          id,product_id,source_store_id,regular_price_eur,display_price_eur,price_per_unit,
          retail_catalog_products!inner(
-           id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,search_text
+           id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,is_national,search_text
          )
        )`,
     )
-    .eq("scope", "national")
-    .gte("national_store_count", 3)
     .lte("valid_from", today)
     .gte("valid_to", today)
     .eq(
       "retail_store_products.retail_catalog_products.retail_banner",
       input.retailBanner,
     )
-    .order("national_store_count", { ascending: false })
+    .eq(
+      "retail_store_products.retail_catalog_products.is_national",
+      true,
+    )
+    .order("valid_to", { ascending: false })
     .limit(MAX_PROMOTION_ROWS);
 
   if (parsed.mechanic === "multibuy") {
@@ -523,13 +526,16 @@ export async function searchStructuredNationalPromotions(
     throw new Error(error.message);
   }
 
+  // Build consensus directly from independent storefront observations.
+  // Do not rely on retail_promotions.scope here: multibuy promotions historically
+  // failed national-scope promotion because their bundle offer price is null.
   const byPromotion = new Map<
     string,
     {
       row: RetailPromotionRow;
       storeProduct: StoreProductRow;
       product: CatalogProductRow;
-      stores: number;
+      sourceStores: Set<string>;
     }
   >();
 
@@ -537,23 +543,24 @@ export async function searchStructuredNationalPromotions(
     if (!rowMatchesMechanic(raw, parsed)) continue;
     const storeProduct = firstJoin(raw.retail_store_products);
     const product = firstJoin(storeProduct?.retail_catalog_products ?? null);
-    if (!storeProduct || !product) continue;
+    if (!storeProduct || !product || product.is_national !== true) continue;
     if (!rowMatchesSubject(raw, product, parsed.subjectTokens)) continue;
 
     const labelKey = normalizeSearchText(
       `${raw.promotion_type} ${raw.loyalty_required ? "loyalty" : ""} ${raw.label ?? raw.description ?? ""}`,
     );
     const key = `${product.id}|${labelKey}`;
-    const stores = numberValue(raw.national_store_count) ?? 0;
     const existing = byPromotion.get(key);
-    if (!existing || stores > existing.stores) {
-      byPromotion.set(key, {
-        row: raw,
-        storeProduct,
-        product,
-        stores,
-      });
+    if (existing) {
+      existing.sourceStores.add(storeProduct.source_store_id);
+      continue;
     }
+    byPromotion.set(key, {
+      row: raw,
+      storeProduct,
+      product,
+      sourceStores: new Set([storeProduct.source_store_id]),
+    });
   }
 
   const limit = Math.max(
@@ -562,14 +569,15 @@ export async function searchStructuredNationalPromotions(
   );
 
   return [...byPromotion.values()]
+    .filter((entry) => entry.sourceStores.size >= 3)
     .sort(
       (a, b) =>
-        b.stores - a.stores ||
+        b.sourceStores.size - a.sourceStores.size ||
         a.product.department.localeCompare(b.product.department) ||
         a.product.product_name.localeCompare(b.product.product_name),
     )
     .slice(0, limit)
-    .map(({ row, storeProduct, product, stores }) => {
+    .map(({ row, storeProduct, product, sourceStores }) => {
       const offerPriceEur = numberValue(row.offer_price_eur);
       const regularPriceEur =
         numberValue(storeProduct.regular_price_eur) ??
@@ -589,7 +597,7 @@ export async function searchStructuredNationalPromotions(
             : null,
         discountLabel: row.label ?? row.description,
         isOnOffer: true,
-        score: Math.min(1, 0.7 + stores / 100),
+        score: Math.min(1, 0.7 + sourceStores.size / 100),
         quoteText: formatPromotionQuote({
           productName: product.product_name,
           label: row.label ?? row.description,
