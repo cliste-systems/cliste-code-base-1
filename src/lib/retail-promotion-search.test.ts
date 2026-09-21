@@ -43,6 +43,22 @@ describe("retail promotion query parsing", () => {
     assert.deepEqual(parsed.subjectTokens, ["cereal"]);
   });
 
+  it("captures explicit Rewards Price amounts with or without Only", () => {
+    const withOnly = parseRetailPromotionQuery(
+      "what is on Rewards Price Only €2.50?",
+    );
+    assert.equal(withOnly.mechanic, "fixed_price");
+    assert.equal(withOnly.loyaltyRequired, true);
+    assert.equal(withOnly.amountEur, 2.5);
+
+    const withoutOnly = parseRetailPromotionQuery(
+      "what has a Rewards Price of two euro fifty?",
+    );
+    assert.equal(withoutOnly.mechanic, "loyalty");
+    assert.equal(withoutOnly.loyaltyRequired, true);
+    assert.equal(withoutOnly.amountEur, 2.5);
+  });
+
   it("supports Rewards multibuys without collapsing them to a unit price", () => {
     const parsed = parseRetailPromotionQuery(
       "what is on 3 for €5 with Rewards?",
