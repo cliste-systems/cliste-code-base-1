@@ -54,6 +54,32 @@ describe("retail promotion query parsing", () => {
     assert.equal(parsed.totalEur, 5);
   });
 
+  it("normalizes natural Irish promotion phrasing before matching", () => {
+    const tenner = parseRetailPromotionQuery(
+      "what fruit is three for a tenner?",
+    );
+    assert.equal(tenner.mechanic, "multibuy");
+    assert.equal(tenner.quantity, 3);
+    assert.equal(tenner.totalEur, 10);
+    assert.equal(tenner.serviceArea, "produce");
+
+    const fiver = parseRetailPromotionQuery("anything two for a fiver?");
+    assert.equal(fiver.quantity, 2);
+    assert.equal(fiver.totalEur, 5);
+
+    const quid = parseRetailPromotionQuery("what is two for six quid?");
+    assert.equal(quid.quantity, 2);
+    assert.equal(quid.totalEur, 6);
+
+    const cents = parseRetailPromotionQuery("anything save fifty cent?");
+    assert.equal(cents.mechanic, "save_amount");
+    assert.equal(cents.amountEur, 0.5);
+
+    const percent = parseRetailPromotionQuery("anything save thirty three percent?");
+    assert.equal(percent.mechanic, "save_percent");
+    assert.equal(percent.percent, 33);
+  });
+
   it("supports percentage, money-off, half-price, fixed-price and cents mechanics", () => {
     assert.equal(
       parseRetailPromotionQuery("what is half price this week?").mechanic,
