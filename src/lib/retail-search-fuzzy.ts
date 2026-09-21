@@ -1,0 +1,63 @@
+import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
+
+function normalizedToken(value: string): string {
+  const token = normalizeSearchText(value).replace(/[^a-z0-9]/g, "");
+  if (token.length > 4 && token.endsWith("s")) return token.slice(0, -1);
+  return token;
+}
+
+function boundedEditDistance(a: string, b: string, maxDistance: number): number {
+  if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowMin = current[0]!;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min(
+        previous[j]! + 1,
+        current[j - 1]! + 1,
+        previous[j - 1]! + cost,
+      );
+      current[j] = value;
+      rowMin = Math.min(rowMin, value);
+    }
+    if (rowMin > maxDistance) return maxDistance + 1;
+    previous = current;
+  }
+
+  return previous[b.length]!;
+}
+
+/**
+ * Voice-friendly product-token similarity. Exact/stem matches score 1.
+ * Minor STT spelling slips are accepted without hardcoded product aliases.
+ */
+export function retailSearchTokenSimilarity(text: string, token: string): number {
+  const normalizedText = normalizeSearchText(text);
+  const query = normalizedToken(token);
+  if (!query) return 0;
+  if (normalizedText.includes(query)) return 1;
+  if (query.length < 5) return 0;
+
+  const maxDistance = query.length >= 9 ? 2 : 1;
+  const words = normalizedText
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map(normalizedToken)
+    .filter(Boolean);
+
+  let best = 0;
+  for (const word of words) {
+    if (word.length < 5) continue;
+    const distance = boundedEditDistance(query, word, maxDistance);
+    if (distance > maxDistance) continue;
+    best = Math.max(best, 1 - distance / Math.max(query.length, word.length));
+  }
+  return best >= 0.72 ? best : 0;
+}
+
+export function retailSearchTokenMatchesText(text: string, token: string): boolean {
+  return retailSearchTokenSimilarity(text, token) > 0;
+}
