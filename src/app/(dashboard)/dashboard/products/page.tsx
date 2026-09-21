@@ -129,7 +129,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   return (
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
-        <DashboardAnimatedPageSections>
+        <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-hidden">
           <ClistePageHeader
             tone="inbox"
             icon={PackageSearch}
@@ -144,10 +144,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </p>
             </div>
           ) : (
-            <>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
               <form
                 method="get"
-                className={`${DASHBOARD_CARD_SURFACE} flex flex-col gap-3 p-4 sm:flex-row sm:items-end`}
+                className={`${DASHBOARD_CARD_SURFACE} shrink-0 flex flex-col gap-3 p-4 sm:flex-row sm:items-end`}
               >
                 <label className="flex-1">
                   <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -185,90 +185,92 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 </button>
               </form>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <strong className="font-semibold text-slate-800">Safe default:</strong>{" "}
                 products start as <strong>Not confirmed</strong>. You only need to change items this store has actually confirmed.
               </div>
 
-              {loadError ? (
-                <p className="text-sm text-red-700">Could not load products: {loadError}</p>
-              ) : query.length < 2 ? (
-                <div className={`${DASHBOARD_CARD_SURFACE} p-6 text-center`}>
-                  <PackageSearch className="mx-auto h-6 w-6 text-slate-400" />
-                  <p className="mt-2 text-sm font-medium text-slate-800">
-                    Search for a product to set this store&apos;s assortment.
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    No one has to review thousands of products up front.
-                  </p>
-                </div>
-              ) : visibleProducts.length === 0 ? (
-                <div className={`${DASHBOARD_CARD_SURFACE} p-6 text-center text-sm text-slate-600`}>
-                  No matching products for this search and filter.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {visibleProducts.map((product) => {
-                    const status = overrides.get(product.id) ?? "not_confirmed";
-                    const copy = STATUS_COPY[status];
-                    const StatusIcon = statusIcon(status);
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]">
+                {loadError ? (
+                  <p className="text-sm text-red-700">Could not load products: {loadError}</p>
+                ) : query.length < 2 ? (
+                  <div className={`${DASHBOARD_CARD_SURFACE} p-6 text-center`}>
+                    <PackageSearch className="mx-auto h-6 w-6 text-slate-400" />
+                    <p className="mt-2 text-sm font-medium text-slate-800">
+                      Search for a product to set this store&apos;s assortment.
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      No one has to review thousands of products up front.
+                    </p>
+                  </div>
+                ) : visibleProducts.length === 0 ? (
+                  <div className={`${DASHBOARD_CARD_SURFACE} p-6 text-center text-sm text-slate-600`}>
+                    No matching products for this search and filter.
+                  </div>
+                ) : (
+                  <div className="space-y-3 pb-1">
+                    {visibleProducts.map((product) => {
+                      const status = overrides.get(product.id) ?? "not_confirmed";
+                      const copy = STATUS_COPY[status];
+                      const StatusIcon = statusIcon(status);
 
-                    return (
-                      <div
-                        key={product.id}
-                        className={`${DASHBOARD_CARD_SURFACE} p-4 sm:p-5`}
-                      >
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="text-[15px] font-semibold text-[#11181d]">
-                                {product.product_name}
-                              </h2>
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${copy.className}`}
-                              >
-                                <StatusIcon className="h-3 w-3" />
-                                {copy.label}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {[product.brand, product.department, product.sku ? `SKU ${product.sku}` : null]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </p>
-                            <p className="mt-2 max-w-2xl text-xs text-slate-600">
-                              {copy.description}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {(
-                              [
-                                ["stocked", "Normally stocked"],
-                                ["not_stocked", "Not stocked"],
-                                ["not_confirmed", "Not confirmed"],
-                              ] as const
-                            ).map(([nextStatus, label]) => (
-                              <form key={nextStatus} action={setProductAssortmentStatus}>
-                                <input type="hidden" name="product_id" value={product.id} />
-                                <input type="hidden" name="status" value={nextStatus} />
-                                <button
-                                  type="submit"
-                                  disabled={status === nextStatus}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-default disabled:bg-slate-100 disabled:text-slate-400"
+                      return (
+                        <div
+                          key={product.id}
+                          className={`${DASHBOARD_CARD_SURFACE} p-4 sm:p-5`}
+                        >
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h2 className="text-[15px] font-semibold text-[#11181d]">
+                                  {product.product_name}
+                                </h2>
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${copy.className}`}
                                 >
-                                  {label}
-                                </button>
-                              </form>
-                            ))}
+                                  <StatusIcon className="h-3 w-3" />
+                                  {copy.label}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {[product.brand, product.department, product.sku ? `SKU ${product.sku}` : null]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                              <p className="mt-2 max-w-2xl text-xs text-slate-600">
+                                {copy.description}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              {(
+                                [
+                                  ["stocked", "Normally stocked"],
+                                  ["not_stocked", "Not stocked"],
+                                  ["not_confirmed", "Not confirmed"],
+                                ] as const
+                              ).map(([nextStatus, label]) => (
+                                <form key={nextStatus} action={setProductAssortmentStatus}>
+                                  <input type="hidden" name="product_id" value={product.id} />
+                                  <input type="hidden" name="status" value={nextStatus} />
+                                  <button
+                                    type="submit"
+                                    disabled={status === nextStatus}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-default disabled:bg-slate-100 disabled:text-slate-400"
+                                  >
+                                    {label}
+                                  </button>
+                                </form>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </DashboardAnimatedPageSections>
       </div>
