@@ -173,6 +173,25 @@ describe("retail product clarification", () => {
     assert.match(response.matches[0]?.product_name ?? "", /Horgans/i);
   });
 
+  it("keeps the intended fillet steak after a one-character STT slip", () => {
+    const response = resolveProductSearchResponse("filled steak", [
+      {
+        product_name: "SuperValu Signature Tastes Hereford Irish Fillet Steak (370 g)",
+        service_area: "butcher",
+        fulfilment: "prepack",
+        quote_text: "fillet",
+      },
+      {
+        product_name: "SuperValu Fresh Irish Beef Sirloin Steak (1 kg)",
+        service_area: "butcher",
+        fulfilment: "counter",
+        quote_text: "sirloin",
+      },
+    ]);
+    assert.equal(response.matches.length, 1);
+    assert.match(response.matches[0]?.product_name ?? "", /Fillet Steak/i);
+  });
+
   it("does not clarify specific brand queries", () => {
     const hint = buildBroadProductClarificationHint("greenfarm turkey slices", [
       { productName: "Green Farm Delicatessen Roasted & Carved Turkey Slices (120 g)" },
