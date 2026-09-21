@@ -114,6 +114,110 @@ test("intent switch scenario requires a stock lookup", () => {
   assert.equal(grade.status, "pass");
 });
 
+test("service-area expectations use the effective backend scope from the product query", () => {
+  const wineScenario = buildDefaultRetailRegressionScenarios().find((row) =>
+    row.slug.startsWith("wine-offer-"),
+  );
+  assert.ok(wineScenario);
+  const grade = gradeRetailRegressionScenario(wineScenario, {
+    durationMs: 100,
+    turns: [
+      {
+        caller: wineScenario.turns[0]!.caller,
+        assistant: "There are wine offers; you must be 18 or over.",
+        transcriptLines: [],
+        tools: [
+          {
+            name: "searchSuperValuProducts",
+            args: { intent: "offer", query: "wine" },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(grade.status, "pass");
+});
+
+test("counter scenarios require the structured fulfilment choice", () => {
+  const scenario = buildDefaultRetailRegressionScenarios().find((row) =>
+    row.slug.startsWith("salmon-fish-counter-"),
+  );
+  assert.ok(scenario);
+
+  const missing = gradeRetailRegressionScenario(scenario, {
+    durationMs: 100,
+    turns: [
+      {
+        caller: scenario.turns[0]!.caller,
+        assistant: "Do you mean the counter or pre-pack?",
+        transcriptLines: [],
+        tools: [
+          {
+            name: "searchSuperValuProducts",
+            args: { intent: "offer", query: "salmon" },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(missing.status, "fail");
+  assert.match(missing.reasons.join(" "), /fulfilment "counter"/i);
+
+  const correct = gradeRetailRegressionScenario(scenario, {
+    durationMs: 100,
+    turns: [
+      {
+        caller: scenario.turns[0]!.caller,
+        assistant: "I checked the fresh counter salmon offers.",
+        transcriptLines: [],
+        tools: [
+          {
+            name: "searchSuperValuProducts",
+            args: { intent: "offer", query: "salmon", fulfilment: "counter" },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(correct.status, "pass");
+});
+
+test("cheapest refinement fails if Cara asks another clarification", () => {
+  const scenario = buildDefaultRetailRegressionScenarios().find((row) =>
+    row.slug.startsWith("avocado-refinement-"),
+  );
+  assert.ok(scenario);
+  const grade = gradeRetailRegressionScenario(scenario, {
+    durationMs: 200,
+    turns: [
+      {
+        caller: scenario.turns[0]!.caller,
+        assistant: "Which type of avocado?",
+        transcriptLines: [],
+        tools: [
+          {
+            name: "searchSuperValuProducts",
+            args: { intent: "price", query: "avocado" },
+          },
+        ],
+      },
+      {
+        caller: scenario.turns[1]!.caller,
+        assistant: "Would you like mini Hass or the ripe avocados?",
+        transcriptLines: [],
+        tools: [
+          {
+            name: "searchSuperValuProducts",
+            args: { intent: "price", query: "cheapest SuperValu avocado" },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(grade.status, "fail");
+  assert.match(grade.reasons.join(" "), /decisive selection/i);
+});
+
 test("recurrence classifier distinguishes new, recurring, and returned regressions", () => {
   assert.deepEqual(
     classifyRegressionFailure({
