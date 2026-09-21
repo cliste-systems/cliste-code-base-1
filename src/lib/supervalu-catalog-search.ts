@@ -82,6 +82,11 @@ export function filterCatalogMatchesByQuery(
 ): SupervaluCatalogMatch[] {
   if (matches.length === 0) return matches;
 
+  // Browse/list queries are already scoped by the offer search. Do not treat
+  // section words such as "off licence" or "dairy wall" as product-name
+  // requirements and accidentally discard valid category results.
+  if (inferWeeklyOffersListIntent(query)) return matches;
+
   const productTokens = catalogProductTokens(query);
   if (productTokens.length === 0) {
     return matches;
