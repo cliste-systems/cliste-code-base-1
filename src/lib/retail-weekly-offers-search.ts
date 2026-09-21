@@ -268,6 +268,9 @@ const STRUCTURAL_PRODUCT_QUERY_TOKENS = new Set([
   "kg",
   "kilo",
   "loose",
+  "licence",
+  "license",
+  "off",
   "packaged",
   "per",
   "prepack",
@@ -314,7 +317,7 @@ function shouldInferStoreArea(query: string): boolean {
   return hasExplicitStoreAreaWording(query) || isStoreAreaOnlyQuery(query);
 }
 
-function productIdentityTokens(query: string): string[] {
+export function offerSearchProductIdentityTokens(query: string): string[] {
   if (hasExplicitStoreAreaWording(query)) {
     return offerSearchProductTokens(query);
   }
@@ -339,6 +342,13 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   }
 
   if (meaningful.length === 0 && /\boffer/i.test(trimmed)) return true;
+
+  // A pure multi-category phrase is a browse even when the caller omits the
+  // word "offer" ("milk bread crisps chocolate fruit"). Mixed category +
+  // product words are not.
+  if (meaningful.length >= 2 && isCategoryOnlyOfferBrowse(trimmed)) {
+    return true;
+  }
 
   // "what fish is on offer?", "wine offers", "fruit and veg offers" etc.
   // Browse only when the meaningful words are genuinely category/section
@@ -614,7 +624,7 @@ function browseRetailWeeklyOffers(
 
 function isSpecificProductOfferQuery(query: string): boolean {
   return (
-    productIdentityTokens(query).length > 0 &&
+    offerSearchProductIdentityTokens(query).length > 0 &&
     !inferWeeklyOffersListIntent(query)
   );
 }
@@ -637,7 +647,7 @@ function specificOfferMatches(
   filters: WeeklyOfferSearchFilters,
   options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
 ): RetailWeeklyOfferRow[] {
-  const tokens = productIdentityTokens(query);
+  const tokens = offerSearchProductIdentityTokens(query);
   if (tokens.length === 0 || inferWeeklyOffersListIntent(query)) return [];
 
   const scoped = rows.filter((row) => {
@@ -647,7 +657,7 @@ function specificOfferMatches(
     // also be store-area words. That keeps "wine gums", "cider vinegar" and
     // "fish fingers" attached to the actual product rather than routing them
     // to alcohol/fish departments. Explicit counter/aisle wording is stripped
-    // separately by productIdentityTokens().
+    // separately by offerSearchProductIdentityTokens().
     const productIdentity = normalizeSearchText(
       `${row.product_name} ${row.brand ?? ""}`,
     );
@@ -671,7 +681,7 @@ function categoryBrowseMatches(
   filters: WeeklyOfferSearchFilters,
   options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
 ): RetailWeeklyOfferRow[] {
-  const tokens = productIdentityTokens(query);
+  const tokens = offerSearchProductIdentityTokens(query);
   if (tokens.length === 0 || tokens.length > 3) return [];
 
   const scoped = rows.filter((row) => {
@@ -1210,7 +1220,7 @@ export function searchSyncedWeeklyOffersInRows(
   // Example: "Bird's Eye fish fingers on offer" contains the word "fish",
   // but it is a specific product family, not a request to browse salmon/cod/prawns.
   if (specificMatches.length > 0) {
-    const tokens = productIdentityTokens(trimmed);
+    const tokens = offerSearchProductIdentityTokens(trimmed);
     return specificMatches
       .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
       .sort(
@@ -1226,7 +1236,7 @@ export function searchSyncedWeeklyOffersInRows(
   // generic browse heuristics. This covers product families such as fish
   // fingers, cereals, yogurts, shampoo, frozen pizza, pet food, etc.
   if (categoryMatches.length > 0) {
-    const tokens = productIdentityTokens(trimmed);
+    const tokens = offerSearchProductIdentityTokens(trimmed);
     return categoryMatches
       .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
       .sort(
