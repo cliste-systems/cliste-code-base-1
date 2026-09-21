@@ -161,7 +161,11 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
 
-  // Explicit browse language is unambiguous regardless of product tokens.
+  const tokens = queryTokens(trimmed);
+  const productTokens = offerSearchProductTokens(trimmed);
+
+  // These phrases explicitly ask for a browse/list and do not depend on a
+  // department word embedded inside a product name.
   if (
     /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offers?\b|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b/i.test(
       trimmed,
@@ -169,9 +173,6 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   ) {
     return true;
   }
-
-  const tokens = queryTokens(trimmed);
-  const productTokens = offerSearchProductTokens(trimmed);
 
   if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
   if (
@@ -183,10 +184,9 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
     return true;
   }
 
-  // Product/brand/family evidence wins over service-area words. "Birds Eye
-  // fish fingers on offer?" is a Birds Eye fish-finger lookup, not "fish
-  // offers". The actual catalogue metadata can still recognise a product
-  // family such as "fish fingers" as a category browse later.
+  // A concrete product/brand/family wins over department words. This is the
+  // critical distinction between "Birds Eye fish fingers on offer?" and
+  // "what fish is on offer?".
   if (
     productTokens.length >= 1 &&
     inferWeeklyOffersBrowseCategories(trimmed).length < 2
@@ -198,8 +198,6 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
     return true;
   }
 
-  // Department + offer wording is a browse only when no product subject
-  // survived the generic service-area/noise filtering above.
   if (
     inferWeeklyOfferServiceAreaFromQuery(trimmed) &&
     /\b(?:offers?|specials?|deals?|promos?|on offer|this week)\b/i.test(trimmed) &&
@@ -488,11 +486,16 @@ function specificOfferMatches(
 
   const scoped = rows.filter((row) => {
     if (!rowMatchesFilters(row, filters, options)) return false;
-    const searchable = normalizeSearchText(
-      `${row.product_name} ${row.brand ?? ""} ${row.department ?? ""} ${row.category_breadcrumb ?? ""} ${row.search_text ?? ""}`,
+
+    // Product intent must come from the product identity itself. Department,
+    // breadcrumb and search_text can contain generic words such as "steaks"
+    // for an unrelated fish-goujon row; category matching is handled
+    // separately below.
+    const productIdentity = normalizeSearchText(
+      `${row.product_name} ${row.brand ?? ""}`,
     );
     return tokens.every((token) =>
-      retailSearchTokenMatchesText(searchable, token),
+      retailSearchTokenMatchesText(productIdentity, token),
     );
   });
 
