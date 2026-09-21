@@ -197,7 +197,7 @@ export async function POST(request: Request) {
   const { clarificationHint, matches: responseMatches } = resolveProductSearchResponse(
     query,
     mappedMatches,
-    { fulfilment },
+    { fulfilment, intent },
   );
 
   let noMatchQuote: string | null =
@@ -237,6 +237,7 @@ export async function POST(request: Request) {
     }));
     const { matches: alternateMatches } = resolveProductSearchResponse(query, alternateMapped, {
       fulfilment: alternateFulfilment,
+      intent,
     });
     noMatchQuote = formatOfferFulfilmentMissQuote({
       query,
