@@ -17,7 +17,8 @@
     "seed:kavanaghs": "tsx scripts/seed-kavanaghs-retail-demo.ts",
     "seed:kavanaghs-activity": "tsx scripts/seed-kavanaghs-dashboard-activity.ts",
     "rehearse:kavanaghs": "tsx scripts/rehearse-kavanaghs-demo.ts",
-    "simulate:retail-calls": "tsx scripts/simulate-retail-live-calls.ts"
+    "simulate:retail-calls": "tsx scripts/simulate-retail-live-calls.ts",
+    "dev:local": "node scripts/dev-local-sync.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
