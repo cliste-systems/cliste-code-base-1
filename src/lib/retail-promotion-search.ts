@@ -246,10 +246,10 @@ export function parseRetailPromotionQuery(
     /(?:\bsave\s+)?(\d+(?:[.,]\d+)?)\s*%\s*(?:off)?/i,
   );
   const saveAmount = normalized.match(
-    /\bsave\s+€\s*(\d+(?:[.,]\d{1,2})?)/i,
+    /\bsave\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i,
   );
   const fixedPrice = !multibuy
-    ? normalized.match(/\bonly\s+€\s*(\d+(?:[.,]\d{1,2})?)/i)
+    ? normalized.match(/\bonly\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i)
     : null;
   const mixMatch = /\bmix\s*(?:&|and)\s*match\b/i.test(normalized);
   const namedPhrase = /\bsuper\s*7\b/i.test(normalized)
@@ -331,23 +331,38 @@ function rowMatchesMechanic(
       return row.loyalty_required === true;
     case "half_price":
       return /half\s+price|50\s*%\s*off/i.test(normalized);
-    case "save_percent":
-      return parsed.percent == null
-        ? /save\s+\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*off/i.test(
-            normalized,
-          )
-        : new RegExp(
-            `(?:save\\s+)?${String(parsed.percent).replace(".", "\\.")}\\s*%|50\\s*%\\s*off`,
-            "i",
-          ).test(normalized);
-    case "save_amount":
-      if (parsed.amountEur == null) return /save\s+€?\s*\d/i.test(normalized);
-      return /save\s+€?\s*\d/i.test(normalized) &&
-        normalized.includes(String(parsed.amountEur));
-    case "fixed_price":
-      if (parsed.amountEur == null) return /^only\s+€?/i.test(normalized);
-      return /^only\s+€?/i.test(normalized) &&
-        normalized.includes(String(parsed.amountEur));
+    case "save_percent": {
+      const match = normalized.match(
+        /(?:save\s+)?(\d+(?:[.,]\d+)?)\s*%\s*(?:off)?/i,
+      );
+      const value = parseMoney(match?.[1]);
+      return (
+        value != null &&
+        (parsed.percent == null || Math.abs(value - parsed.percent) <= 0.01)
+      );
+    }
+    case "save_amount": {
+      const match = normalized.match(
+        /save\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i,
+      );
+      const value = parseMoney(match?.[1]);
+      return (
+        value != null &&
+        (parsed.amountEur == null ||
+          Math.abs(value - parsed.amountEur) <= 0.01)
+      );
+    }
+    case "fixed_price": {
+      const match = normalized.match(
+        /^only\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i,
+      );
+      const value = parseMoney(match?.[1]);
+      return (
+        value != null &&
+        (parsed.amountEur == null ||
+          Math.abs(value - parsed.amountEur) <= 0.01)
+      );
+    }
     case "named":
       return parsed.namedPhrase
         ? normalizeSearchText(
