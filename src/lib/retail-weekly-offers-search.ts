@@ -160,14 +160,19 @@ export type WeeklyOfferSearchFilters = {
 export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
+
+  // Explicit browse language is unambiguous regardless of product tokens.
   if (
-    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b|\b(?:what )?(?:alcohol|wine|beer|spirits|dairy|ambient|fruit|veg|produce|bakery|deli|fish|butcher|grocery|provisions|frozen|household)\b.*\b(?:on offer|offers?|this week|specials?)\b/i.test(
+    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offers?\b|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b/i.test(
       trimmed,
     )
   ) {
     return true;
   }
+
   const tokens = queryTokens(trimmed);
+  const productTokens = offerSearchProductTokens(trimmed);
+
   if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
   if (
     tokens.length === 1 &&
@@ -177,22 +182,32 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
   ) {
     return true;
   }
+
+  // Product/brand/family evidence wins over service-area words. "Birds Eye
+  // fish fingers on offer?" is a Birds Eye fish-finger lookup, not "fish
+  // offers". The actual catalogue metadata can still recognise a product
+  // family such as "fish fingers" as a category browse later.
   if (
-    offerSearchProductTokens(trimmed).length >= 2 &&
+    productTokens.length >= 1 &&
     inferWeeklyOffersBrowseCategories(trimmed).length < 2
   ) {
     return false;
   }
+
   if (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2) {
     return true;
   }
+
+  // Department + offer wording is a browse only when no product subject
+  // survived the generic service-area/noise filtering above.
   if (
     inferWeeklyOfferServiceAreaFromQuery(trimmed) &&
     /\b(?:offers?|specials?|deals?|promos?|on offer|this week)\b/i.test(trimmed) &&
-    offerSearchProductTokens(trimmed).length === 0
+    productTokens.length === 0
   ) {
     return true;
   }
+
   return false;
 }
 
