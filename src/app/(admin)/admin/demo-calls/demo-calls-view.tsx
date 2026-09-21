@@ -8,7 +8,7 @@ import {
   useConnectionState,
   useRoomContext,
 } from "@livekit/components-react";
-import { ConnectionState, RoomEvent } from "livekit-client";
+import { ConnectionState, RoomEvent, Track } from "livekit-client";
 import { Loader2, Mic, Phone, PhoneOff } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
@@ -95,6 +95,8 @@ function ActiveCallPanel({
   const room = useRoomContext();
   const connectionState = useConnectionState();
   const [agentJoined, setAgentJoined] = useState(false);
+  const [microphoneReady, setMicrophoneReady] = useState(false);
+  const micEnableStartedRef = useRef(false);
 
   useEffect(() => {
     const syncParticipants = () => {
@@ -109,13 +111,62 @@ function ActiveCallPanel({
     };
   }, [room]);
 
+  useEffect(() => {
+    if (connectionState !== ConnectionState.Connected) return;
+    if (micEnableStartedRef.current) return;
+    micEnableStartedRef.current = true;
+
+    let cancelled = false;
+    void (async () => {
+      const started = Date.now();
+      try {
+        log.append("info", "microphone", "Publishing browser microphone…");
+        const publication = await room.localParticipant.setMicrophoneEnabled(true);
+        const micPublication =
+          publication ??
+          room.localParticipant.getTrackPublication(Track.Source.Microphone);
+        const enabled =
+          room.localParticipant.isMicrophoneEnabled && Boolean(micPublication);
+
+        if (!enabled) {
+          throw new Error(
+            "LiveKit connected, but the browser microphone was not published.",
+          );
+        }
+        if (cancelled) return;
+
+        const ms = Date.now() - sessionStartedAt;
+        setMicrophoneReady(true);
+        log.setMetrics((prev) => ({ ...prev, microphonePublishMs: ms }));
+        log.append(
+          "success",
+          "microphone",
+          `Browser microphone published (${((Date.now() - started) / 1000).toFixed(1)}s enable)`,
+        );
+      } catch (err) {
+        if (cancelled) return;
+        setMicrophoneReady(false);
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to publish browser microphone.";
+        log.append("error", "microphone", message);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionState, log, room, sessionStartedAt]);
+
   const statusLabel = useMemo(() => {
     if (connectionState === ConnectionState.Connecting) return "Connecting…";
     if (connectionState === ConnectionState.Reconnecting) return "Reconnecting…";
     if (connectionState === ConnectionState.Disconnected) return "Disconnected";
     if (!agentJoined) return "Waiting for Cara…";
+    if (!microphoneReady) return "Connecting microphone…";
     return "In call";
-  }, [agentJoined, connectionState]);
+  }, [agentJoined, connectionState, microphoneReady]);
 
   return (
     <div className="space-y-4">
@@ -346,7 +397,7 @@ export function DemoCallsView({ lines }: DemoCallsViewProps) {
               serverUrl={session.livekitUrl}
               token={session.token}
               connect
-              audio
+              audio={false}
               video={false}
               onDisconnected={endCall}
               onMediaDeviceFailure={() => {
