@@ -890,4 +890,19 @@ describe("retail weekly offers search", () => {
     assert.match(matches[0]?.productName ?? "", /Horgans Sliced Corned Beef/i);
     assert.match(matches[0]?.quoteText ?? "", /deli counter/i);
   });
+
+  it("does not boost butcher departments for unrelated product searches", () => {
+    const produceScore = scoreSupervaluSearchText(
+      "supervalu ripe avocado avocados fruit",
+      ["avocado"],
+      "Avocados",
+    );
+    const unrelatedButcherScore = scoreSupervaluSearchText(
+      "avocado flavoured prepared item",
+      ["avocado"],
+      "Butcher Counter",
+    );
+    assert.ok(produceScore >= unrelatedButcherScore);
+  });
+
 });
