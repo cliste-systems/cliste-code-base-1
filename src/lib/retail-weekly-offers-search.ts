@@ -32,11 +32,73 @@ export function isRetailOfferWeekActive(
   return end >= today;
 }
 
+export function isRetailOfferPriceSemanticallyValid(
+  row: Pick<
+    RetailWeeklyOfferRow,
+    "current_price_eur" | "was_price_eur" | "discount_label"
+  >,
+): boolean {
+  const current = Number(row.current_price_eur);
+  if (!Number.isFinite(current) || current <= 0) return false;
+
+  const was =
+    row.was_price_eur == null ? null : Number(row.was_price_eur);
+  if (was != null && (!Number.isFinite(was) || was <= 0)) return false;
+
+  const label = String(row.discount_label ?? "").trim();
+
+  const saveAmount = label.match(
+    /^save\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i,
+  );
+  if (saveAmount) {
+    if (was == null || was <= current) return false;
+    const amount = Number(saveAmount[1]!.replace(",", "."));
+    return (
+      Number.isFinite(amount) &&
+      Math.abs((was - current) - amount) <= 0.03
+    );
+  }
+
+  const savePercent = label.match(
+    /^save\s*([0-9]+(?:[.,][0-9]+)?)\s*%/i,
+  );
+  if (savePercent) {
+    if (was == null || was <= current) return false;
+    const expected = Number(savePercent[1]!.replace(",", "."));
+    const actual = ((was - current) / was) * 100;
+    return Number.isFinite(expected) && Math.abs(actual - expected) <= 1.5;
+  }
+
+  const explicitOfferPrice = label.match(
+    /(?:rewards?\s+price(?:\s+only)?|\bonly)\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i,
+  );
+  if (explicitOfferPrice) {
+    const amount = Number(explicitOfferPrice[1]!.replace(",", "."));
+    if (!Number.isFinite(amount) || Math.abs(current - amount) > 0.02) {
+      return false;
+    }
+  }
+
+  if (
+    was != null &&
+    current > was &&
+    /save|reward|offer|deal|only/i.test(label)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export function filterRetailWeeklyOffersToActiveWeek(
   rows: RetailWeeklyOfferRow[],
   reference = new Date(),
 ): RetailWeeklyOfferRow[] {
-  return rows.filter((row) => isRetailOfferWeekActive(row, reference));
+  return rows.filter(
+    (row) =>
+      isRetailOfferWeekActive(row, reference) &&
+      isRetailOfferPriceSemanticallyValid(row),
+  );
 }
 
 export function activeRetailOfferWeekKey(reference = new Date()): string {
