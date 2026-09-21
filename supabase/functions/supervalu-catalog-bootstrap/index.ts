@@ -78,7 +78,9 @@ function classify(categoryName: string, href: string) {
   else if (/deli/.test(x)) serviceArea = "deli";
   else if (/fish|seafood/.test(x)) serviceArea = "fish";
   else if (/meat|poultry|butcher|beef|pork|lamb|sausage|rasher/.test(x)) serviceArea = "butcher";
-  else if (/fruit|vegetable|produce/.test(x)) serviceArea = "produce";
+  else if (
+    /\/categories\/(?:fruit|vegetables|fruit-vegetables)(?:\/|-)|fresh.?fruit.?veg/.test(x)
+  ) serviceArea = "produce";
   else if (/bakery|bread|cake/.test(x)) serviceArea = "bakery";
   const explicitlyPrepack = /pre.?pack|packaged/.test(x);
   const counterPath =
