@@ -142,7 +142,7 @@ export function formatOwnBrandFallbackQuote(
 export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
   const q = query.toLowerCase();
   if (
-    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
+    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b|\b(?:buy\s+)?\d+\s+for\s+(?:€\s*)?\d+|\breal\s+rewards?\b|\brewards?\s+price\b|\bhalf\s+price\b|\bsave\s+(?:€\s*)?\d+|\b\d+\s*%\s*off\b|\bmix\s*(?:&|and)\s*match\b|\bsuper\s*7\b/i.test(
       q,
     )
   ) {
