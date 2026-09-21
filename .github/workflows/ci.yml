@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, feature/retail-regression-lab]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -44,15 +44,12 @@ jobs:
           npm_config_ignore_scripts: "true"
 
       - name: Lint
-        continue-on-error: true
         run: npm run lint
 
       - name: Typecheck
-        continue-on-error: true
         run: npx tsc --noEmit
 
       - name: Build
-        continue-on-error: true
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
