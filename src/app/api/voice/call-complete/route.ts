@@ -11,8 +11,6 @@ import { shouldRunCallCompleteSideEffects } from "@/lib/blocked-callers";
 import { blockedCallDashboardSummary } from "@/lib/blocked-call-copy";
 import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
-import { notifyActionInboxOwner } from "@/lib/action-inbox-notify";
-import { classifyActionDepartment } from "@/lib/classify-action-department";
 import { ingestCallKnowledgeGaps } from "@/lib/cara-training-ingest";
 import type { KnowledgeGapPayload } from "@/lib/cara-training-types";
 import type { CallCloseDiagnosticsPayload } from "@/lib/call-testing-types";
@@ -712,26 +710,6 @@ export async function POST(request: Request) {
     !isEngineerTestCall
   ) {
     after(async () => {
-      if (outcome === "action_created" && !isEngineerTestCall) {
-      const notifySummary =
-        summaryRedacted.text?.trim() ||
-        reviewRedacted.text?.trim() ||
-        "A caller needs follow-up in your Action Inbox.";
-      try {
-        await notifyActionInboxOwner(admin, orgId, {
-          summary: notifySummary,
-          callerNumber,
-          callerName,
-          departmentSlug: classifyActionDepartment({ summary: notifySummary }),
-        });
-      } catch (e) {
-        await captureObservedError(e, {
-          route: "voice/call-complete",
-          sideEffect: "action_inbox_notify",
-          orgId,
-        });
-      }
-    }
     if (knowledgeGaps.length > 0) {
       try {
         await ingestCallKnowledgeGaps(admin, orgId, callLogId, knowledgeGaps);
