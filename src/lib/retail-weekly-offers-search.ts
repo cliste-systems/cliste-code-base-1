@@ -363,7 +363,10 @@ export function inferWeeklyOffersListIntent(query: string): boolean {
     return true;
   }
 
-  if (hasExplicitStoreAreaWording(trimmed) && isStoreAreaOnlyQuery(trimmed)) {
+  if (
+    hasExplicitStoreAreaWording(trimmed) &&
+    (meaningful.length === 0 || isStoreAreaOnlyQuery(trimmed))
+  ) {
     return true;
   }
 
