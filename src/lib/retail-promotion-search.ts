@@ -1,14 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimeZone } from "date-fns-tz";
 
-import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import {
   resolveWeeklyOfferSearchFilters,
   tokenizeSupervaluSearchQuery,
 } from "@/lib/retail-weekly-offers-search";
-import {
-  normalizeSearchText,
-} from "@/lib/supervalu-offers-normalize";
 import type {
   SupervaluFulfilment,
   SupervaluServiceArea,
@@ -20,7 +16,6 @@ import {
 import type { SupervaluCatalogMatch } from "@/lib/supervalu-catalog-search";
 
 const DUBLIN = "Europe/Dublin";
-const MAX_PROMOTION_ROWS = 1000;
 export const RETAIL_PROMOTION_LIST_MAX_RESULTS = 16;
 
 const NUMBER_WORDS: Record<string, string> = {
@@ -140,51 +135,6 @@ export type ParsedRetailPromotionQuery = {
   fulfilment: SupervaluFulfilment | null;
   subjectTokens: string[];
 };
-
-type CatalogProductRow = {
-  id: string;
-  sku: string;
-  product_name: string;
-  brand: string | null;
-  department: string;
-  category_breadcrumb: string | null;
-  service_area: string;
-  fulfilment: string;
-  is_alcohol: boolean;
-  is_national: boolean;
-  search_text: string;
-};
-
-type StoreProductRow = {
-  id: string;
-  product_id: string;
-  source_store_id: string;
-  regular_price_eur: number | string | null;
-  display_price_eur: number | string | null;
-  price_per_unit: string | null;
-  retail_catalog_products: CatalogProductRow | CatalogProductRow[] | null;
-};
-
-type RetailPromotionRow = {
-  id: string;
-  promotion_type: string;
-  loyalty_required: boolean;
-  loyalty_program: string | null;
-  offer_price_eur: number | string | null;
-  regular_price_eur: number | string | null;
-  label: string | null;
-  description: string | null;
-  valid_from: string;
-  valid_to: string;
-  national_store_count: number | string | null;
-  source_metadata: Record<string, unknown> | null;
-  retail_store_products: StoreProductRow | StoreProductRow[] | null;
-};
-
-function firstJoin<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
 
 function numberValue(value: number | string | null | undefined): number | null {
   if (value == null) return null;
@@ -319,118 +269,6 @@ function parseLabelMultibuy(
   const totalEur = parseMoney(match[2]);
   if (totalEur == null) return null;
   return { quantity: Number(match[1]), totalEur };
-}
-
-function rowMatchesMechanic(
-  row: RetailPromotionRow,
-  parsed: ParsedRetailPromotionQuery,
-): boolean {
-  const label = String(row.label ?? row.description ?? "").trim();
-  const normalized = normalizeNumberWords(label);
-  if (parsed.loyaltyRequired && row.loyalty_required !== true) return false;
-
-  switch (parsed.mechanic) {
-    case "multibuy": {
-      if (row.promotion_type !== "multibuy" && !/\d+\s+for\s+/i.test(normalized)) {
-        return false;
-      }
-      if (parsed.quantity == null || parsed.totalEur == null) return true;
-      const metaQuantity = numberValue(row.source_metadata?.multibuy_quantity as number | string | null | undefined);
-      const metaTotal = numberValue(row.source_metadata?.multibuy_total_eur as number | string | null | undefined);
-      if (metaQuantity != null && metaTotal != null) {
-        return (
-          metaQuantity === parsed.quantity &&
-          Math.abs(metaTotal - parsed.totalEur) <= 0.02
-        );
-      }
-      const mechanic = parseLabelMultibuy(label);
-      return Boolean(
-        mechanic &&
-          mechanic.quantity === parsed.quantity &&
-          Math.abs(mechanic.totalEur - parsed.totalEur) <= 0.02,
-      );
-    }
-    case "loyalty":
-      return row.loyalty_required === true;
-    case "half_price":
-      return /half\s+price|50\s*%\s*off/i.test(normalized);
-    case "save_percent": {
-      const meta = numberValue(
-        row.source_metadata?.save_percent as number | string | null | undefined,
-      );
-      const match = normalized.match(
-        /(?:save\s+)?(\d+(?:[.,]\d+)?)\s*%\s*(?:off)?/i,
-      );
-      const value = meta ?? parseMoney(match?.[1]);
-      return (
-        value != null &&
-        (parsed.percent == null || Math.abs(value - parsed.percent) <= 0.01)
-      );
-    }
-    case "save_amount": {
-      const meta = numberValue(
-        row.source_metadata?.save_amount_eur as number | string | null | undefined,
-      );
-      const match = normalized.match(
-        /save\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
-      );
-      const value = meta ?? (match ? parseMoneyExpression(match[1]) : null);
-      return (
-        value != null &&
-        (parsed.amountEur == null ||
-          Math.abs(value - parsed.amountEur) <= 0.01)
-      );
-    }
-    case "fixed_price": {
-      const match = normalized.match(
-        /^only\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
-      );
-      const value = match ? parseMoneyExpression(match[1]) : row.offer_price_eur == null ? null : numberValue(row.offer_price_eur);
-      return (
-        value != null &&
-        (parsed.amountEur == null ||
-          Math.abs(value - parsed.amountEur) <= 0.01)
-      );
-    }
-    case "named":
-      return parsed.namedPhrase
-        ? normalizeSearchText(
-            `${row.label ?? ""} ${row.description ?? ""}`,
-          ).includes(normalizeSearchText(parsed.namedPhrase))
-        : false;
-    case "generic":
-    default:
-      return true;
-  }
-}
-
-function rowSubjectText(
-  row: RetailPromotionRow,
-  product: CatalogProductRow,
-): string {
-  return normalizeSearchText(
-    [
-      product.product_name,
-      product.brand,
-      product.department,
-      product.category_breadcrumb,
-      product.search_text,
-      row.label,
-      row.description,
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
-}
-
-function rowMatchesSubject(
-  row: RetailPromotionRow,
-  product: CatalogProductRow,
-  subjectTokens: string[],
-): boolean {
-  if (subjectTokens.length === 0) return true;
-  const text = rowSubjectText(row, product);
-  return subjectTokens.every((token) => retailSearchTokenMatchesText(text, token));
 }
 
 function formatPromotionQuote(input: {
