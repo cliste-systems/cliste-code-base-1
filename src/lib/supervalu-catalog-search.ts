@@ -10,6 +10,7 @@ import {
   normalizeSearchText,
 } from "@/lib/supervalu-offers-normalize";
 import type { SupervaluFulfilment, SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
+import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import {
   inferWeeklyOffersListIntent,
   offerSearchProductTokens,
@@ -67,16 +68,11 @@ export function catalogProductTokens(query: string): string[] {
 }
 
 function productNameMatchesTokens(productName: string, tokens: string[]): boolean {
-  const normalized = normalizeSearchText(productName);
   if (tokens.length === 0) return true;
   if (tokens.length >= 2) {
-    return tokens.every((token) => {
-      const stem = token.replace(/s$/, "");
-      return normalized.includes(stem);
-    });
+    return tokens.every((token) => retailSearchTokenMatchesText(productName, token));
   }
-  const stem = tokens[0]!.replace(/s$/, "");
-  return normalized.includes(stem);
+  return retailSearchTokenMatchesText(productName, tokens[0]!);
 }
 
 /** Drop partial fish/meat matches when the caller asked for a specific product phrase. */
