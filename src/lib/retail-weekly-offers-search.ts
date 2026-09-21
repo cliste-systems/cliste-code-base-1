@@ -796,7 +796,12 @@ export function formatWeeklyOfferQuote(input: {
     input.currentPriceEur,
     input.wasPriceEur,
   );
-  if (spokenLabel && /\bfor\b/i.test(spokenLabel)) {
+  const preferSourceLabel =
+    spokenLabel &&
+    (/\bfor\b/i.test(spokenLabel) ||
+      /^save\b/i.test(spokenLabel.trim()) ||
+      /rewards?\s+price/i.test(spokenLabel));
+  if (preferSourceLabel) {
     sentences.push(`${spokenLabel}.`);
   } else if (percentOff) {
     sentences.push(`${percentOff}.`);
