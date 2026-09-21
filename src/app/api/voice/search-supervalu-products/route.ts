@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
   assessSyncedOffersFreshness,
+  inferWeeklyOfferFulfilmentFromQuery,
   loadLatestRetailOfferWeekEnd,
   offerSearchProductTokens,
 } from "@/lib/retail-weekly-offers-search";
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
   const fulfilment: SupervaluFulfilment | null =
     body.fulfilment === "counter" || body.fulfilment === "prepack"
       ? body.fulfilment
-      : null;
+      : inferWeeklyOfferFulfilmentFromQuery(query);
 
   const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner);
   const offersFreshness = assessSyncedOffersFreshness({

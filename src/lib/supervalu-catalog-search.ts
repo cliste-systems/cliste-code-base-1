@@ -642,7 +642,10 @@ async function searchSupervaluCatalogLiveInternal(
 
   const intent = options?.intent ?? inferCatalogSearchIntent(trimmed);
   const listIntent = inferWeeklyOffersListIntent(trimmed);
-  const fulfilment = options?.fulfilment ?? null;
+  const filters = resolveWeeklyOfferSearchFilters(trimmed, {
+    fulfilment: options?.fulfilment,
+  });
+  const fulfilment = filters.fulfilment ?? null;
 
   let syncedMatches: WeeklyOfferMatch[] = [];
   if (options?.supabase && options?.retailBanner) {
@@ -661,7 +664,6 @@ async function searchSupervaluCatalogLiveInternal(
     return syncedMatches.map(syncedOfferToCatalogMatch);
   }
 
-  const filters = resolveWeeklyOfferSearchFilters(trimmed, { fulfilment });
   if (intent === "offer" && listIntent && (fulfilment || filters.serviceArea)) {
     return syncedMatches.map(syncedOfferToCatalogMatch);
   }

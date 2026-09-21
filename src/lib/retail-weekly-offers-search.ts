@@ -305,8 +305,10 @@ export function resolveWeeklyOfferSearchFilters(
   return {
     channel: explicit?.channel ?? null,
     serviceArea: explicit?.serviceArea ?? inferWeeklyOfferServiceAreaFromQuery(query),
-    // Never infer counter vs pre-pack from caller phrasing — Cara clarifies, then passes fulfilment explicitly.
-    fulfilment: explicit?.fulfilment ?? null,
+    // Respect explicit caller meaning ("meat counter", "pre-pack aisle", "per kilo").
+    // Ambiguous product-only requests still return null so Cara can clarify once.
+    fulfilment:
+      explicit?.fulfilment ?? inferWeeklyOfferFulfilmentFromQuery(query),
   };
 }
 

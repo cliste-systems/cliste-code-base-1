@@ -280,6 +280,18 @@ describe("supervalu offers sync helpers", () => {
       "butcher",
     );
     assert.equal(
+      resolveWeeklyOfferSearchFilters("sirloin at the meat counter", {}).fulfilment,
+      "counter",
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("pre-pack rashers in the meat aisle", {}).fulfilment,
+      "prepack",
+    );
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("any steaks on offer this week", {}).fulfilment,
+      null,
+    );
+    assert.equal(
       resolveWeeklyOfferSearchFilters("what alcohol is on offer", {}).serviceArea,
       "off_licence",
     );
