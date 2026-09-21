@@ -246,6 +246,33 @@ export async function runIsolatedTextRehearsalTurn(input: {
   }
 }
 
+export async function runIsolatedTextRehearsalConversation(input: {
+  session: TextRehearsalSessionConnect;
+  callerTurns: string[];
+  readyTimeoutMs?: number;
+  turnTimeoutMs?: number;
+}): Promise<
+  Array<TextRehearsalTurnResult & { caller: string }>
+> {
+  const room = await connectTextRehearsalRoom(input.session);
+  try {
+    await waitForWorkerReady(room, input.readyTimeoutMs ?? 45_000);
+    const results: Array<TextRehearsalTurnResult & { caller: string }> = [];
+    for (const caller of input.callerTurns) {
+      const result = await sendCallerTurn(
+        room,
+        caller,
+        input.turnTimeoutMs ?? 90_000,
+      );
+      results.push({ caller, ...result });
+      if (result.error) break;
+    }
+    return results;
+  } finally {
+    await endTextRehearsalRoom(room);
+  }
+}
+
 export async function startTextRehearsalSession(
   calledNumber: string,
 ): Promise<TextRehearsalSessionConnect & { calledNumber: string; orgName?: string }> {
