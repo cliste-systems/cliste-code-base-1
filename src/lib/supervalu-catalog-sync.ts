@@ -16,19 +16,33 @@ import {
   type SupervaluGatewayProduct,
 } from "@/lib/supervalu-offers-types";
 
+/**
+ * SuperValu's current top-level online-shopping aisles.
+ * Keep these IDs aligned with the live storefront navigation; a full-catalogue
+ * sync is rejected if it comes back implausibly small.
+ */
 const ROOT_CATEGORIES = [
+  { categoryId: "O100001", department: "Fruit & Vegetables" },
   { categoryId: "O100010", department: "Bakery" },
   { categoryId: "O100015", department: "Meat & Poultry" },
   { categoryId: "O100017", department: "Fish & Seafood" },
   { categoryId: "O100020", department: "Deli Counter" },
-  { categoryId: "O100025", department: "Fresh Fruit & Veg" },
+  { categoryId: "O100023", department: "Cheese" },
+  { categoryId: "O100025", department: "Milk, Yogurt, Butter & Eggs" },
+  { categoryId: "O100027", department: "Health & Wellness" },
   { categoryId: "O100030", department: "Chilled Food" },
   { categoryId: "O100035", department: "Food Cupboard" },
-  { categoryId: "O100040", department: "Drinks" },
   { categoryId: "O100045", department: "Frozen Foods" },
-  { categoryId: "O100050", department: "Household" },
-  { categoryId: "O100055", department: "Health & Beauty" },
+  { categoryId: "O100050", department: "Drinks" },
+  { categoryId: "O100055", department: "Beauty & Personal Care" },
+  { categoryId: "O100060", department: "Baby" },
+  { categoryId: "O100065", department: "Household & Cleaning" },
+  { categoryId: "O100070", department: "Pets" },
+  { categoryId: "O100075", department: "Wine, Beer & Spirits" },
+  { categoryId: "O100080", department: "Newsagent & Tobacconist" },
 ] as const;
+
+const MIN_FULL_CATALOG_PRODUCTS = 5000;
 
 type CatalogProduct = {
   sku: string;
@@ -199,7 +213,11 @@ export async function syncSupervaluFullCatalog(
 
   try {
     const products = await fetchSupervaluFullCatalog(storeId);
-    if (products.length < 1000) throw new Error(`Full SuperValu catalogue unexpectedly small (${products.length} products)`);
+    if (products.length < MIN_FULL_CATALOG_PRODUCTS) {
+      throw new Error(
+        `Full SuperValu catalogue unexpectedly small (${products.length} products; expected at least ${MIN_FULL_CATALOG_PRODUCTS})`,
+      );
+    }
 
     const productRows = products.map((p) => ({
       retail_banner: "supervalu",
@@ -264,13 +282,25 @@ export async function syncSupervaluFullCatalog(
       if (error) throw new Error(error.message);
     }
 
-    const { data: storeProductIds, error: storeProductError } = await supabase
-      .from("retail_store_products")
-      .select("id,product_id")
-      .eq("source_store_id", storeId)
-      .eq("sync_batch_id", syncBatchId);
-    if (storeProductError) throw new Error(storeProductError.message);
-    const spByProductId = new Map((storeProductIds ?? []).map((r) => [String(r.product_id), String(r.id)]));
+    const storeProductIds: Array<{ id: string; product_id: string }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("retail_store_products")
+        .select("id,product_id")
+        .eq("source_store_id", storeId)
+        .eq("sync_batch_id", syncBatchId)
+        .range(from, from + 999);
+      if (error) throw new Error(error.message);
+      const page = (data ?? []).map((row) => ({
+        id: String(row.id),
+        product_id: String(row.product_id),
+      }));
+      storeProductIds.push(...page);
+      if (page.length < 1000) break;
+    }
+    const spByProductId = new Map(
+      storeProductIds.map((r) => [r.product_id, r.id]),
+    );
 
     const promoRows = products.flatMap((p) => {
       if (!p.promotion) return [];
@@ -301,6 +331,21 @@ export async function syncSupervaluFullCatalog(
       }];
     });
 
+    // Each successful catalogue pass is authoritative for the current offer
+    // week. Remove that week's previous snapshot first so an offer that
+    // disappears between the 00:20 / 06:20 / 08:20 Thursday passes cannot
+    // remain stale in Cara's answers.
+    for (let i = 0; i < storeProductIds.length; i += 500) {
+      const ids = storeProductIds.slice(i, i + 500).map((r) => r.id);
+      const { error } = await supabase
+        .from("retail_promotions")
+        .delete()
+        .in("store_product_id", ids)
+        .gte("valid_to", week.start)
+        .lte("valid_from", week.end);
+      if (error) throw new Error(error.message);
+    }
+
     for (let i = 0; i < promoRows.length; i += 500) {
       const { error } = await supabase
         .from("retail_promotions")
@@ -314,11 +359,15 @@ export async function syncSupervaluFullCatalog(
       .eq("source_store_id", storeId)
       .neq("sync_batch_id", syncBatchId);
 
-    await supabase
-      .from("retail_promotions")
-      .delete()
-      .in("store_product_id", (storeProductIds ?? []).map((r) => String(r.id)))
-      .lt("valid_to", week.start);
+    for (let i = 0; i < storeProductIds.length; i += 500) {
+      const ids = storeProductIds.slice(i, i + 500).map((r) => r.id);
+      const { error } = await supabase
+        .from("retail_promotions")
+        .delete()
+        .in("store_product_id", ids)
+        .lt("valid_to", week.start);
+      if (error) throw new Error(error.message);
+    }
 
     await supabase
       .from("organizations")

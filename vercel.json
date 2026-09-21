@@ -46,6 +46,22 @@
     {
       "path": "/api/cron/supervalu-catalog-sync",
       "schedule": "20 2 * * *"
+    },
+    {
+      "path": "/api/cron/supervalu-catalog-sync",
+      "schedule": "20 0 * * 4"
+    },
+    {
+      "path": "/api/cron/supervalu-catalog-sync",
+      "schedule": "20 6 * * 4"
+    },
+    {
+      "path": "/api/cron/supervalu-catalog-sync",
+      "schedule": "20 8 * * 4"
+    },
+    {
+      "path": "/api/cron/supervalu-catalog-sync",
+      "schedule": "20 6 * * 5"
     }
   ]
 }
