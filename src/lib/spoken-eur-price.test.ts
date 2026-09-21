@@ -20,9 +20,12 @@ describe("spoken eur price", () => {
     assert.equal(formatSpokenEurAmount(12.99), "twelve euro ninety nine");
   });
 
-  it("speaks embedded euro symbols in labels", () => {
+  it("speaks embedded euro and cents labels naturally", () => {
     assert.equal(formatSpokenDiscountLabel("Only €4"), "Only four euro");
     assert.equal(formatSpokenDiscountLabel("3 for €10"), "three for ten euro");
+    assert.equal(formatSpokenDiscountLabel("2 FOR 2.70"), "two for two euro seventy");
+    assert.equal(formatSpokenDiscountLabel("Save 50c"), "Save fifty cents");
+    assert.equal(formatSpokenDiscountLabel("Only 79c"), "Only seventy nine cents");
   });
 
   it("speaks per-unit prices", () => {
