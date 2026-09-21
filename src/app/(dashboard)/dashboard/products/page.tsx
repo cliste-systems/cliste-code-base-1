@@ -13,10 +13,24 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 import { setProductAssortmentStatus } from "./actions";
 
+type ProductArea =
+  | "all"
+  | "grocery"
+  | "butcher"
+  | "deli"
+  | "fish"
+  | "bakery"
+  | "produce"
+  | "off_licence";
+
+type ProductFulfilment = "all" | "counter" | "prepack";
+
 type ProductsPageProps = {
   searchParams: Promise<{
     q?: string;
     filter?: string;
+    area?: string;
+    type?: string;
   }>;
 };
 
@@ -26,7 +40,39 @@ type ProductRow = {
   brand: string | null;
   department: string | null;
   sku: string | null;
+  service_area: string | null;
+  fulfilment: string | null;
 };
+
+const PRODUCT_AREAS: Array<{ value: ProductArea; label: string }> = [
+  { value: "all", label: "All areas" },
+  { value: "grocery", label: "Grocery" },
+  { value: "butcher", label: "Butcher" },
+  { value: "deli", label: "Deli" },
+  { value: "fish", label: "Fish" },
+  { value: "bakery", label: "Bakery" },
+  { value: "produce", label: "Produce" },
+  { value: "off_licence", label: "Off-licence" },
+];
+
+const PRODUCT_AREA_LABELS = Object.fromEntries(
+  PRODUCT_AREAS.map(({ value, label }) => [value, label]),
+) as Record<ProductArea, string>;
+
+function parseProductArea(value: string | undefined): ProductArea {
+  return PRODUCT_AREAS.some((area) => area.value === value)
+    ? (value as ProductArea)
+    : "all";
+}
+
+function parseProductFulfilment(value: string | undefined): ProductFulfilment {
+  return value === "counter" || value === "prepack" ? value : "all";
+}
+
+function productAreaLabel(value: string | null): string | null {
+  if (!value) return null;
+  return PRODUCT_AREA_LABELS[value as ProductArea] ?? null;
+}
 
 const STATUS_COPY: Record<
   RetailStoreAssortmentStatus,
@@ -65,6 +111,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     params.filter === "not_confirmed"
       ? params.filter
       : "all";
+  const area = parseProductArea(params.area);
+  const productType = parseProductFulfilment(params.type);
 
   const admin = createAdminClient();
   const { data: org } = await admin
@@ -82,7 +130,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   if (isRetail && retailBanner && query.length >= 2) {
     let productQuery = admin
       .from("retail_catalog_products")
-      .select("id, product_name, brand, department, sku")
+      .select("id, product_name, brand, department, sku, service_area, fulfilment")
       .eq("retail_banner", retailBanner)
       .ilike("search_text", `%${query}%`)
       .order("product_name", { ascending: true })
@@ -90,6 +138,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
     if (retailBanner === "supervalu") {
       productQuery = productQuery.eq("is_national", true);
+    }
+    if (area !== "all") {
+      productQuery = productQuery.eq("service_area", area);
+    }
+    if (productType !== "all") {
+      productQuery = productQuery.eq("fulfilment", productType);
     }
 
     const { data, error } = await productQuery;
@@ -147,42 +201,81 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
               <form
                 method="get"
-                className={`${DASHBOARD_CARD_SURFACE} shrink-0 flex flex-col gap-3 p-4 sm:flex-row sm:items-end`}
+                className={`${DASHBOARD_CARD_SURFACE} shrink-0 flex flex-col gap-3 p-4`}
               >
-                <label className="flex-1">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Search the {retailBanner === "supervalu" ? "SuperValu" : "retailer"} catalogue
-                  </span>
-                  <input
-                    name="q"
-                    defaultValue={query}
-                    placeholder="e.g. Wagyu sirloin, avocados, Heinz ketchup"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                  />
-                </label>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label className="min-w-0 flex-1">
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Search the {retailBanner === "supervalu" ? "SuperValu" : "retailer"} catalogue
+                    </span>
+                    <input
+                      name="q"
+                      defaultValue={query}
+                      placeholder="Product, brand or SKU — e.g. striploin, Heinz, 1023229001"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    />
+                    <span className="mt-1.5 block text-[11px] text-slate-500">
+                      Search matches product name, brand, category and SKU.
+                    </span>
+                  </label>
 
-                <label className="sm:w-44">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Store status
-                  </span>
-                  <select
-                    name="filter"
-                    defaultValue={filter}
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                  <button
+                    type="submit"
+                    className="h-11 rounded-xl bg-[#11181d] px-5 text-sm font-semibold text-white transition hover:bg-[#222c33]"
                   >
-                    <option value="all">All</option>
-                    <option value="stocked">Normally stocked</option>
-                    <option value="not_stocked">Not stocked</option>
-                    <option value="not_confirmed">Not confirmed</option>
-                  </select>
-                </label>
+                    Search
+                  </button>
+                </div>
 
-                <button
-                  type="submit"
-                  className="h-11 rounded-xl bg-[#11181d] px-5 text-sm font-semibold text-white transition hover:bg-[#222c33]"
-                >
-                  Search
-                </button>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label>
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Store area
+                    </span>
+                    <select
+                      name="area"
+                      defaultValue={area}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    >
+                      {PRODUCT_AREAS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Product type
+                    </span>
+                    <select
+                      name="type"
+                      defaultValue={productType}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    >
+                      <option value="all">Counter + prepacked</option>
+                      <option value="counter">Counter only</option>
+                      <option value="prepack">Prepacked only</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Store status
+                    </span>
+                    <select
+                      name="filter"
+                      defaultValue={filter}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="stocked">Normally stocked</option>
+                      <option value="not_stocked">Not stocked</option>
+                      <option value="not_confirmed">Not confirmed</option>
+                    </select>
+                  </label>
+                </div>
               </form>
 
               <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -209,10 +302,25 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </div>
                 ) : (
                   <div className="space-y-3 pb-1">
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {visibleProducts.length === 1
+                          ? "1 matching product"
+                          : `${visibleProducts.length} matching products`}
+                        {products.length >= 50 ? " · refine your search for more" : ""}
+                      </p>
+                    </div>
                     {visibleProducts.map((product) => {
                       const status = overrides.get(product.id) ?? "not_confirmed";
                       const copy = STATUS_COPY[status];
                       const StatusIcon = statusIcon(status);
+                      const areaLabel = productAreaLabel(product.service_area);
+                      const fulfilmentLabel =
+                        product.fulfilment === "counter"
+                          ? "Counter"
+                          : product.fulfilment === "prepack"
+                            ? "Prepacked"
+                            : null;
 
                       return (
                         <div
@@ -231,6 +339,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                                   <StatusIcon className="h-3 w-3" />
                                   {copy.label}
                                 </span>
+                                {areaLabel ? (
+                                  <span className="inline-flex items-center rounded-full border border-[#d6dfda] bg-[#f7faf8] px-2 py-0.5 text-[11px] font-semibold text-[#4d5f58]">
+                                    {areaLabel}
+                                  </span>
+                                ) : null}
+                                {fulfilmentLabel ? (
+                                  <span
+                                    className={
+                                      product.fulfilment === "counter"
+                                        ? "inline-flex items-center rounded-full border border-[#9da9a4] bg-[#f3f6f4] px-2 py-0.5 text-[11px] font-semibold text-[#11181d]"
+                                        : "inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600"
+                                    }
+                                  >
+                                    {fulfilmentLabel}
+                                  </span>
+                                ) : null}
                               </div>
                               <p className="mt-1 text-xs text-slate-500">
                                 {[product.brand, product.department, product.sku ? `SKU ${product.sku}` : null]
