@@ -601,7 +601,13 @@ export function scoreSupervaluSearchText(
   for (const token of tokens) {
     score += retailSearchTokenSimilarity(searchText, token);
   }
-  if (/butcher|beef|meat|steak|striploin|lamb|poultry|chicken|deli|ham/i.test(department)) {
+  const meatIntent = tokens.some((token) =>
+    /^(?:butcher|beef|meat|steak|striploin|sirloin|fillet|lamb|poultry|chicken|deli|ham|rashers|sausages?)$/i.test(token),
+  );
+  if (
+    meatIntent &&
+    /butcher|beef|meat|steak|striploin|lamb|poultry|chicken|deli|ham/i.test(department)
+  ) {
     score += 0.15;
   }
   return score / tokens.length;
