@@ -260,6 +260,7 @@ const STORE_AREA_SEMANTIC_TOKENS = new Set([
 
 const STRUCTURAL_PRODUCT_QUERY_TOKENS = new Set([
   "aisle",
+  "back",
   "backstore",
   "counter",
   "department",
