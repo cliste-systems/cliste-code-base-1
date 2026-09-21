@@ -23,6 +23,10 @@ import {
   voiceWebhookUnauthorizedResponse,
 } from "@/lib/voice-webhook-auth";
 import { createAdminClient } from "@/utils/supabase/admin";
+import {
+  formatStoreAssortmentQuote,
+  parseRetailStoreAssortmentStatus,
+} from "@/lib/retail-store-assortment";
 
 export const dynamic = "force-dynamic";
 
@@ -200,6 +204,106 @@ export async function POST(request: Request) {
     { fulfilment, intent },
   );
 
+  // A national catalogue match is not evidence that this specific store carries
+  // the product. Resolve explicit store-level assortment decisions separately.
+  // No override row means "not confirmed" and must remain conservative.
+  const matchSkus = [
+    ...new Set(
+      responseMatches
+        .map((match) => String(match.sku ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const matchNames = [
+    ...new Set(
+      responseMatches
+        .map((match) => String(match.product_name ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  type CatalogIdentityRow = {
+    id: string;
+    sku: string | null;
+    product_name: string;
+  };
+
+  const catalogIdentityRows: CatalogIdentityRow[] = [];
+  if (matchSkus.length > 0) {
+    const { data, error } = await admin
+      .from("retail_catalog_products")
+      .select("id, sku, product_name")
+      .eq("retail_banner", retailBanner)
+      .in("sku", matchSkus);
+    if (error) {
+      console.error("[voice/search-supervalu-products] assortment sku lookup", error);
+    } else {
+      catalogIdentityRows.push(...((data ?? []) as CatalogIdentityRow[]));
+    }
+  }
+  if (matchNames.length > 0) {
+    const { data, error } = await admin
+      .from("retail_catalog_products")
+      .select("id, sku, product_name")
+      .eq("retail_banner", retailBanner)
+      .in("product_name", matchNames);
+    if (error) {
+      console.error("[voice/search-supervalu-products] assortment name lookup", error);
+    } else {
+      catalogIdentityRows.push(...((data ?? []) as CatalogIdentityRow[]));
+    }
+  }
+
+  const productIdBySku = new Map<string, string>();
+  const productIdByName = new Map<string, string>();
+  for (const row of catalogIdentityRows) {
+    const sku = String(row.sku ?? "").trim();
+    if (sku) productIdBySku.set(sku, row.id);
+    const nameKey = String(row.product_name ?? "").trim().toLowerCase();
+    if (nameKey) productIdByName.set(nameKey, row.id);
+  }
+
+  const productIds = [...new Set(catalogIdentityRows.map((row) => row.id))];
+  const assortmentByProductId = new Map<string, "stocked" | "not_stocked">();
+  if (productIds.length > 0) {
+    const { data, error } = await admin
+      .from("retail_store_product_assortment")
+      .select("product_id, status")
+      .eq("organization_id", orgId)
+      .in("product_id", productIds);
+    if (error) {
+      console.error("[voice/search-supervalu-products] assortment override lookup", error);
+    } else {
+      for (const row of data ?? []) {
+        if (row.status === "stocked" || row.status === "not_stocked") {
+          assortmentByProductId.set(String(row.product_id), row.status);
+        }
+      }
+    }
+  }
+
+  const storeAwareMatches = responseMatches.map((match) => {
+    const sku = String(match.sku ?? "").trim();
+    const nameKey = String(match.product_name ?? "").trim().toLowerCase();
+    const productId =
+      (sku ? productIdBySku.get(sku) : undefined) ??
+      productIdByName.get(nameKey);
+    const storeStatus = parseRetailStoreAssortmentStatus(
+      productId ? assortmentByProductId.get(productId) : undefined,
+    );
+
+    return {
+      ...match,
+      store_assortment_status: storeStatus,
+      quote_text: formatStoreAssortmentQuote({
+        productName: match.product_name,
+        status: storeStatus,
+        intent,
+        originalQuote: match.quote_text,
+      }),
+    };
+  });
+
   let noMatchQuote: string | null =
     mappedMatches.length === 0
       ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
@@ -254,7 +358,7 @@ export async function POST(request: Request) {
     fulfilment,
     clarification_hint: clarificationHint,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
-    matches: responseMatches,
+    matches: storeAwareMatches,
     no_match_quote: noMatchQuote,
   });
 }
