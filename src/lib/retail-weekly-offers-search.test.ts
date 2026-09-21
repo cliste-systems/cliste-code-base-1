@@ -408,6 +408,36 @@ describe("supervalu offers sync helpers", () => {
 });
 
 describe("retail weekly offers search", () => {
+  it("treats a real department query like cereals as a browse, not one ambiguous product", () => {
+    const rows = [
+      mockOfferRow({
+        id: "cereal-1",
+        product_name: "Kellogg's Corn Flakes (450 g)",
+        department: "Cereals",
+        category_breadcrumb: "/categories/breakfast-cereals/cereals-id-O303590",
+        search_text: "kellogg's corn flakes cereals breakfast cereals",
+      }),
+      mockOfferRow({
+        id: "cereal-2",
+        product_name: "Weetabix 24 Pack (430 g)",
+        department: "Cereals",
+        category_breadcrumb: "/categories/breakfast-cereals/cereals-id-O303590",
+        search_text: "weetabix cereals breakfast cereals",
+      }),
+      mockOfferRow({
+        id: "other",
+        product_name: "Tayto Cheese & Onion Crisps",
+        department: "Crisps",
+        category_breadcrumb: "/categories/snacks/crisps",
+        search_text: "tayto crisps",
+      }),
+    ];
+    const matches = searchSyncedWeeklyOffersInRows(rows, "cereals");
+    assert.equal(matches.length, 2);
+    assert.ok(matches.every((match) => /cereal/i.test(match.department)));
+  });
+
+
   it("rejects Save euro rows when the saving amount is mistaken for the selling price", () => {
     assert.equal(
       isRetailOfferPriceSemanticallyValid(

@@ -11,6 +11,26 @@ import {
 } from "./retail-product-clarification";
 
 describe("retail product clarification", () => {
+  it("does not ask for a brand when the query is the department itself", () => {
+    const response = resolveProductSearchResponse("cereals", [
+      {
+        product_name: "Kellogg's Corn Flakes (450 g)",
+        department: "Cereals",
+        service_area: "grocery",
+        fulfilment: "prepack",
+      },
+      {
+        product_name: "Weetabix 24 Pack (430 g)",
+        department: "Cereals",
+        service_area: "grocery",
+        fulfilment: "prepack",
+      },
+    ]);
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 2);
+  });
+
+
   it("treats single-word category queries as broad", () => {
     assert.equal(isBroadProductQuery("mushrooms"), true);
     assert.equal(isBroadProductQuery("weekly offers"), true);

@@ -450,6 +450,41 @@ function isSpecificProductOfferQuery(query: string): boolean {
   );
 }
 
+function categoryMetadataText(row: RetailWeeklyOfferRow): string {
+  return normalizeSearchText(
+    `${row.department ?? ""} ${row.category_breadcrumb ?? ""}`,
+  );
+}
+
+/**
+ * Generic category/department browse detection from the actual catalogue.
+ * This avoids a hardcoded category list: cereals, yogurts, crisps, shampoo,
+ * frozen pizza, pet food, etc. all work when the query matches department
+ * metadata across multiple offer rows.
+ */
+function categoryBrowseMatches(
+  rows: RetailWeeklyOfferRow[],
+  query: string,
+  filters: WeeklyOfferSearchFilters,
+  options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
+): RetailWeeklyOfferRow[] {
+  const tokens = offerSearchProductTokens(query);
+  if (tokens.length === 0 || tokens.length > 3) return [];
+
+  const scoped = rows.filter((row) => {
+    if (!rowMatchesFilters(row, filters, options)) return false;
+    const categoryText = categoryMetadataText(row);
+    return tokens.every((token) =>
+      retailSearchTokenMatchesText(categoryText, token),
+    );
+  });
+
+  const uniqueProducts = new Set(
+    scoped.map((row) => row.sku ?? normalizeSearchText(row.product_name)),
+  );
+  return uniqueProducts.size >= 2 ? scoped : [];
+}
+
 function sampleRetailWeeklyOffersAcrossDepartments(
   rows: RetailWeeklyOfferRow[],
   limit: number,
@@ -903,7 +938,10 @@ export async function loadRetailWeeklyOffersForBanner(
       reference,
     );
     rows.push(...batch);
-    if (batch.length < pageSize) break;
+    // Pagination must be based on rows fetched from Supabase, not rows that
+    // survived active-week / price validation. Otherwise one invalid row on
+    // page 1 can silently hide every later department from Cara.
+    if ((data ?? []).length < pageSize) break;
     from += pageSize;
   }
 
@@ -944,6 +982,28 @@ export function searchSyncedWeeklyOffersInRows(
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
   const browseOptions = { excludeMeat, filters, alcoholOnly };
+  const categoryMatches = categoryBrowseMatches(
+    rows,
+    trimmed,
+    filters,
+    { excludeMeat, alcoholOnly },
+  );
+
+  // A caller asking for a real department/category ("cereals", "yogurts",
+  // "crisps", etc.) wants offers from that category, not a fake product-name
+  // clarification. Detect it from catalogue metadata instead of hardcoding.
+  if (!listIntent && categoryMatches.length > 0) {
+    const tokens = offerSearchProductTokens(trimmed);
+    return categoryMatches
+      .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.row.product_name.localeCompare(b.row.product_name),
+      )
+      .slice(0, tokenLimit)
+      .map((entry) => rowToMatch(entry.row, entry.score));
+  }
 
   if (listIntent) {
     const skipBrowseForDualFulfilment =

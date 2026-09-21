@@ -13,6 +13,7 @@ import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
 export type ClarificationMatch = {
   productName?: string;
   product_name?: string;
+  department?: string | null;
   service_area?: string | null;
   serviceArea?: string | null;
   fulfilment?: string | null;
@@ -151,6 +152,22 @@ export function buildBroadProductClarificationHint(
   if (inferWeeklyOffersListIntent(query)) return null;
   if (!isBroadProductQuery(query)) return null;
   if (matches.length < 2) return null;
+
+  // If the caller's words match the returned department/category itself,
+  // this is a browse request ("cereals", "yogurts", "crisps"), not an
+  // ambiguous individual product. Return the category offers directly.
+  const categoryTokens = offerSearchProductTokens(query);
+  if (
+    categoryTokens.length > 0 &&
+    matches.filter((match) => {
+      const department = String(match.department ?? "");
+      return categoryTokens.every((token) =>
+        retailSearchTokenMatchesText(department, token),
+      );
+    }).length >= 2
+  ) {
+    return null;
+  }
 
   const labels = distinctProductLabels(matches);
   if (labels.length < 2) return null;
