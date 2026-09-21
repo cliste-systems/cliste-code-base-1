@@ -361,6 +361,12 @@ export function formatRetailRegressionReport(input: {
       `Expected: ${scenario.expectations.summary}`,
     );
 
+    if (scenario.history && scenario.history.totalRuns > 0) {
+      lines.push(
+        `Prior history: ${scenario.history.totalRuns} run(s) · ${scenario.history.totalFailures} failure(s) · ${scenario.history.consecutiveFailures} consecutive failure(s) before this run · recent ${scenario.history.recentStatuses.join(" -> ")}`,
+      );
+    }
+
     if (result.issueKind) {
       lines.push(
         `History flag: ${result.issueKind} · occurrence ${result.occurrenceCount ?? 1}`,
@@ -377,6 +383,12 @@ export function formatRetailRegressionReport(input: {
       );
       for (const tool of turn.tools) {
         lines.push(`Tool: ${tool.name} ${JSON.stringify(tool.args)}`);
+      }
+      if (turn.transcriptLines.length > 0) {
+        lines.push("Raw transcript:");
+        for (const transcriptLine of turn.transcriptLines) {
+          lines.push(`  ${transcriptLine}`);
+        }
       }
       if (turn.error) lines.push(`Turn error: ${turn.error}`);
     });
