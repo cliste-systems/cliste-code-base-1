@@ -24,6 +24,11 @@ import {
 } from "@/lib/voice-webhook-auth";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
+  formatStructuredPromotionNoMatchQuote,
+  searchStructuredNationalPromotions,
+  shouldUseStructuredPromotionSearch,
+} from "@/lib/retail-promotion-search";
+import {
   formatStoreAssortmentQuote,
   parseRetailStoreAssortmentStatus,
 } from "@/lib/retail-store-assortment";
@@ -172,16 +177,25 @@ export async function POST(request: Request) {
   const sourceStoreId =
     String(orgRow.retail_source_store_id ?? "").trim() || null;
 
-  const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
-    query,
-    {
-      intent,
-      supabase: admin,
-      retailBanner,
-      fulfilment,
-      storeId: sourceStoreId ?? undefined,
-    },
-  );
+  const structuredPromotionQuery =
+    intent === "offer" && shouldUseStructuredPromotionSearch(query);
+  const structuredPromotionMatches = structuredPromotionQuery
+    ? await searchStructuredNationalPromotions(admin, {
+        retailBanner,
+        query,
+      })
+    : [];
+
+  const catalogResult = structuredPromotionQuery
+    ? { matches: structuredPromotionMatches, ownBrandFallbackQuote: null }
+    : await searchSupervaluCatalogLiveWithFallback(query, {
+        intent,
+        supabase: admin,
+        retailBanner,
+        fulfilment,
+        storeId: sourceStoreId ?? undefined,
+      });
+  const { matches, ownBrandFallbackQuote } = catalogResult;
 
   const mappedMatches = matches.map((match) => ({
     product_name: match.productName,
@@ -306,11 +320,14 @@ export async function POST(request: Request) {
 
   let noMatchQuote: string | null =
     mappedMatches.length === 0
-      ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
+      ? structuredPromotionQuery
+        ? formatStructuredPromotionNoMatchQuote(query)
+        : ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
       : null;
 
   if (
     responseMatches.length === 0 &&
+    !structuredPromotionQuery &&
     fulfilment &&
     intent === "offer" &&
     offerSearchProductTokens(query).length > 0
@@ -359,6 +376,7 @@ export async function POST(request: Request) {
     clarification_hint: clarificationHint,
     clarification_kind: clarificationKind,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
+    promotion_query: structuredPromotionQuery,
     matches: clarificationHint ? [] : storeAwareMatches,
     no_match_quote: noMatchQuote,
   });
