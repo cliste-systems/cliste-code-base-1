@@ -105,16 +105,17 @@ function queryValue(tool: { name: string; args: Record<string, unknown> }): stri
   return normalize(value);
 }
 
-function serviceAreaValue(tool: { name: string; args: Record<string, unknown> }): string {
-  const value =
-    tool.args.serviceArea ??
-    tool.args.service_area ??
-    tool.args.fulfillment ??
-    tool.args.fulfilment ??
-    tool.args.department ??
-    tool.args.area ??
-    "";
-  return normalize(value);
+function serviceAreaValues(tool: { name: string; args: Record<string, unknown> }): string[] {
+  return [
+    tool.args.serviceArea,
+    tool.args.service_area,
+    tool.args.fulfillment,
+    tool.args.fulfilment,
+    tool.args.department,
+    tool.args.area,
+  ]
+    .map(normalize)
+    .filter(Boolean);
 }
 
 function intentValue(tool: { name: string; args: Record<string, unknown> }): string {
@@ -200,8 +201,11 @@ export function gradeRetailRegressionScenario(
       }
 
       if (exp.requiredServiceArea) {
-        const found = matching.some(
-          (tool) => serviceAreaValue(tool) === normalize(exp.requiredServiceArea),
+        const expectedArea = normalize(exp.requiredServiceArea);
+        const found = matching.some((tool) =>
+          serviceAreaValues(tool).some(
+            (value) => value === expectedArea || value.includes(expectedArea),
+          ),
         );
         if (!found) {
           reasons.push(`Expected service area "${exp.requiredServiceArea}" was not used.`);
@@ -210,11 +214,14 @@ export function gradeRetailRegressionScenario(
 
       if (exp.forbiddenServiceAreas?.length) {
         const bad = matching.find((tool) => {
-          const area = serviceAreaValue(tool);
+          const areas = serviceAreaValues(tool);
           const text = toolArgText(tool);
           return exp.forbiddenServiceAreas!.some((term) => {
             const normalized = normalize(term);
-            return area.includes(normalized) || text.includes(`"${normalized}"`);
+            return (
+              areas.some((area) => area.includes(normalized)) ||
+              text.includes(`"${normalized}"`)
+            );
           });
         });
         if (bad) {
