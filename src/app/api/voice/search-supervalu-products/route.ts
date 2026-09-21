@@ -302,7 +302,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const storeAwareMatches = responseMatches.map((match) => {
+  const storeAwareMatches = responseMatches.flatMap((match) => {
     const sku = String(match.sku ?? "").trim();
     const nameKey = String(match.product_name ?? "").trim().toLowerCase();
     const productId =
@@ -312,16 +312,37 @@ export async function POST(request: Request) {
       productId ? assortmentByProductId.get(productId) : undefined,
     );
 
-    return {
-      ...match,
-      store_assortment_status: storeStatus,
-      quote_text: formatStoreAssortmentQuote({
-        productName: match.product_name,
-        status: storeStatus,
-        intent,
-        originalQuote: match.quote_text,
-      }),
-    };
+    // A promotion browse is a list from cross-store SuperValu consensus.
+    // If this store has explicitly said it does not normally stock a product,
+    // omit it from the list. Otherwise keep the promotion quote clean and give
+    // Cara one scope note for the whole result set rather than repeating an
+    // assortment disclaimer after every product.
+    if (structuredPromotionQuery) {
+      if (storeStatus === "not_stocked") return [];
+      return [
+        {
+          ...match,
+          store_assortment_status: storeStatus,
+          quote_text:
+            storeStatus === "stocked"
+              ? `${match.quote_text} This store has confirmed it normally stocks this product.`
+              : match.quote_text,
+        },
+      ];
+    }
+
+    return [
+      {
+        ...match,
+        store_assortment_status: storeStatus,
+        quote_text: formatStoreAssortmentQuote({
+          productName: match.product_name,
+          status: storeStatus,
+          intent,
+          originalQuote: match.quote_text,
+        }),
+      },
+    ];
   });
 
   let noMatchQuote: string | null =
@@ -329,7 +350,9 @@ export async function POST(request: Request) {
       ? structuredPromotionQuery
         ? formatStructuredPromotionNoMatchQuote(query)
         : ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
-      : null;
+      : structuredPromotionQuery && storeAwareMatches.length === 0
+        ? "Matching promotion products exist on the wider SuperValu range, but this store has marked those returned products as not normally stocked. Do not list them as available here."
+        : null;
 
   if (
     responseMatches.length === 0 &&
@@ -383,6 +406,9 @@ export async function POST(request: Request) {
     clarification_kind: clarificationKind,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
     promotion_query: structuredPromotionQuery,
+    promotion_scope_note: structuredPromotionQuery
+      ? "These promotion matches are verified from current cross-store SuperValu consensus. Do not claim live shelf availability or local assortment unless a returned match says this store has confirmed it normally stocks that product."
+      : null,
     matches: clarificationHint ? [] : storeAwareMatches,
     no_match_quote: noMatchQuote,
   });
