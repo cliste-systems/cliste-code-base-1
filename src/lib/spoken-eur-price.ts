@@ -94,6 +94,12 @@ export function speakEmbeddedEurAmounts(text: string): string {
     return Number.isFinite(parsed) ? formatSpokenEurAmount(parsed) : amount;
   });
 
+  out = out.replace(/\b(\d{1,2})\s*c\b/gi, (_, cents: string) => {
+    const parsed = Number(cents);
+    if (!Number.isFinite(parsed)) return `${cents}c`;
+    return parsed === 1 ? "one cent" : `${formatSpokenInteger(parsed)} cents`;
+  });
+
   return out;
 }
 
@@ -103,7 +109,7 @@ export function formatSpokenDiscountLabel(label: string | null | undefined): str
   if (!trimmed) return null;
 
   let out = trimmed.replace(
-    /(\d+)\s+for\s+€\s*(\d+(?:[.,]\d{1,2})?)/gi,
+    /(\d+)\s+for\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)/gi,
     (_, count: string, amount: string) => {
       const parsed = Number(amount.replace(",", "."));
       return Number.isFinite(parsed)
