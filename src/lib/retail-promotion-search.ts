@@ -261,6 +261,9 @@ export function parseRetailPromotionQuery(
         /\bonly\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
       )
     : null;
+  const loyaltyPriceAmount = normalized.match(
+    /\brewards?\s+price(?:\s+only)?\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
+  );
   const mixMatch = /\bmix\s*(?:&|and)\s*match\b/i.test(normalized);
   const namedPhrase = /\bsuper\s*7\b/i.test(normalized)
     ? "super 7"
@@ -290,7 +293,9 @@ export function parseRetailPromotionQuery(
       ? parseMoneyExpression(saveAmount[1])
       : fixedPrice
         ? parseMoneyExpression(fixedPrice[1])
-        : null,
+        : loyaltyPriceAmount
+          ? parseMoneyExpression(loyaltyPriceAmount[1])
+          : null,
     loyaltyRequired,
     namedPhrase,
     serviceArea: filters.serviceArea ?? null,
