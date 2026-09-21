@@ -156,54 +156,204 @@ export type WeeklyOfferSearchFilters = {
   fulfilment?: SupervaluFulfilment | null;
 };
 
+const OFFER_BROWSE_CATEGORY_TOKENS = new Set([
+  "alcohol",
+  "alcoholic",
+  "ambient",
+  "bakery",
+  "beer",
+  "biscuits",
+  "bread",
+  "butcher",
+  "butchers",
+  "cheese",
+  "chocolate",
+  "cider",
+  "coffee",
+  "confectionery",
+  "crisps",
+  "dairy",
+  "deli",
+  "drinks",
+  "fish",
+  "fishmonger",
+  "frozen",
+  "fruit",
+  "grocery",
+  "ham",
+  "household",
+  "liquor",
+  "liqueur",
+  "meat",
+  "milk",
+  "potatoes",
+  "produce",
+  "provisions",
+  "seafood",
+  "spirits",
+  "sweets",
+  "tea",
+  "toiletries",
+  "veg",
+  "vegetable",
+  "vegetables",
+  "wine",
+  "yogurt",
+  "yogurts",
+]);
+
+const STORE_AREA_SEMANTIC_TOKENS = new Set([
+  "alcohol",
+  "alcoholic",
+  "ambient",
+  "apple",
+  "apples",
+  "bakery",
+  "beer",
+  "butcher",
+  "butchers",
+  "cheese",
+  "cider",
+  "cod",
+  "croissant",
+  "dairy",
+  "deli",
+  "fish",
+  "fishmonger",
+  "frozen",
+  "fruit",
+  "grocery",
+  "haddock",
+  "ham",
+  "household",
+  "lamb",
+  "liquor",
+  "liqueur",
+  "mackerel",
+  "meat",
+  "milk",
+  "potato",
+  "potatoes",
+  "poultry",
+  "prawn",
+  "prawns",
+  "produce",
+  "provisions",
+  "rashers",
+  "salami",
+  "salmon",
+  "sausages",
+  "seafood",
+  "sirloin",
+  "spirits",
+  "steak",
+  "steaks",
+  "striploin",
+  "trout",
+  "tuna",
+  "veg",
+  "vegetable",
+  "vegetables",
+  "wine",
+  "yogurt",
+]);
+
+const STRUCTURAL_PRODUCT_QUERY_TOKENS = new Set([
+  "aisle",
+  "backstore",
+  "counter",
+  "department",
+  "fishcounter",
+  "fresh",
+  "kg",
+  "kilo",
+  "loose",
+  "packaged",
+  "per",
+  "prepack",
+  "section",
+  "shelf",
+  "shop",
+  "sliced",
+  "store",
+  "wall",
+  "weight",
+]);
+
+function meaningfulOfferTokens(query: string): string[] {
+  return tokenizeSupervaluSearchQuery(query).filter(
+    (token) =>
+      !STRUCTURAL_PRODUCT_QUERY_TOKENS.has(token) &&
+      !/^\d+(?:\.\d+)?$/.test(token),
+  );
+}
+
+function isCategoryOnlyOfferBrowse(query: string): boolean {
+  const tokens = meaningfulOfferTokens(query);
+  return (
+    tokens.length > 0 &&
+    tokens.every((token) => OFFER_BROWSE_CATEGORY_TOKENS.has(token))
+  );
+}
+
+function hasExplicitStoreAreaWording(query: string): boolean {
+  return /\b(?:off[- ]licen[cs]e|(?:butcher|meat|fish|seafood|deli|fruit|veg|produce|bakery)\s+(?:counter|department|section)|(?:wine|beer|spirits|drinks|meat|fish|chilled|grocery|frozen)\s+aisle|dairy\s+wall|back\s*store|centre\s+aisle|center\s+aisle)\b/i.test(
+    query,
+  );
+}
+
+function isStoreAreaOnlyQuery(query: string): boolean {
+  const tokens = meaningfulOfferTokens(query);
+  return (
+    tokens.length > 0 &&
+    tokens.every((token) => STORE_AREA_SEMANTIC_TOKENS.has(token))
+  );
+}
+
+function shouldInferStoreArea(query: string): boolean {
+  return hasExplicitStoreAreaWording(query) || isStoreAreaOnlyQuery(query);
+}
+
+function productIdentityTokens(query: string): string[] {
+  if (hasExplicitStoreAreaWording(query)) {
+    return offerSearchProductTokens(query);
+  }
+  return meaningfulOfferTokens(query);
+}
+
 /** Caller wants a rundown of synced offers, not one specific product. */
 export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
 
-  const tokens = queryTokens(trimmed);
-  const productTokens = offerSearchProductTokens(trimmed);
+  const meaningful = meaningfulOfferTokens(trimmed);
 
-  // These phrases explicitly ask for a browse/list and do not depend on a
-  // department word embedded inside a product name.
+  // Explicit list/rundown requests stay browsing. Product questions that only
+  // happen to contain a department word are handled below as products.
   if (
-    /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offers?\b|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b/i.test(
+    /\bweekly offers\b|\bbest offers?\b|\blist offers\b|\blist (?:five|5|\d+)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bnon[- ]meat\b/i.test(
       trimmed,
     )
   ) {
     return true;
   }
 
-  if (tokens.length === 0 && /\boffer/i.test(trimmed)) return true;
+  if (meaningful.length === 0 && /\boffer/i.test(trimmed)) return true;
+
+  // "what fish is on offer?", "wine offers", "fruit and veg offers" etc.
+  // Browse only when the meaningful words are genuinely category/section
+  // words. "wine gums", "Birds Eye fish fingers", "cider vinegar" and
+  // "Cadbury Dairy Milk" therefore remain product phrases.
   if (
-    tokens.length === 1 &&
-    /^(meat|butcher|deli|fish|produce|bakery|grocery|offers?|promos?|wine|beer|alcohol|dairy|ambient|spirits|fruit|veg|vegetables|seafood|provisions|frozen|household|fishmonger)$/i.test(
-      tokens[0] ?? "",
-    )
+    /\boffers?|\bon offer\b|\bthis week\b|\bspecials?|\bdeals?|\bpromos?\b/i.test(
+      trimmed,
+    ) &&
+    isCategoryOnlyOfferBrowse(trimmed)
   ) {
     return true;
   }
 
-  // A short concrete product/brand/family phrase wins over department words.
-  // This is the critical distinction between "Birds Eye fish fingers on
-  // offer?" and "what fish is on offer?". Longer multi-category shopping-list
-  // style requests can still be treated as a browse below.
-  if (productTokens.length >= 1 && productTokens.length <= 3) {
-    return false;
-  }
-
-  if (
-    productTokens.length >= 4 ||
-    (tokens.length >= 2 && inferWeeklyOffersBrowseCategories(trimmed).length >= 2)
-  ) {
-    return true;
-  }
-
-  if (
-    inferWeeklyOfferServiceAreaFromQuery(trimmed) &&
-    /\b(?:offers?|specials?|deals?|promos?|on offer|this week)\b/i.test(trimmed) &&
-    productTokens.length === 0
-  ) {
+  if (hasExplicitStoreAreaWording(trimmed) && isStoreAreaOnlyQuery(trimmed)) {
     return true;
   }
 
@@ -381,7 +531,11 @@ export function resolveWeeklyOfferSearchFilters(
 ): WeeklyOfferSearchFilters {
   return {
     channel: explicit?.channel ?? null,
-    serviceArea: explicit?.serviceArea ?? inferWeeklyOfferServiceAreaFromQuery(query),
+    serviceArea:
+      explicit?.serviceArea ??
+      (shouldInferStoreArea(query)
+        ? inferWeeklyOfferServiceAreaFromQuery(query)
+        : null),
     // Respect explicit caller meaning ("meat counter", "pre-pack aisle", "per kilo").
     // Ambiguous product-only requests still return null so Cara can clarify once.
     fulfilment:
@@ -415,8 +569,9 @@ function rowMatchesFilters(
 }
 
 function inferAlcoholOnlyFromQuery(query: string): boolean {
-  return /\balcohol|alcoholic|wine|beer|spirits|cider|liquor|liqueur|off[- ]licence/i.test(
-    query.toLowerCase(),
+  return (
+    shouldInferStoreArea(query) &&
+    inferWeeklyOfferServiceAreaFromQuery(query) === "off_licence"
   );
 }
 
@@ -459,7 +614,7 @@ function browseRetailWeeklyOffers(
 
 function isSpecificProductOfferQuery(query: string): boolean {
   return (
-    offerSearchProductTokens(query).length > 0 &&
+    productIdentityTokens(query).length > 0 &&
     !inferWeeklyOffersListIntent(query)
   );
 }
@@ -482,16 +637,17 @@ function specificOfferMatches(
   filters: WeeklyOfferSearchFilters,
   options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
 ): RetailWeeklyOfferRow[] {
-  const tokens = offerSearchProductTokens(query);
-  if (tokens.length === 0) return [];
+  const tokens = productIdentityTokens(query);
+  if (tokens.length === 0 || inferWeeklyOffersListIntent(query)) return [];
 
   const scoped = rows.filter((row) => {
     if (!rowMatchesFilters(row, filters, options)) return false;
 
-    // Product intent must come from the product identity itself. Department,
-    // breadcrumb and search_text can contain generic words such as "steaks"
-    // for an unrelated fish-goujon row; category matching is handled
-    // separately below.
+    // Match the caller's complete product identity, including words that can
+    // also be store-area words. That keeps "wine gums", "cider vinegar" and
+    // "fish fingers" attached to the actual product rather than routing them
+    // to alcohol/fish departments. Explicit counter/aisle wording is stripped
+    // separately by productIdentityTokens().
     const productIdentity = normalizeSearchText(
       `${row.product_name} ${row.brand ?? ""}`,
     );
@@ -515,7 +671,7 @@ function categoryBrowseMatches(
   filters: WeeklyOfferSearchFilters,
   options?: { excludeMeat?: boolean; alcoholOnly?: boolean },
 ): RetailWeeklyOfferRow[] {
-  const tokens = offerSearchProductTokens(query);
+  const tokens = productIdentityTokens(query);
   if (tokens.length === 0 || tokens.length > 3) return [];
 
   const scoped = rows.filter((row) => {
