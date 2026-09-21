@@ -1,4 +1,5 @@
 import {
+  catalogProductTokens,
   stripCatalogPackagingNoise,
   stripCatalogSearchBoilerplate,
 } from "@/lib/supervalu-catalog-search";
@@ -100,7 +101,7 @@ function narrowMatchesByProductTokens<T extends ClarificationMatch>(
 ): T[] {
   if (inferWeeklyOffersListIntent(query)) return matches;
 
-  const productTokens = offerSearchProductTokens(query);
+  const productTokens = catalogProductTokens(query);
   if (productTokens.length === 0 || matches.length <= 1) return matches;
 
   const byProductName = matches.filter((match) => {
@@ -211,7 +212,7 @@ export function buildBroadProductClarificationHint(
   const labels = distinctProductLabels(matches);
   if (labels.length < 2) return null;
 
-  const productTokens = offerSearchProductTokens(query);
+  const productTokens = catalogProductTokens(query);
   if (productTokens.length > 0) {
     const relevant = matches.filter((match) => {
       const name = String(match.productName ?? match.product_name ?? "").toLowerCase();
