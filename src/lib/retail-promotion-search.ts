@@ -147,11 +147,21 @@ function normalizeNumberWords(value: string): string {
   for (const [word, digit] of Object.entries(NUMBER_WORDS)) {
     out = out.replace(new RegExp(`\\b${word}\\b`, "gi"), digit);
   }
-  return out
-    .replace(/\beuros?\b/gi, "€")
+
+  // Natural Irish/UK retail phrasing should resolve to the same mechanic as
+  // badge syntax. Keep these as lexical normalisation, not query-specific
+  // business rules, so the promotion engine remains generic.
+  out = out
+    .replace(/\b(?:a\s+)?tenner\b/gi, "€10")
+    .replace(/\b(?:a\s+)?fiver\b/gi, "€5")
+    .replace(/\b([0-9]+(?:[.,][0-9]{1,2})?)\s+quid\b/gi, "€$1")
+    .replace(/\b([0-9]+(?:[.,][0-9]{1,2})?)\s+euros?\b/gi, "€$1")
+    .replace(/\b([0-9]{1,2})\s+cents?\b/gi, "$1c")
     .replace(/\bpercent\b/gi, "%")
     .replace(/\s+/g, " ")
     .trim();
+
+  return out;
 }
 
 function parseMoney(value: string | undefined): number | null {
