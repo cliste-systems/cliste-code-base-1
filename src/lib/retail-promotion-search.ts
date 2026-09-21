@@ -31,6 +31,24 @@ const NUMBER_WORDS: Record<string, string> = {
   ten: "10",
   eleven: "11",
   twelve: "12",
+  thirteen: "13",
+  fourteen: "14",
+  fifteen: "15",
+  sixteen: "16",
+  seventeen: "17",
+  eighteen: "18",
+  nineteen: "19",
+};
+
+const NUMBER_TENS: Record<string, number> = {
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
 };
 
 const PROMOTION_NOISE = new Set([
@@ -144,6 +162,23 @@ function numberValue(value: number | string | null | undefined): number | null {
 
 function normalizeNumberWords(value: string): string {
   let out = value.toLowerCase();
+
+  // Convert compound spoken numbers before single words: "twenty five" -> 25.
+  for (const [tensWord, tensValue] of Object.entries(NUMBER_TENS)) {
+    for (const [onesWord, onesValue] of Object.entries(NUMBER_WORDS)) {
+      const ones = Number(onesValue);
+      if (ones < 1 || ones > 9) continue;
+      out = out.replace(
+        new RegExp(`\\b${tensWord}[ -]${onesWord}\\b`, "gi"),
+        String(tensValue + ones),
+      );
+    }
+    out = out.replace(
+      new RegExp(`\\b${tensWord}\\b`, "gi"),
+      String(tensValue),
+    );
+  }
+
   for (const [word, digit] of Object.entries(NUMBER_WORDS)) {
     out = out.replace(new RegExp(`\\b${word}\\b`, "gi"), digit);
   }
