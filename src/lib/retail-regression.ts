@@ -109,6 +109,8 @@ function serviceAreaValue(tool: { name: string; args: Record<string, unknown> })
   const value =
     tool.args.serviceArea ??
     tool.args.service_area ??
+    tool.args.fulfillment ??
+    tool.args.fulfilment ??
     tool.args.department ??
     tool.args.area ??
     "";
