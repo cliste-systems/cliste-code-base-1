@@ -995,6 +995,15 @@ describe("retail weekly offers search", () => {
     assert.equal(resolveWeeklyOfferSearchFilters("wine gums").serviceArea, null);
   });
 
+  it("ignores deal and specials boilerplate when inferring a store area", () => {
+    assert.equal(resolveWeeklyOfferSearchFilters("produce deals").serviceArea, "produce");
+    assert.equal(
+      resolveWeeklyOfferSearchFilters("fruit and veg specials").serviceArea,
+      "produce",
+    );
+    assert.equal(resolveWeeklyOfferSearchFilters("wine deals").serviceArea, "off_licence");
+  });
+
   it("filters obviously misclassified tea and juice out of produce browsing", () => {
     const rows = [
       mockOfferRow({
