@@ -108,7 +108,10 @@ export function filterCatalogMatchesByQuery(
     return applyOwnLabelFilter(broadMatches);
   }
 
-  return matches;
+  // A specific product query with zero token overlap must not leak unrelated
+  // browse/gateway results back to Cara. Returning [] is safer than letting an
+  // irrelevant candidate become a spoken answer.
+  return [];
 }
 
 function shortCatalogProductLabel(productName: string): string {
