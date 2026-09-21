@@ -213,7 +213,10 @@ export function buildProductClarificationHint(
 export function resolveProductSearchResponse<T extends ClarificationMatch>(
   query: string,
   matches: T[],
-  options?: { fulfilment?: SupervaluFulfilment | null },
+  options?: {
+    fulfilment?: SupervaluFulfilment | null;
+    intent?: "offer" | "price" | "stock";
+  },
 ): { matches: T[]; clarificationHint: string | null } {
   let narrowed = filterOfferMatchesByExplicitFulfilment(
     matches,
@@ -222,9 +225,15 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
   if (!queryMatchesDepartmentScope(query, narrowed)) {
     narrowed = narrowMatchesByProductTokens(query, narrowed);
   }
+  const fulfilmentHint = buildOfferFulfilmentClarificationHint(
+    narrowed,
+    options?.fulfilment,
+  );
   const clarificationHint =
-    buildOfferFulfilmentClarificationHint(narrowed, options?.fulfilment) ??
-    buildBroadProductClarificationHint(query, narrowed);
+    fulfilmentHint ??
+    (options?.intent === "offer"
+      ? null
+      : buildBroadProductClarificationHint(query, narrowed));
   return {
     clarificationHint,
     matches: narrowed,
