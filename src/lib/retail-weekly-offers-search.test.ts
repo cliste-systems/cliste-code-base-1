@@ -815,11 +815,11 @@ describe("retail weekly offers search", () => {
     );
   });
 
-  it("does not infer fulfilment from caller phrasing alone", () => {
+  it("respects explicit fulfilment in caller phrasing or tool input", () => {
     assert.equal(
       resolveWeeklyOfferSearchFilters("what's on offer in the meat counter this week")
         .fulfilment,
-      null,
+      "counter",
     );
     assert.equal(
       resolveWeeklyOfferSearchFilters("meat counter steaks", { fulfilment: "counter" })
