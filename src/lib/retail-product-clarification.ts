@@ -259,7 +259,17 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     matches,
     options?.fulfilment,
   );
-  if (!queryMatchesDepartmentScope(query, narrowed)) {
+
+  // A broad offer category can legitimately return several different product
+  // names ("toiletries" -> shampoo, deodorant, shower gel). Detect that before
+  // product-name narrowing, otherwise the generic category token can erase the
+  // very evidence Cara needs in order to ask one useful refinement question.
+  const broadOfferHint =
+    options?.intent === "offer"
+      ? buildBroadOfferBrowseClarificationHint(query, narrowed)
+      : null;
+
+  if (!broadOfferHint && !queryMatchesDepartmentScope(query, narrowed)) {
     narrowed = narrowMatchesByProductTokens(query, narrowed);
   }
   const fulfilmentHint = buildOfferFulfilmentClarificationHint(
@@ -268,7 +278,7 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
   );
   const refinementHint =
     options?.intent === "offer"
-      ? buildBroadOfferBrowseClarificationHint(query, narrowed)
+      ? broadOfferHint ?? buildBroadOfferBrowseClarificationHint(query, narrowed)
       : buildBroadProductClarificationHint(query, narrowed, {
           // A broad PRICE question usually needs one more detail (type/size/brand)
           // before reading several prices. Stock/range browse can still return a category.
