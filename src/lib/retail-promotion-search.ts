@@ -177,6 +177,7 @@ type RetailPromotionRow = {
   valid_from: string;
   valid_to: string;
   national_store_count: number | string | null;
+  source_metadata: Record<string, unknown> | null;
   retail_store_products: StoreProductRow | StoreProductRow[] | null;
 };
 
@@ -209,13 +210,25 @@ function parseMoney(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseMoneyExpression(value: string): number | null {
+  const euro = value.match(/€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i);
+  if (euro) return parseMoney(euro[1]);
+  const cents = value.match(/\b([0-9]{1,2})\s*c\b/i);
+  if (cents) {
+    const amount = Number(cents[1]) / 100;
+    return Number.isFinite(amount) ? amount : null;
+  }
+  const bare = value.match(/\b([0-9]+(?:[.,][0-9]{1,2})?)\b/);
+  return bare ? parseMoney(bare[1]) : null;
+}
+
 function promotionSubjectTokens(query: string): string[] {
   const normalized = normalizeNumberWords(query)
-    .replace(/(?:buy\s+)?\d+\s+for\s+€?\s*\d+(?:[.,]\d{1,2})?/gi, " ")
-    .replace(/save\s+€?\s*\d+(?:[.,]\d{1,2})?/gi, " ")
+    .replace(/(?:buy\s+)?\d+\s+for\s+(?:€\s*)?\d+(?:[.,]\d{1,2})?(?:\s*euro)?/gi, " ")
+    .replace(/save\s+(?:(?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)/gi, " ")
     .replace(/save\s+\d+(?:[.,]\d+)?\s*%/gi, " ")
     .replace(/\d+(?:[.,]\d+)?\s*%\s*off/gi, " ")
-    .replace(/only\s+€?\s*\d+(?:[.,]\d{1,2})?/gi, " ")
+    .replace(/only\s+(?:(?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)/gi, " ")
     .replace(/half\s+price/gi, " ")
     .replace(/super\s*7/gi, " ")
     .replace(/mix\s*(?:&|and)\s*match/gi, " ");
@@ -235,7 +248,7 @@ export function parseRetailPromotionQuery(
   const filters = resolveWeeklyOfferSearchFilters(query);
 
   const multibuy = normalized.match(
-    /(?:buy\s+)?(\d+)\s+for\s+€?\s*(\d+(?:[.,]\d{1,2})?)/i,
+    /(?:buy\s+)?(\d+)\s+for\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*euro)?\b/i,
   );
   const loyaltyRequired =
     /\breal\s+rewards?\b|\brewards?\s+price\b|\bmembers?\s+(?:price|offer|deal)s?\b/i.test(
@@ -246,10 +259,12 @@ export function parseRetailPromotionQuery(
     /(?:\bsave\s+)?(\d+(?:[.,]\d+)?)\s*%\s*(?:off)?/i,
   );
   const saveAmount = normalized.match(
-    /\bsave\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i,
+    /\bsave\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
   );
   const fixedPrice = !multibuy
-    ? normalized.match(/\bonly\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i)
+    ? normalized.match(
+        /\bonly\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
+      )
     : null;
   const mixMatch = /\bmix\s*(?:&|and)\s*match\b/i.test(normalized);
   const namedPhrase = /\bsuper\s*7\b/i.test(normalized)
@@ -277,9 +292,9 @@ export function parseRetailPromotionQuery(
     totalEur: multibuy ? parseMoney(multibuy[2]) : null,
     percent: savePercent ? parseMoney(savePercent[1]) : halfPrice ? 50 : null,
     amountEur: saveAmount
-      ? parseMoney(saveAmount[1])
+      ? parseMoneyExpression(saveAmount[1])
       : fixedPrice
-        ? parseMoney(fixedPrice[1])
+        ? parseMoneyExpression(fixedPrice[1])
         : null,
     loyaltyRequired,
     namedPhrase,
@@ -298,7 +313,7 @@ function parseLabelMultibuy(
 ): { quantity: number; totalEur: number } | null {
   const normalized = normalizeNumberWords(label);
   const match = normalized.match(
-    /(?:buy\s+)?(\d+)\s+for\s+€?\s*(\d+(?:[.,]\d{1,2})?)/i,
+    /(?:buy\s+)?(\d+)\s+for\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*euro)?\b/i,
   );
   if (!match) return null;
   const totalEur = parseMoney(match[2]);
@@ -320,6 +335,14 @@ function rowMatchesMechanic(
         return false;
       }
       if (parsed.quantity == null || parsed.totalEur == null) return true;
+      const metaQuantity = numberValue(row.source_metadata?.multibuy_quantity as number | string | null | undefined);
+      const metaTotal = numberValue(row.source_metadata?.multibuy_total_eur as number | string | null | undefined);
+      if (metaQuantity != null && metaTotal != null) {
+        return (
+          metaQuantity === parsed.quantity &&
+          Math.abs(metaTotal - parsed.totalEur) <= 0.02
+        );
+      }
       const mechanic = parseLabelMultibuy(label);
       return Boolean(
         mechanic &&
@@ -332,20 +355,26 @@ function rowMatchesMechanic(
     case "half_price":
       return /half\s+price|50\s*%\s*off/i.test(normalized);
     case "save_percent": {
+      const meta = numberValue(
+        row.source_metadata?.save_percent as number | string | null | undefined,
+      );
       const match = normalized.match(
         /(?:save\s+)?(\d+(?:[.,]\d+)?)\s*%\s*(?:off)?/i,
       );
-      const value = parseMoney(match?.[1]);
+      const value = meta ?? parseMoney(match?.[1]);
       return (
         value != null &&
         (parsed.percent == null || Math.abs(value - parsed.percent) <= 0.01)
       );
     }
     case "save_amount": {
-      const match = normalized.match(
-        /save\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i,
+      const meta = numberValue(
+        row.source_metadata?.save_amount_eur as number | string | null | undefined,
       );
-      const value = parseMoney(match?.[1]);
+      const match = normalized.match(
+        /save\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
+      );
+      const value = meta ?? (match ? parseMoneyExpression(match[1]) : null);
       return (
         value != null &&
         (parsed.amountEur == null ||
@@ -354,9 +383,9 @@ function rowMatchesMechanic(
     }
     case "fixed_price": {
       const match = normalized.match(
-        /^only\s+(?:€\s*)?(\d+(?:[.,]\d{1,2})?)(?:\s*€)?/i,
+        /^only\s+((?:€\s*)?\d+(?:[.,]\d{1,2})?|\d{1,2}\s*c)\b/i,
       );
-      const value = parseMoney(match?.[1]);
+      const value = match ? parseMoneyExpression(match[1]) : row.offer_price_eur == null ? null : numberValue(row.offer_price_eur);
       return (
         value != null &&
         (parsed.amountEur == null ||
@@ -471,7 +500,7 @@ export async function searchStructuredNationalPromotions(
   let query = supabase
     .from("retail_promotions")
     .select(
-      `id,promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,description,valid_from,valid_to,national_store_count,
+      `id,promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,description,valid_from,valid_to,national_store_count,source_metadata,
        retail_store_products!inner(
          id,product_id,source_store_id,regular_price_eur,display_price_eur,price_per_unit,
          retail_catalog_products!inner(
