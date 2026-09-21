@@ -189,13 +189,32 @@ consensus as (
     f.loyalty_program,
     f.label,
     f.description,
-    f.effective_offer_price_eur,
-    f.regular_price_eur,
+    case
+      when max(f.effective_offer_price_eur) is null then null
+      when max(f.effective_offer_price_eur) - min(f.effective_offer_price_eur) <= 0.02
+        then round(avg(f.effective_offer_price_eur), 2)
+      else null
+    end as effective_offer_price_eur,
+    case
+      when max(f.regular_price_eur) is null then null
+      when max(f.regular_price_eur) - min(f.regular_price_eur) <= 0.02
+        then round(avg(f.regular_price_eur), 2)
+      else null
+    end as regular_price_eur,
     f.valid_from,
     f.valid_to,
     count(distinct f.source_store_id)::integer as source_store_count,
-    max(f.display_price_eur) as display_price_eur,
-    max(f.price_per_unit) as price_per_unit,
+    case
+      when max(f.display_price_eur) is null then null
+      when max(f.display_price_eur) - min(f.display_price_eur) <= 0.02
+        then round(avg(f.display_price_eur), 2)
+      else null
+    end as display_price_eur,
+    case
+      when count(distinct f.price_per_unit) filter (where f.price_per_unit is not null) <= 1
+        then max(f.price_per_unit)
+      else null
+    end as price_per_unit,
     (array_agg(f.source_metadata order by f.source_store_id))[1] as source_metadata
   from filtered f
   group by
@@ -211,8 +230,6 @@ consensus as (
     f.loyalty_program,
     f.label,
     f.description,
-    f.effective_offer_price_eur,
-    f.regular_price_eur,
     f.valid_from,
     f.valid_to
   having count(distinct f.source_store_id) >= 3
