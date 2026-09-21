@@ -93,6 +93,7 @@ export function useDemoCallEngineeringLog(input: {
   const [metrics, setMetrics] = useState({
     agentJoinMs: null as number | null,
     audioTrackMs: null as number | null,
+    microphonePublishMs: null as number | null,
     incidentCount: 0,
     qualityFlagCount: 0,
   });
@@ -219,6 +220,7 @@ export function useDemoCallEngineeringLog(input: {
       setMetrics({
         agentJoinMs: null,
         audioTrackMs: null,
+        microphonePublishMs: null,
         incidentCount: 0,
         qualityFlagCount: 0,
       });
@@ -244,6 +246,7 @@ export function DemoCallEngineeringLogPanel({
   metrics: {
     agentJoinMs: number | null;
     audioTrackMs: number | null;
+    microphonePublishMs: number | null;
     incidentCount: number;
     qualityFlagCount: number;
   };
@@ -291,9 +294,14 @@ export function DemoCallEngineeringLogPanel({
         hint: null,
       },
       {
-        label: "Audio track",
+        label: "Microphone",
+        value: formatSecondsShort(metrics.microphonePublishMs),
+        hint: metrics.microphonePublishMs == null ? "Browser mic not published yet" : "Browser mic published",
+      },
+      {
+        label: "Agent audio",
         value: formatSecondsShort(metrics.audioTrackMs),
-        hint: null,
+        hint: "Cara's outgoing audio track",
       },
       { label: "Incidents", value: String(metrics.incidentCount), hint: null },
       {
