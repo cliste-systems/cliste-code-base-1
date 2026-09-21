@@ -57,7 +57,10 @@ with candidates as (
     sp.source_store_id,
     sp.display_price_eur,
     sp.price_per_unit,
-    coalesce(sp.regular_price_eur, rp.regular_price_eur) as regular_price_eur,
+    case
+      when rp.promotion_type='multibuy' then null
+      else coalesce(sp.regular_price_eur, rp.regular_price_eur)
+    end as regular_price_eur,
     rp.promotion_type,
     rp.loyalty_required,
     rp.loyalty_program,
@@ -133,6 +136,10 @@ filtered as (
       or (
         p_mechanic='loyalty'
         and c.loyalty_required=true
+        and (
+          p_amount_eur is null
+          or abs(coalesce(c.offer_price_eur,c.display_price_eur)-p_amount_eur) <= 0.02
+        )
       )
       or (
         p_mechanic='half_price'
@@ -154,7 +161,7 @@ filtered as (
       )
       or (
         p_mechanic='fixed_price'
-        and coalesce(c.label,'') ~* '^\s*only(?:\s|$)'
+        and coalesce(c.label,'') ~* '(^\s*only(?:\s|$)|rewards?\s+price\s+only(?:\s|$))'
         and (
           p_amount_eur is null
           or abs(coalesce(c.offer_price_eur,c.display_price_eur)-p_amount_eur) <= 0.02
