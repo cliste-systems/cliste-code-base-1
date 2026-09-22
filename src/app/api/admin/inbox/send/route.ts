@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminSessionUser } from "@/lib/admin-session";
-import { sendNewAdminEmail } from "@/lib/resend-admin-inbox";
+import {
+  isAdminEmailIdentityKey,
+  sendNewAdminEmail,
+} from "@/lib/resend-admin-inbox";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +16,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  let body: { to?: string; subject?: string; text?: string };
+  let body: {
+    to?: string;
+    subject?: string;
+    text?: string;
+    identity?: string;
+  };
   try {
     body = (await request.json()) as {
       to?: string;
       subject?: string;
       text?: string;
+      identity?: string;
     };
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
@@ -29,6 +38,7 @@ export async function POST(request: Request) {
       to: body.to ?? "",
       subject: body.subject ?? "",
       text: body.text ?? "",
+      identity: isAdminEmailIdentityKey(body.identity) ? body.identity : "hello",
     });
     return NextResponse.json({ ok: true, id: result.id });
   } catch (error) {
