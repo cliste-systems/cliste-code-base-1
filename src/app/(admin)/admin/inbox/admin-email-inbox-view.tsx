@@ -191,70 +191,32 @@ function DeliveryStatusBadge({
   );
 }
 
-function deliveryEventLabel(type: string): string {
-  switch (type) {
-    case "email.sent":
-      return "Sent";
-    case "email.delivered":
-      return "Delivered";
-    case "email.delivery_delayed":
-      return "Delivery delayed";
-    case "email.opened":
-      return "Opened";
-    case "email.clicked":
-      return "Link clicked";
-    case "email.bounced":
-      return "Bounced";
-    case "email.failed":
-      return "Failed";
-    case "email.suppressed":
-      return "Suppressed";
-    case "email.complained":
-      return "Complaint";
-    default:
-      return type.replace(/^email\./, "").replaceAll("_", " ");
-  }
+function deliveryStages(message: EmailMessage): Array<{
+  label: "Sent" | "Delivered" | "Opened";
+  complete: boolean;
+}> {
+  const eventTypes = new Set(message.deliveryEvents.map((event) => event.type));
+  const opened =
+    message.deliveryStatus === "opened" ||
+    message.deliveryStatus === "clicked" ||
+    eventTypes.has("email.opened") ||
+    eventTypes.has("email.clicked");
+  const delivered =
+    opened ||
+    message.deliveryStatus === "delivered" ||
+    eventTypes.has("email.delivered");
+
+  return [
+    { label: "Sent", complete: true },
+    { label: "Delivered", complete: delivered },
+    { label: "Opened", complete: opened },
+  ];
 }
 
-function deliveryTimeline(message: EmailMessage): DeliveryEvent[] {
-  const events = [...message.deliveryEvents];
-  if (!events.some((event) => event.type === "email.sent")) {
-    events.unshift({
-      id: `local-sent-${message.id}`,
-      type: "email.sent",
-      occurredAt: message.occurredAt,
-      detail: null,
-    });
-  }
-
-  if (
-    message.deliveryStatus &&
-    !["sent", "unknown"].includes(message.deliveryStatus)
-  ) {
-    const currentType =
-      message.deliveryStatus === "delayed"
-        ? "email.delivery_delayed"
-        : `email.${message.deliveryStatus}`;
-    if (!events.some((event) => event.type === currentType)) {
-      events.push({
-        id: `live-${message.deliveryStatus}-${message.id}`,
-        type: currentType,
-        occurredAt: message.deliveryStatusAt || "",
-        detail: null,
-      });
-    }
-  }
-
-  const firstByType = new Map<string, DeliveryEvent>();
-  for (const event of events) {
-    if (!firstByType.has(event.type)) firstByType.set(event.type, event);
-  }
-
-  return [...firstByType.values()].sort((a, b) => {
-    const aTime = a.occurredAt ? new Date(a.occurredAt).getTime() : Infinity;
-    const bTime = b.occurredAt ? new Date(b.occurredAt).getTime() : Infinity;
-    return aTime - bTime;
-  });
+function deliveryFailed(status: DeliveryStatus | null): boolean {
+  return ["failed", "bounced", "suppressed", "complained"].includes(
+    status ?? "",
+  );
 }
 
 function buildEmailFrameDocument(html: string): string {
@@ -1148,22 +1110,10 @@ export function AdminEmailInboxView({
                       To {selected.toAddresses.join(", ") || activeIdentity.email}
                     </p>
                   ) : (
-                    <>
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        From {selected.fromName || activeIdentity.name} &lt;
-                        {selected.fromAddress || activeIdentity.email}&gt;
-                      </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <DeliveryStatusBadge
-                          status={selected.deliveryStatus}
-                        />
-                        {selected.deliveryStatusAt ? (
-                          <span className="text-[11px] text-slate-400">
-                            Updated {fullWhenLabel(selected.deliveryStatusAt)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      From {selected.fromName || activeIdentity.name} &lt;
+                      {selected.fromAddress || activeIdentity.email}&gt;
+                    </p>
                   )}
                 </div>
 
@@ -1231,39 +1181,41 @@ export function AdminEmailInboxView({
             <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50">
               <article className="mx-auto max-w-4xl px-6 py-6">
                 {selected.direction === "outbound" ? (
-                  <div className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-                      {deliveryTimeline(selected).map((event) => (
+                  <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div className="grid grid-cols-3 divide-x divide-slate-100">
+                      {deliveryStages(selected).map((stage) => (
                         <div
-                          key={event.id}
-                          className="flex min-w-0 items-start gap-2"
+                          key={stage.label}
+                          className="flex items-center justify-center gap-2 px-4 py-3.5"
                         >
                           <span
                             className={cn(
-                              "mt-1 block size-2 shrink-0 rounded-full",
-                              ["email.failed", "email.bounced", "email.suppressed", "email.complained"].includes(event.type)
-                                ? "bg-red-500"
-                                : "bg-slate-400",
+                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full border",
+                              stage.complete
+                                ? "border-slate-900 bg-slate-900 text-white"
+                                : "border-slate-300 bg-white text-transparent",
                             )}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-slate-700">
-                              {deliveryEventLabel(event.type)}
-                            </p>
-                            {event.occurredAt ? (
-                              <p className="mt-0.5 text-[10px] text-slate-400">
-                                {fullWhenLabel(event.occurredAt)}
-                              </p>
-                            ) : null}
-                            {event.detail ? (
-                              <p className="mt-1 max-w-xl break-words text-[11px] text-slate-500">
-                                {event.detail}
-                              </p>
-                            ) : null}
-                          </div>
+                          >
+                            <CheckCircle2 className="size-3.5" aria-hidden />
+                          </span>
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              stage.complete
+                                ? "text-slate-800"
+                                : "text-slate-400",
+                            )}
+                          >
+                            {stage.label}
+                          </span>
                         </div>
                       ))}
                     </div>
+                    {deliveryFailed(selected.deliveryStatus) ? (
+                      <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-[11px] font-medium text-red-700">
+                        This email was not delivered successfully.
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className="mb-3 flex min-h-9 items-center justify-between">
