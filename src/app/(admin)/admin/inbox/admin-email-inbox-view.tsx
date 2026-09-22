@@ -216,6 +216,28 @@ function deliveryEventLabel(type: string): string {
   }
 }
 
+function deliveryTimeline(message: EmailMessage): DeliveryEvent[] {
+  const events = [...message.deliveryEvents];
+  if (!events.some((event) => event.type === "email.sent")) {
+    events.unshift({
+      id: `local-sent-${message.id}`,
+      type: "email.sent",
+      occurredAt: message.occurredAt,
+      detail: null,
+    });
+  }
+
+  const firstByType = new Map<string, DeliveryEvent>();
+  for (const event of events) {
+    if (!firstByType.has(event.type)) firstByType.set(event.type, event);
+  }
+
+  return [...firstByType.values()].sort(
+    (a, b) =>
+      new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
+  );
+}
+
 function buildEmailFrameDocument(html: string): string {
   const safeHtml = html.replace(
     /<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi,
@@ -392,7 +414,7 @@ export function AdminEmailInboxView({
     const requestId = ++messageRequestRef.current;
     const cached = messageCacheRef.current.get(id);
 
-    if (cached) {
+    if (cached && cached.direction !== "outbound") {
       setSelected(cached);
       setMessageView(cached.htmlBody ? "formatted" : "plain");
       setLoadingMessage(false);
@@ -415,12 +437,14 @@ export function AdminEmailInboxView({
           : data.message.readAt;
       const openedMessage = { ...data.message, readAt: openedAt };
 
-      messageCacheRef.current.set(id, openedMessage);
-      if (messageCacheRef.current.size > 30) {
-        const oldest = messageCacheRef.current.keys().next().value as
-          | string
-          | undefined;
-        if (oldest) messageCacheRef.current.delete(oldest);
+      if (openedMessage.direction !== "outbound") {
+        messageCacheRef.current.set(id, openedMessage);
+        if (messageCacheRef.current.size > 30) {
+          const oldest = messageCacheRef.current.keys().next().value as
+            | string
+            | undefined;
+          if (oldest) messageCacheRef.current.delete(oldest);
+        }
       }
 
       setSelected(openedMessage);
@@ -469,24 +493,29 @@ export function AdminEmailInboxView({
   }, [selectedId, composing, loadMessage]);
 
   useEffect(() => {
-    if (folder !== "inbox") return;
+    if (folder !== "inbox" && folder !== "sent") return;
 
-    const refreshInbox = () => {
-      if (document.visibilityState === "visible") {
-        void loadFolder("inbox", true, true);
+    const refreshFolder = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadFolder(folder, true, true);
+      if (folder === "sent" && selectedId && !composing) {
+        void loadMessage(selectedId);
       }
     };
 
-    const timer = window.setInterval(refreshInbox, 5_000);
-    window.addEventListener("focus", refreshInbox);
-    document.addEventListener("visibilitychange", refreshInbox);
+    const timer = window.setInterval(
+      refreshFolder,
+      folder === "sent" ? 8_000 : 5_000,
+    );
+    window.addEventListener("focus", refreshFolder);
+    document.addEventListener("visibilitychange", refreshFolder);
 
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener("focus", refreshInbox);
-      document.removeEventListener("visibilitychange", refreshInbox);
+      window.removeEventListener("focus", refreshFolder);
+      document.removeEventListener("visibilitychange", refreshFolder);
     };
-  }, [folder, loadFolder]);
+  }, [folder, selectedId, composing, loadFolder, loadMessage]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -1065,10 +1094,22 @@ export function AdminEmailInboxView({
                       To {selected.toAddresses.join(", ") || activeIdentity.email}
                     </p>
                   ) : (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      From {selected.fromName || activeIdentity.name} &lt;
-                      {selected.fromAddress || activeIdentity.email}&gt;
-                    </p>
+                    <>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        From {selected.fromName || activeIdentity.name} &lt;
+                        {selected.fromAddress || activeIdentity.email}&gt;
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <DeliveryStatusBadge
+                          status={selected.deliveryStatus}
+                        />
+                        {selected.deliveryStatusAt ? (
+                          <span className="text-[11px] text-slate-400">
+                            Updated {fullWhenLabel(selected.deliveryStatusAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -1135,6 +1176,40 @@ export function AdminEmailInboxView({
 
             <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50">
               <article className="mx-auto max-w-4xl px-6 py-6">
+                {selected.direction === "outbound" ? (
+                  <div className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+                      {deliveryTimeline(selected).map((event) => (
+                        <div
+                          key={event.id}
+                          className="flex min-w-0 items-start gap-2"
+                        >
+                          <span
+                            className={cn(
+                              "mt-1 block size-2 shrink-0 rounded-full",
+                              ["email.failed", "email.bounced", "email.suppressed", "email.complained"].includes(event.type)
+                                ? "bg-red-500"
+                                : "bg-slate-400",
+                            )}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-slate-700">
+                              {deliveryEventLabel(event.type)}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-slate-400">
+                              {fullWhenLabel(event.occurredAt)}
+                            </p>
+                            {event.detail ? (
+                              <p className="mt-1 max-w-xl break-words text-[11px] text-slate-500">
+                                {event.detail}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mb-3 flex min-h-9 items-center justify-between">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
                     Message
