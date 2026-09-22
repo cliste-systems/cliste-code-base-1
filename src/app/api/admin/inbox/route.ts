@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import {
+  isAdminEmailIdentityKey,
   listAdminInbox,
   type AdminEmailFolder,
 } from "@/lib/resend-admin-inbox";
@@ -23,10 +24,12 @@ export async function GET(request: Request) {
   const folder = FOLDERS.has(rawFolder as AdminEmailFolder)
     ? (rawFolder as AdminEmailFolder)
     : "inbox";
+  const rawIdentity = url.searchParams.get("identity");
+  const identity = isAdminEmailIdentityKey(rawIdentity) ? rawIdentity : "hello";
 
   try {
-    const messages = await listAdminInbox(folder);
-    return NextResponse.json({ messages, folder });
+    const messages = await listAdminInbox(folder, identity);
+    return NextResponse.json({ messages, folder, identity });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not load inbox.";
