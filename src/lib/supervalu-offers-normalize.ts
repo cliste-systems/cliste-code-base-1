@@ -106,6 +106,19 @@ function matchesButcherPrepackName(name: string, product: SupervaluGatewayProduc
     return pattern.test(name);
   });
 }
+function hasStrongFreshMeatName(name: string): boolean {
+  return /\b(?:beef\s+)?(?:striploin|sirloin|rib[ -]?eye|rump|fillet)\s+steaks?\b|\b(?:beef|steak)\s+mince\b|\bbeef\s+(?:roasting\s+)?joint\b|\blamb\s+(?:loin\s+)?chops?\b|\bpork\s+(?:loin\s+)?chops?\b|\bchicken\s+(?:breast\s+)?fillets?\b|\bwhole\s+chicken\b|\bturkey\s+breast\b|\brashers\b|\bsausages?\b/i.test(
+    name,
+  );
+}
+
+function isClearlyNonButcherContext(department: string, breadcrumb: string): boolean {
+  const context = `${department} ${breadcrumb}`;
+  return /dog|cat|pet|soup|gravy|stock|sauce|seasoning|herbs?|spices?|ready[ -]?meals?|pot[ -]?noodle|frozen|pie|pizza|sandwich|crisps?|snacks?|baby food/i.test(
+    context,
+  );
+}
+
 
 /** Classify service area + counter vs prepack from gateway breadcrumbs and attributes. */
 export function classifySupervaluOfferServiceArea(input: {
@@ -154,6 +167,19 @@ export function classifySupervaluOfferServiceArea(input: {
   const clearlyNonMeatPudding =
     /rice pudding|dessert|custard/i.test(dept) ||
     /food cupboard\/desserts|rice pudding/i.test(crumb);
+
+  // Some genuine fresh/prepacked meat lines sit under generic source categories
+  // such as "Organic". Strong cut names can safely recover those rows, while
+  // prepared foods, soups, sauces, pet food, frozen food, etc. remain grocery.
+  if (
+    hasStrongFreshMeatName(name) &&
+    !isClearlyNonButcherContext(dept, crumb)
+  ) {
+    if (isWeightSold(product) && !matchesButcherPrepackName(name, product)) {
+      return { serviceArea: "butcher", fulfilment: "counter" };
+    }
+    return { serviceArea: "butcher", fulfilment: "prepack" };
+  }
 
   if (
     !clearlyNonMeatPudding &&
