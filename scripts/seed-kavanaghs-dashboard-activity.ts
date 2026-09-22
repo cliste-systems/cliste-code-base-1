@@ -489,6 +489,7 @@ async function main() {
     ...(call.transcript ? { transcript: call.transcript } : {}),
     ...(call.transcriptReview ? { transcript_review: call.transcriptReview } : {}),
     call_sid: `KAV-TEST-${String(index + 1).padStart(4, "0")}`,
+    is_test_call: true,
     created_at: callCreatedAt(call, index),
     ...(call.outcome === "transferred"
       ? {
@@ -509,6 +510,7 @@ async function main() {
     caller_name: ticket.callerName,
     summary: ticket.summary,
     status: ticket.status,
+    engineer_test_call: true,
     created_at: minutesAgoIso(ticket.minutesAgo),
   }));
 
@@ -543,6 +545,7 @@ async function main() {
       started_at: startedAt.toISOString(),
       ended_at: endedAt.toISOString(),
       minutes_billable: 2.5,
+      sync_skip_reason: "test_data",
       billing_period_start: billingPeriodStart,
       plan_tier_at_time: "starter",
       plan_quota_at_time: 140,
