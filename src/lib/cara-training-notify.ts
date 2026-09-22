@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { sendTwilioBookingSms } from "@/lib/booking-confirmation-sms";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { resolveOrgSenderEmail } from "@/lib/org-sender-email";
 
 /**
@@ -42,7 +42,7 @@ export async function notifyCaraTrainingOwner(
   const origin = resolveAppSiteOrigin().origin;
   const trainingUrl = `${origin}/dashboard/cara-training?item=${encodeURIComponent(input.itemId)}`;
 
-  if (email && isSendGridConfigured()) {
+  if (email && isResendConfigured()) {
     const orgSender = resolveOrgSenderEmail({
       name: org.name,
       slug: org.slug,

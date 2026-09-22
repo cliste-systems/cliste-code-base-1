@@ -45,7 +45,7 @@ quickly. We will not pursue legal action against good-faith researchers who:
   exploit path (we welcome them, but they're not eligible for any bounty
   treatment).
 - Stripe / Twilio / Supabase / OpenRouter / ElevenLabs / LiveKit /
-  SendGrid / Cloudflare / Google platform issues — please report those upstream.
+  Resend / Cloudflare / Google platform issues — please report those upstream.
 
 ## Acknowledgements
 

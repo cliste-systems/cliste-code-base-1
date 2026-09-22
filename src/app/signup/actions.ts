@@ -7,7 +7,7 @@ import {
   rateLimitFingerprint,
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
-import { isSendGridConfigured } from "@/lib/sendgrid-mail";
+import { isResendConfigured } from "@/lib/resend-mail";
 import { sendSignupConfirmationEmail } from "@/lib/signup-confirmation-email";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isPlanTier, type PlanTier } from "@/lib/cliste-plans";
@@ -126,8 +126,8 @@ export async function startSignup(_: unknown, formData: FormData): Promise<Signu
       message: "Signup is temporarily unavailable. Please try again later.",
     };
   }
-  if (IS_PRODUCTION && !isSendGridConfigured()) {
-    console.error("[signup] SendGrid is required in production for confirmation email");
+  if (IS_PRODUCTION && !isResendConfigured()) {
+    console.error("[signup] Resend is required in production for confirmation email");
     return {
       ok: false,
       message: "Signup is temporarily unavailable. Please try again later.",

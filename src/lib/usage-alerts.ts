@@ -3,7 +3,7 @@ import "server-only";
 import { DEFAULT_APP_SITE_URL, PRODUCT_NAME } from "@/lib/company-details";
 import { PLANS, type PlanTier } from "@/lib/cliste-plans.data";
 import { recordComplianceEvent } from "@/lib/compliance-events";
-import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { sendTransactionalEmail } from "@/lib/resend-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type UsageAlertResult = {

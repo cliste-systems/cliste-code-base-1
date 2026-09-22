@@ -5,7 +5,7 @@
  *   npx tsx scripts/verify-twilio-ie1-messaging.ts
  *   npx tsx scripts/verify-twilio-ie1-messaging.ts --fix
  *
- * Also reports SendGrid domain authentication for hellocara.ie.
+ * Also reports Resend domain verification for hellocara.ie.
  */
 
 import { config } from "dotenv";
@@ -18,7 +18,7 @@ import {
   ensureTwilioIe1MessagingRegion,
   getTwilioMessagingRegion,
 } from "../src/lib/twilio-ie-messaging";
-import { getSendGridDomainAuthStatus } from "../src/lib/sendgrid-domain";
+import { getResendDomainAuthStatus } from "../src/lib/resend-domain";
 
 const fix = process.argv.includes("--fix");
 
@@ -34,8 +34,8 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const domainStatus = await getSendGridDomainAuthStatus();
-  console.log("\nSendGrid domain auth:");
+  const domainStatus = await getResendDomainAuthStatus();
+  console.log("\nResend domain auth:");
   console.log(`  ${domainStatus.message}`);
   console.log(`  authenticated=${domainStatus.authenticated} valid=${domainStatus.valid}`);
 

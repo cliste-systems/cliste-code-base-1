@@ -20,8 +20,8 @@ export function resolvePlatformSenderEmail(): {
 } {
   return {
     email:
-      process.env.SENDGRID_FROM_EMAIL?.trim() ||
+      process.env.RESEND_FROM_EMAIL?.trim() ||
       CLISTE_COMPANY.helloEmail,
-    name: process.env.SENDGRID_FROM_NAME?.trim() || "Cliste",
+    name: process.env.RESEND_FROM_NAME?.trim() || "Cliste",
   };
 }

@@ -175,7 +175,7 @@ is signed:
 - LiveKit Inc. (EU SIP Frankfurt for inbound; WebRTC global until protocol pinning; DPF / SCCs)
 - ElevenLabs Inc. (US; EU residency on Enterprise — DPF / SCCs; transient TTS)
 - OpenRouter Inc. (US; EU in-region routing on Enterprise — SCCs; LLM routing)
-- SendGrid / Twilio (US global API today; EU residency available — SCCs)
+- Resend (US global API — SCCs)
 - Google Ireland Ltd (optional geocoding — SCCs)
 - Cloudflare Ireland (Ireland; global edge)
 

@@ -54,8 +54,8 @@ export function SubProcessorsDocument({
           until LiveKit <strong>protocol region pinning</strong> is enabled
           (Scale plan + Support request).
           Text-to-speech and LLM routing use United States vendors (ElevenLabs,
-          OpenRouter). Transactional email (SendGrid) uses the global API today; EU
-          residency is available when configured. Where processing leaves the EEA we
+          OpenRouter). Transactional email (Resend) uses the global API. Where
+          processing leaves the EEA we
           rely on <strong>EU–US Data Privacy Framework</strong> certification
           where the sub-processor is certified, and the European Commission&apos;s{" "}
           <strong>Standard Contractual Clauses</strong> (Module 3) elsewhere, plus

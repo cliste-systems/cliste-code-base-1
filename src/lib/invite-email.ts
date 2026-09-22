@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { buildInviteEmailBodies } from "@/lib/invite-email-bodies";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export { buildInviteEmailBodies } from "@/lib/invite-email-bodies";
@@ -44,7 +44,7 @@ function isEmailAlreadyRegisteredError(message: string): boolean {
 export async function sendInviteEmail(
   input: SendInviteEmailInput,
 ): Promise<SendInviteEmailResult> {
-  if (!isSendGridConfigured()) {
+  if (!isResendConfigured()) {
     return {
       ok: false,
       message: "Email is not configured yet. Please try again later.",

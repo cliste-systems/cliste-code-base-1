@@ -35,7 +35,7 @@ transparency expectations. Run before go-live on each DID and quarterly thereaft
 | LiveKit WebRTC | Protocol region pinning (Scale+) | [ ] |
 | ElevenLabs TTS | `api.eu.residency.elevenlabs.io` + Zero Retention (Enterprise) | [ ] |
 | OpenRouter LLM | `https://eu.openrouter.ai` (Enterprise) | [ ] |
-| SendGrid | EU subuser + `api.eu.sendgrid.com` | [ ] |
+| Resend | Verify `hellocara.ie` domain + DNS | [ ] |
 
 Document actual routing in the sub-processor annex if any vendor remains on US endpoints
 (SCCs / DPF must be on file).

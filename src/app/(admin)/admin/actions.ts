@@ -229,7 +229,7 @@ function formatAuthError(message: string): string {
     return (
       "Email rate limit exceeded. Supabase's built-in email service only allows a handful of messages per hour. " +
       "Wait and try again, or connect custom SMTP under Supabase → Authentication → Emails → SMTP Settings " +
-      "(e.g. Resend, SendGrid, or Amazon SES) for production volume."
+      "(e.g. Resend or Amazon SES) for production volume."
     );
   }
   if (

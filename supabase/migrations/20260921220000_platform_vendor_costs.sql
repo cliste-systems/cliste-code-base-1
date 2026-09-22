@@ -90,12 +90,12 @@ insert into public.platform_vendor_costs (
     'LLM routing for text rehearsal / dev. Synced via OpenRouter API.'
   ),
   (
-    'sendgrid',
-    'SendGrid',
+    'resend',
+    'Resend',
     'monthly',
     'manual',
     null,
-    'https://app.sendgrid.com/settings/billing',
+    'https://resend.com/settings/billing',
     'Transactional email.'
   ),
   (

@@ -93,7 +93,7 @@ Everything else is already applied.
   secret header in a Cloudflare Transform Rule checked by the Next.js
   middleware. Also available on request.
 - **DMARC/SPF/DKIM** — needs coordination with whichever provider sends
-  your outbound mail (SendGrid, Twilio, Google Workspace). A one-line
+  your outbound mail (Resend, Twilio, Google Workspace). A one-line
   `v=DMARC1; p=reject; rua=mailto:dmarc@hellocara.ie` is the goal, but
   you want SPF/DKIM aligned first or legitimate mail gets rejected.
 

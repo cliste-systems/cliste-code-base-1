@@ -1,6 +1,6 @@
 # Infrastructure costs & billing alerts
 
-Platform costs (excluding per-call Twilio/ElevenLabs usage) for Cliste: Vercel, Supabase, Railway (voice worker), SendGrid, Sentry, Cloudflare.
+Platform costs (excluding per-call Twilio/ElevenLabs usage) for Cliste: Vercel, Supabase, Railway (voice worker), Resend, Sentry, Cloudflare.
 
 ## Billing alerts (set in each provider console)
 
@@ -30,7 +30,7 @@ These cannot be configured in-repo. Complete once per environment (production).
 | Service | Where to alert |
 |---------|----------------|
 | **Sentry** | Project → Settings → Subscription / Usage quotas |
-| **SendGrid** | Settings → Alerting (email volume) |
+| **Resend** | Dashboard → Usage |
 | **LiveKit** | Cloud dashboard → Usage / billing |
 | **OpenRouter** | Account → Limits / credits |
 
@@ -73,4 +73,4 @@ Cost data is stored on `call_logs.cost_estimate` (JSON from the voice worker). I
 
 ## Typical fixed platform burn (order of magnitude)
 
-At pilot (5–20 paying salons): **~€150–400/month** fixed (Vercel Pro + Supabase Pro + Railway + Sentry/Cloudflare/SendGrid). Variable costs scale with **call minutes** (metered to customers) and **active dashboard sessions** (Supabase egress).
+At pilot (5–20 paying salons): **~€150–400/month** fixed (Vercel Pro + Supabase Pro + Railway + Sentry/Cloudflare/Resend). Variable costs scale with **call minutes** (metered to customers) and **active dashboard sessions** (Supabase egress).

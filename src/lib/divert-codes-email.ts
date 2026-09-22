@@ -9,7 +9,7 @@ import { buildDivertCodesEmailBodies } from "@/lib/divert-codes-email-bodies";
 import {
   inviteEmailLogoUrl,
 } from "@/lib/invite-email";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export type SendDivertCodesResult =
@@ -23,10 +23,10 @@ export async function sendDivertCodesEmail(params: {
   clisteNumber: string;
   organizationId: string;
 }): Promise<SendDivertCodesResult> {
-  if (!isSendGridConfigured()) {
+  if (!isResendConfigured()) {
     return {
       ok: false,
-      message: "SendGrid is not configured — cannot send divert codes email.",
+      message: "Resend is not configured — cannot send divert codes email.",
     };
   }
 

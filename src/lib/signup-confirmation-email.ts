@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { SIGNUP_EMAIL_OTP_PATTERN } from "@/lib/signup-email-otp";
 import { PRODUCT_NAME } from "@/lib/company-details";
 import { buildTransactionalEmailHtml } from "@/lib/transactional-email-layout";
@@ -71,7 +71,7 @@ type SendSignupConfirmationInput = {
 export async function sendSignupConfirmationEmail(
   input: SendSignupConfirmationInput,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!isSendGridConfigured()) {
+  if (!isResendConfigured()) {
     return {
       ok: false,
       message: "Email is not configured yet. Please try again later.",

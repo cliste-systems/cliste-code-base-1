@@ -2,7 +2,7 @@ import "server-only";
 
 import { CLISTE_COMPANY, DEFAULT_APP_SITE_URL, PRODUCT_NAME } from "@/lib/company-details";
 import { SUB_PROCESSOR_LIST_VERSION } from "@/lib/sub-processors.data";
-import { sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { sendTransactionalEmail } from "@/lib/resend-mail";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const PLATFORM_CONFIG_KEY = "sub_processors_notified_version";

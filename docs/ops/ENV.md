@@ -44,13 +44,12 @@ service-role only.
 
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `SENDGRID_API_KEY` | Production | Sends signup confirmation link (with `SENDGRID_FROM_EMAIL`) |
-| `SENDGRID_FROM_EMAIL` | Production | Platform sender for signup, invites, and system notices |
-| `SENDGRID_FROM_NAME` | Optional | From name (defaults to Hello Cara) |
-| `SENDGRID_API_URL` | Optional | Use `https://api.eu.sendgrid.com` with an EU SendGrid subuser |
+| `RESEND_API_KEY` | Production | Resend API key with send permission |
+| `RESEND_FROM_EMAIL` | Production | Verified sender on a Resend domain (e.g. `hello@hellocara.ie`) |
+| `RESEND_FROM_NAME` | Optional | From name (defaults to Hello Cara) |
 
-Per-business owner notifications use `{org.slug}@hellocara.ie` when SendGrid
-domain authentication is enabled for `hellocara.ie`. Verify with:
+Per-business owner notifications use `{org.slug}@hellocara.ie` when
+`hellocara.ie` is verified in Resend. Verify with:
 
 ```bash
 npx tsx scripts/verify-twilio-ie1-messaging.ts

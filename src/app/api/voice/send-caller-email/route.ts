@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import {
   authorizeVoiceWebhook,
   voiceWebhookNoSecretResponse,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (auth === "no_secret") return voiceWebhookNoSecretResponse();
   if (auth === "bad") return voiceWebhookUnauthorizedResponse();
 
-  if (!isSendGridConfigured()) {
+  if (!isResendConfigured()) {
     return NextResponse.json(
       { ok: false, error: "Email is not configured on this server" },
       { status: 503 },

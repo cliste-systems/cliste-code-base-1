@@ -5,7 +5,7 @@ import { PRODUCT_NAME } from "@/lib/company-details";
 import { formatE164ForDisplay } from "@/lib/call-history-types";
 import { resolveAppSiteOrigin } from "@/lib/booking-site-origin";
 import { sendTwilioBookingSms } from "@/lib/booking-confirmation-sms";
-import { isSendGridConfigured, sendTransactionalEmail } from "@/lib/sendgrid-mail";
+import { isResendConfigured, sendTransactionalEmail } from "@/lib/resend-mail";
 import { resolveOrgSenderEmail } from "@/lib/org-sender-email";
 
 type NotifyInput = {
@@ -63,7 +63,7 @@ export async function notifyActionInboxOwner(
   const origin = resolveAppSiteOrigin().origin;
   const inboxUrl = `${origin}/dashboard/action-inbox`;
 
-  if (email && isSendGridConfigured()) {
+  if (email && isResendConfigured()) {
     const orgSender = resolveOrgSenderEmail({
       name: org.name,
       slug: org.slug,

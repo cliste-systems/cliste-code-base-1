@@ -65,14 +65,12 @@ export const SUB_PROCESSORS: SubProcessor[] = [
     group: "global-services",
   },
   {
-    name: "SendGrid / Twilio SendGrid",
+    name: "Resend (Resend, Inc.)",
     purpose: "Transactional email (e.g. Action Inbox, account notices).",
     data: "Recipient email, message body.",
-    location:
-      "United States (global API today). EU data residency available (EU subuser + api.eu.sendgrid.com).",
-    transferMechanism:
-      "SCCs (Module 3) under Twilio Group DPA; EU data residency available when configured.",
-    url: "https://www.twilio.com/legal/privacy",
+    location: "United States (global API).",
+    transferMechanism: "SCCs (Module 3) under Resend DPA.",
+    url: "https://resend.com/legal/privacy-policy",
     group: "global-services",
   },
   {

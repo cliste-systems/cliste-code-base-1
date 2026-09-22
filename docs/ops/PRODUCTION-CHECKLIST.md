@@ -5,7 +5,7 @@
 - [ ] **Billing alerts** configured — see [INFRASTRUCTURE-COSTS.md](./INFRASTRUCTURE-COSTS.md) (Vercel spend cap, Supabase usage, Railway limit)
 - [ ] Migrations `060`–`064` applied to production Supabase (064 revokes legacy anon storefront access)
 - [ ] `SENTRY_DSN` set; alert rules configured
-- [ ] `CRON_SECRET`, Stripe, **SendGrid** (signup confirmation email), **Turnstile** keys set on Vercel
+- [ ] `CRON_SECRET`, Stripe, **Resend** (signup confirmation email), **Turnstile** keys set on Vercel
 - [ ] `STRIPE_WEBHOOK_SECRET` set; `CLISTE_ALLOW_UNSIGNED_STRIPE_WEBHOOKS` unset in production
 - [ ] `python3 scripts/cloudflare-harden.py` run (rate-limit paths updated)
 - [ ] Voice worker deployed with `call_sid`, `is_active` gate, E.164 callers

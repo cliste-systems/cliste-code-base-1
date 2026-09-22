@@ -67,7 +67,7 @@ salon**. Cliste's processing is governed by the DPA at `docs/legal/DPA.md`.
 | ----------------- | -------------------------------------------------------------------------------- |
 | Categories        | Customer name, mobile phone, email (optional), service, time, price, payment status, booking reference |
 | Subjects          | Salon's customers                                                                 |
-| Recipients        | Stripe (where the customer pays), SendGrid (email), Twilio (SMS)                 |
+| Recipients        | Stripe (where the customer pays), Resend (email), Twilio (SMS)                 |
 | International     | See DPA Annex III                                                                |
 | Retention         | Lifetime of contract + per-customer erasure on request. Anonymised on Art 17 request, time/price retained for tax (6 years). |
 
@@ -105,7 +105,7 @@ salon**. Cliste's processing is governed by the DPA at `docs/legal/DPA.md`.
 | Field             | Value                                                                            |
 | ----------------- | -------------------------------------------------------------------------------- |
 | Categories        | Phone / email, message body (booking metadata)                                    |
-| Recipients        | Twilio (SMS), SendGrid (email)                                                    |
+| Recipients        | Twilio (SMS), Resend (email)                                                    |
 | International     | See DPA Annex III                                                                |
 | Retention         | We do not retain message content beyond the carrier delivery receipt.            |
 

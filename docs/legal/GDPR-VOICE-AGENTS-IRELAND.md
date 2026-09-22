@@ -64,7 +64,7 @@ When the salon has a valid **Article 6** basis (usually **contract** or **legiti
 | Stream audio to STT/LLM/TTS; store **MP3 call recordings** for up to 30 days in private EU storage | Documented in DPA, DPIA, privacy notice; Twilio call recording OFF; recording starts only after spoken disclosure |
 | Store **caller ID**, duration, outcome, **redacted** transcript (≤30 days), AI summary (≤13 months), call recording (≤30 days) | `src/lib/transcript-redaction.ts`, `src/lib/call-recordings-server.ts`, `src/app/api/cron/data-retention/route.ts` |
 | Create/update appointments initiated by the agent | `appointments` with `source = ai_call` |
-| Send **transactional** SMS/email (confirmations, reminders, pay links) | Twilio / SendGrid — terms prohibit using Cliste for bulk marketing |
+| Send **transactional** SMS/email (confirmations, reminders, pay links) | Twilio / Resend — terms prohibit using Cliste for bulk marketing |
 | Transfer data to **US sub-processors** with **DPF and/or SCCs** | Listed at `/legal/sub-processors` |
 | **Anonymise** a customer on erasure while keeping appointment **time/price** for Revenue | `eraseCustomerData` in `src/app/(dashboard)/dashboard/privacy/actions.ts` |
 | Provide salons **Article 15 export**, **Article 17 erasure**, and **Article 20 portability** tools | `/dashboard/legal/data-requests` |

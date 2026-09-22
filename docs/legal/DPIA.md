@@ -72,7 +72,7 @@ be on behalf of minors (parents booking for children).
 
 ### 2.4 Recipients
 
-LiveKit, OpenRouter, ElevenLabs, Twilio, Supabase, SendGrid, Sentry
+LiveKit, OpenRouter, ElevenLabs, Twilio, Supabase, Resend, Sentry
 (error monitoring — stack traces only, no intentional caller content).
 See `/legal/sub-processors` for transfer mechanisms and EU-region options.
 
