@@ -301,7 +301,7 @@ export function DemoRetailDiscoveryPanel({ line }: { line: AdminDemoCallLine }) 
       setGenerating(false);
     }
 
-    if (!stopRequested.current && generated.length > 0) {
+    if (!stopRequested.current && generated.length === targetCount) {
       await runGenerated(generated);
     }
   };
