@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { Activity } from "lucide-react";
 
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import {
   DashboardHomeFirstRowButton,
   DashboardHomeFirstRowList,
-  HOME_FIRST_ROW_EMPTY,
   HOME_FIRST_ROW_FOOTER,
   HOME_FIRST_ROW_HEADER,
   HOME_FIRST_ROW_HEADER_META,
@@ -24,17 +24,18 @@ import { cn } from "@/lib/utils";
 
 function LiveActivityEmptyState() {
   return (
-    <div className={HOME_FIRST_ROW_EMPTY}>
-      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-2 size-10")} aria-hidden>
-        <Activity className="size-5" />
+    <div className="flex min-h-[5.75rem] flex-1 items-center gap-3 px-1">
+      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-0 size-9 shrink-0 shadow-none")} aria-hidden>
+        <Activity className="size-4" />
       </div>
-      <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[14px]")}>
-        No activity yet
-      </p>
-      <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-1 max-w-none text-[12px]")}>
-        Calls, requests and actions will appear here once Cara starts taking
-        calls.
-      </p>
+      <div className="min-w-0 text-left">
+        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[13px]")}>
+          No customer activity yet
+        </p>
+        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-0.5 max-w-none text-[11.5px]")}>
+          Recent customer calls will appear here.
+        </p>
+      </div>
     </div>
   );
 }
@@ -74,9 +75,18 @@ export function DashboardHomeLiveActivityCard({
           />
 
           <div className={cn(HOME_FIRST_ROW_FOOTER, "mt-auto")}>
-            <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.activity}>
-              View all activity
-            </DashboardHomeFirstRowButton>
+            {embedded ? (
+              <Link
+                href={DASHBOARD_ROUTES.activity}
+                className="inline-flex text-[11px] font-medium text-[#4d5f58] transition-colors hover:text-[#11181d]"
+              >
+                View all activity →
+              </Link>
+            ) : (
+              <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.activity}>
+                View all activity
+              </DashboardHomeFirstRowButton>
+            )}
           </div>
         </>
       ) : (
