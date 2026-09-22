@@ -259,7 +259,9 @@ function sanitizeExpectations(
   if (
     canRequireProductTool &&
     ["offer", "price", "stock"].includes(rawIntent) &&
-    signals.size <= 1
+    signals.size <= 1 &&
+    (signals.size === 0 ||
+      signals.has(rawIntent as "offer" | "price" | "stock"))
   ) {
     expectation.requiredIntent = rawIntent;
   }
