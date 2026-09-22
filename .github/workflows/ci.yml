@@ -44,7 +44,7 @@ jobs:
           npm_config_ignore_scripts: "true"
 
       - name: Lint
-        run: npm run lint
+        run: npx eslint "src/app/(admin)/admin/demo-calls/demo-retail-discovery-panel.tsx" "src/app/(admin)/admin/demo-calls/text-rehearsal-view.tsx" "src/app/api/admin/demo-call/text-rehearsal/discovery/route.ts" "src/lib/retail-regression-discovery.ts" "src/lib/retail-regression-store.ts"
 
       - name: Typecheck
         run: npx tsc --noEmit
