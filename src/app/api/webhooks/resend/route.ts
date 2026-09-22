@@ -127,10 +127,7 @@ export async function POST(request: Request) {
     payload: parsedPayload,
   });
 
-  if (eventError) {
-    if (eventError.code === "23505") {
-      return NextResponse.json({ ok: true, duplicate: true });
-    }
+  if (eventError && eventError.code !== "23505") {
     throw new Error(eventError.message);
   }
 
