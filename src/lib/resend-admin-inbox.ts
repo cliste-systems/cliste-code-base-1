@@ -207,7 +207,21 @@ async function syncInboundMetadata(): Promise<void> {
   if (received.length === 0) return;
 
   const admin = createAdminClient();
-  const rows = received.map((email) => {
+  const ids = received.map((email) => email.id);
+  const { data: existingRows, error: existingError } = await admin
+    .from("admin_email_messages")
+    .select("resend_email_id")
+    .in("resend_email_id", ids);
+
+  if (existingError) throw new Error(existingError.message);
+
+  const existing = new Set(
+    (existingRows ?? []).map((row) => String(row.resend_email_id)),
+  );
+  const newMessages = received.filter((email) => !existing.has(email.id));
+  if (newMessages.length === 0) return;
+
+  const rows = newMessages.map((email) => {
     const from = parseMailbox(email.from);
     return {
       resend_email_id: email.id,
@@ -222,13 +236,10 @@ async function syncInboundMetadata(): Promise<void> {
       subject: email.subject?.trim() || "(no subject)",
       attachments: Array.isArray(email.attachments) ? email.attachments : [],
       received_at: email.created_at ?? new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
   });
 
-  const { error } = await admin
-    .from("admin_email_messages")
-    .upsert(rows, { onConflict: "resend_email_id" });
+  const { error } = await admin.from("admin_email_messages").insert(rows);
   if (error) throw new Error(error.message);
 }
 
