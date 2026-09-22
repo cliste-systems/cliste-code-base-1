@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { offerSearchProductTokens, scoreSupervaluSearchText } from "@/lib/retail-weekly-offers-search";
 import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
-import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
+import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import {
   formatCatalogStockQuote,
   type CatalogQuoteIntent,
@@ -47,6 +47,7 @@ export async function searchStoredRetailCatalog(
     query: string;
     intent: CatalogQuoteIntent;
     fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
     limit?: number;
   },
 ): Promise<SupervaluCatalogMatch[]> {
@@ -65,6 +66,7 @@ export async function searchStoredRetailCatalog(
     .ilike("search_text", `%${broad}%`)
     .limit(80);
   if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+  if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -143,6 +145,7 @@ export async function searchNationalRetailCatalog(
     query: string;
     intent: CatalogQuoteIntent;
     fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
     limit?: number;
   },
 ): Promise<SupervaluCatalogMatch[]> {
@@ -169,6 +172,7 @@ export async function searchNationalRetailCatalog(
       .limit(80);
 
     if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+    if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
