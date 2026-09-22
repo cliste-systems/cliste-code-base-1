@@ -227,15 +227,34 @@ function deliveryTimeline(message: EmailMessage): DeliveryEvent[] {
     });
   }
 
+  if (
+    message.deliveryStatus &&
+    !["sent", "unknown"].includes(message.deliveryStatus)
+  ) {
+    const currentType =
+      message.deliveryStatus === "delayed"
+        ? "email.delivery_delayed"
+        : `email.${message.deliveryStatus}`;
+    if (!events.some((event) => event.type === currentType)) {
+      events.push({
+        id: `live-${message.deliveryStatus}-${message.id}`,
+        type: currentType,
+        occurredAt: message.deliveryStatusAt || "",
+        detail: null,
+      });
+    }
+  }
+
   const firstByType = new Map<string, DeliveryEvent>();
   for (const event of events) {
     if (!firstByType.has(event.type)) firstByType.set(event.type, event);
   }
 
-  return [...firstByType.values()].sort(
-    (a, b) =>
-      new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
-  );
+  return [...firstByType.values()].sort((a, b) => {
+    const aTime = a.occurredAt ? new Date(a.occurredAt).getTime() : Infinity;
+    const bTime = b.occurredAt ? new Date(b.occurredAt).getTime() : Infinity;
+    return aTime - bTime;
+  });
 }
 
 function buildEmailFrameDocument(html: string): string {
@@ -1231,9 +1250,11 @@ export function AdminEmailInboxView({
                             <p className="text-xs font-medium text-slate-700">
                               {deliveryEventLabel(event.type)}
                             </p>
-                            <p className="mt-0.5 text-[10px] text-slate-400">
-                              {fullWhenLabel(event.occurredAt)}
-                            </p>
+                            {event.occurredAt ? (
+                              <p className="mt-0.5 text-[10px] text-slate-400">
+                                {fullWhenLabel(event.occurredAt)}
+                              </p>
+                            ) : null}
                             {event.detail ? (
                               <p className="mt-1 max-w-xl break-words text-[11px] text-slate-500">
                                 {event.detail}
