@@ -45,6 +45,7 @@ export function DashboardHomeCardsGrid({
           <DashboardHomeNeedsAttentionCard
             rows={needsAttention}
             openActions={openActions}
+            title="Needs action"
             className="h-full"
           />
         </DashboardHomeResizeItem>
