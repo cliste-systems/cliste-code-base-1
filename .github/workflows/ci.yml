@@ -44,13 +44,17 @@ jobs:
           npm_config_ignore_scripts: "true"
 
       - name: Lint
-        run: npx eslint "src/lib/retail-regression.ts" "src/lib/retail-regression.test.ts" "src/lib/retail-regression-discovery.ts"
+        run: npm run lint
 
       - name: Typecheck
-        run: echo "Full repo typecheck is blocked by existing local-dev debt; targeted lint and regression tests run below."
+        run: npx tsc --noEmit
 
       - name: Build
-        run: echo "Full repo build verification is handled separately from this targeted discovery policy patch."
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
 
       - name: Unit tests
-        run: npx tsx --test src/lib/retail-regression.test.ts
+        run: npm test
