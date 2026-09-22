@@ -698,10 +698,12 @@ export async function refreshAdminEmailDeliveryStatus(
       const normalizedType = remoteEvent.startsWith("email.")
         ? remoteEvent
         : `email.${remoteEvent}`;
+      const changed = normalizedType !== row.last_delivery_event;
       const { error: updateError } = await admin
         .from("admin_email_messages")
         .update({
           last_delivery_event: normalizedType,
+          ...(changed ? { last_delivery_event_at: null } : {}),
           updated_at: new Date().toISOString(),
           ...(remote.message_id ? { message_id: remote.message_id } : {}),
         })
@@ -709,6 +711,9 @@ export async function refreshAdminEmailDeliveryStatus(
 
       if (updateError) throw new Error(updateError.message);
       (row as Record<string, unknown>).last_delivery_event = normalizedType;
+      if (changed) {
+        (row as Record<string, unknown>).last_delivery_event_at = null;
+      }
     }
   } catch {
     // Webhook data/local state remains authoritative if Resend lookup is unavailable.
