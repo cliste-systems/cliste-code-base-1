@@ -65,15 +65,6 @@ type CallLogRow = {
   engineer_test_call?: boolean | null;
 };
 
-type TicketRow = {
-  id: string;
-  summary: string | null;
-  created_at: string;
-  status: string | null;
-  caller_name?: string | null;
-  caller_number?: string | null;
-};
-
 export type DashboardHomeStat = {
   label: string;
   value: string;
@@ -173,11 +164,9 @@ export async function loadDashboardHomeSnapshot(input: {
     openActionsRes,
     callsForMetricRollupsRes,
     callsForPanelsRes,
-    recentTicketsForPanelsRes,
     openTicketsRes,
     orgRes,
     latestCallRes,
-    ticketsForRequestTypesRes,
     usageRecordsRes,
     trainingItemsRes,
     openTrainingCountRes,
@@ -236,18 +225,6 @@ export async function loadDashboardHomeSnapshot(input: {
       ),
       metricRangeEndExclusiveIso,
     ),
-    applyRangeEnd(
-      applyOrganizationScope(
-        supabase
-          .from("action_tickets")
-          .select("id, summary, created_at, caller_name, caller_number")
-          .gte("created_at", metricRangeStartIso)
-          .order("created_at", { ascending: false })
-          .limit(DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT),
-        scopedOrgIds,
-      ),
-      metricRangeEndExclusiveIso,
-    ),
     applyOrganizationScope(
       supabase
         .from("action_tickets")
@@ -275,16 +252,6 @@ export async function loadDashboardHomeSnapshot(input: {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    applyRangeEnd(
-      applyOrganizationScope(
-        supabase
-          .from("action_tickets")
-          .select("summary")
-          .gte("created_at", metricRangeStartIso),
-        scopedOrgIds,
-      ),
-      metricRangeEndExclusiveIso,
-    ),
     applyOrganizationScope(
       supabase
         .from("usage_records")
@@ -360,10 +327,6 @@ export async function loadDashboardHomeSnapshot(input: {
     lastCall,
   });
 
-  const ticketRows = (recentTicketsForPanelsRes.error
-    ? []
-    : (recentTicketsForPanelsRes.data ?? [])) as TicketRow[];
-
   const openTicketRows = (openTicketsRes.error
     ? []
     : (openTicketsRes.data ?? [])) as HomeRequestTicketRow[];
@@ -397,10 +360,6 @@ export async function loadDashboardHomeSnapshot(input: {
     formatTime: formatDashboardFeedRelativeTime,
     limit: DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT,
   });
-
-  const ticketSummaries = (ticketsForRequestTypesRes.error
-    ? []
-    : (ticketsForRequestTypesRes.data ?? [])) as { summary: string | null }[];
 
   const callSummariesForTopics = callsForMetricRollups.map(
     (row) => (row as { ai_summary?: string | null }).ai_summary,
