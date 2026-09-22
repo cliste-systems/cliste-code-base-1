@@ -354,10 +354,10 @@ export function DemoRetailDiscoveryPanel({ line }: { line: AdminDemoCallLine }) 
     <AdminSectionCard
       title="Discovery / Stress"
       description={`${line.orgName} · ${formatIrishE164Display(line.e164)} · fresh adversarial scenarios every run`}
-      className="flex min-h-0 flex-1 flex-col"
-      contentClassName="flex min-h-0 flex-1 flex-col"
+      className="shrink-0"
+      contentClassName=""
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
+      <div className="space-y-4 p-5">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="max-w-2xl">
@@ -536,7 +536,7 @@ export function DemoRetailDiscoveryPanel({ line }: { line: AdminDemoCallLine }) 
         ) : null}
 
         {results.size > 0 ? (
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200">
+          <div className="overflow-hidden rounded-lg border border-gray-200">
             {(failedScenarios.length ? failedScenarios : scenarios).map((scenario) => {
               const result = results.get(scenario.id);
               if (!result) return null;
@@ -640,12 +640,12 @@ export function DemoRetailDiscoveryPanel({ line }: { line: AdminDemoCallLine }) 
             })}
           </div>
         ) : scenarios.length > 0 ? (
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Generated scenarios
             </p>
             <div className="mt-2 space-y-2">
-              {scenarios.slice(-50).map((scenario) => (
+              {scenarios.slice(-12).map((scenario) => (
                 <div key={scenario.id} className="rounded-md bg-white p-2 text-xs">
                   <p className="font-medium text-gray-900">{scenario.title}</p>
                   <p className="mt-0.5 text-gray-600">{scenario.turns[0]?.caller}</p>

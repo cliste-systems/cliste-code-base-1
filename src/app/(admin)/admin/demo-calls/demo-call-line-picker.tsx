@@ -83,6 +83,7 @@ type DemoCallLinePickerProps = {
   onSelectedE164Change: (e164: string | null) => void;
   disabled?: boolean;
   toolbarAction?: React.ReactNode;
+  compact?: boolean;
 };
 
 export function DemoCallLinePicker({
@@ -91,6 +92,7 @@ export function DemoCallLinePicker({
   onSelectedE164Change,
   disabled = false,
   toolbarAction,
+  compact = false,
 }: DemoCallLinePickerProps) {
   const [provisionFilter, setProvisionFilter] =
     useState<ClientProvisionFilter>("all");
@@ -138,6 +140,44 @@ export function DemoCallLinePicker({
       : ""
   }${searchQuery.trim() ? " · filtered" : ""}`;
 
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Testing line
+          </p>
+          <p className="mt-0.5 truncate text-sm font-medium text-gray-900">
+            {selectedLine?.orgName ?? "No line selected"}
+          </p>
+        </div>
+
+        <select
+          value={selectedLine?.e164 ?? ""}
+          disabled={disabled || lines.length === 0}
+          onChange={(event) => onSelectedE164Change(event.target.value || null)}
+          className="min-w-[16rem] flex-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none focus:border-gray-300 focus:ring-2 focus:ring-gray-200/80 disabled:opacity-60"
+        >
+          {lines.map((line) => (
+            <option key={line.e164} value={line.e164}>
+              {line.orgName} · {formatIrishE164Display(line.e164)}
+            </option>
+          ))}
+        </select>
+
+        {selectedLine ? (
+          <div className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+            <AdminBadge variant="plain">
+              {clientProvisionSourceLabel(selectedLine.provisionSource)}
+            </AdminBadge>
+            <span>{selectedLine.workerPath}</span>
+          </div>
+        ) : null}
+
+        {toolbarAction}
+      </div>
+    );
+  }
   return (
     <AdminListCard
       countLabel={countLabel}
