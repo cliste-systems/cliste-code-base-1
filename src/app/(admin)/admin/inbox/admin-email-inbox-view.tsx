@@ -8,9 +8,12 @@ import {
   Loader2,
   Mail,
   MailOpen,
+  Plus,
   RefreshCw,
   Search,
   Send,
+  Sparkles,
+  X,
 } from "lucide-react";
 
 import {
@@ -20,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "archived" | "sent";
+type GrammarTarget = "reply" | "compose";
 
 type EmailListItem = {
   id: string;
@@ -100,8 +104,10 @@ async function apiJson<T>(
 
 export function AdminEmailInboxView({
   fromAddress,
+  fromName,
 }: {
   fromAddress: string;
+  fromName: string;
 }) {
   const [folder, setFolder] = useState<Folder>("inbox");
   const [messages, setMessages] = useState<EmailListItem[]>([]);
@@ -109,16 +115,29 @@ export function AdminEmailInboxView({
   const [selected, setSelected] = useState<EmailMessage | null>(null);
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
+  const [composing, setComposing] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState(false);
   const [sending, setSending] = useState(false);
+  const [checkingGrammar, setCheckingGrammar] =
+    useState<GrammarTarget | null>(null);
   const [changingState, setChangingState] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const loadFolder = useCallback(
-    async (nextFolder: Folder, preserveSelection = false) => {
-      setLoadingList(true);
-      setError(null);
+    async (
+      nextFolder: Folder,
+      preserveSelection = false,
+      silent = false,
+    ) => {
+      if (!silent) {
+        setLoadingList(true);
+        setError(null);
+      }
       try {
         const data = await apiJson<{ messages: EmailListItem[] }>(
           `/api/admin/inbox?folder=${nextFolder}`,
@@ -134,11 +153,15 @@ export function AdminEmailInboxView({
           if (!nextId) setSelected(null);
         }
       } catch (loadError) {
-        setError(
-          loadError instanceof Error ? loadError.message : "Could not load inbox.",
-        );
+        if (!silent) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Could not load inbox.",
+          );
+        }
       } finally {
-        setLoadingList(false);
+        if (!silent) setLoadingList(false);
       }
     },
     [selectedId],
@@ -177,14 +200,27 @@ export function AdminEmailInboxView({
   }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (selectedId) void loadMessage(selectedId);
-  }, [selectedId, loadMessage]);
+    if (selectedId && !composing) void loadMessage(selectedId);
+  }, [selectedId, composing, loadMessage]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadFolder(folder, true);
-    }, 30_000);
-    return () => window.clearInterval(timer);
+    if (folder !== "inbox") return;
+
+    const refreshInbox = () => {
+      if (document.visibilityState === "visible") {
+        void loadFolder("inbox", true, true);
+      }
+    };
+
+    const timer = window.setInterval(refreshInbox, 5_000);
+    window.addEventListener("focus", refreshInbox);
+    document.addEventListener("visibilitychange", refreshInbox);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshInbox);
+      document.removeEventListener("visibilitychange", refreshInbox);
+    };
   }, [folder, loadFolder]);
 
   const filtered = useMemo(() => {
@@ -209,10 +245,49 @@ export function AdminEmailInboxView({
     [messages],
   );
 
+  const checkGrammar = async (target: GrammarTarget) => {
+    const draft = target === "reply" ? reply : composeBody;
+    if (!draft.trim()) return;
+
+    setCheckingGrammar(target);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiJson<{
+        ok: true;
+        suggested: string;
+        changed: boolean;
+      }>("/api/admin/inbox/grammar", {
+        method: "POST",
+        body: JSON.stringify({ text: draft }),
+      });
+
+      if (target === "reply") {
+        setReply(data.suggested);
+      } else {
+        setComposeBody(data.suggested);
+      }
+      setNotice(
+        data.changed
+          ? "Grammar corrected. Review it before sending."
+          : "No grammar issues found.",
+      );
+    } catch (reviewError) {
+      setError(
+        reviewError instanceof Error
+          ? reviewError.message
+          : "AI grammar check failed.",
+      );
+    } finally {
+      setCheckingGrammar(null);
+    }
+  };
+
   const sendReply = async () => {
     if (!selected || selected.direction !== "inbound" || !reply.trim()) return;
     setSending(true);
     setError(null);
+    setNotice(null);
     try {
       await apiJson<{ ok: true; id: string }>(
         `/api/admin/inbox/${encodeURIComponent(selected.id)}/reply`,
@@ -222,11 +297,50 @@ export function AdminEmailInboxView({
         },
       );
       setReply("");
+      setNotice("Reply sent.");
       await loadMessage(selected.id);
-      await loadFolder(folder, true);
+      await loadFolder(folder, true, true);
     } catch (sendError) {
       setError(
         sendError instanceof Error ? sendError.message : "Could not send reply.",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendNewEmail = async () => {
+    if (!composeTo.trim() || !composeSubject.trim() || !composeBody.trim()) {
+      setError("Add a recipient, subject and message before sending.");
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiJson<{ ok: true; id: string }>(
+        "/api/admin/inbox/send",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            to: composeTo,
+            subject: composeSubject,
+            text: composeBody,
+          }),
+        },
+      );
+
+      setComposeTo("");
+      setComposeSubject("");
+      setComposeBody("");
+      setComposing(false);
+      setFolder("sent");
+      setSelectedId(data.id);
+      setNotice("Email sent.");
+    } catch (sendError) {
+      setError(
+        sendError instanceof Error ? sendError.message : "Could not send email.",
       );
     } finally {
       setSending(false);
@@ -240,6 +354,7 @@ export function AdminEmailInboxView({
     if (!selected) return;
     setChangingState(true);
     setError(null);
+    setNotice(null);
     try {
       await apiJson<{ ok: true }>(
         `/api/admin/inbox/${encodeURIComponent(selected.id)}`,
@@ -264,6 +379,25 @@ export function AdminEmailInboxView({
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <aside className="flex w-[22rem] min-w-[19rem] shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="shrink-0 border-b border-slate-100 p-3">
+          <button
+            type="button"
+            onClick={() => {
+              setComposing(true);
+              setSelectedId(null);
+              setSelected(null);
+              setReply("");
+              setError(null);
+              setNotice(null);
+            }}
+            className={cn(
+              adminPrimaryButtonClass,
+              "mb-3 w-full justify-center py-2",
+            )}
+          >
+            <Plus className="size-3.5" aria-hidden />
+            New email
+          </button>
+
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
             {FOLDERS.map(({ value, label, icon: Icon }) => (
               <button
@@ -271,13 +405,15 @@ export function AdminEmailInboxView({
                 type="button"
                 onClick={() => {
                   setFolder(value);
+                  setComposing(false);
                   setSelected(null);
                   setSelectedId(null);
                   setReply("");
+                  setNotice(null);
                 }}
                 className={cn(
                   "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                  folder === value
+                  folder === value && !composing
                     ? "bg-white text-slate-950 shadow-sm"
                     : "text-slate-500 hover:text-slate-900",
                 )}
@@ -308,6 +444,7 @@ export function AdminEmailInboxView({
                 ? `${unreadCount} unread · `
                 : ""}
               {messages.length} message{messages.length === 1 ? "" : "s"}
+              {folder === "inbox" ? " · Live" : ""}
             </span>
             <button
               type="button"
@@ -335,22 +472,24 @@ export function AdminEmailInboxView({
               {query.trim()
                 ? "No email matches that search."
                 : folder === "sent"
-                  ? "No replies sent from the admin inbox yet."
+                  ? "No sent email yet."
                   : folder === "archived"
                     ? "No archived email."
                     : "No received email yet."}
             </div>
           ) : (
             filtered.map((message) => {
-              const active = selectedId === message.id;
+              const active = selectedId === message.id && !composing;
               const unread = message.direction === "inbound" && !message.readAt;
               return (
                 <button
                   key={message.id}
                   type="button"
                   onClick={() => {
+                    setComposing(false);
                     setSelectedId(message.id);
                     setReply("");
+                    setNotice(null);
                   }}
                   className={cn(
                     "relative block w-full cursor-pointer border-b border-slate-100 px-4 py-3 text-left transition-colors hover:bg-slate-50",
@@ -407,17 +546,134 @@ export function AdminEmailInboxView({
             {error}
           </div>
         ) : null}
+        {notice ? (
+          <div
+            className="shrink-0 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-sm text-slate-700"
+            role="status"
+          >
+            {notice}
+          </div>
+        ) : null}
 
-        {!selectedId ? (
+        {composing ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">
+                  New email
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  From {fromName} &lt;{fromAddress}&gt;
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setComposing(false)}
+                className={cn(adminSecondaryButtonClass, "px-2.5")}
+              >
+                <X className="size-3.5" aria-hidden />
+                Close
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="mx-auto max-w-4xl space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-700">
+                    To
+                  </span>
+                  <input
+                    type="email"
+                    value={composeTo}
+                    onChange={(event) => setComposeTo(event.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-700">
+                    Subject
+                  </span>
+                  <input
+                    type="text"
+                    value={composeSubject}
+                    onChange={(event) => setComposeSubject(event.target.value)}
+                    maxLength={500}
+                    placeholder="Email subject"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-slate-700">
+                    Message
+                  </span>
+                  <textarea
+                    value={composeBody}
+                    onChange={(event) => setComposeBody(event.target.value)}
+                    maxLength={20_000}
+                    rows={14}
+                    placeholder="Write your email…"
+                    className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
+              <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+                <button
+                  type="button"
+                  disabled={
+                    checkingGrammar !== null || sending || !composeBody.trim()
+                  }
+                  onClick={() => void checkGrammar("compose")}
+                  className={adminSecondaryButtonClass}
+                  title="Only correct spelling, grammar and punctuation"
+                >
+                  {checkingGrammar === "compose" ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles className="size-3.5" aria-hidden />
+                  )}
+                  {checkingGrammar === "compose"
+                    ? "Checking…"
+                    : "Check grammar"}
+                </button>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-slate-400">
+                    {composeBody.length.toLocaleString()}/20,000
+                  </span>
+                  <button
+                    type="button"
+                    disabled={
+                      sending ||
+                      !composeTo.trim() ||
+                      !composeSubject.trim() ||
+                      !composeBody.trim()
+                    }
+                    onClick={() => void sendNewEmail()}
+                    className={adminPrimaryButtonClass}
+                  >
+                    {sending ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Send className="size-3.5" aria-hidden />
+                    )}
+                    {sending ? "Sending…" : "Send email"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : !selectedId ? (
           <div className="flex min-h-0 flex-1 items-center justify-center p-8 text-center">
             <div>
               <Mail className="mx-auto size-7 text-slate-300" aria-hidden />
               <p className="mt-3 text-sm font-medium text-slate-700">
-                Select an email
+                Select an email or start a new one
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Incoming email is treated as untrusted content and never runs
-                admin actions automatically.
+                Inbox mail updates automatically while this tab is open.
               </p>
             </div>
           </div>
@@ -449,9 +705,14 @@ export function AdminEmailInboxView({
                   </div>
                   {selected.direction === "inbound" ? (
                     <p className="mt-1 text-[11px] text-slate-400">
-                      To {selected.toAddresses.join(", ") || "brendan@hellocara.ie"}
+                      To {selected.toAddresses.join(", ") || fromAddress}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      From {selected.fromName || fromName} &lt;
+                      {selected.fromAddress || fromAddress}&gt;
+                    </p>
+                  )}
                 </div>
 
                 {selected.direction === "inbound" ? (
@@ -535,7 +796,7 @@ export function AdminEmailInboxView({
                         >
                           <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
                             <span>
-                              Brendan &lt;{fromAddress}&gt; →{" "}
+                              {fromName} &lt;{fromAddress}&gt; →{" "}
                               {sent.toAddresses[0] || "recipient"}
                             </span>
                             <span className="shrink-0">
@@ -558,7 +819,7 @@ export function AdminEmailInboxView({
                 <div className="mx-auto max-w-4xl">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <p className="text-xs font-medium text-slate-700">
-                      Reply as Brendan &lt;{fromAddress}&gt;
+                      Reply as {fromName} &lt;{fromAddress}&gt;
                     </p>
                     <span className="text-[10px] text-slate-400">
                       {reply.length.toLocaleString()}/20,000
@@ -572,7 +833,25 @@ export function AdminEmailInboxView({
                     placeholder="Write a reply…"
                     className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/80"
                   />
-                  <div className="mt-2 flex justify-end">
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      disabled={
+                        checkingGrammar !== null || sending || !reply.trim()
+                      }
+                      onClick={() => void checkGrammar("reply")}
+                      className={adminSecondaryButtonClass}
+                      title="Only correct spelling, grammar and punctuation"
+                    >
+                      {checkingGrammar === "reply" ? (
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      ) : (
+                        <Sparkles className="size-3.5" aria-hidden />
+                      )}
+                      {checkingGrammar === "reply"
+                        ? "Checking…"
+                        : "Check grammar"}
+                    </button>
                     <button
                       type="button"
                       disabled={sending || !reply.trim()}
