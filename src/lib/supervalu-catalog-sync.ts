@@ -103,16 +103,20 @@ function classifyPromotion(product: SupervaluGatewayProduct, label: string): Cat
   const regular = Number.isFinite(was) && was > 0 ? was : offer;
   const text = promotionText(product);
   const loyalty = /rewards?\s+price|real\s+rewards?/i.test(text);
+  const multibuy = /\b\d+\s+for\s+[€£]?\d+/i.test(text);
   let type: NonNullable<CatalogProduct["promotion"]>["type"] = "standard_offer";
-  if (loyalty) type = "loyalty";
-  else if (/\b\d+\s+for\s+[€£]?\d+/i.test(text)) type = "multibuy";
+  // "3 for €5 Rewards Price" is both loyalty-gated and a multibuy. Keep the
+  // promotion shape as multibuy so downstream code never mistakes €2.99 each
+  // for the promotional price.
+  if (multibuy) type = "multibuy";
+  else if (loyalty) type = "loyalty";
   else if (/save\s+\d+\s*%/i.test(text)) type = "percentage";
   else if (!label && !product.priceSource && !(product.promotions?.length)) type = "other";
   return {
     type,
     loyaltyRequired: loyalty,
     loyaltyProgram: loyalty ? "Real Rewards" : null,
-    offerPriceEur: offer,
+    offerPriceEur: type === "multibuy" ? null : offer,
     regularPriceEur: regular,
     label: label || null,
     description: String(product.promotions?.[0]?.description ?? "").trim() || null,
