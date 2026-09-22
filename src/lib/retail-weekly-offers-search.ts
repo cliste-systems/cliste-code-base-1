@@ -303,8 +303,11 @@ export function inferWeeklyOfferServiceAreaFromQuery(
   if (/bakery|in[- ]store bakery|bread counter|croissant|scone|baguette/i.test(q)) {
     return "bakery";
   }
+  if (/dairy wall|dairy section|milk|yogurt|yoghurt|cheese|butter|cream/i.test(q)) {
+    return "dairy";
+  }
   if (
-    /dairy wall|dairy|ambient|provisions|back store|backstore|household|frozen|grocery|milk|yogurt|cheese|butter|centre aisle|center aisle/i.test(
+    /ambient|provisions|back store|backstore|household|frozen|grocery|centre aisle|center aisle/i.test(
       q,
     )
   ) {
