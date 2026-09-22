@@ -38,7 +38,7 @@ type ProductFulfilment = "all" | "counter" | "prepack";
 
 type WeeklyOfferRow = {
   sku: string | null;
-  current_price_eur: number | null;
+  current_price_eur: number;
   was_price_eur: number | null;
   discount_label: string | null;
   price_per_unit: string | null;
