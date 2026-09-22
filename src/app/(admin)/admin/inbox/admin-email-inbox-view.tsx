@@ -93,6 +93,80 @@ function displaySender(item: EmailListItem): string {
   return item.fromName?.trim() || item.fromAddress;
 }
 
+function buildEmailFrameDocument(html: string): string {
+  const safeHtml = html.replace(
+    /<meta\b[^>]*http-equiv\s*=\s*["\']?refresh["\']?[^>]*>/gi,
+    "",
+  );
+  const head = [
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<base target="_blank">',
+    "<style>",
+    "html{background:#fff;color-scheme:light;}",
+    "body{max-width:100%;overflow-wrap:anywhere;}",
+    "img{max-width:100%;height:auto;}",
+    "</style>",
+  ].join("");
+
+  if (/<head(?:\\s|>)/i.test(safeHtml)) {
+    return safeHtml.replace(/<head([^>]*)>/i, `<head$1>${head}`);
+  }
+  if (/<html(?:\\s|>)/i.test(safeHtml)) {
+    return safeHtml.replace(/<html([^>]*)>/i, `<html$1><head>${head}</head>`);
+  }
+  return `<!doctype html><html><head>${head}</head><body>${safeHtml}</body></html>`;
+}
+
+function EmailHtmlFrame({ html }: { html: string }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const [height, setHeight] = useState(560);
+  const srcDoc = useMemo(() => buildEmailFrameDocument(html), [html]);
+
+  useEffect(() => {
+    setHeight(560);
+    return () => observerRef.current?.disconnect();
+  }, [html]);
+
+  const syncHeight = useCallback(() => {
+    const documentNode = frameRef.current?.contentDocument;
+    if (!documentNode) return;
+    const bodyHeight = documentNode.body?.scrollHeight ?? 0;
+    const rootHeight = documentNode.documentElement?.scrollHeight ?? 0;
+    const measured = Math.max(bodyHeight, rootHeight, 360);
+    setHeight(Math.min(measured + 8, 8000));
+  }, []);
+
+  const handleLoad = useCallback(() => {
+    observerRef.current?.disconnect();
+    syncHeight();
+
+    const documentNode = frameRef.current?.contentDocument;
+    if (!documentNode || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(documentNode.documentElement);
+    if (documentNode.body) observer.observe(documentNode.body);
+    observerRef.current = observer;
+
+    window.setTimeout(syncHeight, 250);
+    window.setTimeout(syncHeight, 1000);
+  }, [syncHeight]);
+
+  return (
+    <iframe
+      ref={frameRef}
+      title="Email message"
+      srcDoc={srcDoc}
+      onLoad={handleLoad}
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      referrerPolicy="no-referrer"
+      className="block w-full border-0 bg-white"
+      style={{ height }}
+    />
+  );
+}
+
 async function apiJson<T>(
   input: RequestInfo | URL,
   init?: RequestInit,
