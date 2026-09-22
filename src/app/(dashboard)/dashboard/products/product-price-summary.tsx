@@ -36,57 +36,78 @@ export function ProductPriceSummary({
     price.currentPriceEur != null &&
     price.regularPriceEur != null &&
     price.regularPriceEur > price.currentPriceEur + 0.001;
+  const multibuyRegularTotal =
+    price.isMultibuy &&
+    price.multibuyQuantity != null &&
+    price.regularPriceEur != null
+      ? Number((price.multibuyQuantity * price.regularPriceEur).toFixed(2))
+      : null;
+  const multibuyUnitPrice =
+    price.isMultibuy &&
+    price.multibuyQuantity != null &&
+    price.multibuyTotalEur != null
+      ? Number((price.multibuyTotalEur / price.multibuyQuantity).toFixed(2))
+      : null;
 
   return (
-    <div className="w-full rounded-xl border border-slate-200 bg-slate-50/70 p-3 lg:w-[18rem] lg:shrink-0">
-      <div className="flex items-center justify-between gap-3">
-        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+    <div className="w-full rounded-lg border border-[#d9e2dd] bg-[#f6faf7] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
           <CircleDollarSign className="h-3.5 w-3.5" aria-hidden />
           Cara price
         </p>
         {price.loyaltyRequired ? (
-          <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+          <span className="rounded-full border border-[#cfd9d4] bg-[#fbfcfb] px-2 py-0.5 text-[10px] font-semibold text-[#35443f]">
             {price.loyaltyProgram ?? "Real Rewards"}
           </span>
         ) : price.isOnOffer ? (
-          <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+          <span className="rounded-full border border-[#cfd9d4] bg-[#fbfcfb] px-2 py-0.5 text-[10px] font-semibold text-[#35443f]">
             On offer
           </span>
         ) : null}
       </div>
 
       {price.isMultibuy && price.multibuyTotalEur != null ? (
-        <div className="mt-2">
-          <p className="text-xl font-semibold tracking-tight text-slate-950">
-            {price.multibuyQuantity} for{" "}
-            {formatRetailPriceEur(price.multibuyTotalEur)}
-          </p>
-          {current ? (
-            <p className="mt-1 text-xs text-slate-500">
-              Single-item price {current}
+        <div className="mt-1.5">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <p className="text-[19px] font-semibold tracking-tight text-[#11181d]">
+              {price.multibuyQuantity} for{" "}
+              {formatRetailPriceEur(price.multibuyTotalEur)}
             </p>
-          ) : null}
-          {price.multibuySavingEur != null ? (
-            <p className="mt-1 text-xs font-medium text-slate-700">
-              Save {formatRetailPriceEur(price.multibuySavingEur)} versus{" "}
-              {price.multibuyQuantity} at the regular price
-            </p>
-          ) : null}
+            {multibuyRegularTotal != null &&
+            multibuyRegularTotal > price.multibuyTotalEur + 0.001 ? (
+              <span className="text-[11px] text-[#87958f] line-through">
+                {formatRetailPriceEur(multibuyRegularTotal)}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+            {multibuyUnitPrice != null ? (
+              <span className="text-[#6b7c75]">
+                {formatRetailPriceEur(multibuyUnitPrice)} each
+              </span>
+            ) : null}
+            {price.multibuySavingEur != null ? (
+              <span className="font-medium text-[#35443f]">
+                Save {formatRetailPriceEur(price.multibuySavingEur)}
+              </span>
+            ) : null}
+          </div>
         </div>
       ) : current ? (
-        <div className="mt-2">
+        <div className="mt-1.5">
           <div className="flex flex-wrap items-baseline gap-2">
-            <p className="text-xl font-semibold tracking-tight text-slate-950">
+            <p className="text-[19px] font-semibold tracking-tight text-[#11181d]">
               {current}
             </p>
             {showWas && regular ? (
-              <span className="text-xs text-slate-400 line-through">
+              <span className="text-[11px] text-[#87958f] line-through">
                 {regular}
               </span>
             ) : null}
           </div>
           {price.savingsEur != null ? (
-            <p className="mt-1 text-xs font-medium text-slate-700">
+            <p className="mt-0.5 text-[11px] font-medium text-[#35443f]">
               Save {formatRetailPriceEur(price.savingsEur)}
               {price.savingsPercent != null
                 ? " (" + Math.round(price.savingsPercent) + "%)"
@@ -95,30 +116,32 @@ export function ProductPriceSummary({
           ) : null}
         </div>
       ) : (
-        <p className="mt-2 text-sm font-medium text-slate-500">
+        <p className="mt-1.5 text-[13px] font-medium text-[#6b7c75]">
           Price unavailable
         </p>
       )}
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {compactOffer ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700">
-            {price.isMultibuy ? (
-              <Tags className="h-3 w-3" aria-hidden />
-            ) : (
-              <BadgePercent className="h-3 w-3" aria-hidden />
-            )}
-            {compactOffer}
-          </span>
-        ) : null}
-        {price.pricePerUnit ? (
-          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
-            {price.pricePerUnit}
-          </span>
-        ) : null}
-      </div>
+      {(compactOffer || price.pricePerUnit) ? (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {compactOffer ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#d9e2dd] bg-[#fbfcfb] px-1.5 py-0.5 text-[9.5px] font-medium text-[#4d5f58]">
+              {price.isMultibuy ? (
+                <Tags className="h-2.5 w-2.5" aria-hidden />
+              ) : (
+                <BadgePercent className="h-2.5 w-2.5" aria-hidden />
+              )}
+              {compactOffer}
+            </span>
+          ) : null}
+          {price.pricePerUnit ? (
+            <span className="rounded-full border border-[#d9e2dd] bg-[#fbfcfb] px-1.5 py-0.5 text-[9.5px] font-medium text-[#6b7c75]">
+              {price.pricePerUnit}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
-      <p className="mt-2 text-[10px] leading-4 text-slate-500">
+      <p className="mt-1.5 truncate text-[9.5px] leading-4 text-[#87958f]" title={sourceLabel}>
         {sourceLabel}
         {synced ? " · synced " + synced : ""}
       </p>
