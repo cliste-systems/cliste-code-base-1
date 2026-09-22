@@ -7,7 +7,6 @@ import { DashboardHomeNeedsAttentionCard } from "@/components/dashboard/dashboar
 import { DashboardHomeResizeItem } from "@/components/dashboard/dashboard-home-resize-motion";
 import {
   DASHBOARD_HOME_UNIFIED_PANEL,
-  DASHBOARD_ICON_CHIP_SM,
 } from "@/components/dashboard/dashboard-surface";
 import type { TimelineFeedRow } from "@/components/dashboard/dashboard-timeline-feed";
 import type { HomeCallReviewRow } from "@/lib/dashboard-home-calls-to-review";
