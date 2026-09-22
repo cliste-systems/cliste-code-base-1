@@ -434,6 +434,13 @@ export function DemoCallRoomTelemetry({
   const [elapsedMs, setElapsedMs] = useState(0);
   const agentJoinedRef = useRef(false);
   const audioTrackRef = useRef(false);
+  const logAppendRef = useRef(log.append);
+  const logSetMetricsRef = useRef(log.setMetrics);
+
+  useEffect(() => {
+    logAppendRef.current = log.append;
+    logSetMetricsRef.current = log.setMetrics;
+  }, [log.append, log.setMetrics]);
 
   useEffect(() => {
     if (sessionEndedAt != null) {
@@ -450,21 +457,21 @@ export function DemoCallRoomTelemetry({
     const markAgentJoined = (ms: number) => {
       if (agentJoinedRef.current) return;
       agentJoinedRef.current = true;
-      log.setMetrics((prev) => ({ ...prev, agentJoinMs: ms }));
-      log.append("success", "agent", `Voice worker joined (${formatSecondsShort(ms)})`);
+      logSetMetricsRef.current((prev) => ({ ...prev, agentJoinMs: ms }));
+      logAppendRef.current("success", "agent", `Voice worker joined (${formatSecondsShort(ms)})`);
     };
 
     const onConnected = () => {
-      log.append("success", "livekit", "Room connected");
+      logAppendRef.current("success", "livekit", "Room connected");
       if (room.remoteParticipants.size > 0) {
         markAgentJoined(Date.now() - sessionStartedAt);
       }
     };
     const onReconnecting = () => {
-      log.append("warn", "livekit", "Reconnecting…");
+      logAppendRef.current("warn", "livekit", "Reconnecting…");
     };
     const onDisconnected = () => {
-      log.append("info", "livekit", "Room disconnected");
+      logAppendRef.current("info", "livekit", "Room disconnected");
     };
     const onParticipantConnected = () => {
       if (room.remoteParticipants.size <= 0) return;
@@ -479,12 +486,12 @@ export function DemoCallRoomTelemetry({
       if (audioTrackRef.current) return;
       audioTrackRef.current = true;
       const ms = Date.now() - sessionStartedAt;
-      log.setMetrics((prev) => ({ ...prev, audioTrackMs: ms }));
+      logSetMetricsRef.current((prev) => ({ ...prev, audioTrackMs: ms }));
       markAgentJoined(ms);
-      log.append("success", "audio", `Agent audio track ready (${formatSecondsShort(ms)})`);
+      logAppendRef.current("success", "audio", `Agent audio track ready (${formatSecondsShort(ms)})`);
     };
     const onMediaDevicesError = (error: Error) => {
-      log.append("error", "media", error.message);
+      logAppendRef.current("error", "media", error.message);
     };
 
     room.on(RoomEvent.Connected, onConnected);
@@ -506,7 +513,7 @@ export function DemoCallRoomTelemetry({
       room.off(RoomEvent.TrackSubscribed, onTrackSubscribed);
       room.off(RoomEvent.MediaDevicesError, onMediaDevicesError);
     };
-  }, [log, room, sessionStartedAt]);
+  }, [room, sessionStartedAt]);
 
   return (
     <DemoCallEngineeringLogPanel

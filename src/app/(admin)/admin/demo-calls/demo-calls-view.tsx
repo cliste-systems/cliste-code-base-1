@@ -9,6 +9,12 @@ import {
   useRoomContext,
 } from "@livekit/components-react";
 import { ConnectionState, RoomEvent, Track } from "livekit-client";
+
+import {
+  ensureMicrophoneAccess,
+  publishDemoCallMicrophone,
+  unpublishDemoCallMicrophone,
+} from "@/lib/demo-call-microphone";
 import { Loader2, Mic, Phone, PhoneOff } from "lucide-react";
 
 import { AdminBadge } from "@/components/admin/admin-badge";
@@ -18,7 +24,7 @@ import {
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
 } from "@/components/admin/admin-interactive";
-import { formatIrishE164Display } from "@/lib/admin-demo-call-lines";
+import { formatIrishE164Display, type AdminDemoCallLine } from "@/lib/admin-demo-call-lines";
 import {
   DemoCallEngineeringLogPanel,
   DemoCallRoomTelemetry,
@@ -50,16 +56,6 @@ type DemoCallsViewProps = {
 };
 
 type CallPhase = "idle" | "connecting" | "in_call" | "ended" | "error";
-
-async function ensureMicrophoneAccess(): Promise<void> {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("This browser does not support microphone access.");
-  }
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-}
 
 function friendlyDemoCallError(err: unknown): string {
   if (err instanceof DOMException) {
@@ -97,8 +93,31 @@ function ActiveCallPanel({
   const [agentJoined, setAgentJoined] = useState(false);
   const [microphoneReady, setMicrophoneReady] = useState(false);
   const [workerMissing, setWorkerMissing] = useState(false);
-  const micEnableStartedRef = useRef(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  const [micRepublishing, setMicRepublishing] = useState(false);
   const workerWarnLoggedRef = useRef(false);
+  const microphoneReadyRef = useRef(false);
+  const micPublishGenerationRef = useRef(0);
+  const logAppendRef = useRef(log.append);
+  const logSetMetricsRef = useRef(log.setMetrics);
+
+  useEffect(() => {
+    logAppendRef.current = log.append;
+    logSetMetricsRef.current = log.setMetrics;
+  }, [log.append, log.setMetrics]);
+
+  const markMicrophoneReady = useCallback(
+    (detail: string) => {
+      if (microphoneReadyRef.current) return;
+      microphoneReadyRef.current = true;
+      setMicrophoneReady(true);
+      setMicError(null);
+      const ms = Date.now() - sessionStartedAt;
+      logSetMetricsRef.current((prev) => ({ ...prev, microphonePublishMs: ms }));
+      logAppendRef.current("success", "microphone", detail, ms);
+    },
+    [sessionStartedAt],
+  );
 
   useEffect(() => {
     const syncParticipants = () => {
@@ -122,7 +141,7 @@ function ActiveCallPanel({
       setWorkerMissing(true);
       if (!workerWarnLoggedRef.current) {
         workerWarnLoggedRef.current = true;
-        log.append(
+        logAppendRef.current(
           "warn",
           "worker",
           "No voice worker joined this room. For local demo calls, run npm run dev:local from cliste-code-base-1 so the dashboard and local Cara worker start together.",
@@ -130,55 +149,124 @@ function ActiveCallPanel({
       }
     }, 8_000);
     return () => window.clearTimeout(timer);
-  }, [agentJoined, connectionState, log]);
+  }, [agentJoined, connectionState]);
 
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return;
-    if (micEnableStartedRef.current) return;
-    micEnableStartedRef.current = true;
 
-    let cancelled = false;
-    void (async () => {
-      const started = Date.now();
+    const generation = micPublishGenerationRef.current + 1;
+    micPublishGenerationRef.current = generation;
+
+    const checkExistingMic = () => {
+      const publication = room.localParticipant.getTrackPublication(
+        Track.Source.Microphone,
+      );
+      if (publication?.track && room.localParticipant.isMicrophoneEnabled) {
+        markMicrophoneReady(
+          `Browser microphone published (${publication.trackSid ?? "local"})`,
+        );
+      }
+    };
+
+    const onLocalTrackPublished = (publication: {
+      source: Track.Source;
+      trackSid?: string;
+    }) => {
+      if (publication.source !== Track.Source.Microphone) return;
+      markMicrophoneReady(
+        `Browser microphone published (${publication.trackSid ?? "local"})`,
+      );
+    };
+
+    room.on(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
+    checkExistingMic();
+
+    let attempts = 0;
+
+    const publishMicrophone = async () => {
+      if (generation !== micPublishGenerationRef.current) return;
+      if (microphoneReadyRef.current) return;
+      attempts += 1;
       try {
-        log.append("info", "microphone", "Publishing browser microphone…");
-        const publication = await room.localParticipant.setMicrophoneEnabled(true);
-        const micPublication =
-          publication ??
-          room.localParticipant.getTrackPublication(Track.Source.Microphone);
-        const enabled =
-          room.localParticipant.isMicrophoneEnabled && Boolean(micPublication);
-
-        if (!enabled) {
-          throw new Error(
-            "LiveKit connected, but the browser microphone was not published.",
-          );
-        }
-        if (cancelled) return;
-
-        const ms = Date.now() - sessionStartedAt;
-        setMicrophoneReady(true);
-        log.setMetrics((prev) => ({ ...prev, microphonePublishMs: ms }));
-        log.append(
-          "success",
+        logAppendRef.current(
+          "info",
           "microphone",
-          `Browser microphone published (${((Date.now() - started) / 1000).toFixed(1)}s enable)`,
+          attempts === 1
+            ? "Publishing browser microphone…"
+            : `Retrying browser microphone publish (attempt ${attempts})…`,
+        );
+        await publishDemoCallMicrophone(room);
+        checkExistingMic();
+        if (microphoneReadyRef.current) return;
+
+        if (attempts < 5) {
+          window.setTimeout(() => {
+            void publishMicrophone();
+          }, 800);
+          return;
+        }
+
+        throw new Error(
+          "LiveKit connected, but the browser microphone was not published.",
         );
       } catch (err) {
-        if (cancelled) return;
-        setMicrophoneReady(false);
+        if (generation !== micPublishGenerationRef.current) return;
+        if (microphoneReadyRef.current) return;
         const message =
           err instanceof Error
             ? err.message
             : "Failed to publish browser microphone.";
-        log.append("error", "microphone", message);
+        setMicError(message);
+        logAppendRef.current("error", "microphone", message);
       }
-    })();
+    };
+
+    const retryTimer = window.setTimeout(() => {
+      void publishMicrophone();
+    }, 150);
 
     return () => {
-      cancelled = true;
+      micPublishGenerationRef.current += 1;
+      window.clearTimeout(retryTimer);
+      room.off(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
+      void unpublishDemoCallMicrophone(room).catch(() => {
+        /* best-effort cleanup */
+      });
     };
-  }, [connectionState, log, room, sessionStartedAt]);
+  }, [connectionState, markMicrophoneReady, room]);
+
+  const republishMicrophone = useCallback(async () => {
+    if (connectionState !== ConnectionState.Connected) return;
+    setMicRepublishing(true);
+    setMicError(null);
+    microphoneReadyRef.current = false;
+    setMicrophoneReady(false);
+    logSetMetricsRef.current((prev) => ({ ...prev, microphonePublishMs: null }));
+    micPublishGenerationRef.current += 1;
+    try {
+      await unpublishDemoCallMicrophone(room);
+      await publishDemoCallMicrophone(room);
+      const publication = room.localParticipant.getTrackPublication(
+        Track.Source.Microphone,
+      );
+      if (publication?.track && room.localParticipant.isMicrophoneEnabled) {
+        markMicrophoneReady(
+          `Browser microphone republished (${publication.trackSid ?? "local"})`,
+        );
+      } else {
+        throw new Error("Microphone republish did not create a LiveKit track.");
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to republish browser microphone.";
+      setMicError(message);
+      logAppendRef.current("error", "microphone", message);
+    } finally {
+      setMicRepublishing(false);
+    }
+  }, [connectionState, markMicrophoneReady, room]);
 
   const statusLabel = useMemo(() => {
     if (connectionState === ConnectionState.Connecting) return "Connecting…";
@@ -209,6 +297,49 @@ function ActiveCallPanel({
             <code className="font-mono text-xs">npm run dev:local</code> from{" "}
             <code className="font-mono text-xs">cliste-code-base-1</code>.
           </p>
+        </div>
+      ) : null}
+
+      {micError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-medium">Microphone not published</p>
+          <p className="mt-1">{micError}</p>
+          <button
+            type="button"
+            disabled={micRepublishing}
+            onClick={() => void republishMicrophone()}
+            className={`${adminSecondaryButtonClass} mt-3`}
+          >
+            {micRepublishing ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Mic className="size-3.5" aria-hidden />
+            )}
+            Republish microphone
+          </button>
+        </div>
+      ) : null}
+
+      {!microphoneReady && !micError && agentJoined ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Waiting for your microphone…</p>
+          <p className="mt-1 text-amber-800">
+            Cara can speak, but she cannot hear you until the browser mic publishes to
+            LiveKit.
+          </p>
+          <button
+            type="button"
+            disabled={micRepublishing}
+            onClick={() => void republishMicrophone()}
+            className={`${adminSecondaryButtonClass} mt-3`}
+          >
+            {micRepublishing ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Mic className="size-3.5" aria-hidden />
+            )}
+            Publish microphone now
+          </button>
         </div>
       ) : null}
 
