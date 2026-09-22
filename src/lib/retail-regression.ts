@@ -138,14 +138,27 @@ function intentValue(tool: { name: string; args: Record<string, unknown> }): str
   return normalize(tool.args.intent ?? "");
 }
 
-function hasClarifyingQuestion(text: string): boolean {
+function hasProductSelectionClarifyingQuestion(text: string): boolean {
   const normalized = normalize(text);
-  return (
-    normalized.includes("?") ||
-    /\b(which|what type|what kind|counter or|pre[- ]?pack|fresh or|brand|size|do you mean)\b/i.test(
+  if (!normalized) return false;
+
+  if (
+    /\b(which|what type|what kind|what one|which one|which brand|what brand|which size|what size|do you mean|are you looking for|were you looking for)\b/i.test(
       normalized,
     )
-  );
+  ) {
+    return true;
+  }
+
+  if (
+    /\b(?:counter|pre[- ]?pack(?:ed)?|fresh|organic|ripe|mini|brand|size|type|kind)\b[^?!.]{0,80}\bor\b|\bor\b[^?!.]{0,80}\b(?:counter|pre[- ]?pack(?:ed)?|fresh|organic|ripe|mini|brand|size|type|kind)\b/i.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function gradeRetailRegressionScenario(
@@ -289,14 +302,19 @@ export function gradeRetailRegressionScenario(
 
   if (
     exp.mustAskClarifyingQuestion &&
-    !execution.turns.some((turn) => hasClarifyingQuestion(turn.assistant))
+    !execution.turns.some((turn) =>
+      hasProductSelectionClarifyingQuestion(turn.assistant),
+    )
   ) {
     reasons.push("Cara should have asked a clarifying question before answering.");
   }
 
   if (exp.lastTurnMustNotAskClarifyingQuestion) {
     const lastTurn = execution.turns.at(-1);
-    if (lastTurn && hasClarifyingQuestion(lastTurn.assistant)) {
+    if (
+      lastTurn &&
+      hasProductSelectionClarifyingQuestion(lastTurn.assistant)
+    ) {
       reasons.push(
         "Cara asked another clarifying question after the caller had already provided a decisive selection.",
       );
