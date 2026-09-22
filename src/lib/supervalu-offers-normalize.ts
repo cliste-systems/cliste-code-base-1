@@ -114,7 +114,7 @@ function hasStrongFreshMeatName(name: string): boolean {
 
 function isClearlyNonButcherContext(department: string, breadcrumb: string): boolean {
   const context = `${department} ${breadcrumb}`;
-  return /dog|cat|pet|soup|gravy|stock|sauce|seasoning|herbs?|spices?|ready[ -]?meals?|pot[ -]?noodle|frozen|pie|pizza|sandwich|crisps?|snacks?|baby food/i.test(
+  return /dog[ -]?(?:food|treat|chew|biscuit|puppy)|cat[ -]?(?:food|treat|kitten)|\/dog-puppy\/|\/cat-kitten\/|pet food|soup|gravy|(?:^|[ /-])stock(?:[ /-]|$)|sauce|seasoning|herbs?|spices?|ready[ -]?meals?|pot[ -]?noodle|frozen|(?:^|[ /-])pie(?:[ /-]|$)|pizza|sandwich|crisps?|snacks?|baby food/i.test(
     context,
   );
 }
