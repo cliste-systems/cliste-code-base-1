@@ -260,3 +260,66 @@ export async function finishRetailRegressionRun(input: {
 
   if (error) throw new Error(error.message);
 }
+
+
+export async function createRetailDiscoveryScenarios(input: {
+  calledNumber: string;
+  drafts: Array<{
+    discoveryKey: string;
+    title: string;
+    category: RetailRegressionScenario["category"];
+    tags: string[];
+    turns: RetailRegressionScenario["turns"];
+    expectations: RetailRegressionScenario["expectations"];
+  }>;
+}): Promise<RetailRegressionScenario[]> {
+  const line = await requireRegressionLine(input.calledNumber);
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  const rows = input.drafts.map((draft) => ({
+    organization_id: line.orgId,
+    slug: `discovery-${draft.discoveryKey}`,
+    title: draft.title,
+    category: draft.category,
+    tags: [...new Set(["discovery", ...draft.tags])],
+    turns: draft.turns,
+    expectations: draft.expectations,
+    source: "variant" as const,
+    active: false,
+    updated_at: now,
+  }));
+
+  const { data, error } = await admin
+    .from("retail_regression_scenarios")
+    .insert(rows)
+    .select("id,slug,title,category,tags,turns,expectations,source,active");
+
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Array<Record<string, unknown>>).map(asScenario);
+}
+
+export async function promoteRetailDiscoveryScenario(input: {
+  calledNumber: string;
+  scenarioId: string;
+}): Promise<RetailRegressionScenario> {
+  const line = await requireRegressionLine(input.calledNumber);
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("retail_regression_scenarios")
+    .update({
+      source: "manual",
+      active: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.scenarioId)
+    .eq("organization_id", line.orgId)
+    .eq("source", "variant")
+    .select("id,slug,title,category,tags,turns,expectations,source,active")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return asScenario(data as Record<string, unknown>);
+}
