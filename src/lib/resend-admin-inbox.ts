@@ -296,6 +296,22 @@ function previewText(value: string | null | undefined, max = 130): string {
   return `${normalized.slice(0, max).trim()}…`;
 }
 
+function plainTextEmailHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+  return [
+    '<!doctype html><html><body style="margin:0;padding:0;background:#ffffff;">',
+    '<div style="max-width:680px;margin:0 auto;padding:24px;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#0f172a;white-space:pre-wrap;">',
+    escaped,
+    "</div></body></html>",
+  ].join("");
+}
+
 function deliveryStatusFromRow(row: AdminEmailRow): {
   status: AdminEmailDeliveryStatus | null;
   at: string | null;
@@ -871,6 +887,7 @@ export async function sendNewAdminEmail(input: {
   const sender = adminInboxIdentityByKey(input.identity);
   const fromEmail = sender.email;
   const fromName = sender.name;
+  const html = plainTextEmailHtml(text);
   const response = await resendFetch<{ id: string }>("/emails", {
     method: "POST",
     headers: {
@@ -881,6 +898,7 @@ export async function sendNewAdminEmail(input: {
       to: [to],
       subject,
       text,
+      html,
     }),
   });
 
@@ -897,6 +915,7 @@ export async function sendNewAdminEmail(input: {
     to_addresses: [to],
     subject,
     text_body: text,
+    html_body: html,
     sent_at: sentAt,
     read_at: sentAt,
     resend_sent_at: sentAt,
@@ -941,6 +960,7 @@ export async function replyToAdminEmail(input: {
     headers.References = source.messageId;
   }
 
+  const html = plainTextEmailHtml(text);
   const response = await resendFetch<{ id: string }>("/emails", {
     method: "POST",
     headers: {
@@ -951,6 +971,7 @@ export async function replyToAdminEmail(input: {
       to: [replyAddress],
       subject,
       text,
+      html,
       ...(Object.keys(headers).length ? { headers } : {}),
     }),
   });
@@ -969,6 +990,7 @@ export async function replyToAdminEmail(input: {
     to_addresses: [replyAddress],
     subject,
     text_body: text,
+    html_body: html,
     sent_at: sentAt,
     read_at: sentAt,
     resend_sent_at: sentAt,
