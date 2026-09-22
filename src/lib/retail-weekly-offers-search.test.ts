@@ -9,6 +9,7 @@ import {
   inferWeeklyOfferFulfilmentFromQuery,
   inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
+  inferRewardsPricePointFromQuery,
   isRetailOfferWeekActive,
   isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
@@ -428,6 +429,67 @@ describe("supervalu offers sync helpers", () => {
 });
 
 describe("retail weekly offers search", () => {
+  it("filters Rewards offer browsing by an exact numeric or spoken price point", () => {
+    assert.equal(inferRewardsPricePointFromQuery("What's on Rewards Price for €2.50?"), 2.5);
+    assert.equal(inferRewardsPricePointFromQuery("Real Rewards offers for two euro fifty"), 2.5);
+    assert.equal(inferRewardsPricePointFromQuery("Anything with Rewards at two fifty?"), 2.5);
+    assert.equal(inferWeeklyOffersListIntent("Anything with Rewards at two fifty?"), true);
+
+    const rows = [
+      mockOfferRow({
+        id: "reward-250",
+        product_name: "Aquafresh White Renew Toothpaste (75 ml)",
+        department: "Dental Care",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        offer_channel: "grocery",
+        current_price_eur: 2.5,
+        was_price_eur: 5,
+        discount_label: "Rewards Price Only €2.50",
+        search_text: "aquafresh white renew toothpaste rewards price only 2.50",
+      }),
+      mockOfferRow({
+        id: "reward-1100",
+        product_name: "Two Tracks Sauvignon Blanc (750 ml)",
+        department: "Wine",
+        service_area: "off_licence",
+        fulfilment: "prepack",
+        offer_channel: "grocery",
+        current_price_eur: 11,
+        was_price_eur: 12,
+        discount_label: "Rewards Price Only €11",
+        is_alcohol: true,
+        search_text: "two tracks sauvignon blanc rewards price only 11",
+      }),
+      mockOfferRow({
+        id: "standard-250",
+        product_name: "Ordinary €2.50 Deal",
+        department: "Grocery",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        offer_channel: "grocery",
+        current_price_eur: 2.5,
+        was_price_eur: 3,
+        discount_label: "Only €2.50",
+        search_text: "ordinary deal only 2.50",
+      }),
+    ];
+
+    for (const query of [
+      "What's on Rewards Price for €2.50?",
+      "What offers are €2.50 with Real Rewards?",
+      "Anything with Rewards at two fifty?",
+    ]) {
+      const matches = searchSyncedWeeklyOffersInRows(rows, query);
+      assert.deepEqual(matches.map((match) => match.productName), [
+        "Aquafresh White Renew Toothpaste (75 ml)",
+      ]);
+      assert.equal(matches[0]?.currentPriceEur, 2.5);
+      assert.match(matches[0]?.quoteText ?? "", /rewards price/i);
+      assert.match(matches[0]?.quoteText ?? "", /two euro fifty/i);
+    }
+  });
+
   it("treats a real department query like cereals as a browse, not one ambiguous product", () => {
     const rows = [
       mockOfferRow({

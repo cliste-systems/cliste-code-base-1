@@ -12,6 +12,7 @@ import {
 import type { SupervaluFulfilment, SupervaluGatewayProduct, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import {
+  inferRewardsPricePointFromQuery,
   inferWeeklyOffersListIntent,
   offerSearchProductTokens,
   resolveWeeklyOfferSearchFilters,
@@ -141,6 +142,9 @@ export function formatOwnBrandFallbackQuote(
 /** Infer whether the caller wants offer status, a price, or stock/range info. */
 export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
   const q = query.toLowerCase();
+  if (inferRewardsPricePointFromQuery(q) != null) {
+    return "offer";
+  }
   if (
     /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
       q,
