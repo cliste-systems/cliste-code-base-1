@@ -5,15 +5,20 @@ import {
   Archive,
   ArchiveRestore,
   Ban,
+  CheckCircle2,
+  Clock3,
+  Eye,
   Inbox,
   Loader2,
   Mail,
   MailOpen,
+  MousePointerClick,
   Plus,
   RefreshCw,
   Search,
   Send,
   Sparkles,
+  TriangleAlert,
   X,
 } from "lucide-react";
 
@@ -27,6 +32,24 @@ type Folder = "inbox" | "archived" | "sent";
 type GrammarTarget = "reply" | "compose";
 type MessageViewMode = "formatted" | "plain";
 type EmailIdentityKey = "hello" | "billing";
+type DeliveryStatus =
+  | "sent"
+  | "delayed"
+  | "delivered"
+  | "opened"
+  | "clicked"
+  | "complained"
+  | "suppressed"
+  | "bounced"
+  | "failed"
+  | "unknown";
+
+type DeliveryEvent = {
+  id: string;
+  type: string;
+  occurredAt: string;
+  detail: string | null;
+};
 
 type EmailIdentity = {
   key: EmailIdentityKey;
@@ -47,6 +70,8 @@ type EmailListItem = {
   occurredAt: string;
   readAt: string | null;
   archivedAt: string | null;
+  deliveryStatus: DeliveryStatus | null;
+  deliveryStatusAt: string | null;
 };
 
 type EmailMessage = EmailListItem & {
@@ -58,6 +83,7 @@ type EmailMessage = EmailListItem & {
   senderBlocked: boolean;
   attachments: Array<Record<string, unknown>>;
   replies: EmailListItem[];
+  deliveryEvents: DeliveryEvent[];
 };
 
 const FOLDERS: Array<{ value: Folder; label: string; icon: typeof Inbox }> = [
@@ -93,6 +119,101 @@ function fullWhenLabel(iso: string): string {
 
 function displaySender(item: EmailListItem): string {
   return item.fromName?.trim() || item.fromAddress;
+}
+
+function deliveryStatusLabel(status: DeliveryStatus | null): string {
+  switch (status) {
+    case "delivered":
+      return "Delivered";
+    case "opened":
+      return "Opened";
+    case "clicked":
+      return "Clicked";
+    case "delayed":
+      return "Delayed";
+    case "bounced":
+      return "Bounced";
+    case "failed":
+      return "Failed";
+    case "suppressed":
+      return "Suppressed";
+    case "complained":
+      return "Complaint";
+    case "sent":
+      return "Sent";
+    default:
+      return "Sent";
+  }
+}
+
+function DeliveryStatusBadge({
+  status,
+  compact = false,
+}: {
+  status: DeliveryStatus | null;
+  compact?: boolean;
+}) {
+  const normalized = status ?? "sent";
+  const failure = ["bounced", "failed", "suppressed", "complained"].includes(
+    normalized,
+  );
+  const Icon =
+    normalized === "opened"
+      ? Eye
+      : normalized === "clicked"
+        ? MousePointerClick
+        : normalized === "delayed"
+          ? Clock3
+          : failure
+            ? TriangleAlert
+            : CheckCircle2;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full border font-medium",
+        compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]",
+        failure
+          ? "border-red-200 bg-red-50 text-red-700"
+          : normalized === "opened" || normalized === "clicked"
+            ? "border-slate-300 bg-slate-100 text-slate-800"
+            : "border-slate-200 bg-white text-slate-600",
+      )}
+      title={
+        normalized === "opened"
+          ? "Open tracking can be affected by image blocking and mail privacy features."
+          : undefined
+      }
+    >
+      <Icon className={compact ? "size-2.5" : "size-3"} aria-hidden />
+      {deliveryStatusLabel(status)}
+    </span>
+  );
+}
+
+function deliveryEventLabel(type: string): string {
+  switch (type) {
+    case "email.sent":
+      return "Sent";
+    case "email.delivered":
+      return "Delivered";
+    case "email.delivery_delayed":
+      return "Delivery delayed";
+    case "email.opened":
+      return "Opened";
+    case "email.clicked":
+      return "Link clicked";
+    case "email.bounced":
+      return "Bounced";
+    case "email.failed":
+      return "Failed";
+    case "email.suppressed":
+      return "Suppressed";
+    case "email.complained":
+      return "Complaint";
+    default:
+      return type.replace(/^email\./, "").replaceAll("_", " ");
+  }
 }
 
 function buildEmailFrameDocument(html: string): string {
