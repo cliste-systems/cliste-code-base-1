@@ -98,7 +98,10 @@ function resendApiKey(): string {
 function normalizeHelloCaraName(value: string | undefined, fallback: string): string {
   const configured = value?.trim();
   if (!configured) return fallback;
-  return /^hello\s*cara$/i.test(configured) ? "HelloCara" : configured;
+  if (/^hello\s*cara$/i.test(configured) || /^brendan$/i.test(configured)) {
+    return "HelloCara";
+  }
+  return configured;
 }
 
 export function adminInboxIdentities(): AdminEmailIdentity[] {
