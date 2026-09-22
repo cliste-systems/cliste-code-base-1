@@ -253,6 +253,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     const skus = products
       .map((product) => String(product.sku ?? "").trim())
       .filter(Boolean);
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Dublin",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
 
     const weeklyOfferBySku = new Map<string, WeeklyOfferRow>();
     if (skus.length > 0) {
@@ -264,6 +270,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         .eq("retail_banner", retailBanner)
         .eq("is_national", true)
         .in("sku", skus)
+        .lte("offer_week_start", today)
+        .gte("offer_week_end", today)
         .order("synced_at", { ascending: false });
 
       if (error) {
