@@ -460,7 +460,6 @@ export async function getAdminEmailMessage(
       const from = parseMailbox(detail.from);
       const textBody =
         detail.text?.trim() || (detail.html ? stripHtml(detail.html) : "");
-      const readAt = row.read_at ?? new Date().toISOString();
 
       const { data: updated, error: updateError } = await admin
         .from("admin_email_messages")
@@ -483,7 +482,6 @@ export async function getAdminEmailMessage(
             ? detail.attachments
             : row.attachments ?? [],
           received_at: detail.created_at ?? row.received_at,
-          read_at: readAt,
           updated_at: new Date().toISOString(),
         })
         .eq("resend_email_id", id)
@@ -492,27 +490,9 @@ export async function getAdminEmailMessage(
 
       if (updateError) throw new Error(updateError.message);
       row = updated as AdminEmailRow;
-    } catch (error) {
+    } catch {
       // Keep the local metadata usable even if Resend no longer has the body.
-      if (!row.read_at) {
-        const readAt = new Date().toISOString();
-        const { error: readError } = await admin
-          .from("admin_email_messages")
-          .update({ read_at: readAt, updated_at: readAt })
-          .eq("resend_email_id", id);
-        if (readError) throw new Error(readError.message);
-        row = { ...row, read_at: readAt };
-      }
     }
-  } else if (row.direction === "inbound" && !row.read_at) {
-    const readAt = new Date().toISOString();
-    const { error: readError } = await admin
-      .from("admin_email_messages")
-      .update({ read_at: readAt, updated_at: readAt })
-      .eq("resend_email_id", id);
-
-    if (readError) throw new Error(readError.message);
-    row = { ...row, read_at: readAt };
   }
 
   const parentId =
