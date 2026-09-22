@@ -219,11 +219,20 @@ function deliveryFailed(status: DeliveryStatus | null): boolean {
   );
 }
 
-function buildEmailFrameDocument(html: string): string {
-  const safeHtml = html.replace(
+function buildEmailFrameDocument(
+  html: string,
+  stripOpenTrackingPixel = false,
+): string {
+  let safeHtml = html.replace(
     /<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi,
     "",
   );
+  if (stripOpenTrackingPixel) {
+    safeHtml = safeHtml.replace(
+      /<img\b[^>]*hellocara-email-open\?token=[^>]*>/gi,
+      "",
+    );
+  }
   const head = [
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<base target="_blank">',
@@ -244,11 +253,20 @@ function buildEmailFrameDocument(html: string): string {
   return `<!doctype html><html><head>${head}</head><body>${safeHtml}</body></html>`;
 }
 
-function EmailHtmlFrame({ html }: { html: string }) {
+function EmailHtmlFrame({
+  html,
+  stripOpenTrackingPixel = false,
+}: {
+  html: string;
+  stripOpenTrackingPixel?: boolean;
+}) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const observerRef = useRef<ResizeObserver | null>(null);
   const [height, setHeight] = useState(560);
-  const srcDoc = useMemo(() => buildEmailFrameDocument(html), [html]);
+  const srcDoc = useMemo(
+    () => buildEmailFrameDocument(html, stripOpenTrackingPixel),
+    [html, stripOpenTrackingPixel],
+  );
 
   useEffect(() => {
     setHeight(560);
@@ -1255,7 +1273,12 @@ export function AdminEmailInboxView({
                   {selected.htmlBody && messageView === "formatted" ? (
                     <div className="p-4">
                       <div className="overflow-hidden rounded-lg bg-white">
-                        <EmailHtmlFrame html={selected.htmlBody} />
+                        <EmailHtmlFrame
+                          html={selected.htmlBody}
+                          stripOpenTrackingPixel={
+                            selected.direction === "outbound"
+                          }
+                        />
                       </div>
                     </div>
                   ) : (
