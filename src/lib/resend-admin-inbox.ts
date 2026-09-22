@@ -639,11 +639,38 @@ export async function setAdminEmailState(input: {
   if (typeof input.read === "boolean") {
     update.read_at = input.read ? new Date().toISOString() : null;
   }
+  const admin = createAdminClient();
+
+  if (input.archived === false) {
+    const { data: message, error: messageError } = await admin
+      .from("admin_email_messages")
+      .select("direction,from_address")
+      .eq("resend_email_id", input.resendEmailId.trim())
+      .maybeSingle();
+
+    if (messageError) throw new Error(messageError.message);
+
+    if (message?.direction === "inbound") {
+      const senderEmail = String(message.from_address ?? "")
+        .trim()
+        .toLowerCase();
+      const { data: blockedSender, error: blockedSenderError } = await admin
+        .from("admin_email_blocked_senders")
+        .select("email")
+        .eq("email", senderEmail)
+        .maybeSingle();
+
+      if (blockedSenderError) throw new Error(blockedSenderError.message);
+      if (blockedSender) {
+        throw new Error("Unblock this sender before restoring the email.");
+      }
+    }
+  }
+
   if (typeof input.archived === "boolean") {
     update.archived_at = input.archived ? new Date().toISOString() : null;
   }
 
-  const admin = createAdminClient();
   const { error } = await admin
     .from("admin_email_messages")
     .update(update)
