@@ -22,6 +22,10 @@ import {
   type RetailStorePriceListing,
 } from "@/lib/retail-price-presentation";
 import { isRetailOfferPriceSemanticallyValid } from "@/lib/retail-weekly-offers-search";
+import {
+  retailSearchCandidateTerms,
+  retailSearchTextScore,
+} from "@/lib/retail-search-fuzzy";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { setProductAssortmentStatus } from "./actions";
@@ -82,6 +86,7 @@ type ProductRow = {
   category_breadcrumb: string | null;
   national_regular_price_eur: number | null;
   national_regular_price_store_count: number | null;
+  search_text: string;
 };
 
 const PRODUCT_AREAS: Array<{ value: ProductArea; label: string }> = [
@@ -196,41 +201,61 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   let loadError: string | null = null;
 
   if (isRetail && retailBanner && query.length >= 2) {
-    let productQuery = admin
-      .from("retail_catalog_products")
-      .select("id, product_name, brand, department, sku, service_area, fulfilment, category_breadcrumb, national_regular_price_eur, national_regular_price_store_count")
-      .eq("retail_banner", retailBanner)
-      .ilike("search_text", `%${query}%`)
-      .order("product_name", { ascending: true })
-      .limit(50);
+    const candidateTerms = retailSearchCandidateTerms(query);
 
-    if (retailBanner === "supervalu") {
-      productQuery = productQuery.eq("is_national", true);
-    }
-    if (area === "cheese_counter") {
-      productQuery = productQuery.ilike(
-        "category_breadcrumb",
-        "%/counter-cheese/%",
-      );
-    } else if (area === "grocery") {
-      // The raw catalogue also tags counter-cheese (and a few noisy rows)
-      // as grocery. In store language, Grocery means ordinary shelf stock.
-      productQuery = productQuery
-        .eq("service_area", "grocery")
-        .eq("fulfilment", "prepack")
-        .not("category_breadcrumb", "ilike", "%/counter-cheese/%");
-    } else if (area !== "all") {
-      productQuery = productQuery.eq("service_area", area);
-    }
-    if (productType !== "all") {
-      productQuery = productQuery.eq("fulfilment", productType);
-    }
+    if (candidateTerms.length > 0) {
+      let productQuery = admin
+        .from("retail_catalog_products")
+        .select("id, product_name, brand, department, sku, service_area, fulfilment, category_breadcrumb, national_regular_price_eur, national_regular_price_store_count, search_text")
+        .eq("retail_banner", retailBanner)
+        .or(
+          candidateTerms
+            .map((term) => `search_text.ilike.%${term}%`)
+            .join(","),
+        )
+        .order("product_name", { ascending: true })
+        .limit(400);
 
-    const { data, error } = await productQuery;
-    if (error) {
-      loadError = error.message;
-    } else {
-      products = (data ?? []) as ProductRow[];
+      if (retailBanner === "supervalu") {
+        productQuery = productQuery.eq("is_national", true);
+      }
+      if (area === "cheese_counter") {
+        productQuery = productQuery.ilike(
+          "category_breadcrumb",
+          "%/counter-cheese/%",
+        );
+      } else if (area === "grocery") {
+        // The raw catalogue also tags counter-cheese (and a few noisy rows)
+        // as grocery. In store language, Grocery means ordinary shelf stock.
+        productQuery = productQuery
+          .eq("service_area", "grocery")
+          .eq("fulfilment", "prepack")
+          .not("category_breadcrumb", "ilike", "%/counter-cheese/%");
+      } else if (area !== "all") {
+        productQuery = productQuery.eq("service_area", area);
+      }
+      if (productType !== "all") {
+        productQuery = productQuery.eq("fulfilment", productType);
+      }
+
+      const { data, error } = await productQuery;
+      if (error) {
+        loadError = error.message;
+      } else {
+        products = ((data ?? []) as ProductRow[])
+          .map((product) => ({
+            product,
+            score: retailSearchTextScore(product.search_text, query),
+          }))
+          .filter((entry) => entry.score > 0)
+          .sort(
+            (a, b) =>
+              b.score - a.score ||
+              a.product.product_name.localeCompare(b.product.product_name),
+          )
+          .slice(0, 50)
+          .map((entry) => entry.product);
+      }
     }
   }
 
