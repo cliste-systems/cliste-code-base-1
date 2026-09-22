@@ -461,6 +461,41 @@ export function AdminEmailInboxView({
         ),
       );
 
+      if (data.message.direction === "outbound") {
+        void apiJson<{
+          ok: true;
+          status: DeliveryStatus;
+          statusAt: string | null;
+        }>(`/api/admin/inbox/${encodeURIComponent(id)}/delivery`, {
+          method: "POST",
+        })
+          .then((delivery) => {
+            setSelected((current) =>
+              current?.id === id
+                ? {
+                    ...current,
+                    deliveryStatus: delivery.status,
+                    deliveryStatusAt: delivery.statusAt,
+                  }
+                : current,
+            );
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === id
+                  ? {
+                      ...message,
+                      deliveryStatus: delivery.status,
+                      deliveryStatusAt: delivery.statusAt,
+                    }
+                  : message,
+              ),
+            );
+          })
+          .catch(() => {
+            // Webhook/local status remains visible if the live Resend check fails.
+          });
+      }
+
       if (data.message.direction === "inbound" && !data.message.readAt) {
         void apiJson<{ ok: true }>(
           `/api/admin/inbox/${encodeURIComponent(id)}`,
