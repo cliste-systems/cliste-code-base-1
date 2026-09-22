@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import { Mail } from "lucide-react";
 
 import { AdminPageShell } from "@/components/admin/admin-page-shell";
-import {
-  adminInboxFromEmail,
-  adminInboxFromName,
-} from "@/lib/resend-admin-inbox";
+import { adminInboxIdentities } from "@/lib/resend-admin-inbox";
 import { PRODUCT_NAME } from "@/lib/company-details";
 
 import { AdminEmailInboxView } from "./admin-email-inbox-view";
@@ -17,25 +14,16 @@ export const metadata: Metadata = {
 };
 
 export default function AdminInboxPage() {
-  const fromEmail = adminInboxFromEmail();
-  const fromName = adminInboxFromName();
+  const identities = adminInboxIdentities();
 
   return (
     <AdminPageShell
       icon={Mail}
       title="Inbox"
-      description={
-        <>
-          Receive and reply to HelloCara email. Replies send as{" "}
-          <span className="font-medium text-slate-700">
-            {fromName} &lt;{fromEmail}&gt;
-          </span>
-          .
-        </>
-      }
+      description="Switch between Hello and Billing mailboxes. Replies automatically use the address the customer contacted."
       fillViewport
     >
-      <AdminEmailInboxView fromAddress={fromEmail} fromName={fromName} />
+      <AdminEmailInboxView identities={identities} />
     </AdminPageShell>
   );
 }
