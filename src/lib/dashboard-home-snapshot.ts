@@ -474,36 +474,67 @@ export async function loadDashboardHomeSnapshot(input: {
   const thirdStatValue =
     thirdStat.kind === "callbacks" ? callbackCount : routedCount;
 
+  const stats: DashboardHomeStat[] =
+    homeCopy.vertical.id === "retail"
+      ? [
+          {
+            label: "Calls answered",
+            value: String(callsAnswered),
+            href: DASHBOARD_ROUTES.calls,
+          },
+          {
+            label: "Enquiries captured",
+            value: String(actionsCreated),
+            href: followUpHubHref,
+          },
+          {
+            label: "Needs action",
+            value: String(openActions),
+            href: followUpHubHref,
+          },
+          {
+            label: "Needs your input",
+            value: String(openTrainingCount),
+            href: DASHBOARD_ROUTES.caraKnowledgeNeedsInput,
+          },
+          {
+            label: "Minutes this period",
+            value: formatMinutes(minutesUsedDisplay),
+            href: DASHBOARD_ROUTES.usage,
+          },
+        ]
+      : [
+          {
+            label: "Calls answered",
+            value: String(callsAnswered),
+            href: DASHBOARD_ROUTES.calls,
+          },
+          {
+            label: "Enquiries captured",
+            value: String(actionsCreated),
+            href: followUpHubHref,
+          },
+          {
+            label: thirdStat.label,
+            value: String(thirdStatValue),
+            href: thirdStat.href,
+          },
+          {
+            label: "Needs attention",
+            value: String(openActions),
+            href: followUpHubHref,
+          },
+          {
+            label: "Minutes this period",
+            value: formatMinutes(minutesUsedDisplay),
+            href: DASHBOARD_ROUTES.usage,
+          },
+        ];
+
   return {
     greeting,
     subheading: homeCopy.home.heroSubheading,
-    stats: [
-      {
-        label: "Calls answered",
-        value: String(callsAnswered),
-        href: DASHBOARD_ROUTES.calls,
-      },
-      {
-        label: "Enquiries captured",
-        value: String(actionsCreated),
-        href: followUpHubHref,
-      },
-      {
-        label: thirdStat.label,
-        value: String(thirdStatValue),
-        href: thirdStat.href,
-      },
-      {
-        label: "Needs attention",
-        value: String(openActions),
-        href: followUpHubHref,
-      },
-      {
-        label: "Minutes this period",
-        value: formatMinutes(minutesUsedDisplay),
-        href: DASHBOARD_ROUTES.usage,
-      },
-    ],
+    stats,
     activity,
     needsAttention,
     openActions,
