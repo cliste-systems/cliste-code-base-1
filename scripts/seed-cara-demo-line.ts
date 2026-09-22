@@ -74,6 +74,7 @@ async function main() {
     .from("organizations")
     .update({
       name: "Hello Cara Demo",
+      is_internal_test: true,
       assistant_display_name: VOICE_ASSISTANT_DEFAULT_NAME,
       greeting: DEMO_GREETING,
       agent_business_type: "AI phone assistant demo",
