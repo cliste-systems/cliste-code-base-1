@@ -105,6 +105,7 @@ function buildEmailFrameDocument(html: string): string {
     '<base target="_blank">',
     "<style>",
     "html{background:#fff;color-scheme:light;}",
+    "html,body{margin:0!important;min-height:100%;}",
     "body{max-width:100%;overflow-wrap:anywhere;}",
     "img{max-width:100%;height:auto;}",
     "</style>",
@@ -1003,48 +1004,54 @@ export function AdminEmailInboxView({
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50">
               <article className="mx-auto max-w-4xl px-6 py-6">
-                {selected.htmlBody ? (
-                  <div className="mb-4 flex items-center justify-end">
-                    <div className="inline-flex rounded-lg bg-slate-100 p-1">
-                      <button
-                        type="button"
-                        onClick={() => setMessageView("formatted")}
-                        className={cn(
-                          "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          messageView === "formatted"
-                            ? "bg-white text-slate-950 shadow-sm"
-                            : "text-slate-500 hover:text-slate-900",
-                        )}
-                      >
-                        Formatted
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMessageView("plain")}
-                        className={cn(
-                          "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                          messageView === "plain"
-                            ? "bg-white text-slate-950 shadow-sm"
-                            : "text-slate-500 hover:text-slate-900",
-                        )}
-                      >
-                        Plain text
-                      </button>
-                    </div>
+                <div className="mb-3 flex min-h-9 items-center justify-between">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Message
+                  </p>
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
+                    <button
+                      type="button"
+                      disabled={!selected.htmlBody}
+                      onClick={() => setMessageView("formatted")}
+                      className={cn(
+                        "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                        selected.htmlBody && messageView === "formatted"
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-slate-500 hover:text-slate-900",
+                      )}
+                    >
+                      Formatted
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMessageView("plain")}
+                      className={cn(
+                        "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                        messageView === "plain" || !selected.htmlBody
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-slate-500 hover:text-slate-900",
+                      )}
+                    >
+                      Plain text
+                    </button>
                   </div>
-                ) : null}
+                </div>
 
-                {selected.htmlBody && messageView === "formatted" ? (
-                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                    <EmailHtmlFrame html={selected.htmlBody} />
-                  </div>
-                ) : (
-                  <div className="whitespace-pre-wrap break-all text-[14px] leading-6 text-slate-800">
-                    {selected.textBody}
-                  </div>
-                )}
+                <div className="min-h-[360px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  {selected.htmlBody && messageView === "formatted" ? (
+                    <div className="p-4">
+                      <div className="overflow-hidden rounded-lg bg-white">
+                        <EmailHtmlFrame html={selected.htmlBody} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap break-words p-6 text-[14px] leading-6 text-slate-800">
+                      {selected.textBody}
+                    </div>
+                  )}
+                </div>
 
                 {selected.attachments.length > 0 ? (
                   <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-3">
