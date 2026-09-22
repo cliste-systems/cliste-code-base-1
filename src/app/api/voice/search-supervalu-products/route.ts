@@ -322,7 +322,7 @@ export async function POST(request: Request) {
   });
 
   let noMatchQuote: string | null =
-    mappedMatches.length === 0
+    mappedMatches.length === 0 || (responseMatches.length === 0 && !clarificationHint)
       ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
       : null;
 
