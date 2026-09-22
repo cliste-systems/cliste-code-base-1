@@ -544,10 +544,7 @@ export function AdminEmailInboxView({
       }
     };
 
-    const timer = window.setInterval(
-      refreshFolder,
-      folder === "sent" ? 5_000 : 5_000,
-    );
+    const timer = window.setInterval(refreshFolder, 5_000);
     window.addEventListener("focus", refreshFolder);
     document.addEventListener("visibilitychange", refreshFolder);
 
