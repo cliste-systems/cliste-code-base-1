@@ -218,6 +218,74 @@ test("cheapest refinement fails if Cara asks another clarification", () => {
   assert.match(grade.reasons.join(" "), /decisive selection/i);
 });
 
+test("cheapest refinement allows callback or team-check follow-up questions", () => {
+  const scenario = buildDefaultRetailRegressionScenarios().find((row) =>
+    row.slug.startsWith("avocado-refinement-"),
+  );
+  assert.ok(scenario);
+
+  for (const assistant of [
+    "The SuperValu Ripe & Ready avocado is one euro fifty nine. I can't confirm exact shelf stock right now, but I can get someone to ring you back if you'd like to be sure?",
+    "The ripe and ready avocado is one euro fifty nine. Would you like me to have the team double-check it for you?",
+    "The avocado is ninety nine cents. Do you want me to check that with the team?",
+  ]) {
+    const grade = gradeRetailRegressionScenario(scenario, {
+      durationMs: 200,
+      turns: [
+        {
+          caller: scenario.turns[0]!.caller,
+          assistant: "Are you looking for fresh avocados or something else?",
+          transcriptLines: [],
+          tools: [
+            {
+              name: "searchSuperValuProducts",
+              args: { intent: "price", query: "avocado" },
+            },
+          ],
+        },
+        {
+          caller: scenario.turns[1]!.caller,
+          assistant,
+          transcriptLines: [],
+          tools: [
+            {
+              name: "searchSuperValuProducts",
+              args: {
+                intent: "price",
+                query: "SuperValu avocado",
+                service_area: "produce",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    assert.equal(grade.status, "pass", assistant);
+  }
+});
+
+test("ambiguous product clarification does not pass on a generic callback question", () => {
+  const scenario = buildDefaultRetailRegressionScenarios().find((row) =>
+    row.slug.startsWith("steak-ambiguous-"),
+  );
+  assert.ok(scenario);
+
+  const grade = gradeRetailRegressionScenario(scenario, {
+    durationMs: 100,
+    turns: [
+      {
+        caller: scenario.turns[0]!.caller,
+        assistant: "I can get the team to check that for you. Would you like a callback?",
+        transcriptLines: [],
+        tools: [],
+      },
+    ],
+  });
+
+  assert.equal(grade.status, "fail");
+  assert.match(grade.reasons.join(" "), /should have asked a clarifying question/i);
+});
+
 test("recurrence classifier distinguishes new, recurring, and returned regressions", () => {
   assert.deepEqual(
     classifyRegressionFailure({
