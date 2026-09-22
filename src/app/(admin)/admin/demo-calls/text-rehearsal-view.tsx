@@ -272,12 +272,13 @@ export function TextRehearsalView({ lines }: TextRehearsalViewProps) {
       ) : null}
 
       {mode === "discovery" && selectedLine && !singleSessionActive ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <DemoCallLinePicker
             lines={lines}
             selectedE164={selectedE164}
             onSelectedE164Change={setSelectedE164}
             disabled={false}
+            compact
           />
           <DemoRetailDiscoveryPanel line={selectedLine} />
         </div>
