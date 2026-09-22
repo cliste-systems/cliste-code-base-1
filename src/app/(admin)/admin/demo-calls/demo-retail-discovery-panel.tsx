@@ -166,16 +166,33 @@ export function DemoRetailDiscoveryPanel({
     }
 
     const grade = gradeRetailRegressionScenario(scenario, execution);
-    const recurrence = await postJson<{
+    let recurrence: {
       issueKind: RunResult["issueKind"];
       occurrenceCount: number;
-    }>(REGRESSION_API, {
-      action: "record_result",
-      runId: activeRunId,
-      scenarioId: scenario.id,
-      grade,
-      execution,
-    });
+    } = { issueKind: null, occurrenceCount: 0 };
+
+    try {
+      recurrence = await postJson<{
+        issueKind: RunResult["issueKind"];
+        occurrenceCount: number;
+      }>(REGRESSION_API, {
+        action: "record_result",
+        runId: activeRunId,
+        scenarioId: scenario.id,
+        grade,
+        execution,
+      });
+    } catch (cause) {
+      const message =
+        cause instanceof Error
+          ? cause.message
+          : "Could not save discovery result.";
+      if (grade.status === "pass") {
+        grade.status = "error";
+        grade.failureSignature = message.toLowerCase();
+      }
+      grade.reasons.push(message);
+    }
 
     return { ...execution, ...grade, ...recurrence };
   };
@@ -188,42 +205,51 @@ export function DemoRetailDiscoveryPanel({
     const collected: RetailRegressionScenario[] = [];
     const recentOpenings: string[] = [];
     let nextBatch = 0;
+    let generationError: Error | null = null;
 
     setGenerationProgress({ done: 0, total });
 
     const worker = async () => {
-      while (!stopRequested.current) {
+      while (!stopRequested.current && !generationError) {
         const batchIndex = nextBatch;
         nextBatch += 1;
         if (batchIndex >= batchCount) return;
 
-        const remaining = total - batchIndex * 20;
-        const batchSize = Math.min(20, remaining);
-        const response = await postJson<{
-          scenarios: RetailRegressionScenario[];
-        }>(DISCOVERY_API, {
-          action: "generate_batch",
-          calledNumber: line.e164,
-          generationId,
-          batchIndex,
-          count: batchSize,
-          avoidExamples: recentOpenings.slice(-40),
-        });
+        try {
+          const remaining = total - batchIndex * 20;
+          const batchSize = Math.min(20, remaining);
+          const response = await postJson<{
+            scenarios: RetailRegressionScenario[];
+          }>(DISCOVERY_API, {
+            action: "generate_batch",
+            calledNumber: line.e164,
+            generationId,
+            batchIndex,
+            count: batchSize,
+            avoidExamples: recentOpenings.slice(-40),
+          });
 
-        collected.push(...response.scenarios);
-        for (const scenario of response.scenarios) {
-          const opening = scenario.turns[0]?.caller;
-          if (opening) recentOpenings.push(opening);
+          collected.push(...response.scenarios);
+          for (const scenario of response.scenarios) {
+            const opening = scenario.turns[0]?.caller;
+            if (opening) recentOpenings.push(opening);
+          }
+          setScenarios([...collected]);
+          setGenerationProgress({
+            done: Math.min(total, collected.length),
+            total,
+          });
+        } catch (cause) {
+          generationError =
+            cause instanceof Error
+              ? cause
+              : new Error("Discovery generation failed.");
         }
-        setScenarios([...collected]);
-        setGenerationProgress({
-          done: Math.min(total, collected.length),
-          total,
-        });
       }
     };
 
     await Promise.all([worker(), worker()]);
+    if (generationError) throw generationError;
     return collected.slice(0, total);
   };
 
