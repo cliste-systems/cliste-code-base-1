@@ -32,13 +32,19 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `RESEND_API_KEY` | Production | Server-side Resend API key for receiving mail and sending admin replies |
-| `RESEND_FROM_EMAIL` | Production | Defaults to `brendan@hellocara.ie` for founder inbox replies |
-| `RESEND_FROM_NAME` | Optional | Defaults to `HelloCara` |
+| `RESEND_API_KEY` | Production | Server-side Resend API key for receiving and sending mail |
+| `RESEND_FROM_EMAIL` | Optional | General transactional sender; defaults to `hello@hellocara.ie` |
+| `RESEND_FROM_NAME` | Optional | General sender name; defaults to `HelloCara` |
+| `RESEND_HELLO_EMAIL` | Optional | Admin Hello mailbox; defaults to `hello@hellocara.ie` |
+| `RESEND_HELLO_NAME` | Optional | Admin Hello sender name; defaults to `HelloCara` |
+| `RESEND_BILLING_EMAIL` | Optional | Admin Billing mailbox; defaults to `billing@hellocara.ie` |
+| `RESEND_BILLING_NAME` | Optional | Billing sender name; defaults to `HelloCara Billing` |
 
 Inbound email is untrusted data. The admin inbox renders a plain-text body and never
 executes actions from received email content. The underlying Supabase table is
-service-role only.
+service-role only. The admin inbox exposes separate Hello and Billing views. New
+messages send from the selected mailbox, and replies automatically use the
+mailbox that originally received the customer's email.
 
 ## Signup email confirmation
 
