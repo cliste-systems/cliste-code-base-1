@@ -156,10 +156,79 @@ export type WeeklyOfferSearchFilters = {
   fulfilment?: SupervaluFulfilment | null;
 };
 
+const REWARDS_PRICE_POINT_EURO_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+};
+
+const REWARDS_PRICE_POINT_CENT_WORDS: Record<string, number> = {
+  ten: 10,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+/**
+ * Price-only Rewards browse, e.g. "Rewards Price for €2.50" or
+ * "Real Rewards offers for two euro fifty". This is an offer filter, not a
+ * product-name query.
+ */
+export function inferRewardsPricePointFromQuery(query: string): number | null {
+  const q = query.toLowerCase();
+  if (!/\b(?:real\s+rewards?|rewards?)(?:\s+price)?\b/i.test(q)) return null;
+
+  const numeric = q.match(/(?:€\s*)?(\d{1,3}(?:[.,]\d{1,2})?)/);
+  if (numeric) {
+    const amount = Number(numeric[1]!.replace(",", "."));
+    if (Number.isFinite(amount) && amount > 0) return Math.round(amount * 100) / 100;
+  }
+
+  const euroWords = Object.keys(REWARDS_PRICE_POINT_EURO_WORDS).join("|");
+  const centWords = Object.keys(REWARDS_PRICE_POINT_CENT_WORDS).join("|");
+  const spoken = q.match(
+    new RegExp(`\\b(${euroWords})\\s+(?:euro(?:s)?\\s+)?(${centWords})\\b`, "i"),
+  );
+  if (!spoken) return null;
+
+  const euros = REWARDS_PRICE_POINT_EURO_WORDS[spoken[1]!.toLowerCase()];
+  const cents = REWARDS_PRICE_POINT_CENT_WORDS[spoken[2]!.toLowerCase()];
+  if (euros == null || cents == null) return null;
+  return euros + cents / 100;
+}
+
+function isRewardsOfferRow(row: RetailWeeklyOfferRow): boolean {
+  return /\brewards?\s+price\b|\breal\s+rewards?\b/i.test(
+    String(row.discount_label ?? ""),
+  );
+}
+
 /** Caller wants a rundown of synced offers, not one specific product. */
 export function inferWeeklyOffersListIntent(query: string): boolean {
   const trimmed = query.trim();
   if (!trimmed) return true;
+  if (inferRewardsPricePointFromQuery(trimmed) != null) return true;
   if (
     /\bweekly offers\b|\bwhat offers\b|\bwhat'?s on offer\b|\bwhats on offer\b|\bbest offer|\blist offers\b|\blist (?:five|5|\d+)\b|\bany offers\b|\boffers (?:this week|do you have|you have|on|in)\b|\bsurprise me\b|\bhighlights\b|\btell me (?:the|your) offers\b|\bapart from meat\b|\bnot meat\b|\bgrocery offers\b|\bwhat (?:meat )?offers\b|\b(?:meat|butcher|deli|fish|produce|bakery|wine|beer|spirits|alcohol|dairy|ambient|grocery|fruit|veg|seafood|provisions|frozen|household) offers\b|\boff[- ]licence offers\b|\b(?:what )?(?:alcohol|wine|beer|spirits|dairy|ambient|fruit|veg|produce|bakery|deli|fish|butcher|grocery|provisions|frozen|household)\b.*\b(?:on offer|offers?|this week|specials?)\b/i.test(
       trimmed,
@@ -985,6 +1054,24 @@ export function searchSyncedWeeklyOffersInRows(
   const tokenLimit = options?.limit ?? RETAIL_WEEKLY_OFFERS_SEARCH_MAX_RESULTS;
   const listLimit = Math.max(tokenLimit, RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS);
   const browseOptions = { excludeMeat, filters, alcoholOnly };
+  const rewardsPricePoint = inferRewardsPricePointFromQuery(trimmed);
+  if (rewardsPricePoint != null) {
+    return rows
+      .filter((row) => rowMatchesFilters(row, filters, { excludeMeat, alcoholOnly }))
+      .filter(
+        (row) =>
+          isRewardsOfferRow(row) &&
+          Math.abs(Number(row.current_price_eur) - rewardsPricePoint) <= 0.01,
+      )
+      .sort(
+        (a, b) =>
+          Number(a.is_alcohol === true) - Number(b.is_alcohol === true) ||
+          a.product_name.localeCompare(b.product_name),
+      )
+      .slice(0, tokenLimit)
+      .map((row, index) => rowToMatch(row, 1 - index * 0.01));
+  }
+
   const categoryMatches = categoryBrowseMatches(
     rows,
     trimmed,
