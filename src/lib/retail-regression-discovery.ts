@@ -45,15 +45,177 @@ const ALLOWED_FULFILMENT = new Set(["counter", "prepack"]);
 
 function cleanStringList(value: unknown, max = 10): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const cleaned = [...new Set(
-    value
-      .map((item) => (typeof item === "string" ? item.trim() : ""))
-      .filter(Boolean),
-  )].slice(0, max);
+  const cleaned = [
+    ...new Set(
+      value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean),
+    ),
+  ].slice(0, max);
   return cleaned.length ? cleaned : undefined;
 }
 
-function sanitizeExpectations(value: unknown): RetailRegressionExpectation {
+function normalizeCaller(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function hasExplicitServiceArea(callerText: string, serviceArea: string): boolean {
+  const text = normalizeCaller(callerText);
+  const explicitPatterns: Record<string, RegExp> = {
+    butcher: /\b(?:butcher(?:'s)?|meat counter|fresh meat counter)\b/,
+    deli: /\b(?:deli|delicatessen)\b/,
+    fish: /\b(?:fish counter|seafood counter|fresh fish counter)\b/,
+    produce: /\b(?:produce|fruit\s*(?:&|and)\s*veg|veg section|fruit section)\b/,
+    bakery: /\b(?:bakery|bakery section|bread counter)\b/,
+    dairy: /\b(?:dairy wall|dairy section|dairy aisle)\b/,
+    off_licence: /\b(?:off[- ]?licen[cs]e|wine aisle|beer aisle|alcohol aisle|offie)\b/,
+    grocery: /\b(?:grocery aisle|grocery section|grocery)\b/,
+  };
+
+  if (explicitPatterns[serviceArea]?.test(text)) return true;
+
+  if (serviceArea === "produce") {
+    return /\b(?:apple|apples|pear|pears|avocado|avocados|vegetable|vegetables|veg|fruit)\b/.test(
+      text,
+    );
+  }
+  if (serviceArea === "dairy") {
+    return /\b(?:milk|yogurt|yoghurt|cheese|butter)\b/.test(text);
+  }
+  if (serviceArea === "bakery") {
+    return /\b(?:bread|rolls?|baguettes?|ciabatta|sourdough)\b/.test(text);
+  }
+  if (serviceArea === "butcher") {
+    return /\b(?:steaks?|beef|chicken breasts?|pork chops?|lamb)\b/.test(text);
+  }
+  if (serviceArea === "fish") {
+    return (
+      /\b(?:salmon|cod|haddock|mackerel|seafood)\b/.test(text) &&
+      !/\bfish fingers?\b/.test(text)
+    );
+  }
+  if (serviceArea === "off_licence") {
+    return (
+      /\b(?:wine|beer|lager|cider|whiskey|whisky|vodka|gin|stout)\b/.test(text) &&
+      !/\b(?:vinegar|wine gums?|beer battered|cider vinegar)\b/.test(text)
+    );
+  }
+
+  return false;
+}
+
+function hasExplicitFulfilment(callerText: string, fulfilment: string): boolean {
+  const text = normalizeCaller(callerText);
+  if (fulfilment === "counter") {
+    return /\b(?:counter|butcher(?:'s)?|deli|fish counter|meat counter)\b/.test(text);
+  }
+  return /\b(?:pre[- ]?pack(?:ed)?|packet aisle|prepacked)\b/.test(text);
+}
+
+function intentSignals(callerText: string): Set<"offer" | "price" | "stock"> {
+  const text = normalizeCaller(callerText);
+  const signals = new Set<"offer" | "price" | "stock">();
+
+  if (
+    /\b(?:offer|offers|deal|deals|special|specials|reduced|reduction|discount|multibuy|multi-buy|half price|rewards)\b/.test(
+      text,
+    )
+  ) {
+    signals.add("offer");
+  }
+  if (
+    /\b(?:price|cost|how much|cheapest|cheap|lowest price|fiver|euro|€)\b/.test(text)
+  ) {
+    signals.add("price");
+  }
+  if (
+    /\b(?:in stock|stock|do you have|have you got|have ye got|do ye have|sell|available|in today|carry|looking for|i'm after|im after|i need|need some|want to buy|can i get|got any|reckon you've got)\b/.test(
+      text,
+    )
+  ) {
+    signals.add("stock");
+  }
+
+  return signals;
+}
+
+function looksGenuinelyAmbiguous(callerText: string): boolean {
+  const text = normalizeCaller(callerText);
+  return (
+    /\b(?:that|those|them|something|the one|which one|big packet|big pack|value pack|fancy|usual sort|not sure|can't remember|cannot remember)\b/.test(
+      text,
+    ) ||
+    /\b(?:some|a bit of)\s+(?:steak|chicken)\b/.test(text) ||
+    /\bsteak(?:s)?\b/.test(text) && !/\b(?:counter|pre[- ]?pack)\b/.test(text)
+  );
+}
+
+function isStoreKnowledgeOnly(callerText: string): boolean {
+  const text = normalizeCaller(callerText);
+  const storeInfo =
+    /\b(?:opening hours?|what time.*(?:open|close|shut)|parking|car park|toilets?|atm|click\s*(?:&|and)\s*collect|delivery policy|shopping trolleys?|where.*trolleys?)\b/.test(
+      text,
+    );
+  const productIntent =
+    /\b(?:price|how much|offer|deal|stock|sell|do you have|have you got|have ye got|do ye have)\b/.test(
+      text,
+    );
+  return storeInfo && !productIntent;
+}
+
+function isRedundantIntentQueryTerm(
+  term: string,
+  requiredIntent: string | undefined,
+): boolean {
+  const normalized = normalizeCaller(term);
+  if (requiredIntent === "offer") {
+    return /^(?:offer|offers|deal|deals|special|special offer|discount|reduced|reduction)$/.test(
+      normalized,
+    );
+  }
+  if (requiredIntent === "price") {
+    return /^(?:price|cost|how much)$/.test(normalized);
+  }
+  if (requiredIntent === "stock") {
+    return /^(?:stock|in stock|available)$/.test(normalized);
+  }
+  return false;
+}
+
+function callerContainsExpectationTerm(callerText: string, term: string): boolean {
+  const caller = normalizeCaller(callerText);
+  const expected = normalizeCaller(term);
+  if (!expected) return false;
+  if (caller.includes(expected)) return true;
+
+  const aliasGroups = [
+    ["fiver", "5 euro", "five euro", "€5", "5.00"],
+    ["two fifty", "2.50", "two euro fifty", "€2.50"],
+    ["half price", "50% off", "50 percent off"],
+    ["multibuy", "multi-buy", "multi buy"],
+    ["cheapest", "lowest price", "cheap"],
+  ];
+
+  return aliasGroups.some(
+    (group) =>
+      group.includes(expected) && group.some((alias) => caller.includes(alias)),
+  );
+}
+
+function safeAssistantForbiddenPhrases(value: unknown): string[] | undefined {
+  const phrases = cleanStringList(value, 6);
+  const safe = phrases?.filter((phrase) =>
+    /\b(?:definitely|guaranteed|guarantee|100%|one hundred percent|certainly in stock)\b/i.test(
+      phrase,
+    ),
+  );
+  return safe?.length ? safe : undefined;
+}
+
+function sanitizeExpectations(
+  value: unknown,
+  callerTurns: string[],
+): RetailRegressionExpectation {
   const raw =
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
@@ -63,54 +225,101 @@ function sanitizeExpectations(value: unknown): RetailRegressionExpectation {
       ? raw.summary.trim().slice(0, 300)
       : "Cara should handle this caller scenario safely and without inventing facts.";
 
+  const callerText = callerTurns.join(" ");
+  const finalCaller = callerTurns.at(-1) ?? "";
+  const signals = intentSignals(callerText);
   const expectation: RetailRegressionExpectation = {
     summary,
     noError: raw.noError !== false,
   };
 
-  if (raw.requiredTool === "searchSuperValuProducts") {
-    expectation.requiredTool = "searchSuperValuProducts";
-  }
-  const forbiddenTools = cleanStringList(raw.forbiddenTools, 5);
-  if (forbiddenTools) expectation.forbiddenTools = forbiddenTools;
-
-  if (["offer", "price", "stock"].includes(String(raw.requiredIntent ?? ""))) {
-    expectation.requiredIntent = String(raw.requiredIntent);
-  }
-
-  for (const key of [
-    "queryMustInclude",
-    "queryMustIncludeAny",
-    "forbiddenQueryTerms",
-    "forbiddenServiceAreas",
-    "assistantMustIncludeAny",
-    "assistantMustNotInclude",
-  ] as const) {
-    const list = cleanStringList(raw[key], 8);
-    if (list) expectation[key] = list;
-  }
-
-  const serviceArea = String(raw.requiredServiceArea ?? "");
-  if (ALLOWED_SERVICE_AREAS.has(serviceArea)) {
-    expectation.requiredServiceArea = serviceArea;
-  }
-
-  const fulfilment = String(raw.requiredFulfilment ?? "");
-  if (ALLOWED_FULFILMENT.has(fulfilment)) {
-    expectation.requiredFulfilment = fulfilment as "counter" | "prepack";
-  }
-
-  if (raw.mustAskClarifyingQuestion === true) {
+  const wantsClarification =
+    raw.mustAskClarifyingQuestion === true &&
+    looksGenuinelyAmbiguous(finalCaller);
+  if (wantsClarification) {
     expectation.mustAskClarifyingQuestion = true;
   }
-  if (raw.lastTurnMustNotAskClarifyingQuestion === true) {
-    expectation.lastTurnMustNotAskClarifyingQuestion = true;
+
+  const canRequireProductTool =
+    raw.requiredTool === "searchSuperValuProducts" &&
+    signals.size > 0 &&
+    !(callerTurns.length === 1 && wantsClarification);
+  if (canRequireProductTool) {
+    expectation.requiredTool = "searchSuperValuProducts";
+  }
+
+  const forbiddenTools = cleanStringList(raw.forbiddenTools, 5);
+  if (
+    forbiddenTools?.includes("searchSuperValuProducts") &&
+    isStoreKnowledgeOnly(callerText)
+  ) {
+    expectation.forbiddenTools = ["searchSuperValuProducts"];
+  }
+
+  const rawIntent = String(raw.requiredIntent ?? "");
+  if (
+    canRequireProductTool &&
+    ["offer", "price", "stock"].includes(rawIntent) &&
+    signals.size <= 1 &&
+    (signals.size === 0 ||
+      signals.has(rawIntent as "offer" | "price" | "stock"))
+  ) {
+    expectation.requiredIntent = rawIntent;
+  }
+
+  if (canRequireProductTool) {
+    const requiredAll = cleanStringList(raw.queryMustInclude, 8)?.filter(
+      (term) =>
+        callerContainsExpectationTerm(callerText, term) &&
+        !isRedundantIntentQueryTerm(term, expectation.requiredIntent),
+    );
+    if (requiredAll?.length) expectation.queryMustInclude = requiredAll;
+
+    const requiredAny = cleanStringList(raw.queryMustIncludeAny, 8)?.filter(
+      (term) =>
+        callerContainsExpectationTerm(callerText, term) &&
+        !isRedundantIntentQueryTerm(term, expectation.requiredIntent),
+    );
+    if (requiredAny?.length) expectation.queryMustIncludeAny = requiredAny;
+
+    const serviceArea = String(raw.requiredServiceArea ?? "");
+    if (
+      ALLOWED_SERVICE_AREAS.has(serviceArea) &&
+      hasExplicitServiceArea(callerText, serviceArea)
+    ) {
+      expectation.requiredServiceArea = serviceArea;
+    }
+
+    const fulfilment = String(raw.requiredFulfilment ?? "");
+    if (
+      ALLOWED_FULFILMENT.has(fulfilment) &&
+      hasExplicitFulfilment(callerText, fulfilment)
+    ) {
+      expectation.requiredFulfilment = fulfilment as "counter" | "prepack";
+    }
+
+    const forbiddenServiceAreas = cleanStringList(
+      raw.forbiddenServiceAreas,
+      5,
+    )?.filter((area) => ALLOWED_SERVICE_AREAS.has(area));
+    if (forbiddenServiceAreas?.length) {
+      expectation.forbiddenServiceAreas = forbiddenServiceAreas;
+    }
+  }
+
+  const assistantForbidden = safeAssistantForbiddenPhrases(
+    raw.assistantMustNotInclude,
+  );
+  if (assistantForbidden) {
+    expectation.assistantMustNotInclude = assistantForbidden;
   }
 
   return expectation;
 }
 
-function sanitizeDraft(value: unknown): DiscoveryDraft | null {
+export function sanitizeRetailDiscoveryDraft(
+  value: unknown,
+): DiscoveryDraft | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   const callerTurns = Array.isArray(raw.turns)
@@ -128,7 +337,9 @@ function sanitizeDraft(value: unknown): DiscoveryDraft | null {
 
   if (callerTurns.length === 0) return null;
 
-  const categoryRaw = String(raw.category ?? "edge_cases") as RetailRegressionCategory;
+  const categoryRaw = String(
+    raw.category ?? "edge_cases",
+  ) as RetailRegressionCategory;
   const category = ALLOWED_CATEGORIES.has(categoryRaw)
     ? categoryRaw
     : "edge_cases";
@@ -143,7 +354,7 @@ function sanitizeDraft(value: unknown): DiscoveryDraft | null {
     category,
     tags: cleanStringList(raw.tags, 8) ?? ["discovery"],
     turns: callerTurns.map((caller) => ({ caller: caller.slice(0, 300) })),
-    expectations: sanitizeExpectations(raw.expectations),
+    expectations: sanitizeExpectations(raw.expectations, callerTurns),
   };
 }
 
@@ -212,12 +423,17 @@ noError: boolean
 
 Important grading rules:
 - Product price/offer/stock/range questions should normally require searchSuperValuProducts and the matching intent.
-- Explicit store areas should use requiredServiceArea.
-- Explicit counter/pre-pack should use requiredFulfilment.
-- Genuine ambiguity may use mustAskClarifyingQuestion instead of forcing a scope.
-- Store knowledge such as hours, parking, toilets, ATM, delivery policy should forbid searchSuperValuProducts unless the question also genuinely includes a product request.
+- If the caller is genuinely ambiguous and Cara should clarify BEFORE searching, use mustAskClarifyingQuestion and DO NOT also require a product tool on that same unresolved one-turn scenario.
+- Only use requiredServiceArea when the caller explicitly names a department/counter/aisle, or when the product-area mapping is unambiguous. Never label ordinary dairy products as grocery merely because they are sold in a supermarket.
+- Only use requiredFulfilment when the caller explicitly says counter or pre-pack.
+- Store knowledge such as hours, parking, toilets, ATM, delivery policy should forbid searchSuperValuProducts only when there is no genuine product request.
 - Never encode an exact price/product answer unless the caller supplied that fact.
-- Query expectations must be tolerant: use queryMustIncludeAny for synonyms/likely reformulations.
+- Do not require generic words like "offer", "reduced", "deal", "stock" or "price" to remain inside the query when the structured intent already carries that meaning.
+- DO preserve material promotion/ranking mechanics such as Rewards, multibuy, half price, a specific price point, cheapest/lowest price, or save-amount wording.
+- Do not use assistantMustIncludeAny for style, dialect mirroring, or exact phrasing.
+- Do not forbid lexical collision words such as "wine" in "red wine vinegar"; use forbiddenServiceAreas if the routing destination itself would be wrong.
+- For combined intents such as price + stock, do not require one exact intent if either structured lookup can safely answer the request.
+- Use lastTurnMustNotAskClarifyingQuestion only when the final caller turn fully and unambiguously selects the exact variant; otherwise omit it.
 - A callback/team-check question is NOT a product-selection clarification.
 - Do not repeat the same product/topic across many scenarios.
 
@@ -258,7 +474,7 @@ This is discovery batch ${input.batchIndex}. Novelty nonce: ${nonce}.`,
   const seen = new Set<string>();
   const drafts: DiscoveryDraft[] = [];
   for (const value of parsed.scenarios) {
-    const draft = sanitizeDraft(value);
+    const draft = sanitizeRetailDiscoveryDraft(value);
     if (!draft) continue;
     const key = normalizeConversation(draft);
     if (seen.has(key)) continue;

@@ -28,6 +28,18 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 | `TURNSTILE_SECRET_KEY` | Production | **Mandatory** for signup; also used on login when set |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Production | Widget site key |
 
+## Admin email inbox
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `RESEND_API_KEY` | Production | Server-side Resend API key for receiving mail and sending admin replies |
+| `RESEND_FROM_EMAIL` | Production | Defaults to `brendan@hellocara.ie` for founder inbox replies |
+| `RESEND_FROM_NAME` | Optional | Defaults to `Brendan` |
+
+Inbound email is untrusted data. The admin inbox renders a plain-text body and never
+executes actions from received email content. The underlying Supabase table is
+service-role only.
+
 ## Signup email confirmation
 
 | Variable | Required | Notes |
