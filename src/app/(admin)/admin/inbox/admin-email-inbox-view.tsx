@@ -885,9 +885,46 @@ export function AdminEmailInboxView({
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               <article className="mx-auto max-w-4xl px-6 py-6">
-                <div className="whitespace-pre-wrap break-words text-[14px] leading-6 text-slate-800">
-                  {selected.textBody}
-                </div>
+                {selected.htmlBody ? (
+                  <div className="mb-4 flex items-center justify-end">
+                    <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setMessageView("formatted")}
+                        className={cn(
+                          "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          messageView === "formatted"
+                            ? "bg-white text-slate-950 shadow-sm"
+                            : "text-slate-500 hover:text-slate-900",
+                        )}
+                      >
+                        Formatted
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMessageView("plain")}
+                        className={cn(
+                          "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          messageView === "plain"
+                            ? "bg-white text-slate-950 shadow-sm"
+                            : "text-slate-500 hover:text-slate-900",
+                        )}
+                      >
+                        Plain text
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selected.htmlBody && messageView === "formatted" ? (
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <EmailHtmlFrame html={selected.htmlBody} />
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap break-all text-[14px] leading-6 text-slate-800">
+                    {selected.textBody}
+                  </div>
+                )}
 
                 {selected.attachments.length > 0 ? (
                   <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-3">
