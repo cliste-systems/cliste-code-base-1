@@ -255,6 +255,7 @@ export function classifySupervaluOfferServiceArea(input: {
     crumb.includes("milk, yogurt, butter & eggs") ||
     crumb.includes("/fresh-milk/") ||
     crumb.includes("/yogurts/") ||
+    crumb.includes("/everyday-yogurts/") ||
     crumb.includes("/cheese/") ||
     crumb.includes("/butter-spreads/") ||
     /milk|yogurt|yoghurt|cheese|butter|cream|dairy/i.test(dept)
