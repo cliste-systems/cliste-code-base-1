@@ -30,6 +30,7 @@ type ProductArea =
   | "fish"
   | "bakery"
   | "produce"
+  | "dairy"
   | "off_licence"
   | "cheese_counter";
 
@@ -86,6 +87,7 @@ const PRODUCT_AREAS: Array<{ value: ProductArea; label: string }> = [
   { value: "fish", label: "Fish" },
   { value: "bakery", label: "Bakery" },
   { value: "produce", label: "Produce" },
+  { value: "dairy", label: "Dairy" },
   { value: "off_licence", label: "Off-licence" },
   { value: "cheese_counter", label: "Cheese counter" },
 ];
@@ -210,7 +212,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       // as grocery. In store language, Grocery means ordinary shelf stock.
       productQuery = productQuery
         .eq("service_area", "grocery")
-        .eq("fulfilment", "prepack");
+        .eq("fulfilment", "prepack")
+        .not("category_breadcrumb", "ilike", "%/counter-cheese/%");
     } else if (area !== "all") {
       productQuery = productQuery.eq("service_area", area);
     }
