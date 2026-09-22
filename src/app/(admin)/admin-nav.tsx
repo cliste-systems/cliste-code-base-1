@@ -8,6 +8,7 @@ import {
   Headphones,
   LayoutGrid,
   LifeBuoy,
+  Mail,
   MessageSquareText,
   Phone,
   Users,
@@ -17,6 +18,7 @@ import { isPublicSignupEnabled } from "@/lib/public-signup";
 import {
   adminCustomersPath,
   adminDemoCallsPath,
+  adminInboxPath,
   adminOverviewPath,
   adminPhonePoolPath,
   adminSupportPath,
@@ -52,6 +54,12 @@ const baseNav = [
     label: "Text rehearsal",
     icon: MessageSquareText,
     exact: true,
+  },
+  {
+    href: adminInboxPath(),
+    label: "Inbox",
+    icon: Mail,
+    exact: false,
   },
   {
     href: adminSupportPath(),
