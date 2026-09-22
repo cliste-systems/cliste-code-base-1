@@ -404,7 +404,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       name="q"
                       defaultValue={query}
                       placeholder="Product, brand or SKU"
-                      className={`h-10 w-full rounded-lg px-3 text-[13px] text-[#11181d] outline-none ${DASHBOARD_INPUT_CLASS}`}
+                      className={`h-10 w-full rounded-lg border px-3 text-[13px] text-[#11181d] outline-none ${DASHBOARD_INPUT_CLASS}`}
                     />
                   </label>
 
@@ -495,7 +495,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     No matching products for this search and filter.
                   </div>
                 ) : (
-                  <div className="space-y-3 pb-1">
+                  <div className="space-y-2.5 pb-1">
                     <div className="flex items-center justify-between px-1">
                       <p className="text-[11px] font-medium text-slate-500">
                         {visibleProducts.length === 1
@@ -550,9 +550,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                                 {[product.brand, product.department, product.sku ? `SKU ${product.sku}` : null]
                                   .filter(Boolean)
                                   .join(" · ")}
-                              </p>
-                              <p className="mt-2 max-w-2xl text-xs text-slate-600">
-                                {copy.description}
                               </p>
                             </div>
 
