@@ -755,7 +755,7 @@ export async function searchSupervaluCatalogLiveWithFallback(
 
   const normalized = normalizeCatalogBrandQuery(trimmed);
   const searchQuery = normalized || trimmed;
-  let matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
+  const matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
 
   if (matches.length > 0 || !queryRequestsSupervaluOwnLabel(searchQuery)) {
     return { matches, ownBrandFallbackQuote: null };
