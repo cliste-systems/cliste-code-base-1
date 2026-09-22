@@ -1,4 +1,5 @@
 import {
+  catalogProductTokens,
   stripCatalogPackagingNoise,
   stripCatalogSearchBoilerplate,
 } from "@/lib/supervalu-catalog-search";
