@@ -24,17 +24,18 @@ import { cn } from "@/lib/utils";
 
 function CaraTrainingEmptyState() {
   return (
-    <div className={HOME_FIRST_ROW_EMPTY}>
-      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-2 size-10")} aria-hidden>
+    <div className="flex min-h-0 flex-1 items-center rounded-lg border border-[#e3e9e5] bg-[#f6faf7] px-4 py-4">
+      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-0 mr-3 size-10")} aria-hidden>
         <GraduationCap className="size-5" />
       </div>
-      <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[14px]")}>
-        Cara is up to date
-      </p>
-      <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-1 max-w-none text-[12px]")}>
-        When Cara cannot answer something on a call, it will appear here for you
-        to teach her.
-      </p>
+      <div className="min-w-0 text-left">
+        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[14px]")}>
+          Cara is up to date
+        </p>
+        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-0.5 max-w-none text-[12px]")}>
+          Questions she could not answer will appear here for the team to teach.
+        </p>
+      </div>
     </div>
   );
 }
