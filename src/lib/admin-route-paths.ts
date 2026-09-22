@@ -33,6 +33,14 @@ export function adminSupportPath(): string {
   return "/admin/support";
 }
 
+export function adminPaymentsPlatformSpendPath(): string {
+  return "/admin/payments/platform-spend";
+}
+
+export function isAdminPaymentsPath(pathname: string): boolean {
+  return pathname === "/admin/payments" || pathname.startsWith("/admin/payments/");
+}
+
 export function adminSupportTicketPath(ticketId: string): string {
   return `/admin/support/${ticketId.trim()}`;
 }

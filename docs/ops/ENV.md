@@ -64,6 +64,20 @@ Production signups use `email_confirm: false` and email a confirmation link befo
 |----------|----------|-------|
 | `CLISTE_ENABLE_LIVEKIT_US_NUMBERS` | Optional | Set to `1` to show LiveKit US number assignment on non-retail admin org pages |
 
+## Admin platform spend
+
+Track internal vendor costs at **`/admin/payments/platform-spend`**.
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `OPENROUTER_MANAGEMENT_KEY` | Optional | OpenRouter credits/analytics sync. Falls back to `OPENROUTER_API_KEY` if unset. |
+| `RAILWAY_API_TOKEN` | Optional | Railway GraphQL billing sync |
+| `RAILWAY_WORKSPACE_ID` | Optional | Railway workspace ID for billing queries |
+| `PLATFORM_SPEND_USD_TO_EUR` | Optional | USD→EUR for API-synced vendors (default `0.92`, else `VOICE_COST_USD_TO_EUR`) |
+| `VOICE_COST_USD_TO_EUR` | Optional | Fallback FX rate for platform spend display |
+
+Manual vendors (Cursor, ChatGPT, Vercel, Supabase, etc.) are edited in the admin UI — no env vars required.
+
 **Local `.env.local`:** pull Supabase keys from your hosted project (after `supabase login` or with `SUPABASE_ACCESS_TOKEN` set):
 
 ```bash

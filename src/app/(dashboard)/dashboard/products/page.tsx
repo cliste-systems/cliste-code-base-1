@@ -240,14 +240,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
               <form
                 method="get"
-                className={`${DASHBOARD_CARD_SURFACE} shrink-0 flex flex-col gap-3 p-4`}
+                className={`${DASHBOARD_CARD_SURFACE} shrink-0 p-5`}
               >
-                <div className="mx-auto w-full max-w-2xl">
-                  <label className="block min-w-0">
-                    <span className="mb-1.5 block text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="w-full space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Search the {retailBanner === "supervalu" ? "SuperValu" : "retailer"} catalogue
-                    </span>
-                    <div className="flex gap-2">
+                    </p>
+                    <div className="mt-2 flex gap-2">
                       <input
                         name="q"
                         defaultValue={query}
@@ -261,68 +261,70 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                         Search
                       </button>
                     </div>
-                    <span className="mt-1.5 block text-center text-[11px] text-slate-500">
+                    <p className="mt-1.5 text-[11px] text-slate-500">
                       Search matches product name, brand, category and SKU.
-                    </span>
-                  </label>
-                </div>
+                    </p>
+                  </div>
 
-                <div
-                  className={
-                    hasMixedCounterAndPrepack(area)
-                      ? "grid gap-3 sm:grid-cols-3"
-                      : "grid gap-3 sm:grid-cols-2"
-                  }
-                >
-                  <label>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Store area
-                    </span>
-                    <select
-                      name="area"
-                      defaultValue={area}
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                  <div className="border-t border-slate-100 pt-4">
+                    <div
+                      className={
+                        hasMixedCounterAndPrepack(area)
+                          ? "grid gap-3 sm:grid-cols-3"
+                          : "grid gap-3 sm:grid-cols-2"
+                      }
                     >
-                      {PRODUCT_AREAS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <label className="block min-w-0">
+                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Store area
+                        </span>
+                        <select
+                          name="area"
+                          defaultValue={area}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                        >
+                          {PRODUCT_AREAS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
 
-                  {hasMixedCounterAndPrepack(area) ? (
-                    <label>
-                      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Counter / prepacked
-                      </span>
-                      <select
-                        name="type"
-                        defaultValue={productType}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                      >
-                        <option value="all">All products</option>
-                        <option value="counter">Counter only</option>
-                        <option value="prepack">Prepacked only</option>
-                      </select>
-                    </label>
-                  ) : null}
+                      {hasMixedCounterAndPrepack(area) ? (
+                        <label className="block min-w-0">
+                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Counter / prepacked
+                          </span>
+                          <select
+                            name="type"
+                            defaultValue={productType}
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                          >
+                            <option value="all">All products</option>
+                            <option value="counter">Counter only</option>
+                            <option value="prepack">Prepacked only</option>
+                          </select>
+                        </label>
+                      ) : null}
 
-                  <label>
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Store status
-                    </span>
-                    <select
-                      name="filter"
-                      defaultValue={filter}
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                    >
-                      <option value="all">All statuses</option>
-                      <option value="stocked">Normally stocked</option>
-                      <option value="not_stocked">Not stocked</option>
-                      <option value="not_confirmed">Not confirmed</option>
-                    </select>
-                  </label>
+                      <label className="block min-w-0">
+                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Store status
+                        </span>
+                        <select
+                          name="filter"
+                          defaultValue={filter}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                        >
+                          <option value="all">All statuses</option>
+                          <option value="stocked">Normally stocked</option>
+                          <option value="not_stocked">Not stocked</option>
+                          <option value="not_confirmed">Not confirmed</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </form>
 

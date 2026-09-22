@@ -26,6 +26,7 @@ import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
 import { cn } from "@/lib/utils";
 
 import { AdminSignOutButton } from "./admin-sign-out-button";
+import { AdminPaymentsNavGroup } from "./admin-payments-nav";
 
 const baseNav = [
   { href: adminOverviewPath(), label: "Overview", icon: LayoutGrid, exact: true },
@@ -116,6 +117,7 @@ export function AdminNav({ loggedInAs }: { loggedInAs: string }) {
             </Link>
           );
         })}
+        <AdminPaymentsNavGroup />
       </nav>
 
       <div className="shrink-0 border-t border-slate-100 p-4">

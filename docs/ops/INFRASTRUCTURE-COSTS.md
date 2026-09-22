@@ -44,6 +44,10 @@ After pilot traffic:
 4. Expand **Cost breakdown** — check LiveKit, STT, LLM, TTS dominate; Supabase line should stay small per call.
 5. Divide total est. cost by calls with estimates → **avg cost per call**. Compare to plan overage rates in [`src/lib/cliste-plans.data.ts`](../../src/lib/cliste-plans.data.ts) (€0.45–0.59/min).
 
+**Platform fixed + variable spend (internal ops)**
+
+Track Cliste’s own vendor bills (Cursor, ChatGPT, Vercel, Supabase, Railway, etc.) at **`/admin/payments/platform-spend`**. Enter manual subscription amounts and billing days; click **Refresh API data** for OpenRouter and Railway MTD usage. See [`ENV.md`](ENV.md) for `OPENROUTER_MANAGEMENT_KEY`, `RAILWAY_API_TOKEN`, and `RAILWAY_WORKSPACE_ID`.
+
 **Healthy pilot signals**
 
 - Avg est. voice cost per minute handled is **below** the customer's effective overage rate.
