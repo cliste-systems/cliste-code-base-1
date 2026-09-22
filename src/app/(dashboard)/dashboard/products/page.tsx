@@ -242,28 +242,29 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 method="get"
                 className={`${DASHBOARD_CARD_SURFACE} shrink-0 flex flex-col gap-3 p-4`}
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <label className="min-w-0 flex-1">
-                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="mx-auto w-full max-w-2xl">
+                  <label className="block min-w-0">
+                    <span className="mb-1.5 block text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Search the {retailBanner === "supervalu" ? "SuperValu" : "retailer"} catalogue
                     </span>
-                    <input
-                      name="q"
-                      defaultValue={query}
-                      placeholder="Product, brand or SKU — e.g. striploin, Heinz, 1023229001"
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                    />
-                    <span className="mt-1.5 block text-[11px] text-slate-500">
+                    <div className="flex gap-2">
+                      <input
+                        name="q"
+                        defaultValue={query}
+                        placeholder="Product, brand or SKU — e.g. striploin, Heinz, 1023229001"
+                        className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                      />
+                      <button
+                        type="submit"
+                        className="h-11 shrink-0 rounded-xl bg-[#11181d] px-5 text-sm font-semibold text-white transition hover:bg-[#222c33]"
+                      >
+                        Search
+                      </button>
+                    </div>
+                    <span className="mt-1.5 block text-center text-[11px] text-slate-500">
                       Search matches product name, brand, category and SKU.
                     </span>
                   </label>
-
-                  <button
-                    type="submit"
-                    className="h-11 rounded-xl bg-[#11181d] px-5 text-sm font-semibold text-white transition hover:bg-[#222c33]"
-                  >
-                    Search
-                  </button>
                 </div>
 
                 <div
