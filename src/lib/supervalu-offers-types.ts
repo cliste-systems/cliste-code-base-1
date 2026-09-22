@@ -6,6 +6,7 @@ export type SupervaluServiceArea =
   | "fish"
   | "produce"
   | "bakery"
+  | "dairy"
   | "off_licence"
   | "grocery";
 
