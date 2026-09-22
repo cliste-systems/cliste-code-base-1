@@ -435,4 +435,124 @@ describe("retail product clarification", () => {
     assert.equal(response.matches.length, 3);
   });
 
+
+  it("prefers fresh own-brand cheapest food matches over ingredient-form noise", () => {
+    const response = resolveProductSearchResponse(
+      "avocado fresh supervalu brand cheapest",
+      [
+        {
+          product_name: "Garnier Ultimate Blends Avocado Oil",
+          department: "Hair Care",
+          service_area: "grocery",
+          fulfilment: "prepack",
+          current_price_eur: 4.99,
+          score: 0.9,
+        },
+        {
+          product_name: "Biona Organic Avocado Oil",
+          department: "Oils",
+          service_area: "grocery",
+          fulfilment: "prepack",
+          current_price_eur: 8.49,
+          score: 0.9,
+        },
+        {
+          product_name: "Freshzilla Smashed Hass Avocado",
+          department: "Fresh Prepared Fruit & Veg",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 2.89,
+          score: 0.85,
+        },
+        {
+          product_name: "SuperValu Fresh Avocados",
+          department: "Fresh Fruit & Vegetables",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 1.49,
+          score: 0.82,
+        },
+        {
+          product_name: "SuperValu Fresh Avocado Twin Pack",
+          department: "Fresh Fruit & Vegetables",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 2.49,
+          score: 0.82,
+        },
+      ],
+      { intent: "price" },
+    );
+
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 1);
+    assert.match(response.matches[0]?.product_name ?? "", /SuperValu Fresh Avocados/i);
+    assert.doesNotMatch(response.matches[0]?.product_name ?? "", /Oil|Smashed/i);
+  });
+
+  it("applies the same fresh/cheapest ranking to another category", () => {
+    const response = resolveProductSearchResponse(
+      "tomatoes fresh supervalu cheapest",
+      [
+        {
+          product_name: "SuperValu Tomato & Basil Pasta Sauce",
+          department: "Pasta Sauce",
+          service_area: "grocery",
+          fulfilment: "prepack",
+          current_price_eur: 1.19,
+          score: 0.92,
+        },
+        {
+          product_name: "SuperValu Fresh Tomatoes",
+          department: "Fresh Fruit & Vegetables",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 1.79,
+          score: 0.82,
+        },
+        {
+          product_name: "SuperValu Fresh Cherry Tomatoes",
+          department: "Fresh Fruit & Vegetables",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 2.49,
+          score: 0.82,
+        },
+      ],
+      { intent: "price" },
+    );
+
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 1);
+    assert.match(response.matches[0]?.product_name ?? "", /Fresh Tomatoes/i);
+    assert.doesNotMatch(response.matches[0]?.product_name ?? "", /Sauce/i);
+  });
+
+  it("does not ask butcher counter clarification for non-counter grocery noise", () => {
+    const response = resolveProductSearchResponse(
+      "avocado fresh supervalu brand cheapest",
+      [
+        {
+          product_name: "SuperValu Fresh Avocados",
+          department: "Fresh Fruit & Vegetables",
+          service_area: "produce",
+          fulfilment: "prepack",
+          current_price_eur: 1.49,
+        },
+        {
+          product_name: "SuperValu Fresh Irish Pork Steak",
+          department: "Butcher",
+          service_area: "butcher",
+          fulfilment: "counter",
+          current_price_eur: 6.69,
+        },
+      ],
+      { intent: "price" },
+    );
+
+    assert.equal(response.clarificationHint, null);
+    assert.equal(response.matches.length, 1);
+    assert.match(response.matches[0]?.product_name ?? "", /Avocados/i);
+  });
+
 });
