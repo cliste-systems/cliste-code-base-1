@@ -139,6 +139,64 @@ describe("supervalu offers sync helpers", () => {
     assert.equal(offer?.discountLabel, "Save 33%");
   });
 
+  it("recovers fresh organic striploin as butcher prepack without pulling prepared grocery into butcher", () => {
+    const steak = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Good Herdsmen Organic Beef Striploin Steak (200 g)",
+        priceNumeric: 7.43,
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "/categories/prepack/organic-id-O411225",
+          },
+        ],
+        attributes: { altCategory: "Organic" },
+      },
+      productName: "Good Herdsmen Organic Beef Striploin Steak (200 g)",
+      department: "Organic",
+      discountLabel: "Save 20%",
+    });
+    assert.equal(steak.serviceArea, "butcher");
+    assert.equal(steak.fulfilment, "prepack");
+
+    const gravy = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Bisto Best Beef Gravy (230 g)",
+        priceNumeric: 4,
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb:
+              "/categories/packet-sauces-stocks-herbs/gravy-stock-id-O301193",
+          },
+        ],
+        attributes: { altCategory: "Gravy & Stock" },
+      },
+      productName: "Bisto Best Beef Gravy (230 g)",
+      department: "Gravy & Stock",
+    });
+    assert.equal(gravy.serviceArea, "grocery");
+    assert.equal(gravy.fulfilment, "prepack");
+
+    const seasoning = classifySupervaluOfferServiceArea({
+      product: {
+        name: "Cape Herb Giant Steak & Chops Shaker (270 g)",
+        priceNumeric: 5,
+        sellBy: "Each",
+        defaultCategory: [
+          {
+            categoryBreadcrumb:
+              "/categories/packet-sauces-stocks-herbs/herbs-spices-id-O301195",
+          },
+        ],
+        attributes: { altCategory: "Herbs & Spices" },
+      },
+      productName: "Cape Herb Giant Steak & Chops Shaker (270 g)",
+      department: "Herbs & Spices",
+    });
+    assert.equal(seasoning.serviceArea, "grocery");
+  });
+
   it("classifies fish counter and pre-pack fish separately", () => {
     const counter = classifySupervaluOfferServiceArea({
       product: {
@@ -197,6 +255,26 @@ describe("supervalu offers sync helpers", () => {
     });
     assert.equal(frozen.serviceArea, "fish");
     assert.equal(frozen.fulfilment, "prepack");
+  });
+
+  it("classifies current everyday-yogurts catalogue paths as dairy", () => {
+    const yogurt = classifySupervaluOfferServiceArea({
+      product: {
+        name: "SuperValu Natural Yogurt (500 g)",
+        priceNumeric: 2.5,
+        defaultCategory: [
+          {
+            categoryBreadcrumb:
+              "/categories/everyday-yogurts/single-pots-id-O402280",
+          },
+        ],
+        attributes: { altCategory: "Single Pots" },
+      },
+      productName: "SuperValu Natural Yogurt (500 g)",
+      department: "Single Pots",
+    });
+    assert.equal(yogurt.serviceArea, "dairy");
+    assert.equal(yogurt.fulfilment, "prepack");
   });
 
   it("classifies dairy wall products separately from generic grocery", () => {

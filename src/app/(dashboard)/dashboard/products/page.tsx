@@ -9,9 +9,18 @@ import {
 } from "@/components/dashboard/dashboard-surface";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import type { RetailStoreAssortmentStatus } from "@/lib/retail-store-assortment";
+import {
+  resolveNationalRetailPrice,
+  resolveStoredRetailPrice,
+  type RetailPricePresentation,
+  type RetailPromotionRow,
+  type RetailStorePriceListing,
+} from "@/lib/retail-price-presentation";
+import { isRetailOfferPriceSemanticallyValid } from "@/lib/retail-weekly-offers-search";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 import { setProductAssortmentStatus } from "./actions";
+import { ProductPriceSummary } from "./product-price-summary";
 
 type ProductArea =
   | "all"
@@ -21,10 +30,32 @@ type ProductArea =
   | "fish"
   | "bakery"
   | "produce"
+  | "dairy"
   | "off_licence"
   | "cheese_counter";
 
 type ProductFulfilment = "all" | "counter" | "prepack";
+
+type WeeklyOfferRow = {
+  sku: string | null;
+  current_price_eur: number;
+  was_price_eur: number | null;
+  discount_label: string | null;
+  price_per_unit: string | null;
+  synced_at: string | null;
+};
+
+type StoreListingRow = RetailStorePriceListing & {
+  product_id: string;
+  synced_at: string | null;
+};
+
+type ProductPriceMeta = {
+  price: RetailPricePresentation;
+  sourceLabel: string;
+  syncedAt: string | null;
+};
+
 
 type ProductsPageProps = {
   searchParams: Promise<{
@@ -44,6 +75,8 @@ type ProductRow = {
   service_area: string | null;
   fulfilment: string | null;
   category_breadcrumb: string | null;
+  national_regular_price_eur: number | null;
+  national_regular_price_store_count: number | null;
 };
 
 const PRODUCT_AREAS: Array<{ value: ProductArea; label: string }> = [
@@ -54,6 +87,7 @@ const PRODUCT_AREAS: Array<{ value: ProductArea; label: string }> = [
   { value: "fish", label: "Fish" },
   { value: "bakery", label: "Bakery" },
   { value: "produce", label: "Produce" },
+  { value: "dairy", label: "Dairy" },
   { value: "off_licence", label: "Off-licence" },
   { value: "cheese_counter", label: "Cheese counter" },
 ];
@@ -145,12 +179,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const admin = createAdminClient();
   const { data: org } = await admin
     .from("organizations")
-    .select("niche, retail_banner")
+    .select("niche, retail_banner, retail_source_store_id, catalog_synced_at, offers_synced_at")
     .eq("id", organizationId)
     .maybeSingle();
 
   const isRetail = String(org?.niche ?? "") === "retail";
   const retailBanner = String(org?.retail_banner ?? "").trim();
+  const sourceStoreId = String(org?.retail_source_store_id ?? "").trim() || null;
 
   let products: ProductRow[] = [];
   let loadError: string | null = null;
@@ -158,7 +193,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   if (isRetail && retailBanner && query.length >= 2) {
     let productQuery = admin
       .from("retail_catalog_products")
-      .select("id, product_name, brand, department, sku, service_area, fulfilment, category_breadcrumb")
+      .select("id, product_name, brand, department, sku, service_area, fulfilment, category_breadcrumb, national_regular_price_eur, national_regular_price_store_count")
       .eq("retail_banner", retailBanner)
       .ilike("search_text", `%${query}%`)
       .order("product_name", { ascending: true })
@@ -177,7 +212,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       // as grocery. In store language, Grocery means ordinary shelf stock.
       productQuery = productQuery
         .eq("service_area", "grocery")
-        .eq("fulfilment", "prepack");
+        .eq("fulfilment", "prepack")
+        .not("category_breadcrumb", "ilike", "%/counter-cheese/%");
     } else if (area !== "all") {
       productQuery = productQuery.eq("service_area", area);
     }
@@ -211,6 +247,105 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           overrides.set(row.product_id as string, row.status);
         }
       }
+    }
+  }
+
+  const pricingByProductId = new Map<string, ProductPriceMeta>();
+
+  if (productIds.length > 0) {
+    const skus = products
+      .map((product) => String(product.sku ?? "").trim())
+      .filter(Boolean);
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Dublin",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+    const weeklyOfferBySku = new Map<string, WeeklyOfferRow>();
+    if (skus.length > 0) {
+      const { data, error } = await admin
+        .from("retail_weekly_offers")
+        .select(
+          "sku, current_price_eur, was_price_eur, discount_label, price_per_unit, synced_at",
+        )
+        .eq("retail_banner", retailBanner)
+        .eq("is_national", true)
+        .in("sku", skus)
+        .lte("offer_week_start", today)
+        .gte("offer_week_end", today)
+        .order("synced_at", { ascending: false });
+
+      if (error) {
+        loadError = loadError ?? error.message;
+      } else {
+        for (const row of (data ?? []) as WeeklyOfferRow[]) {
+          const sku = String(row.sku ?? "").trim();
+          if (!sku || weeklyOfferBySku.has(sku)) continue;
+          if (!isRetailOfferPriceSemanticallyValid(row)) continue;
+          weeklyOfferBySku.set(sku, row);
+        }
+      }
+    }
+
+    const storeListingByProductId = new Map<string, StoreListingRow>();
+    if (sourceStoreId) {
+      const { data, error } = await admin
+        .from("retail_store_products")
+        .select(
+          "product_id, regular_price_eur, display_price_eur, price_per_unit, source_price_label, synced_at, retail_promotions(promotion_type, loyalty_required, loyalty_program, offer_price_eur, regular_price_eur, label, valid_from, valid_to)",
+        )
+        .eq("source_store_id", sourceStoreId)
+        .eq("is_listed", true)
+        .in("product_id", productIds);
+
+      if (error) {
+        loadError = loadError ?? error.message;
+      } else {
+        for (const raw of data ?? []) {
+          const row = raw as unknown as StoreListingRow;
+          storeListingByProductId.set(String(row.product_id), {
+            ...row,
+            retail_promotions: (row.retail_promotions ?? []) as RetailPromotionRow[],
+          });
+        }
+      }
+    }
+
+    for (const product of products) {
+      const storeListing = storeListingByProductId.get(product.id);
+      if (storeListing) {
+        pricingByProductId.set(product.id, {
+          price: resolveStoredRetailPrice(storeListing),
+          sourceLabel: "This store catalogue",
+          syncedAt:
+            storeListing.synced_at ??
+            (typeof org?.catalog_synced_at === "string"
+              ? org.catalog_synced_at
+              : null),
+        });
+        continue;
+      }
+
+      const sku = String(product.sku ?? "").trim();
+      const weeklyOffer = sku ? weeklyOfferBySku.get(sku) ?? null : null;
+      pricingByProductId.set(product.id, {
+        price: resolveNationalRetailPrice({
+          regularPriceEur: product.national_regular_price_eur,
+          weeklyOffer,
+        }),
+        sourceLabel: weeklyOffer
+          ? "National SuperValu price / current offer"
+          : "National SuperValu price",
+        syncedAt:
+          weeklyOffer?.synced_at ??
+          (typeof org?.offers_synced_at === "string"
+            ? org.offers_synced_at
+            : typeof org?.catalog_synced_at === "string"
+              ? org.catalog_synced_at
+              : null),
+      });
     }
   }
 
@@ -330,7 +465,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
               <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <strong className="font-semibold text-slate-800">Safe default:</strong>{" "}
-                products start as <strong>Not confirmed</strong>. You only need to change items this store has actually confirmed.
+                products start as <strong>Not confirmed</strong>. Prices and offers shown below use the same catalogue data Cara can quote on calls; the source label shows whether it is store-specific or national SuperValu data.
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]">
@@ -366,14 +501,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       const StatusIcon = statusIcon(status);
                       const areaLabel = productAreaLabel(product);
                       const fulfilmentLabel = productFulfilmentLabel(product);
+                      const pricing = pricingByProductId.get(product.id);
 
                       return (
                         <div
                           key={product.id}
                           className={`${DASHBOARD_CARD_SURFACE} p-4 sm:p-5`}
                         >
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="min-w-0">
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                            <div className="min-w-0 xl:flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h2 className="text-[15px] font-semibold text-[#11181d]">
                                   {product.product_name}
@@ -411,7 +547,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               </p>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            {pricing ? (
+                              <ProductPriceSummary
+                                price={pricing.price}
+                                sourceLabel={pricing.sourceLabel}
+                                syncedAt={pricing.syncedAt}
+                              />
+                            ) : null}
+
+                            <div className="flex flex-wrap gap-2 xl:w-[18rem] xl:shrink-0 xl:justify-end">
                               {(
                                 [
                                   ["stocked", "Normally stocked"],

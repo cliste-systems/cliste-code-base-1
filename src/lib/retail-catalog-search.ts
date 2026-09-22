@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { offerSearchProductTokens, scoreSupervaluSearchText } from "@/lib/retail-weekly-offers-search";
 import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
+import { resolveStoredRetailPrice } from "@/lib/retail-price-presentation";
 import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import {
   formatCatalogStockQuote,
@@ -53,7 +54,6 @@ export async function searchStoredRetailCatalog(
 ): Promise<SupervaluCatalogMatch[]> {
   const tokens = offerSearchProductTokens(input.query);
   if (tokens.length === 0) return [];
-  const today = new Date().toISOString().slice(0, 10);
   const broad = tokens[0]!.replace(/s$/, "");
   let query = supabase
     .from("retail_catalog_products")
@@ -75,20 +75,17 @@ export async function searchStoredRetailCatalog(
     .map((row) => {
       const listing = row.retail_store_products?.[0];
       if (!listing) return null;
-      const activePromos = (listing.retail_promotions ?? []).filter(
-        (p) => p.valid_from <= today && p.valid_to >= today,
-      );
-      const promo = activePromos.find((p) => p.loyalty_required) ?? activePromos[0] ?? null;
-      const isOnOffer = promo != null;
-      const currentPrice = promo?.offer_price_eur ?? listing.display_price_eur ?? listing.regular_price_eur;
-      const regularPrice = promo?.regular_price_eur ?? listing.regular_price_eur;
+      const price = resolveStoredRetailPrice(listing);
+      const isOnOffer = price.isOnOffer;
+      const currentPrice = price.currentPriceEur;
+      const regularPrice = price.regularPriceEur;
       const score = scoreSupervaluSearchText(
         normalizeSearchText(row.search_text),
         tokens,
         row.department,
       );
-      const loyaltySuffix = promo?.loyalty_required
-        ? ` ${promo.loyalty_program ?? "Loyalty"} required.`
+      const loyaltySuffix = price.loyaltyRequired
+        ? ` ${price.loyaltyProgram ?? "Loyalty"} required.`
         : "";
       const quoteText =
         formatCatalogStockQuote({
@@ -96,7 +93,7 @@ export async function searchStoredRetailCatalog(
           department: row.department,
           currentPriceEur: currentPrice,
           wasPriceEur: isOnOffer ? regularPrice : null,
-          discountLabel: promo?.label ?? null,
+          discountLabel: price.offerLabel,
           pricePerUnit: listing.price_per_unit,
           isOnOffer,
           intent: input.intent,
@@ -107,7 +104,7 @@ export async function searchStoredRetailCatalog(
         sku: row.sku,
         currentPriceEur: currentPrice,
         wasPriceEur: isOnOffer ? regularPrice : null,
-        discountLabel: promo?.label ?? null,
+        discountLabel: price.offerLabel,
         isOnOffer,
         score,
         quoteText,
