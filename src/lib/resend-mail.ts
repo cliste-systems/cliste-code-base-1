@@ -2,18 +2,24 @@
  * Transactional email via Resend HTTP API.
  *
  * Signup confirmation, team invites, owner notifications, and system notices
- * are sent through this module. Configure `RESEND_API_KEY` and
- * `RESEND_FROM_EMAIL` in production.
+ * are sent through this module. HelloCara defaults to hello@hellocara.ie for
+ * general transactional mail; billing-specific flows can override the sender.
  *
  * Env (Vercel / `.env.local`):
  * - `RESEND_API_KEY` — API key with send permission
- * - `RESEND_FROM_EMAIL` — verified sender on a Resend domain
- * - `RESEND_FROM_NAME` — optional display name
+ * - `RESEND_FROM_EMAIL` — optional general sender override
+ * - `RESEND_FROM_NAME` — optional display name override
+ * - `RESEND_BILLING_EMAIL` — optional billing sender override
+ * - `RESEND_BILLING_NAME` — optional billing display name override
  */
 
 import { Resend } from "resend";
 
 import { PRODUCT_NAME } from "@/lib/company-details";
+
+const DEFAULT_FROM_EMAIL = "hello@hellocara.ie";
+const DEFAULT_BILLING_EMAIL = "billing@hellocara.ie";
+const DEFAULT_BILLING_NAME = "HelloCara Billing";
 
 let resendClient: Resend | null = null;
 
@@ -27,10 +33,7 @@ function getResendClient(): Resend | null {
 }
 
 export function isResendConfigured(): boolean {
-  return Boolean(
-    process.env.RESEND_API_KEY?.trim() &&
-      process.env.RESEND_FROM_EMAIL?.trim(),
-  );
+  return Boolean(process.env.RESEND_API_KEY?.trim());
 }
 
 export type EmailAddress = {
@@ -52,6 +55,15 @@ export type SendTransactionalEmailResult =
   | { ok: true }
   | { ok: false; message: string };
 
+export function helloCaraBillingSender(): EmailAddress {
+  return {
+    email:
+      process.env.RESEND_BILLING_EMAIL?.trim().toLowerCase() ||
+      DEFAULT_BILLING_EMAIL,
+    name: process.env.RESEND_BILLING_NAME?.trim() || DEFAULT_BILLING_NAME,
+  };
+}
+
 function formatFromAddress(email: string, name: string): string {
   const safeName = name.replace(/"/g, '\\"').trim();
   return safeName ? `${safeName} <${email}>` : email;
@@ -61,7 +73,8 @@ export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput,
 ): Promise<SendTransactionalEmailResult> {
   const client = getResendClient();
-  const platformFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+  const platformFromEmail =
+    process.env.RESEND_FROM_EMAIL?.trim().toLowerCase() || DEFAULT_FROM_EMAIL;
   const configuredFromName = process.env.RESEND_FROM_NAME?.trim();
   const platformFromName =
     configuredFromName && /^hello\s*cara$/i.test(configuredFromName)
@@ -73,10 +86,6 @@ export async function sendTransactionalEmail(
   if (!client) {
     return { ok: false, message: "RESEND_API_KEY is not configured." };
   }
-  if (!fromEmail) {
-    return { ok: false, message: "RESEND_FROM_EMAIL is not configured." };
-  }
-
   const to = input.to.trim().toLowerCase();
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     return { ok: false, message: "Invalid recipient email." };
