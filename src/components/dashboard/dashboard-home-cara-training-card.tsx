@@ -6,7 +6,6 @@ import {
   DashboardHomeFirstRowButton,
   DashboardHomeFirstRowList,
   HOME_FIRST_ROW_COUNT_BADGE,
-  HOME_FIRST_ROW_EMPTY,
   HOME_FIRST_ROW_FOOTER,
   HOME_FIRST_ROW_HEADER,
   HOME_FIRST_ROW_TITLE,
