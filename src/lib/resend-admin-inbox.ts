@@ -5,10 +5,21 @@ import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const RESEND_API_BASE = "https://api.resend.com";
-const DEFAULT_FROM_EMAIL = "brendan@hellocara.ie";
-const DEFAULT_FROM_NAME = "HelloCara";
+const DEFAULT_HELLO_EMAIL = "hello@hellocara.ie";
+const DEFAULT_HELLO_NAME = "HelloCara";
+const DEFAULT_BILLING_EMAIL = "billing@hellocara.ie";
+const DEFAULT_BILLING_NAME = "HelloCara Billing";
+const LEGACY_HELLO_ADDRESSES = ["brendan@hellocara.ie"] as const;
 
 export type AdminEmailFolder = "inbox" | "archived" | "sent";
+export type AdminEmailIdentityKey = "hello" | "billing";
+
+export type AdminEmailIdentity = {
+  key: AdminEmailIdentityKey;
+  label: string;
+  email: string;
+  name: string;
+};
 
 export type AdminEmailListItem = {
   id: string;
@@ -84,14 +95,91 @@ function resendApiKey(): string {
   return key;
 }
 
+function normalizeHelloCaraName(value: string | undefined, fallback: string): string {
+  const configured = value?.trim();
+  if (!configured) return fallback;
+  return /^hello\s*cara$/i.test(configured) ? "HelloCara" : configured;
+}
+
+export function adminInboxIdentities(): AdminEmailIdentity[] {
+  return [
+    {
+      key: "hello",
+      label: "Hello",
+      email:
+        process.env.RESEND_HELLO_EMAIL?.trim().toLowerCase() ||
+        DEFAULT_HELLO_EMAIL,
+      name: normalizeHelloCaraName(
+        process.env.RESEND_HELLO_NAME || process.env.RESEND_FROM_NAME,
+        DEFAULT_HELLO_NAME,
+      ),
+    },
+    {
+      key: "billing",
+      label: "Billing",
+      email:
+        process.env.RESEND_BILLING_EMAIL?.trim().toLowerCase() ||
+        DEFAULT_BILLING_EMAIL,
+      name:
+        process.env.RESEND_BILLING_NAME?.trim() || DEFAULT_BILLING_NAME,
+    },
+  ];
+}
+
+export function isAdminEmailIdentityKey(
+  value: string | null | undefined,
+): value is AdminEmailIdentityKey {
+  return value === "hello" || value === "billing";
+}
+
+function adminInboxIdentityByKey(
+  key: AdminEmailIdentityKey = "hello",
+): AdminEmailIdentity {
+  return (
+    adminInboxIdentities().find((identity) => identity.key === key) ||
+    adminInboxIdentities()[0]!
+  );
+}
+
+function adminInboxIdentityAddresses(key: AdminEmailIdentityKey): Set<string> {
+  const identity = adminInboxIdentityByKey(key);
+  const addresses = new Set([identity.email.toLowerCase()]);
+  if (key === "hello") {
+    for (const legacy of LEGACY_HELLO_ADDRESSES) {
+      addresses.add(legacy.toLowerCase());
+    }
+  }
+  return addresses;
+}
+
+function rowBelongsToIdentity(
+  row: AdminEmailRow,
+  key: AdminEmailIdentityKey,
+): boolean {
+  const addresses = adminInboxIdentityAddresses(key);
+  if (row.direction === "outbound") {
+    return addresses.has(row.from_address.trim().toLowerCase());
+  }
+  return (row.to_addresses ?? []).some((value) =>
+    addresses.has(parseMailbox(value).email),
+  );
+}
+
+function identityForInboundRecipients(
+  recipients: string[],
+): AdminEmailIdentity {
+  const parsed = recipients.map((value) => parseMailbox(value).email);
+  const billing = adminInboxIdentityByKey("billing");
+  if (parsed.includes(billing.email.toLowerCase())) return billing;
+  return adminInboxIdentityByKey("hello");
+}
+
 export function adminInboxFromEmail(): string {
-  return process.env.RESEND_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL;
+  return adminInboxIdentityByKey("hello").email;
 }
 
 export function adminInboxFromName(): string {
-  const configured = process.env.RESEND_FROM_NAME?.trim();
-  if (!configured) return DEFAULT_FROM_NAME;
-  return /^hello\s*cara$/i.test(configured) ? "HelloCara" : configured;
+  return adminInboxIdentityByKey("hello").name;
 }
 
 async function resendFetch<T>(
@@ -245,6 +333,7 @@ async function syncInboundMetadata(): Promise<void> {
 
 export async function listAdminInbox(
   folder: AdminEmailFolder,
+  identity: AdminEmailIdentityKey = "hello",
 ): Promise<AdminEmailListItem[]> {
   if (folder !== "sent") {
     await syncInboundMetadata();
@@ -275,7 +364,9 @@ export async function listAdminInbox(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return ((data ?? []) as AdminEmailRow[]).map(rowToListItem);
+  return ((data ?? []) as AdminEmailRow[])
+    .filter((row) => rowBelongsToIdentity(row, identity))
+    .map(rowToListItem);
 }
 
 export async function getAdminEmailMessage(
@@ -413,6 +504,7 @@ export async function sendNewAdminEmail(input: {
   to: string;
   subject: string;
   text: string;
+  identity?: AdminEmailIdentityKey;
 }): Promise<{ id: string }> {
   const to = input.to.trim().toLowerCase();
   const subject = input.subject.trim();
@@ -426,8 +518,9 @@ export async function sendNewAdminEmail(input: {
   if (!text) throw new Error("Email body cannot be empty.");
   if (text.length > 20_000) throw new Error("Email body is too long.");
 
-  const fromEmail = adminInboxFromEmail();
-  const fromName = adminInboxFromName();
+  const sender = adminInboxIdentityByKey(input.identity);
+  const fromEmail = sender.email;
+  const fromName = sender.name;
   const response = await resendFetch<{ id: string }>("/emails", {
     method: "POST",
     headers: {
@@ -484,8 +577,9 @@ export async function replyToAdminEmail(input: {
   const subject = /^re:/i.test(source.subject)
     ? source.subject
     : `Re: ${source.subject}`;
-  const fromEmail = adminInboxFromEmail();
-  const fromName = adminInboxFromName();
+  const sender = identityForInboundRecipients(source.toAddresses);
+  const fromEmail = sender.email;
+  const fromName = sender.name;
   const headers: Record<string, string> = {};
 
   if (source.messageId) {
