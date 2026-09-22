@@ -1,11 +1,16 @@
 import { CheckCircle2, CircleHelp, PackageSearch, XCircle } from "lucide-react";
 
 import { DashboardAnimatedPageSections } from "@/components/dashboard/dashboard-animated-group";
-import { ClistePageHeader } from "@/components/dashboard/cliste-page-header";
 import {
   DASHBOARD_CARD_SURFACE,
+  DASHBOARD_HINT_CLASS,
   DASHBOARD_HOME_CONTENT_COLUMN,
+  DASHBOARD_ICON_CHIP_MD,
+  DASHBOARD_ICON_GLYPH_MD,
+  DASHBOARD_INPUT_CLASS,
   DASHBOARD_PAGE_SHELL_FILL_WHITE,
+  DASHBOARD_PRIMARY_BUTTON_CLASS,
+  DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
 import { requireDashboardSession } from "@/lib/dashboard-session";
 import type { RetailStoreAssortmentStatus } from "@/lib/retail-store-assortment";
@@ -358,12 +363,19 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     <div className={DASHBOARD_PAGE_SHELL_FILL_WHITE} data-dashboard-fill>
       <div className={DASHBOARD_HOME_CONTENT_COLUMN}>
         <DashboardAnimatedPageSections className="min-h-0 flex-1 overflow-hidden">
-          <ClistePageHeader
-            tone="inbox"
-            icon={PackageSearch}
-            title="Products"
-            description="Tell Cara what this store normally stocks. Catalogue presence alone never means this shop carries an item."
-          />
+          <div className="flex shrink-0 items-center gap-3 px-1">
+            <span className={DASHBOARD_ICON_CHIP_MD}>
+              <PackageSearch className={DASHBOARD_ICON_GLYPH_MD} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-[#11181d]">
+                Products
+              </h1>
+              <p className={`${DASHBOARD_HINT_CLASS} mt-0.5`}>
+                Search the catalogue, check live pricing and offers, and tell Cara what this store normally carries.
+              </p>
+            </div>
+          </div>
 
           {!isRetail || !retailBanner ? (
             <div className={`${DASHBOARD_CARD_SURFACE} p-5`}>
@@ -375,98 +387,95 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
               <form
                 method="get"
-                className={`${DASHBOARD_CARD_SURFACE} shrink-0 p-5`}
+                className={`${DASHBOARD_CARD_SURFACE} shrink-0 px-3 py-3 sm:px-4`}
               >
-                <div className="w-full space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Search the {retailBanner === "supervalu" ? "SuperValu" : "retailer"} catalogue
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        name="q"
-                        defaultValue={query}
-                        placeholder="Product, brand or SKU — e.g. striploin, Heinz, 1023229001"
-                        className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-                      />
-                      <button
-                        type="submit"
-                        className="h-11 shrink-0 rounded-xl bg-[#11181d] px-5 text-sm font-semibold text-white transition hover:bg-[#222c33]"
-                      >
-                        Search
-                      </button>
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-slate-500">
-                      Search matches product name, brand, category and SKU.
-                    </p>
-                  </div>
+                <div
+                  className={
+                    hasMixedCounterAndPrepack(area)
+                      ? "grid gap-2.5 lg:grid-cols-[minmax(20rem,1fr)_10rem_10rem_10.5rem_auto] lg:items-end"
+                      : "grid gap-2.5 lg:grid-cols-[minmax(20rem,1fr)_10rem_10.5rem_auto] lg:items-end"
+                  }
+                >
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
+                      Search {retailBanner === "supervalu" ? "SuperValu" : "retailer"}
+                    </span>
+                    <input
+                      name="q"
+                      defaultValue={query}
+                      placeholder="Product, brand or SKU"
+                      className={`h-10 w-full rounded-lg px-3 text-[13px] text-[#11181d] outline-none ${DASHBOARD_INPUT_CLASS}`}
+                    />
+                  </label>
 
-                  <div className="border-t border-slate-100 pt-4">
-                    <div
-                      className={
-                        hasMixedCounterAndPrepack(area)
-                          ? "grid gap-3 sm:grid-cols-3"
-                          : "grid gap-3 sm:grid-cols-2"
-                      }
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
+                      Store area
+                    </span>
+                    <select
+                      name="area"
+                      defaultValue={area}
+                      className={DASHBOARD_SELECT_CLASS}
                     >
-                      <label className="block min-w-0">
-                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Store area
-                        </span>
-                        <select
-                          name="area"
-                          defaultValue={area}
-                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                        >
-                          {PRODUCT_AREAS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      {PRODUCT_AREAS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                      {hasMixedCounterAndPrepack(area) ? (
-                        <label className="block min-w-0">
-                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Counter / prepacked
-                          </span>
-                          <select
-                            name="type"
-                            defaultValue={productType}
-                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                          >
-                            <option value="all">All products</option>
-                            <option value="counter">Counter only</option>
-                            <option value="prepack">Prepacked only</option>
-                          </select>
-                        </label>
-                      ) : null}
+                  {hasMixedCounterAndPrepack(area) ? (
+                    <label className="block min-w-0">
+                      <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
+                        Product type
+                      </span>
+                      <select
+                        name="type"
+                        defaultValue={productType}
+                        className={DASHBOARD_SELECT_CLASS}
+                      >
+                        <option value="all">All products</option>
+                        <option value="counter">Counter only</option>
+                        <option value="prepack">Prepacked only</option>
+                      </select>
+                    </label>
+                  ) : null}
 
-                      <label className="block min-w-0">
-                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Store status
-                        </span>
-                        <select
-                          name="filter"
-                          defaultValue={filter}
-                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                        >
-                          <option value="all">All statuses</option>
-                          <option value="stocked">Normally stocked</option>
-                          <option value="not_stocked">Not stocked</option>
-                          <option value="not_confirmed">Not confirmed</option>
-                        </select>
-                      </label>
-                    </div>
-                  </div>
+                  <label className="block min-w-0">
+                    <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
+                      Store status
+                    </span>
+                    <select
+                      name="filter"
+                      defaultValue={filter}
+                      className={DASHBOARD_SELECT_CLASS}
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="stocked">Normally stocked</option>
+                      <option value="not_stocked">Not stocked</option>
+                      <option value="not_confirmed">Not confirmed</option>
+                    </select>
+                  </label>
+
+                  <button
+                    type="submit"
+                    className={`${DASHBOARD_PRIMARY_BUTTON_CLASS} w-full px-5 lg:w-auto`}
+                  >
+                    Search
+                  </button>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-[#e3e9e5] pt-2.5 text-[11px] leading-4 text-[#6b7c75]">
+                  <span>
+                    Name, brand, category or SKU.
+                  </span>
+                  <span>
+                    <strong className="font-medium text-[#35443f]">Safe default:</strong>{" "}
+                    unconfirmed products are never presented as normally stocked.
+                  </span>
                 </div>
               </form>
-
-              <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <strong className="font-semibold text-slate-800">Safe default:</strong>{" "}
-                products start as <strong>Not confirmed</strong>. Prices and offers shown below use the same catalogue data Cara can quote on calls; the source label shows whether it is store-specific or national SuperValu data.
-              </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]">
                 {loadError ? (
@@ -506,10 +515,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                       return (
                         <div
                           key={product.id}
-                          className={`${DASHBOARD_CARD_SURFACE} p-4 sm:p-5`}
+                          className={`${DASHBOARD_CARD_SURFACE} px-4 py-3.5`}
                         >
-                          <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                            <div className="min-w-0 xl:flex-1">
+                          <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1fr)_15.5rem_17rem] xl:items-center">
+                            <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h2 className="text-[15px] font-semibold text-[#11181d]">
                                   {product.product_name}
@@ -555,26 +564,40 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                               />
                             ) : null}
 
-                            <div className="flex flex-wrap gap-2 xl:w-[18rem] xl:shrink-0 xl:justify-end">
-                              {(
-                                [
-                                  ["stocked", "Normally stocked"],
-                                  ["not_stocked", "Not stocked"],
-                                  ["not_confirmed", "Not confirmed"],
-                                ] as const
-                              ).map(([nextStatus, label]) => (
-                                <form key={nextStatus} action={setProductAssortmentStatus}>
-                                  <input type="hidden" name="product_id" value={product.id} />
-                                  <input type="hidden" name="status" value={nextStatus} />
-                                  <button
-                                    type="submit"
-                                    disabled={status === nextStatus}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-default disabled:bg-slate-100 disabled:text-slate-400"
+                            <div className="min-w-0">
+                              <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
+                                Store status
+                              </p>
+                              <div className="grid grid-cols-3 rounded-lg border border-[#d9e2dd] bg-[#f6faf7] p-0.5">
+                                {(
+                                  [
+                                    ["stocked", "Stocked"],
+                                    ["not_stocked", "Not stocked"],
+                                    ["not_confirmed", "Unconfirmed"],
+                                  ] as const
+                                ).map(([nextStatus, label]) => (
+                                  <form
+                                    key={nextStatus}
+                                    action={setProductAssortmentStatus}
+                                    className="min-w-0"
                                   >
-                                    {label}
-                                  </button>
-                                </form>
-                              ))}
+                                    <input type="hidden" name="product_id" value={product.id} />
+                                    <input type="hidden" name="status" value={nextStatus} />
+                                    <button
+                                      type="submit"
+                                      aria-pressed={status === nextStatus}
+                                      disabled={status === nextStatus}
+                                      className={
+                                        status === nextStatus
+                                          ? "h-8 w-full rounded-md bg-[#11181d] px-2 text-[11px] font-medium text-white shadow-sm"
+                                          : "h-8 w-full rounded-md px-2 text-[11px] font-medium text-[#5b6b65] transition-colors hover:bg-white hover:text-[#11181d]"
+                                      }
+                                    >
+                                      {label}
+                                    </button>
+                                  </form>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
