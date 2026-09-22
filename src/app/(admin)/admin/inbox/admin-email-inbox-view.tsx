@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
+  Ban,
   Inbox,
   Loader2,
   Mail,
@@ -54,6 +55,7 @@ type EmailMessage = EmailListItem & {
   ccAddresses: string[];
   textBody: string;
   htmlBody: string | null;
+  senderBlocked: boolean;
   attachments: Array<Record<string, unknown>>;
   replies: EmailListItem[];
 };
@@ -472,6 +474,54 @@ export function AdminEmailInboxView({
     }
   };
 
+  const updateSenderBlocked = async () => {
+    if (!selected || selected.direction !== "inbound") return;
+
+    const block = !selected.senderBlocked;
+    if (
+      block &&
+      !window.confirm(
+        `Block ${selected.fromAddress}? Future emails from this exact address will go straight to Archived.`,
+      )
+    ) {
+      return;
+    }
+
+    setChangingState(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiJson<{
+        ok: true;
+        senderEmail: string | null;
+      }>(`/api/admin/inbox/${encodeURIComponent(selected.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ blocked: block }),
+      });
+
+      setNotice(
+        block
+          ? `${data.senderEmail || selected.fromAddress} blocked. Future mail from this address will go to Archived.`
+          : `${data.senderEmail || selected.fromAddress} unblocked.`,
+      );
+
+      if (block && folder === "inbox") {
+        await loadFolder("inbox");
+      } else {
+        await loadMessage(selected.id);
+        await loadFolder(folder, true, true);
+      }
+    } catch (stateError) {
+      setError(
+        stateError instanceof Error
+          ? stateError.message
+          : "Could not update blocked sender.",
+      );
+    } finally {
+      setChangingState(false);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <aside className="flex w-[22rem] min-w-[19rem] shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -860,6 +910,20 @@ export function AdminEmailInboxView({
                         <MailOpen className="size-3.5" aria-hidden />
                       )}
                       {selected.readAt ? "Mark unread" : "Mark read"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={changingState}
+                      onClick={() => void updateSenderBlocked()}
+                      className={cn(
+                        adminSecondaryButtonClass,
+                        selected.senderBlocked
+                          ? "text-slate-700"
+                          : "text-red-700 hover:border-red-200 hover:bg-red-50 hover:text-red-800",
+                      )}
+                    >
+                      <Ban className="size-3.5" aria-hidden />
+                      {selected.senderBlocked ? "Unblock sender" : "Block sender"}
                     </button>
                     <button
                       type="button"
