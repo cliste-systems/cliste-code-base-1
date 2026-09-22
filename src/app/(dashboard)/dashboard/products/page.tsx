@@ -465,7 +465,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
               <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <strong className="font-semibold text-slate-800">Safe default:</strong>{" "}
-                products start as <strong>Not confirmed</strong>. You only need to change items this store has actually confirmed.
+                products start as <strong>Not confirmed</strong>. Prices and offers shown below use the same catalogue data Cara can quote on calls; the source label shows whether it is store-specific or national SuperValu data.
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]">
