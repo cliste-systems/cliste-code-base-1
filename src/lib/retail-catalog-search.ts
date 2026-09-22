@@ -2,8 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { offerSearchProductTokens, scoreSupervaluSearchText } from "@/lib/retail-weekly-offers-search";
 import { normalizeSearchText } from "@/lib/supervalu-offers-normalize";
-import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
-import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
+import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import {
   formatCatalogStockQuote,
   type CatalogQuoteIntent,
@@ -16,7 +15,6 @@ type CatalogRow = {
   product_name: string;
   brand: string | null;
   department: string;
-  category_breadcrumb: string | null;
   service_area: string;
   fulfilment: string;
   is_alcohol: boolean;
@@ -49,6 +47,7 @@ export async function searchStoredRetailCatalog(
     query: string;
     intent: CatalogQuoteIntent;
     fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
     limit?: number;
   },
 ): Promise<SupervaluCatalogMatch[]> {
@@ -59,7 +58,7 @@ export async function searchStoredRetailCatalog(
   let query = supabase
     .from("retail_catalog_products")
     .select(
-      "id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to))",
+      "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,retail_store_products!inner(id,regular_price_eur,display_price_eur,price_per_unit,source_price_label,is_listed,retail_promotions(promotion_type,loyalty_required,loyalty_program,offer_price_eur,regular_price_eur,label,valid_from,valid_to))",
     )
     .eq("retail_banner", input.retailBanner)
     .eq("retail_store_products.source_store_id", input.sourceStoreId)
@@ -67,6 +66,7 @@ export async function searchStoredRetailCatalog(
     .ilike("search_text", `%${broad}%`)
     .limit(80);
   if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+  if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -82,12 +82,11 @@ export async function searchStoredRetailCatalog(
       const isOnOffer = promo != null;
       const currentPrice = promo?.offer_price_eur ?? listing.display_price_eur ?? listing.regular_price_eur;
       const regularPrice = promo?.regular_price_eur ?? listing.regular_price_eur;
-      const score =
-        scoreSupervaluSearchText(
-          normalizeSearchText(row.search_text),
-          tokens,
-          row.department,
-        ) + catalogCategoryDirectnessScore(row, tokens);
+      const score = scoreSupervaluSearchText(
+        normalizeSearchText(row.search_text),
+        tokens,
+        row.department,
+      );
       const loyaltySuffix = promo?.loyalty_required
         ? ` ${promo.loyalty_program ?? "Loyalty"} required.`
         : "";
@@ -131,7 +130,6 @@ type NationalCatalogRow = {
   product_name: string;
   brand: string | null;
   department: string;
-  category_breadcrumb: string | null;
   service_area: string;
   fulfilment: string;
   is_alcohol: boolean;
@@ -140,35 +138,6 @@ type NationalCatalogRow = {
   national_regular_price_eur: number | null;
 };
 
-function catalogCategoryDirectnessScore(
-  row: { department: string; category_breadcrumb?: string | null; product_name: string },
-  tokens: string[],
-): number {
-  if (tokens.length === 0) return 0;
-  const department = normalizeSearchText(row.department);
-  const category = normalizeSearchText(row.category_breadcrumb ?? "");
-  const productName = normalizeSearchText(row.product_name);
-  let direct = 0;
-
-  for (const token of tokens) {
-    if (retailSearchTokenMatchesText(department, token)) {
-      direct += 0.65;
-      continue;
-    }
-    if (retailSearchTokenMatchesText(category, token)) {
-      direct += 0.45;
-      continue;
-    }
-    // A product whose noun is the actual item should outrank products where the
-    // same word is merely an ingredient/flavour (e.g. avocado vs avocado oil).
-    if (retailSearchTokenMatchesText(productName, token)) {
-      direct += 0.1;
-    }
-  }
-
-  return direct / tokens.length;
-}
-
 export async function searchNationalRetailCatalog(
   supabase: SupabaseClient,
   input: {
@@ -176,6 +145,7 @@ export async function searchNationalRetailCatalog(
     query: string;
     intent: CatalogQuoteIntent;
     fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
     limit?: number;
   },
 ): Promise<SupervaluCatalogMatch[]> {
@@ -193,7 +163,7 @@ export async function searchNationalRetailCatalog(
     let query = supabase
       .from("retail_catalog_products")
       .select(
-        "id,sku,product_name,brand,department,category_breadcrumb,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
+        "id,sku,product_name,brand,department,service_area,fulfilment,is_alcohol,search_text,national_store_count,national_regular_price_eur",
       )
       .eq("retail_banner", input.retailBanner)
       .eq("is_national", true)
@@ -202,6 +172,7 @@ export async function searchNationalRetailCatalog(
       .limit(80);
 
     if (input.fulfilment) query = query.eq("fulfilment", input.fulfilment);
+    if (input.serviceArea) query = query.eq("service_area", input.serviceArea);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
@@ -213,12 +184,11 @@ export async function searchNationalRetailCatalog(
 
   return candidateRows
     .map((row) => {
-      const score =
-        scoreSupervaluSearchText(
-          normalizeSearchText(row.search_text),
-          tokens,
-          row.department,
-        ) + catalogCategoryDirectnessScore(row, tokens);
+      const score = scoreSupervaluSearchText(
+        normalizeSearchText(row.search_text),
+        tokens,
+        row.department,
+      );
       return {
         productName: row.product_name,
         department: row.department,

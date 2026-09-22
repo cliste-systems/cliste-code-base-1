@@ -95,6 +95,8 @@ describe("supervalu catalog search", () => {
 
   it("infers offer intent from caller phrasing", () => {
     assert.equal(inferCatalogSearchIntent("is Weetabix on offer this week"), "offer");
+    assert.equal(inferCatalogSearchIntent("What's on Rewards Price for €2.50?"), "offer");
+    assert.equal(inferCatalogSearchIntent("Anything with Rewards at two fifty?"), "offer");
     assert.equal(inferCatalogSearchIntent("how much is Weetabix"), "price");
     assert.equal(inferCatalogSearchIntent("do you stock Weetabix"), "stock");
   });

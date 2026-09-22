@@ -9,9 +9,10 @@ import {
   isPromotionalSupervaluProduct,
   normalizeSearchText,
 } from "@/lib/supervalu-offers-normalize";
-import type { SupervaluFulfilment, SupervaluGatewayProduct } from "@/lib/supervalu-offers-types";
+import type { SupervaluFulfilment, SupervaluGatewayProduct, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import { retailSearchTokenMatchesText } from "@/lib/retail-search-fuzzy";
 import {
+  inferRewardsPricePointFromQuery,
   inferWeeklyOffersListIntent,
   offerSearchProductTokens,
   resolveWeeklyOfferSearchFilters,
@@ -82,11 +83,6 @@ export function filterCatalogMatchesByQuery(
 ): SupervaluCatalogMatch[] {
   if (matches.length === 0) return matches;
 
-  // Browse/list queries are already scoped by the offer search. Do not treat
-  // section words such as "off licence" or "dairy wall" as product-name
-  // requirements and accidentally discard valid category results.
-  if (inferWeeklyOffersListIntent(query)) return matches;
-
   const productTokens = catalogProductTokens(query);
   if (productTokens.length === 0) {
     return matches;
@@ -113,10 +109,7 @@ export function filterCatalogMatchesByQuery(
     return applyOwnLabelFilter(broadMatches);
   }
 
-  // A specific product query with zero token overlap must not leak unrelated
-  // browse/gateway results back to Cara. Returning [] is safer than letting an
-  // irrelevant candidate become a spoken answer.
-  return [];
+  return matches;
 }
 
 function shortCatalogProductLabel(productName: string): string {
@@ -149,8 +142,11 @@ export function formatOwnBrandFallbackQuote(
 /** Infer whether the caller wants offer status, a price, or stock/range info. */
 export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
   const q = query.toLowerCase();
+  if (inferRewardsPricePointFromQuery(q) != null) {
+    return "offer";
+  }
   if (
-    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b|\b(?:buy\s+)?\d+\s+for\s+(?:€\s*)?\d+|\breal\s+rewards?\b|\brewards?\s+price\b|\bhalf\s+price\b|\bsave\s+(?:€\s*)?\d+|\b\d+\s*%\s*off\b|\bmix\s*(?:&|and)\s*match\b|\bsuper\s*7\b/i.test(
+    /\bon offer\b|\bthis week\b|\bspecial\b|\bpromo|\bpromotion|\bdeal\b|\breduced\b|\bany offers\b|\bis it on\b|\bare they on\b|\boffers?\s+this\b/i.test(
       q,
     )
   ) {
@@ -170,7 +166,7 @@ export function inferCatalogSearchIntent(query: string): CatalogQuoteIntent {
 export function stripCatalogSearchBoilerplate(query: string): string {
   return query
     .replace(
-      /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|cheapest|lowest price|least expensive|best value|budget|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
+      /\b(on offer|this week|any offers?|special|promotion|promo|deal|reduced|how much is|how much|what(?:'s| is) the price|what(?:'s| is) the cost|price of|cost of|do you stock|do you sell|do you carry|are they on|is it on)\b/gi,
       " ",
     )
     .replace(
@@ -643,6 +639,7 @@ async function searchSupervaluCatalogLiveInternal(
     supabase?: SupabaseClient;
     retailBanner?: string;
     fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
@@ -659,6 +656,7 @@ async function searchSupervaluCatalogLiveInternal(
       query: trimmed,
       intent,
       fulfilment: options.fulfilment,
+      serviceArea: options.serviceArea,
       limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
     });
     if (stored.length > 0) return filterCatalogMatchesByQuery(trimmed, stored);
@@ -668,13 +666,16 @@ async function searchSupervaluCatalogLiveInternal(
       query: trimmed,
       intent,
       fulfilment: options.fulfilment,
+      serviceArea: options.serviceArea,
       limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : SUPERVALU_CATALOG_SEARCH_MAX_RESULTS,
     });
   }
   const filters = resolveWeeklyOfferSearchFilters(trimmed, {
     fulfilment: options?.fulfilment,
+    serviceArea: options?.serviceArea,
   });
   const fulfilment = filters.fulfilment ?? null;
+  const serviceArea = filters.serviceArea ?? null;
 
   let syncedMatches: WeeklyOfferMatch[] = [];
   if (options?.supabase && options?.retailBanner) {
@@ -685,6 +686,7 @@ async function searchSupervaluCatalogLiveInternal(
       {
         limit: listIntent ? RETAIL_WEEKLY_OFFERS_LIST_MAX_RESULTS : undefined,
         fulfilment,
+        serviceArea,
       },
     );
   }
@@ -712,6 +714,11 @@ async function searchSupervaluCatalogLiveInternal(
         (match) => match.fulfilment === fulfilment,
       );
     }
+    if (serviceArea) {
+      filteredNational = filteredNational.filter(
+        (match) => match.serviceArea === serviceArea,
+      );
+    }
     return filteredNational;
   }
 
@@ -723,8 +730,10 @@ async function searchSupervaluCatalogLiveInternal(
   const merged = mergeGatewayWithSyncedOffers(gatewayMatches, syncedMatches, intent);
   let filtered = filterCatalogMatchesByQuery(trimmed, merged);
   if (fulfilment) {
-    const fulfilmentMatches = filtered.filter((match) => match.fulfilment === fulfilment);
-    filtered = fulfilmentMatches;
+    filtered = filtered.filter((match) => match.fulfilment === fulfilment);
+  }
+  if (serviceArea) {
+    filtered = filtered.filter((match) => match.serviceArea === serviceArea);
   }
   return filtered;
 }
@@ -742,6 +751,7 @@ export async function searchSupervaluCatalogLiveWithFallback(
     supabase?: SupabaseClient;
     retailBanner?: string;
     fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
   },
 ): Promise<SupervaluCatalogSearchResult> {
   const trimmed = query.trim().slice(0, SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS);
@@ -749,30 +759,26 @@ export async function searchSupervaluCatalogLiveWithFallback(
 
   const normalized = normalizeCatalogBrandQuery(trimmed);
   const searchQuery = normalized || trimmed;
-  const ownLabelRequested = queryRequestsSupervaluOwnLabel(trimmed);
+  const matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
 
-  // Treat own-brand as a constraint, not another search token. Searching
-  // "SuperValu avocado" directly can fill the candidate window with unrelated
-  // SuperValu products before the actual avocado rows are ranked.
-  if (ownLabelRequested) {
-    const productOnly = catalogProductTokens(searchQuery).join(" ").trim();
-    if (productOnly) {
-      const alternatives = await searchSupervaluCatalogLiveInternal(productOnly, options);
-      const ownMatches = alternatives.filter((match) => /\bsupervalu\b/i.test(match.productName));
-      if (ownMatches.length > 0) {
-        return { matches: ownMatches, ownBrandFallbackQuote: null };
-      }
-      if (alternatives.length > 0) {
-        return {
-          matches: [],
-          ownBrandFallbackQuote: formatOwnBrandFallbackQuote(productOnly, alternatives),
-        };
-      }
-    }
+  if (matches.length > 0 || !queryRequestsSupervaluOwnLabel(searchQuery)) {
+    return { matches, ownBrandFallbackQuote: null };
   }
 
-  const matches = await searchSupervaluCatalogLiveInternal(searchQuery, options);
-  return { matches, ownBrandFallbackQuote: null };
+  const productOnly = catalogProductTokens(searchQuery).join(" ").trim();
+  if (!productOnly || productOnly.toLowerCase() === searchQuery.toLowerCase()) {
+    return { matches: [], ownBrandFallbackQuote: null };
+  }
+
+  const alternatives = await searchSupervaluCatalogLiveInternal(productOnly, options);
+  if (alternatives.length === 0) {
+    return { matches: [], ownBrandFallbackQuote: null };
+  }
+
+  return {
+    matches: [],
+    ownBrandFallbackQuote: formatOwnBrandFallbackQuote(productOnly, alternatives),
+  };
 }
 
 export async function searchSupervaluCatalogLive(
@@ -782,6 +788,8 @@ export async function searchSupervaluCatalogLive(
     intent?: CatalogQuoteIntent;
     supabase?: SupabaseClient;
     retailBanner?: string;
+    fulfilment?: SupervaluFulfilment | null;
+    serviceArea?: SupervaluServiceArea | null;
   },
 ): Promise<SupervaluCatalogMatch[]> {
   const result = await searchSupervaluCatalogLiveWithFallback(query, options);

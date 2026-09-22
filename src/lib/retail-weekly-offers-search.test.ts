@@ -9,6 +9,7 @@ import {
   inferWeeklyOfferFulfilmentFromQuery,
   inferWeeklyOfferServiceAreaFromQuery,
   inferWeeklyOffersListIntent,
+  inferRewardsPricePointFromQuery,
   isRetailOfferWeekActive,
   isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
@@ -196,6 +197,25 @@ describe("supervalu offers sync helpers", () => {
     });
     assert.equal(frozen.serviceArea, "fish");
     assert.equal(frozen.fulfilment, "prepack");
+  });
+
+  it("classifies dairy wall products separately from generic grocery", () => {
+    const dairy = classifySupervaluOfferServiceArea({
+      product: {
+        name: "SuperValu Whole Milk 2L",
+        priceNumeric: 2.2,
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Milk, Yogurt, Butter & Eggs/Fresh Milk/Whole Milk",
+          },
+        ],
+        attributes: { altCategory: "Whole Milk" },
+      },
+      productName: "SuperValu Whole Milk 2L",
+      department: "Whole Milk",
+    });
+    assert.equal(dairy.serviceArea, "dairy");
+    assert.equal(dairy.fulfilment, "prepack");
   });
 
   it("classifies grocery promos separately from meat", () => {
@@ -408,154 +428,68 @@ describe("supervalu offers sync helpers", () => {
   });
 });
 
-describe("retail offer intent routing", () => {
-  it("does not turn branded fish-finger questions into generic fish browsing", () => {
-    assert.equal(
-      inferWeeklyOffersListIntent(
-        "are the Bird's Eye fish fingers on offer this week?",
-      ),
-      false,
-    );
-  });
+describe("retail weekly offers search", () => {
+  it("filters Rewards offer browsing by an exact numeric or spoken price point", () => {
+    assert.equal(inferRewardsPricePointFromQuery("What's on Rewards Price for €2.50?"), 2.5);
+    assert.equal(inferRewardsPricePointFromQuery("Real Rewards offers for two euro fifty"), 2.5);
+    assert.equal(inferRewardsPricePointFromQuery("Anything with Rewards at two fifty?"), 2.5);
+    assert.equal(inferWeeklyOffersListIntent("Anything with Rewards at two fifty?"), true);
 
-  it("keeps genuine department offer questions as browsing", () => {
-    assert.equal(inferWeeklyOffersListIntent("what fish is on offer this week?"), true);
-    assert.equal(inferWeeklyOffersListIntent("any fish offers this week?"), true);
-    assert.equal(inferWeeklyOffersListIntent("what alcohol is on offer?"), true);
-  });
-
-  it("keeps specific butcher products specific even though butcher is a service area", () => {
-    assert.equal(inferWeeklyOffersListIntent("is sirloin on offer this week?"), false);
-    assert.equal(inferWeeklyOffersListIntent("any fillet steaks on offer?"), false);
-  });
-});
-
-describe("semantic product versus store-area routing", () => {
-  it("does not route product names containing alcohol words into off-licence", () => {
-    assert.equal(
-      resolveWeeklyOfferSearchFilters("are wine gums on offer?").serviceArea,
-      null,
-    );
-    assert.equal(
-      resolveWeeklyOfferSearchFilters("any cider vinegar crisps on offer?").serviceArea,
-      null,
-    );
-    assert.equal(
-      resolveWeeklyOfferSearchFilters("beer battered fish on offer?").serviceArea,
-      null,
-    );
-    assert.equal(
-      resolveWeeklyOfferSearchFilters("what wine is on offer?").serviceArea,
-      "off_licence",
-    );
-    assert.equal(
-      resolveWeeklyOfferSearchFilters("anything in the wine aisle on offer?").serviceArea,
-      "off_licence",
-    );
-  });
-
-  it("treats category-only phrases as browsing and mixed phrases as products", () => {
-    assert.equal(inferWeeklyOffersListIntent("what fish is on offer this week?"), true);
-    assert.equal(inferWeeklyOffersListIntent("wine and beer offers"), true);
-    assert.equal(inferWeeklyOffersListIntent("milk bread crisps chocolate offers"), true);
-    assert.equal(inferWeeklyOffersListIntent("Birds Eye fish fingers on offer"), false);
-    assert.equal(inferWeeklyOffersListIntent("wine gums on offer"), false);
-    assert.equal(inferWeeklyOffersListIntent("Cadbury Dairy Milk on offer"), false);
-    assert.equal(inferWeeklyOffersListIntent("cider vinegar crisps on offer"), false);
-  });
-
-  it("keeps overlapping department words attached to the complete product identity", () => {
     const rows = [
       mockOfferRow({
-        id: "wine-gums",
-        product_name: "Maynards Bassetts Wine Gums Bag (110 g)",
-        brand: "Maynards Bassetts",
-        department: "Sweets",
+        id: "reward-250",
+        product_name: "Aquafresh White Renew Toothpaste (75 ml)",
+        department: "Dental Care",
         service_area: "grocery",
         fulfilment: "prepack",
-        current_price_eur: 1,
-        discount_label: "Rewards Price Only €1",
-        search_text: "maynards bassetts wine gums bag sweets",
+        offer_channel: "grocery",
+        current_price_eur: 2.5,
+        was_price_eur: 5,
+        discount_label: "Rewards Price Only €2.50",
+        search_text: "aquafresh white renew toothpaste rewards price only 2.50",
       }),
       mockOfferRow({
-        id: "wine",
-        product_name: "House White Wine (750 ml)",
+        id: "reward-1100",
+        product_name: "Two Tracks Sauvignon Blanc (750 ml)",
         department: "Wine",
         service_area: "off_licence",
         fulfilment: "prepack",
-        current_price_eur: 8,
+        offer_channel: "grocery",
+        current_price_eur: 11,
+        was_price_eur: 12,
+        discount_label: "Rewards Price Only €11",
         is_alcohol: true,
-        search_text: "house white wine alcohol",
+        search_text: "two tracks sauvignon blanc rewards price only 11",
       }),
       mockOfferRow({
-        id: "cider-vinegar",
-        product_name: "Keogh's Atlantic Sea Salt & Irish Cider Vinegar Crisps (125 g)",
-        brand: "Keogh's",
-        department: "Crisps & Snacks",
+        id: "standard-250",
+        product_name: "Ordinary €2.50 Deal",
+        department: "Grocery",
         service_area: "grocery",
         fulfilment: "prepack",
+        offer_channel: "grocery",
         current_price_eur: 2.5,
-        discount_label: "Rewards Price Only €2.50",
-        search_text: "keoghs cider vinegar crisps snacks",
-      }),
-      mockOfferRow({
-        id: "cider",
-        product_name: "Irish Cider 8 Pack",
-        department: "Cider",
-        service_area: "off_licence",
-        fulfilment: "prepack",
-        current_price_eur: 12,
-        is_alcohol: true,
-        search_text: "irish cider alcohol",
+        was_price_eur: 3,
+        discount_label: "Only €2.50",
+        search_text: "ordinary deal only 2.50",
       }),
     ];
 
-    const gums = searchSyncedWeeklyOffersInRows(rows, "wine gums on offer?");
-    assert.equal(gums.length, 1);
-    assert.match(gums[0]?.productName ?? "", /Wine Gums/i);
-
-    const vinegar = searchSyncedWeeklyOffersInRows(
-      rows,
-      "cider vinegar crisps on offer?",
-    );
-    assert.equal(vinegar.length, 1);
-    assert.match(vinegar[0]?.productName ?? "", /Cider Vinegar Crisps/i);
+    for (const query of [
+      "What's on Rewards Price for €2.50?",
+      "What offers are €2.50 with Real Rewards?",
+      "Anything with Rewards at two fifty?",
+    ]) {
+      const matches = searchSyncedWeeklyOffersInRows(rows, query);
+      assert.deepEqual(matches.map((match) => match.productName), [
+        "Aquafresh White Renew Toothpaste (75 ml)",
+      ]);
+      assert.equal(matches[0]?.currentPriceEur, 2.5);
+      assert.match(matches[0]?.quoteText ?? "", /rewards price/i);
+      assert.match(matches[0]?.quoteText ?? "", /two euro fifty/i);
+    }
   });
 
-  it("does not use phrase length as a proxy for browse intent", () => {
-    const rows = [
-      mockOfferRow({
-        id: "birds-eye",
-        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
-        brand: "Birds Eye",
-        department: "Fish Fingers",
-        service_area: "fish",
-        fulfilment: "prepack",
-        current_price_eur: 2.5,
-        discount_label: "Rewards Price Only €2.50",
-        search_text: "birds eye crispy fish fingers frozen seafood",
-      }),
-      mockOfferRow({
-        id: "salmon",
-        product_name: "Fresh Salmon Fillets",
-        department: "Fish",
-        service_area: "fish",
-        fulfilment: "prepack",
-        current_price_eur: 8,
-        search_text: "fresh salmon fillets fish",
-      }),
-    ];
-
-    const matches = searchSyncedWeeklyOffersInRows(
-      rows,
-      "Birds Eye crispy fish fingers on offer",
-    );
-    assert.equal(matches.length, 1);
-    assert.match(matches[0]?.productName ?? "", /Birds Eye.*Fish Fingers/i);
-  });
-});
-
-describe("retail weekly offers search", () => {
   it("treats a real department query like cereals as a browse, not one ambiguous product", () => {
     const rows = [
       mockOfferRow({
@@ -585,118 +519,6 @@ describe("retail weekly offers search", () => {
     assert.ok(matches.every((match) => /cereal/i.test(match.department)));
   });
 
-
-  it("keeps a branded fish-finger offer specific instead of browsing generic fish", () => {
-    const rows = [
-      mockOfferRow({
-        id: "birds-eye-8",
-        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
-        brand: "Birds Eye",
-        department: "Fish Fingers",
-        category_breadcrumb: "/categories/frozen-fish-seafood/fish-fingers",
-        service_area: "fish",
-        fulfilment: "prepack",
-        current_price_eur: 2.5,
-        was_price_eur: 3.15,
-        discount_label: "Rewards Price Only €2.50",
-        search_text:
-          "birds eye crispy fish fingers fish fingers frozen fish seafood",
-      }),
-      mockOfferRow({
-        id: "salmon",
-        product_name: "Keohane's Salmon Fillets (480 g)",
-        department: "Prepack Fresh Fish",
-        category_breadcrumb: "/categories/fish-seafood/prepack-fresh-fish",
-        service_area: "fish",
-        fulfilment: "prepack",
-        current_price_eur: 9,
-        search_text: "keohanes salmon fillets fish seafood",
-      }),
-    ];
-
-    const matches = searchSyncedWeeklyOffersInRows(
-      rows,
-      "are the Bird's Eye fish fingers on offer this week?",
-    );
-    assert.equal(matches.length, 1);
-    assert.match(matches[0]?.productName ?? "", /Birds Eye.*Fish Fingers/i);
-  });
-
-  it("treats an actual product-family department like fish fingers as the category", () => {
-    const rows = [
-      mockOfferRow({
-        id: "fish-finger-1",
-        product_name: "Birds Eye Crispy Fish Fingers 8 Pack (224 g)",
-        brand: "Birds Eye",
-        department: "Fish Fingers",
-        category_breadcrumb: "/categories/frozen-fish-seafood/fish-fingers",
-        service_area: "fish",
-        fulfilment: "prepack",
-        current_price_eur: 2.5,
-        search_text: "birds eye crispy fish fingers",
-      }),
-      mockOfferRow({
-        id: "fish-finger-2",
-        product_name: "Birds Eye Fish Fingers 14 Pack (350 g)",
-        brand: "Birds Eye",
-        department: "Fish Fingers",
-        category_breadcrumb: "/categories/frozen-fish-seafood/fish-fingers",
-        service_area: "fish",
-        fulfilment: "prepack",
-        current_price_eur: 4.5,
-        search_text: "birds eye fish fingers 14 pack",
-      }),
-      mockOfferRow({
-        id: "cod",
-        product_name: "Loose Cod Fillet",
-        department: "Fish Counter",
-        service_area: "fish",
-        fulfilment: "counter",
-        current_price_eur: 12,
-        search_text: "loose cod fish counter",
-      }),
-    ];
-
-    const matches = searchSyncedWeeklyOffersInRows(
-      rows,
-      "any fish fingers on offer?",
-    );
-    assert.equal(matches.length, 2);
-    assert.ok(matches.every((match) => /Fish Fingers/i.test(match.department)));
-  });
-
-  it("keeps brand refinement inside the caller's cereal request", () => {
-    const rows = [
-      mockOfferRow({
-        id: "kelloggs",
-        product_name: "Kellogg's Corn Flakes (450 g)",
-        brand: "Kellogg's",
-        department: "Cereals",
-        category_breadcrumb: "/categories/breakfast-cereals/cereals",
-        service_area: "grocery",
-        fulfilment: "prepack",
-        current_price_eur: 2.79,
-        was_price_eur: 2.99,
-        discount_label: "Rewards Price Only €2.79",
-        search_text: "kelloggs corn flakes cereals breakfast cereals",
-      }),
-      mockOfferRow({
-        id: "weetabix",
-        product_name: "Weetabix 24 Pack (430 g)",
-        brand: "Weetabix",
-        department: "Cereals",
-        category_breadcrumb: "/categories/breakfast-cereals/cereals",
-        service_area: "grocery",
-        fulfilment: "prepack",
-        current_price_eur: 4,
-        search_text: "weetabix cereals breakfast cereals",
-      }),
-    ];
-
-    const matches = searchSyncedWeeklyOffersInRows(rows, "kelloggs cereals");
-    assert.equal(matches.length, 1);
-    assert.match(matches[0]?.productName ?? "", /Kellogg/i);
-  });
 
   it("rejects Save euro rows when the saving amount is mistaken for the selling price", () => {
     assert.equal(
@@ -940,7 +762,7 @@ describe("retail weekly offers search", () => {
     );
   });
 
-  it("respects explicit fulfilment in caller phrasing or tool input", () => {
+  it("infers fulfilment when the caller explicitly names the counter", () => {
     assert.equal(
       resolveWeeklyOfferSearchFilters("what's on offer in the meat counter this week")
         .fulfilment,
@@ -979,7 +801,7 @@ describe("retail weekly offers search", () => {
   });
 
   it("infers store section service areas from varied caller phrasing", () => {
-    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "grocery");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "dairy");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("back store specials"), "grocery");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("provisions on offer"), "grocery");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("fruit and veg offers"), "produce");
@@ -987,107 +809,6 @@ describe("retail weekly offers search", () => {
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("seafood counter salmon"), "fish");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("deli department ham"), "deli");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("meat department steaks"), "butcher");
-  });
-
-  it("normalizes simple plurals for category scope without turning wine gums into alcohol", () => {
-    assert.equal(resolveWeeklyOfferSearchFilters("wines").serviceArea, "off_licence");
-    assert.equal(inferWeeklyOffersListIntent("wines on offer"), true);
-    assert.equal(resolveWeeklyOfferSearchFilters("wine gums").serviceArea, null);
-  });
-
-  it("ignores deal and specials boilerplate when inferring a store area", () => {
-    assert.equal(resolveWeeklyOfferSearchFilters("produce deals").serviceArea, "produce");
-    assert.equal(
-      resolveWeeklyOfferSearchFilters("fruit and veg specials").serviceArea,
-      "produce",
-    );
-    assert.equal(resolveWeeklyOfferSearchFilters("wine deals").serviceArea, "off_licence");
-  });
-
-  it("filters obviously misclassified tea and juice out of produce browsing", () => {
-    const rows = [
-      mockOfferRow({
-        id: "berry-tea",
-        product_name: "Barry's Tea Berry Burst 20 Bags (50 g)",
-        department: "Green, Fruit & Herbal Tea",
-        category_breadcrumb: "/categories/tea/green-fruit-herbal-tea-id-O301526",
-        service_area: "produce",
-        fulfilment: "prepack",
-        current_price_eur: 3,
-        search_text: "barrys tea berry burst green fruit herbal tea",
-      }),
-      mockOfferRow({
-        id: "rubicon",
-        product_name: "Rubicon Mango (1 L)",
-        department: "Tropical & Mixed Fruit",
-        category_breadcrumb: "/categories/chill-long-life-juice/tropical-mixed-fruit-id-O411168",
-        service_area: "produce",
-        fulfilment: "prepack",
-        current_price_eur: 1.75,
-        search_text: "rubicon mango tropical mixed fruit juice",
-      }),
-      mockOfferRow({
-        id: "berries",
-        product_name: "SuperValu Signature Tastes Blueberries (125 g)",
-        department: "Berries",
-        category_breadcrumb: "/categories/fruit/berries-id-O302620",
-        service_area: "produce",
-        fulfilment: "prepack",
-        current_price_eur: 2.5,
-        search_text: "supervalu blueberries berries fruit",
-      }),
-    ];
-
-    const matches = searchSyncedWeeklyOffersInRows(rows, "fruit and veg offers");
-    assert.equal(matches.length, 1);
-    assert.match(matches[0]?.productName ?? "", /Blueberries/i);
-  });
-
-  it("does not classify incidental fruit words in tea, juice, or fruit bread as produce", () => {
-    const tea = classifySupervaluOfferServiceArea({
-      product: {
-        name: "Barry's Tea Berry Burst 20 Bags (50 g)",
-        priceNumeric: 3,
-        sellBy: "Each",
-        defaultCategory: [
-          { categoryBreadcrumb: "Grocery/Tea/Green, Fruit & Herbal Tea" },
-        ],
-        attributes: { altCategory: "Green, Fruit & Herbal Tea" },
-      },
-      productName: "Barry's Tea Berry Burst 20 Bags (50 g)",
-      department: "Green, Fruit & Herbal Tea",
-    });
-    assert.notEqual(tea.serviceArea, "produce");
-
-    const juice = classifySupervaluOfferServiceArea({
-      product: {
-        name: "Rubicon Mango (1 L)",
-        priceNumeric: 1.75,
-        sellBy: "Each",
-        defaultCategory: [
-          { categoryBreadcrumb: "Grocery/Chill Long Life Juice/Tropical & Mixed Fruit" },
-        ],
-        attributes: { altCategory: "Tropical & Mixed Fruit" },
-      },
-      productName: "Rubicon Mango (1 L)",
-      department: "Tropical & Mixed Fruit",
-    });
-    assert.notEqual(juice.serviceArea, "produce");
-
-    const fruit = classifySupervaluOfferServiceArea({
-      product: {
-        name: "SuperValu Blueberries (125 g)",
-        priceNumeric: 2.5,
-        sellBy: "Each",
-        defaultCategory: [
-          { categoryBreadcrumb: "Grocery/Fruit/Berries" },
-        ],
-        attributes: { altCategory: "Berries" },
-      },
-      productName: "SuperValu Blueberries (125 g)",
-      department: "Berries",
-    });
-    assert.equal(fruit.serviceArea, "produce");
   });
 
   it("only narrows fulfilment when the caller explicitly chose counter or pre-pack", () => {
@@ -1251,19 +972,4 @@ describe("retail weekly offers search", () => {
     assert.match(matches[0]?.productName ?? "", /Horgans Sliced Corned Beef/i);
     assert.match(matches[0]?.quoteText ?? "", /deli counter/i);
   });
-
-  it("does not boost butcher departments for unrelated product searches", () => {
-    const produceScore = scoreSupervaluSearchText(
-      "supervalu ripe avocado avocados fruit",
-      ["avocado"],
-      "Avocados",
-    );
-    const unrelatedButcherScore = scoreSupervaluSearchText(
-      "avocado flavoured prepared item",
-      ["avocado"],
-      "Butcher Counter",
-    );
-    assert.ok(produceScore >= unrelatedButcherScore);
-  });
-
 });

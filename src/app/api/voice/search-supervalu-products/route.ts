@@ -4,19 +4,17 @@ import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
   assessSyncedOffersFreshness,
   inferWeeklyOfferFulfilmentFromQuery,
+  inferWeeklyOfferServiceAreaFromQuery,
   loadLatestRetailOfferWeekEnd,
-  offerSearchProductTokens,
 } from "@/lib/retail-weekly-offers-search";
-import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
+import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
 import {
   formatCatalogStockNoMatchQuote,
-  formatOfferFulfilmentMissQuote,
   inferCatalogSearchIntent,
   searchSupervaluCatalogLiveWithFallback,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
   type CatalogQuoteIntent,
-  type SupervaluCatalogMatch,
 } from "@/lib/supervalu-catalog-search";
 import {
   authorizeVoiceWebhook,
@@ -25,14 +23,8 @@ import {
 } from "@/lib/voice-webhook-auth";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
-  formatStructuredPromotionNoMatchQuote,
-  searchStructuredNationalPromotions,
-  shouldUseStructuredPromotionSearch,
-} from "@/lib/retail-promotion-search";
-import {
   formatStoreAssortmentQuote,
   parseRetailStoreAssortmentStatus,
-  type RetailStoreAssortmentStatus,
 } from "@/lib/retail-store-assortment";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +34,7 @@ type SearchSupervaluProductsBody = {
   query?: string;
   intent?: CatalogQuoteIntent;
   fulfilment?: "counter" | "prepack";
+  service_area?: SupervaluServiceArea;
 };
 
 /**
@@ -169,6 +162,22 @@ export async function POST(request: Request) {
       ? body.fulfilment
       : inferWeeklyOfferFulfilmentFromQuery(query);
 
+  const allowedServiceAreas = new Set<SupervaluServiceArea>([
+    "butcher",
+    "deli",
+    "fish",
+    "produce",
+    "bakery",
+    "dairy",
+    "off_licence",
+    "grocery",
+  ]);
+  const requestedServiceArea = String(body.service_area ?? "").trim() as SupervaluServiceArea;
+  const serviceArea: SupervaluServiceArea | null =
+    allowedServiceAreas.has(requestedServiceArea)
+      ? requestedServiceArea
+      : inferWeeklyOfferServiceAreaFromQuery(query);
+
   const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner);
   const offersFreshness = assessSyncedOffersFreshness({
     syncedAt:
@@ -179,43 +188,17 @@ export async function POST(request: Request) {
   const sourceStoreId =
     String(orgRow.retail_source_store_id ?? "").trim() || null;
 
-  const structuredPromotionQuery =
-    intent === "offer" && shouldUseStructuredPromotionSearch(query);
-  let structuredPromotionMatches: SupervaluCatalogMatch[] = [];
-  if (structuredPromotionQuery) {
-    try {
-      structuredPromotionMatches = await searchStructuredNationalPromotions(admin, {
-        retailBanner,
-        query,
-      });
-    } catch (error) {
-      console.error("[voice/search-supervalu-products] promotion lookup", {
-        query,
-        retailBanner,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return NextResponse.json(
-        {
-          ok: false,
-          promotion_query: true,
-          error:
-            "Promotion data lookup is temporarily unavailable. Do not guess or fall back to unrelated offers.",
-        },
-        { status: 503 },
-      );
-    }
-  }
-
-  const catalogResult = structuredPromotionQuery
-    ? { matches: structuredPromotionMatches, ownBrandFallbackQuote: null }
-    : await searchSupervaluCatalogLiveWithFallback(query, {
-        intent,
-        supabase: admin,
-        retailBanner,
-        fulfilment,
-        storeId: sourceStoreId ?? undefined,
-      });
-  const { matches, ownBrandFallbackQuote } = catalogResult;
+  const { matches, ownBrandFallbackQuote } = await searchSupervaluCatalogLiveWithFallback(
+    query,
+    {
+      intent,
+      supabase: admin,
+      retailBanner,
+      fulfilment,
+      serviceArea,
+      storeId: sourceStoreId ?? undefined,
+    },
+  );
 
   const mappedMatches = matches.map((match) => ({
     product_name: match.productName,
@@ -232,17 +215,11 @@ export async function POST(request: Request) {
     quote_text: match.quoteText,
     source: match.source ?? null,
   }));
-  const {
-    clarificationHint,
-    clarificationKind,
-    matches: responseMatches,
-  } = structuredPromotionQuery
-    ? {
-        clarificationHint: null,
-        clarificationKind: null,
-        matches: mappedMatches,
-      }
-    : resolveProductSearchResponse(query, mappedMatches, { fulfilment, intent });
+  const { clarificationHint, matches: responseMatches } = resolveProductSearchResponse(
+    query,
+    mappedMatches,
+    { fulfilment, intent },
+  );
 
   // A national catalogue match is not evidence that this specific store carries
   // the product. Resolve explicit store-level assortment decisions separately.
@@ -322,13 +299,7 @@ export async function POST(request: Request) {
     }
   }
 
-  type StoreAwareMatch = (typeof responseMatches)[number] & {
-    store_assortment_status: RetailStoreAssortmentStatus;
-    quote_text: string;
-  };
-  const storeAwareRawMatches: StoreAwareMatch[] = [];
-
-  for (const match of responseMatches) {
+  const storeAwareMatches = responseMatches.map((match) => {
     const sku = String(match.sku ?? "").trim();
     const nameKey = String(match.product_name ?? "").trim().toLowerCase();
     const productId =
@@ -338,25 +309,7 @@ export async function POST(request: Request) {
       productId ? assortmentByProductId.get(productId) : undefined,
     );
 
-    // A promotion browse is a list from cross-store SuperValu consensus.
-    // If this store has explicitly said it does not normally stock a product,
-    // omit it from the list. Otherwise keep the promotion quote clean and give
-    // Cara one scope note for the whole result set rather than repeating an
-    // assortment disclaimer after every product.
-    if (structuredPromotionQuery) {
-      if (storeStatus === "not_stocked") continue;
-      storeAwareRawMatches.push({
-        ...match,
-        store_assortment_status: storeStatus,
-        quote_text:
-          storeStatus === "stocked"
-            ? `${match.quote_text} This store has confirmed it normally stocks this product.`
-            : match.quote_text,
-      });
-      continue;
-    }
-
-    storeAwareRawMatches.push({
+    return {
       ...match,
       store_assortment_status: storeStatus,
       quote_text: formatStoreAssortmentQuote({
@@ -365,94 +318,22 @@ export async function POST(request: Request) {
         intent,
         originalQuote: match.quote_text,
       }),
-    });
-  }
-
-  const storeAwareBySpokenOffer = new Map<
-    string,
-    (typeof storeAwareRawMatches)[number]
-  >();
-  for (const match of storeAwareRawMatches) {
-    const spokenKey = [
-      String(match.product_name ?? "").trim().toLowerCase(),
-      String(match.discount_label ?? "").trim().toLowerCase(),
-    ].join("|");
-    const existing = storeAwareBySpokenOffer.get(spokenKey);
-    if (
-      !existing ||
-      (existing.store_assortment_status !== "stocked" &&
-        match.store_assortment_status === "stocked")
-    ) {
-      storeAwareBySpokenOffer.set(spokenKey, match);
-    }
-  }
-  const storeAwareMatches = [...storeAwareBySpokenOffer.values()];
+    };
+  });
 
   let noMatchQuote: string | null =
     mappedMatches.length === 0
-      ? structuredPromotionQuery
-        ? formatStructuredPromotionNoMatchQuote(query)
-        : ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
-      : structuredPromotionQuery && storeAwareMatches.length === 0
-        ? "Matching promotion products exist on the wider SuperValu range, but this store has marked those returned products as not normally stocked. Do not list them as available here."
-        : null;
-
-  if (
-    responseMatches.length === 0 &&
-    !structuredPromotionQuery &&
-    fulfilment &&
-    intent === "offer" &&
-    offerSearchProductTokens(query).length > 0
-  ) {
-    const alternateFulfilment: SupervaluFulfilment =
-      fulfilment === "counter" ? "prepack" : "counter";
-    const { matches: alternateRaw } = await searchSupervaluCatalogLiveWithFallback(query, {
-      intent,
-      supabase: admin,
-      retailBanner,
-      fulfilment: alternateFulfilment,
-      storeId: sourceStoreId ?? undefined,
-    });
-    const alternateMapped = alternateRaw.map((match) => ({
-      product_name: match.productName,
-      department: match.department,
-      sku: match.sku,
-      current_price_eur: match.currentPriceEur,
-      was_price_eur: match.wasPriceEur,
-      discount_label: match.discountLabel,
-      is_on_offer: match.isOnOffer,
-      service_area: match.serviceArea ?? null,
-      fulfilment: match.fulfilment ?? null,
-      is_alcohol: match.isAlcohol === true,
-      score: match.score,
-      quote_text: match.quoteText,
-      source: match.source ?? null,
-    }));
-    const { matches: alternateMatches } = resolveProductSearchResponse(query, alternateMapped, {
-      fulfilment: alternateFulfilment,
-      intent,
-    });
-    noMatchQuote = formatOfferFulfilmentMissQuote({
-      query,
-      requestedFulfilment: fulfilment,
-      alternateMatches: alternateMatches.map((match) => ({
-        quoteText: match.quote_text,
-      })),
-    });
-  }
+      ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
+      : null;
 
   return NextResponse.json({
     ok: true,
     intent,
+    service_area: serviceArea,
     fulfilment,
     clarification_hint: clarificationHint,
-    clarification_kind: clarificationKind,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
-    promotion_query: structuredPromotionQuery,
-    promotion_scope_note: structuredPromotionQuery
-      ? "These promotion matches are verified from current cross-store SuperValu consensus. Do not claim live shelf availability or local assortment unless a returned match says this store has confirmed it normally stocks that product."
-      : null,
-    matches: clarificationHint ? [] : storeAwareMatches,
+    matches: storeAwareMatches,
     no_match_quote: noMatchQuote,
   });
 }
