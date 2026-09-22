@@ -311,6 +311,30 @@ function deliveryStatusFromRow(row: AdminEmailRow): {
   if (row.delivery_delayed_at) {
     return { status: "delayed", at: row.delivery_delayed_at };
   }
+
+  const lastEvent = row.last_delivery_event?.replace(/^email\./, "");
+  if (
+    lastEvent &&
+    [
+      "sent",
+      "delayed",
+      "delivered",
+      "opened",
+      "clicked",
+      "complained",
+      "suppressed",
+      "bounced",
+      "failed",
+    ].includes(lastEvent)
+  ) {
+    return {
+      status: (lastEvent === "delivery_delayed"
+        ? "delayed"
+        : lastEvent) as AdminEmailDeliveryStatus,
+      at: row.last_delivery_event_at,
+    };
+  }
+
   if (row.resend_sent_at || row.sent_at) {
     return { status: "sent", at: row.resend_sent_at || row.sent_at };
   }
@@ -637,6 +661,62 @@ export async function getAdminEmailMessage(
       : [],
     replies,
     deliveryEvents,
+  };
+}
+
+export async function refreshAdminEmailDeliveryStatus(
+  resendEmailId: string,
+): Promise<{ status: AdminEmailDeliveryStatus; statusAt: string | null }> {
+  const id = resendEmailId.trim();
+  if (!id) throw new Error("Email ID is required.");
+
+  const admin = createAdminClient();
+  const { data: row, error: rowError } = await admin
+    .from("admin_email_messages")
+    .select(
+      "resend_email_id,direction,last_delivery_event,last_delivery_event_at,resend_sent_at,delivered_at,delivery_delayed_at,bounced_at,failed_at,suppressed_at,complained_at,opened_at,clicked_at,sent_at",
+    )
+    .eq("resend_email_id", id)
+    .maybeSingle();
+
+  if (rowError) throw new Error(rowError.message);
+  if (!row) throw new Error("Email not found.");
+  if (row.direction !== "outbound") {
+    throw new Error("Delivery status is only available for sent email.");
+  }
+
+  try {
+    const remote = await resendFetch<{
+      id?: string;
+      message_id?: string | null;
+      last_event?: string | null;
+    }>(`/emails/${encodeURIComponent(id)}`);
+
+    const remoteEvent = remote.last_event?.trim().toLowerCase();
+    if (remoteEvent) {
+      const normalizedType = remoteEvent.startsWith("email.")
+        ? remoteEvent
+        : `email.${remoteEvent}`;
+      const { error: updateError } = await admin
+        .from("admin_email_messages")
+        .update({
+          last_delivery_event: normalizedType,
+          updated_at: new Date().toISOString(),
+          ...(remote.message_id ? { message_id: remote.message_id } : {}),
+        })
+        .eq("resend_email_id", id);
+
+      if (updateError) throw new Error(updateError.message);
+      (row as Record<string, unknown>).last_delivery_event = normalizedType;
+    }
+  } catch {
+    // Webhook data/local state remains authoritative if Resend lookup is unavailable.
+  }
+
+  const delivery = deliveryStatusFromRow(row as AdminEmailRow);
+  return {
+    status: delivery.status ?? "unknown",
+    statusAt: delivery.at,
   };
 }
 
