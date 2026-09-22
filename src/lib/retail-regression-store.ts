@@ -1,6 +1,9 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { resolveAdminDemoCallLine } from "@/lib/admin-demo-call";
+import type { RetailDiscoveryScenarioDraft } from "@/lib/retail-discovery";
 import { buildDefaultRetailRegressionScenarios } from "@/lib/retail-regression-library";
 import {
   classifyRegressionFailure,
@@ -152,6 +155,95 @@ export async function loadRetailRegressionSuite(calledNumber: string): Promise<{
   };
 }
 
+export async function persistRetailDiscoveryScenarios(input: {
+  calledNumber: string;
+  generationId: string;
+  batchIndex: number;
+  drafts: RetailDiscoveryScenarioDraft[];
+}): Promise<RetailRegressionScenario[]> {
+  const line = await requireRegressionLine(input.calledNumber);
+  const admin = createAdminClient();
+  const generationId = input.generationId.trim();
+
+  if (!generationId || input.drafts.length === 0) return [];
+
+  const rows = input.drafts.map((draft, index) => {
+    const fingerprint = createHash("sha1")
+      .update(
+        [
+          generationId,
+          String(input.batchIndex),
+          String(index),
+          draft.discoveryProfile,
+          draft.title,
+          draft.turns.map((turn) => turn.caller).join("\n"),
+        ].join("|"),
+      )
+      .digest("hex")
+      .slice(0, 16);
+
+    return {
+      organization_id: line.orgId,
+      slug: `discovery-${generationId.slice(0, 8)}-${input.batchIndex}-${index}-${fingerprint}`,
+      title: draft.title,
+      category: draft.category,
+      tags: draft.tags,
+      turns: draft.turns,
+      expectations: draft.expectations,
+      source: "variant",
+      active: false,
+      updated_at: new Date().toISOString(),
+    };
+  });
+
+  const { data, error } = await admin
+    .from("retail_regression_scenarios")
+    .insert(rows)
+    .select(
+      "id,slug,title,category,tags,turns,expectations,source,active,created_at,updated_at",
+    );
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => asScenario(row as Record<string, unknown>));
+}
+
+export async function promoteRetailDiscoveryScenario(input: {
+  calledNumber: string;
+  scenarioId: string;
+}): Promise<void> {
+  const line = await requireRegressionLine(input.calledNumber);
+  const admin = createAdminClient();
+
+  const { data: row, error: loadError } = await admin
+    .from("retail_regression_scenarios")
+    .select("id,tags,source")
+    .eq("id", input.scenarioId)
+    .eq("organization_id", line.orgId)
+    .maybeSingle();
+
+  if (loadError) throw new Error(loadError.message);
+  if (!row) throw new Error("Discovery scenario not found.");
+
+  const tags = Array.isArray(row.tags) ? row.tags.map(String) : [];
+  if (!tags.includes("discovery")) {
+    throw new Error("Only discovery scenarios can be promoted here.");
+  }
+
+  const nextTags = [...new Set([...tags, "promoted-discovery"])];
+  const { error } = await admin
+    .from("retail_regression_scenarios")
+    .update({
+      source: "manual",
+      active: true,
+      tags: nextTags,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.scenarioId)
+    .eq("organization_id", line.orgId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function startRetailRegressionRun(input: {
   calledNumber: string;
   total: number;
@@ -184,26 +276,90 @@ export async function recordRetailRegressionResult(input: {
 }> {
   const admin = createAdminClient();
 
-  const { data: priorRows, error: priorError } = await admin
-    .from("retail_regression_results")
-    .select("status,failure_signature")
-    .eq("scenario_id", input.scenarioId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const { data: scenarioMeta, error: scenarioMetaError } = await admin
+    .from("retail_regression_scenarios")
+    .select("organization_id,tags,source")
+    .eq("id", input.scenarioId)
+    .maybeSingle();
 
-  if (priorError) throw new Error(priorError.message);
+  if (scenarioMetaError) throw new Error(scenarioMetaError.message);
 
-  const recurrence = classifyRegressionFailure({
-    currentStatus: input.grade.status,
-    currentFailureSignature: input.grade.failureSignature,
-    prior: ((priorRows ?? []) as Array<{
-      status: "pass" | "fail" | "error";
-      failure_signature: string | null;
-    }>).map((row) => ({
-      status: row.status,
-      failureSignature: row.failure_signature,
-    })),
-  });
+  const scenarioTags = Array.isArray(scenarioMeta?.tags)
+    ? scenarioMeta.tags.map(String)
+    : [];
+  const discoveryFamily = scenarioTags.find((tag) =>
+    tag.startsWith("discovery-family:"),
+  );
+  const isDiscovery =
+    scenarioMeta?.source === "variant" &&
+    scenarioTags.includes("discovery") &&
+    Boolean(discoveryFamily);
+
+  let recurrence: {
+    issueKind: "new_failure" | "recurring" | "regression_returned" | null;
+    occurrenceCount: number;
+  };
+
+  if (
+    isDiscovery &&
+    input.grade.status !== "pass" &&
+    input.grade.failureSignature &&
+    scenarioMeta?.organization_id &&
+    discoveryFamily
+  ) {
+    const { data: familyScenarios, error: familyError } = await admin
+      .from("retail_regression_scenarios")
+      .select("id")
+      .eq("organization_id", scenarioMeta.organization_id)
+      .eq("source", "variant")
+      .contains("tags", ["discovery", discoveryFamily])
+      .limit(1000);
+
+    if (familyError) throw new Error(familyError.message);
+
+    const familyScenarioIds = (familyScenarios ?? []).map((row) => String(row.id));
+    let priorSameSignatureCount = 0;
+
+    if (familyScenarioIds.length > 0) {
+      const { count, error: signatureError } = await admin
+        .from("retail_regression_results")
+        .select("id", { count: "exact", head: true })
+        .in("scenario_id", familyScenarioIds)
+        .eq("failure_signature", input.grade.failureSignature);
+
+      if (signatureError) throw new Error(signatureError.message);
+      priorSameSignatureCount = count ?? 0;
+    }
+
+    recurrence =
+      priorSameSignatureCount > 0
+        ? {
+            issueKind: "recurring",
+            occurrenceCount: priorSameSignatureCount + 1,
+          }
+        : { issueKind: "new_failure", occurrenceCount: 1 };
+  } else {
+    const { data: priorRows, error: priorError } = await admin
+      .from("retail_regression_results")
+      .select("status,failure_signature")
+      .eq("scenario_id", input.scenarioId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (priorError) throw new Error(priorError.message);
+
+    recurrence = classifyRegressionFailure({
+      currentStatus: input.grade.status,
+      currentFailureSignature: input.grade.failureSignature,
+      prior: ((priorRows ?? []) as Array<{
+        status: "pass" | "fail" | "error";
+        failure_signature: string | null;
+      }>).map((row) => ({
+        status: row.status,
+        failureSignature: row.failure_signature,
+      })),
+    });
+  }
 
   const assistantText = input.execution.turns
     .map((turn) => turn.assistant)

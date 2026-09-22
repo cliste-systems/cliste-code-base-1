@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { FlaskConical, Loader2, MessageSquareText, Rows3 } from "lucide-react";
+import {
+  FlaskConical,
+  Loader2,
+  MessageSquareText,
+  Rows3,
+  Sparkles,
+} from "lucide-react";
 
 import { AdminSectionCard } from "@/components/admin/admin-section-card";
 import {
@@ -13,6 +19,7 @@ import type { AdminDemoCallLine } from "@/lib/admin-demo-call-lines";
 import { cn } from "@/lib/utils";
 
 import { useDemoCallEngineeringLog } from "./demo-call-engineering-log";
+import { DemoRetailDiscoveryPanel } from "./demo-retail-discovery-panel";
 import { DemoRetailRegressionPanel } from "./demo-retail-regression-panel";
 import { DemoTextRehearsalBatchPanel } from "./demo-text-rehearsal-batch-panel";
 import {
@@ -31,7 +38,7 @@ type TextRehearsalSession = {
 };
 
 type SessionPhase = "idle" | "connecting" | "in_session" | "ended" | "error";
-type RehearsalMode = "single" | "batch" | "regression";
+type RehearsalMode = "single" | "batch" | "regression" | "discovery";
 
 type TextRehearsalViewProps = {
   lines: AdminDemoCallLine[];
@@ -161,6 +168,20 @@ export function TextRehearsalView({ lines }: TextRehearsalViewProps) {
           <FlaskConical className="size-3.5" aria-hidden />
           Regression suite
         </button>
+        <button
+          type="button"
+          onClick={() => switchMode("discovery")}
+          className={cn(
+            adminSegmentedTabButtonClass,
+            "inline-flex items-center gap-2 border px-3 py-1.5 shadow-sm disabled:cursor-not-allowed disabled:opacity-60",
+            mode === "discovery"
+              ? "border-gray-900 bg-gray-900 text-white"
+              : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50",
+          )}
+        >
+          <Sparkles className="size-3.5" aria-hidden />
+          Discovery / Stress
+        </button>
       </div>
 
       {phase === "connecting" ? (
@@ -253,6 +274,18 @@ export function TextRehearsalView({ lines }: TextRehearsalViewProps) {
             disabled={false}
           />
           <DemoRetailRegressionPanel line={selectedLine} />
+        </div>
+      ) : null}
+
+      {mode === "discovery" && selectedLine && !singleSessionActive ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
+          <DemoCallLinePicker
+            lines={lines}
+            selectedE164={selectedE164}
+            onSelectedE164Change={setSelectedE164}
+            disabled={false}
+          />
+          <DemoRetailDiscoveryPanel line={selectedLine} />
         </div>
       ) : null}
     </div>
