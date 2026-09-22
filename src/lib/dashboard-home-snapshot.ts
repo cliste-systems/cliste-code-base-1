@@ -387,7 +387,7 @@ export async function loadDashboardHomeSnapshot(input: {
 
   const openTrainingCountLive = countExact(openTrainingCountRes);
 
-  const recentCallsForFeed = callsForPanels.slice(
+  const recentCallsForFeed = customerCallsForPanels.slice(
     0,
     DASHBOARD_HOME_RECENT_ACTIVITY_LIMIT,
   );
@@ -407,9 +407,12 @@ export async function loadDashboardHomeSnapshot(input: {
   );
 
   const topTopicsLive = buildHomeTopTopicRows({
+    // "Top topics" on Overview should describe what customers are actually
+    // calling about. Training gaps and follow-up tickets are operational work,
+    // not call-volume signals, and including them can make the label misleading.
     callSummaries: callSummariesForTopics,
-    ticketSummaries: ticketSummaries.map((row) => row.summary),
-    trainingGaps: trainingItemRows.map((row) => row.gap_summary),
+    ticketSummaries: [],
+    trainingGaps: [],
   });
 
   const callsToReviewLive = buildHomeCallsToReviewRows({
