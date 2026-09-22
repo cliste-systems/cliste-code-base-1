@@ -296,7 +296,7 @@ function previewText(value: string | null | undefined, max = 130): string {
   return `${normalized.slice(0, max).trim()}…`;
 }
 
-function plainTextEmailHtml(text: string): string {
+function plainTextEmailHtml(text: string, trackingToken: string): string {
   const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -304,11 +304,20 @@ function plainTextEmailHtml(text: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    process.env.SUPABASE_URL?.trim() ||
+    "https://rtoebbwzwxcnscsxghww.supabase.co";
+  const pixelUrl =
+    `${supabaseUrl.replace(/\/$/, "")}/functions/v1/hellocara-email-open?token=${encodeURIComponent(trackingToken)}`;
+
   return [
     '<!doctype html><html><body style="margin:0;padding:0;background:#ffffff;">',
     '<div style="max-width:680px;margin:0 auto;padding:24px;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#0f172a;white-space:pre-wrap;">',
     escaped,
-    "</div></body></html>",
+    "</div>",
+    `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;opacity:0;" />`,
+    "</body></html>",
   ].join("");
 }
 
@@ -887,7 +896,8 @@ export async function sendNewAdminEmail(input: {
   const sender = adminInboxIdentityByKey(input.identity);
   const fromEmail = sender.email;
   const fromName = sender.name;
-  const html = plainTextEmailHtml(text);
+  const trackingToken = randomUUID();
+  const html = plainTextEmailHtml(text, trackingToken);
   const response = await resendFetch<{ id: string }>("/emails", {
     method: "POST",
     headers: {
@@ -916,6 +926,7 @@ export async function sendNewAdminEmail(input: {
     subject,
     text_body: text,
     html_body: html,
+    open_tracking_token: trackingToken,
     sent_at: sentAt,
     read_at: sentAt,
     resend_sent_at: sentAt,
@@ -960,7 +971,8 @@ export async function replyToAdminEmail(input: {
     headers.References = source.messageId;
   }
 
-  const html = plainTextEmailHtml(text);
+  const trackingToken = randomUUID();
+  const html = plainTextEmailHtml(text, trackingToken);
   const response = await resendFetch<{ id: string }>("/emails", {
     method: "POST",
     headers: {
@@ -991,6 +1003,7 @@ export async function replyToAdminEmail(input: {
     subject,
     text_body: text,
     html_body: html,
+    open_tracking_token: trackingToken,
     sent_at: sentAt,
     read_at: sentAt,
     resend_sent_at: sentAt,
