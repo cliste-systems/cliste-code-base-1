@@ -197,6 +197,25 @@ describe("supervalu offers sync helpers", () => {
     assert.equal(frozen.fulfilment, "prepack");
   });
 
+  it("classifies dairy wall products separately from generic grocery", () => {
+    const dairy = classifySupervaluOfferServiceArea({
+      product: {
+        name: "SuperValu Whole Milk 2L",
+        priceNumeric: 2.2,
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Milk, Yogurt, Butter & Eggs/Fresh Milk/Whole Milk",
+          },
+        ],
+        attributes: { altCategory: "Whole Milk" },
+      },
+      productName: "SuperValu Whole Milk 2L",
+      department: "Whole Milk",
+    });
+    assert.equal(dairy.serviceArea, "dairy");
+    assert.equal(dairy.fulfilment, "prepack");
+  });
+
   it("classifies grocery promos separately from meat", () => {
     assert.equal(
       classifySupervaluOfferChannel({
@@ -719,7 +738,7 @@ describe("retail weekly offers search", () => {
   });
 
   it("infers store section service areas from varied caller phrasing", () => {
-    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "grocery");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "dairy");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("back store specials"), "grocery");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("provisions on offer"), "grocery");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("fruit and veg offers"), "produce");
