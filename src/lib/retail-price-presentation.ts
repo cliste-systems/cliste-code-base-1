@@ -38,6 +38,9 @@ export type RetailPricePresentation = {
   loyaltyRequired: boolean;
   loyaltyProgram: string | null;
   isMultibuy: boolean;
+  multibuyQuantity: number | null;
+  multibuyTotalEur: number | null;
+  multibuySavingEur: number | null;
   savingsEur: number | null;
   savingsPercent: number | null;
 };
@@ -58,6 +61,32 @@ export function inferPromotionTypeFromLabel(
   if (/save\s*\d+(?:[.,]\d+)?\s*%/i.test(value)) return "percentage";
   if (/save\s*[€£]\s*\d/i.test(value)) return "money_off";
   return "standard_offer";
+}
+
+function parseMultibuy(
+  label: string | null | undefined,
+): { quantity: number; totalEur: number } | null {
+  const match = String(label ?? "").match(
+    /\b(\d+)\s*for\s*[€£]?\s*(\d+(?:[.,]\d{1,2})?)/i,
+  );
+  if (!match) return null;
+  const quantity = Number(match[1]);
+  const totalEur = Number(match[2]?.replace(",", "."));
+  if (!Number.isFinite(quantity) || quantity < 2) return null;
+  if (!Number.isFinite(totalEur) || totalEur <= 0) return null;
+  return { quantity, totalEur };
+}
+
+export function compactRetailOfferLabel(
+  label: string | null | undefined,
+): string | null {
+  const value = String(label ?? "").trim();
+  if (!value) return null;
+  const multibuy = parseMultibuy(value);
+  if (multibuy) {
+    return `${multibuy.quantity} for €${multibuy.totalEur.toFixed(2)}`;
+  }
+  return value;
 }
 
 function buildPresentation(input: {
@@ -81,6 +110,11 @@ function buildPresentation(input: {
       ? Number(((savings / regular) * 100).toFixed(1))
       : null;
   const inferred = input.promotionType ?? inferPromotionTypeFromLabel(input.offerLabel);
+  const multibuy = parseMultibuy(input.offerLabel);
+  const multibuySaving =
+    multibuy && regular != null && regular * multibuy.quantity > multibuy.totalEur
+      ? Number((regular * multibuy.quantity - multibuy.totalEur).toFixed(2))
+      : null;
 
   return {
     currentPriceEur: current,
@@ -100,6 +134,9 @@ function buildPresentation(input: {
     isMultibuy:
       inferred === "multibuy" ||
       /\b\d+\s*for\s*[€£]?\s*\d/i.test(input.offerLabel ?? ""),
+    multibuyQuantity: multibuy?.quantity ?? null,
+    multibuyTotalEur: multibuy?.totalEur ?? null,
+    multibuySavingEur: multibuySaving,
     savingsEur: savings,
     savingsPercent: percent,
   };
