@@ -107,7 +107,7 @@ function matchesButcherPrepackName(name: string, product: SupervaluGatewayProduc
   });
 }
 function hasStrongFreshMeatName(name: string): boolean {
-  return /\b(?:beef\s+)?(?:striploin|sirloin|rib[ -]?eye|rump|fillet)\s+steaks?\b|\b(?:beef|steak)\s+mince\b|\bbeef\s+(?:roasting\s+)?joint\b|\blamb\s+(?:loin\s+)?chops?\b|\bpork\s+(?:loin\s+)?chops?\b|\bchicken\s+(?:breast\s+)?fillets?\b|\bwhole\s+chicken\b|\bturkey\s+breast\b|\brashers\b|\bsausages?\b/i.test(
+  return /\b(?:beef\s+)?(?:striploin|sirloin|rib[ -]?eye|rump|fillet)\s+steaks?\b|\b(?:striploin|sirloin|rib[ -]?eye)\s+roast\b|\b(?:beef|steak)\s+mince\b|\bbeef\s+(?:roasting\s+)?joint\b|\blamb\s+(?:loin\s+)?chops?\b|\bpork\s+(?:loin\s+)?chops?\b|\bchicken\s+(?:breast\s+)?fillets?\b|\bwhole\s+chicken\b|\bturkey\s+breast\b|\brashers\b|\bsausages?\b/i.test(
     name,
   );
 }
@@ -152,6 +152,13 @@ export function classifySupervaluOfferServiceArea(input: {
       return { serviceArea: "fish", fulfilment: "counter" };
     }
     return { serviceArea: "fish", fulfilment: "prepack" };
+  }
+
+  // SuperValu's /categories/prepack/* tree is the packaged fresh-meat
+  // range (mince, roasts, steaks/chops, stewing/diced, organic meat, etc.).
+  // Treat it as butcher/prepacked even when altCategory is generic like "Organic".
+  if (crumb.includes("/categories/prepack/")) {
+    return { serviceArea: "butcher", fulfilment: "prepack" };
   }
 
   if (crumb.includes("deli counter")) {
