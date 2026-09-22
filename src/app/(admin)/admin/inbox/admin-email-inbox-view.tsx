@@ -200,6 +200,8 @@ export function AdminEmailInboxView({
   const [messages, setMessages] = useState<EmailListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<EmailMessage | null>(null);
+  const messageCacheRef = useRef<Map<string, EmailMessage>>(new Map());
+  const messageRequestRef = useRef(0);
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
   const [composing, setComposing] = useState(false);
@@ -265,31 +267,74 @@ export function AdminEmailInboxView({
   );
 
   const loadMessage = useCallback(async (id: string) => {
+    const requestId = ++messageRequestRef.current;
+    const cached = messageCacheRef.current.get(id);
+
+    if (cached) {
+      setSelected(cached);
+      setMessageView(cached.htmlBody ? "formatted" : "plain");
+      setLoadingMessage(false);
+      return;
+    }
+
     setLoadingMessage(true);
+    setSelected(null);
     setError(null);
+
     try {
       const data = await apiJson<{ message: EmailMessage }>(
         `/api/admin/inbox/${encodeURIComponent(id)}`,
       );
-      setSelected(data.message);
-      setMessageView(data.message.htmlBody ? "formatted" : "plain");
+      if (requestId !== messageRequestRef.current) return;
+
+      const openedAt =
+        data.message.direction === "inbound" && !data.message.readAt
+          ? new Date().toISOString()
+          : data.message.readAt;
+      const openedMessage = { ...data.message, readAt: openedAt };
+
+      messageCacheRef.current.set(id, openedMessage);
+      if (messageCacheRef.current.size > 30) {
+        const oldest = messageCacheRef.current.keys().next().value as
+          | string
+          | undefined;
+        if (oldest) messageCacheRef.current.delete(oldest);
+      }
+
+      setSelected(openedMessage);
+      setMessageView(openedMessage.htmlBody ? "formatted" : "plain");
       setMessages((current) =>
         current.map((message) =>
           message.id === id
             ? {
                 ...message,
-                readAt: data.message.readAt ?? new Date().toISOString(),
-                preview: data.message.preview || message.preview,
+                readAt: openedAt,
+                preview: openedMessage.preview || message.preview,
               }
             : message,
         ),
       );
+
+      if (data.message.direction === "inbound" && !data.message.readAt) {
+        void apiJson<{ ok: true }>(
+          `/api/admin/inbox/${encodeURIComponent(id)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ read: true }),
+          },
+        ).catch(() => {
+          // Reading the message should never wait on the read-receipt write.
+        });
+      }
     } catch (loadError) {
+      if (requestId !== messageRequestRef.current) return;
       setError(
         loadError instanceof Error ? loadError.message : "Could not open email.",
       );
     } finally {
-      setLoadingMessage(false);
+      if (requestId === messageRequestRef.current) {
+        setLoadingMessage(false);
+      }
     }
   }, []);
 
@@ -396,6 +441,7 @@ export function AdminEmailInboxView({
       );
       setReply("");
       setNotice("Reply sent.");
+      messageCacheRef.current.delete(selected.id);
       await loadMessage(selected.id);
       await loadFolder(folder, true, true);
     } catch (sendError) {
@@ -462,6 +508,7 @@ export function AdminEmailInboxView({
           body: JSON.stringify(change),
         },
       );
+      messageCacheRef.current.delete(selected.id);
       await loadFolder(folder);
     } catch (stateError) {
       setError(
@@ -504,6 +551,7 @@ export function AdminEmailInboxView({
           ? `${data.senderEmail || selected.fromAddress} blocked. Future mail from this address will go to Archived.`
           : `${data.senderEmail || selected.fromAddress} unblocked.`,
       );
+      messageCacheRef.current.clear();
 
       if (block && folder === "inbox") {
         await loadFolder("inbox");
