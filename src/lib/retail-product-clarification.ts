@@ -1,5 +1,4 @@
 import {
-  catalogProductTokens,
   stripCatalogPackagingNoise,
   stripCatalogSearchBoilerplate,
 } from "@/lib/supervalu-catalog-search";
@@ -19,6 +18,7 @@ export type ClarificationMatch = {
   serviceArea?: string | null;
   fulfilment?: string | null;
   current_price_eur?: number | null;
+  score?: number | null;
 };
 
 export type ProductClarificationKind = "fulfilment" | "refinement";
@@ -76,6 +76,125 @@ function matchServiceArea(match: ClarificationMatch): string {
     .toLowerCase();
 }
 
+function matchProductName(match: ClarificationMatch): string {
+  return String(match.productName ?? match.product_name ?? "").trim();
+}
+
+function queryRequestsFresh(query: string): boolean {
+  return /\b(?:fresh|loose|whole|produce|fruit|veg|vegetable)\b/i.test(query);
+}
+
+function queryRequestsOwnBrand(query: string): boolean {
+  return /\b(?:supervalu|own\s*brand|own[- ]label|store\s*brand|shops?\s*own)\b/i.test(
+    query,
+  );
+}
+
+function queryRequestsCheapest(query: string): boolean {
+  return /\b(?:cheapest|lowest|least expensive|best price|best value|budget|cheap(?:est)?)\b/i.test(
+    query,
+  );
+}
+
+const INGREDIENT_FORM_WORDS = new Set([
+  "oil",
+  "butter",
+  "sauce",
+  "dressing",
+  "spread",
+  "dip",
+  "smashed",
+  "crushed",
+  "flavoured",
+  "flavored",
+  "seasoning",
+  "marinade",
+  "paste",
+  "powder",
+]);
+
+const SEARCH_PREFERENCE_TOKENS = new Set([
+  "fresh",
+  "loose",
+  "whole",
+  "supervalu",
+  "brand",
+  "own",
+  "cheapest",
+  "cheap",
+  "lowest",
+  "price",
+  "value",
+  "budget",
+]);
+
+function literalProductTokens(query: string): string[] {
+  return offerSearchProductTokens(query).filter(
+    (token) => !SEARCH_PREFERENCE_TOKENS.has(token),
+  );
+}
+
+function normalizedWords(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function productFormScore(query: string, match: ClarificationMatch): number {
+  const productTokens = literalProductTokens(query);
+  if (productTokens.length === 0) return 0;
+
+  const nameWords = normalizedWords(matchProductName(match));
+  const departmentWords = normalizedWords(String(match.department ?? ""));
+  let score = 0;
+
+  for (const token of productTokens) {
+    const stem = token.replace(/s$/, "");
+    const nameIndex = nameWords.findIndex(
+      (word) =>
+        word === token ||
+        word === stem ||
+        retailSearchTokenMatchesText(word, token),
+    );
+    if (nameIndex >= 0) {
+      score += 4;
+      const next = nameWords[nameIndex + 1] ?? "";
+      if (INGREDIENT_FORM_WORDS.has(next)) score -= 3;
+      continue;
+    }
+
+    if (
+      departmentWords.some(
+        (word) =>
+          word === token ||
+          word === stem ||
+          retailSearchTokenMatchesText(word, token),
+      )
+    ) {
+      score += 2;
+    }
+  }
+
+  if (queryRequestsFresh(query)) {
+    const text = `${matchProductName(match)} ${match.department ?? ""} ${matchServiceArea(match)}`.toLowerCase();
+    if (/\b(?:fresh|loose|whole|produce|fruit|veg|vegetable)\b/.test(text)) {
+      score += 3;
+    }
+    if (nameWords.some((word) => INGREDIENT_FORM_WORDS.has(word))) {
+      score -= 3;
+    }
+  }
+
+  if (queryRequestsOwnBrand(query)) {
+    if (/^supervalu\b/i.test(matchProductName(match))) score += 3;
+    else score -= 1;
+  }
+
+  return score;
+}
+
 function fulfilmentClarificationAreaHint(serviceArea: string): string | null {
   return COUNTER_PREPACK_AREA_HINTS[serviceArea] ?? null;
 }
@@ -102,7 +221,7 @@ function narrowMatchesByProductTokens<T extends ClarificationMatch>(
 ): T[] {
   if (inferWeeklyOffersListIntent(query)) return matches;
 
-  const productTokens = catalogProductTokens(query);
+  const productTokens = literalProductTokens(query);
   if (productTokens.length === 0 || matches.length <= 1) return matches;
 
   const byProductName = matches.filter((match) => {
@@ -261,26 +380,19 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
     options?.fulfilment,
   );
 
-  const wantsCheapest =
-    options?.intent === "price" &&
-    /\b(?:cheapest|lowest\s+price|least\s+expensive|best\s+value|budget)\b/i.test(
-      query,
-    );
-  if (wantsCheapest && narrowed.length > 1) {
-    const priced = narrowed
-      .map((match, index) => ({
-        match,
-        index,
-        price: Number(match.current_price_eur),
-      }))
-      .filter((entry) => Number.isFinite(entry.price) && entry.price > 0)
-      .sort((a, b) => a.price - b.price || a.index - b.index);
-    if (priced.length > 0) {
-      return {
-        matches: [priced[0]!.match],
-        clarificationHint: null,
-        clarificationKind: null,
-      };
+  // Rank the caller's intended product form before choosing a price. This keeps
+  // "fresh SuperValu avocado" on actual avocados instead of cheaper avocado oil,
+  // sauces or other ingredient-form matches.
+  if (narrowed.length > 1) {
+    const scored = narrowed.map((match) => ({
+      match,
+      formScore: productFormScore(query, match),
+    }));
+    const bestFormScore = Math.max(...scored.map((entry) => entry.formScore));
+    if (bestFormScore >= 3) {
+      narrowed = scored
+        .filter((entry) => entry.formScore >= bestFormScore - 1)
+        .map((entry) => entry.match);
     }
   }
 
@@ -295,6 +407,28 @@ export function resolveProductSearchResponse<T extends ClarificationMatch>(
 
   if (!broadOfferHint && !queryMatchesDepartmentScope(query, narrowed)) {
     narrowed = narrowMatchesByProductTokens(query, narrowed);
+  }
+
+  const wantsCheapest =
+    options?.intent === "price" && queryRequestsCheapest(query);
+  if (wantsCheapest && narrowed.length > 1) {
+    const priced = narrowed
+      .map((match, index) => ({
+        match,
+        index,
+        price: Number(match.current_price_eur),
+        sourceScore: Number(match.score ?? 0),
+      }))
+      .filter((entry) => Number.isFinite(entry.price) && entry.price > 0)
+      .sort(
+        (a, b) =>
+          a.price - b.price ||
+          b.sourceScore - a.sourceScore ||
+          a.index - b.index,
+      );
+    if (priced.length > 0) {
+      narrowed = [priced[0]!.match];
+    }
   }
   const fulfilmentHint = buildOfferFulfilmentClarificationHint(
     narrowed,
