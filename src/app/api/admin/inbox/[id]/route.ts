@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminSessionUser } from "@/lib/admin-session";
 import {
   getAdminEmailMessage,
+  setAdminEmailSenderBlocked,
   setAdminEmailState,
 } from "@/lib/resend-admin-inbox";
 
@@ -39,31 +40,52 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  let body: { read?: boolean; archived?: boolean };
+  let body: { read?: boolean; archived?: boolean; blocked?: boolean };
   try {
-    body = (await request.json()) as { read?: boolean; archived?: boolean };
+    body = (await request.json()) as {
+      read?: boolean;
+      archived?: boolean;
+      blocked?: boolean;
+    };
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
   if (
     typeof body.read !== "boolean" &&
-    typeof body.archived !== "boolean"
+    typeof body.archived !== "boolean" &&
+    typeof body.blocked !== "boolean"
   ) {
     return NextResponse.json(
-      { error: "Provide read or archived state." },
+      { error: "Provide read, archived or blocked state." },
       { status: 400 },
     );
   }
 
   const { id } = await context.params;
+  const resendEmailId = decodeURIComponent(id);
   try {
-    await setAdminEmailState({
-      resendEmailId: decodeURIComponent(id),
-      read: body.read,
-      archived: body.archived,
-    });
-    return NextResponse.json({ ok: true });
+    let senderEmail: string | null = null;
+    if (typeof body.blocked === "boolean") {
+      const result = await setAdminEmailSenderBlocked({
+        resendEmailId,
+        blocked: body.blocked,
+      });
+      senderEmail = result.email;
+    }
+
+    if (
+      typeof body.read === "boolean" ||
+      typeof body.archived === "boolean"
+    ) {
+      await setAdminEmailState({
+        resendEmailId,
+        read: body.read,
+        archived: body.archived,
+      });
+    }
+
+    return NextResponse.json({ ok: true, senderEmail });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not update email.";
