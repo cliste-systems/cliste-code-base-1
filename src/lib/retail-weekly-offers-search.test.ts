@@ -13,6 +13,7 @@ import {
   isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
+  searchSyncedWeeklyOffersInRows,
   scoreSupervaluSearchText,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
@@ -699,11 +700,11 @@ describe("retail weekly offers search", () => {
     );
   });
 
-  it("does not infer fulfilment from caller phrasing alone", () => {
+  it("infers fulfilment when the caller explicitly names the counter", () => {
     assert.equal(
       resolveWeeklyOfferSearchFilters("what's on offer in the meat counter this week")
         .fulfilment,
-      null,
+      "counter",
     );
     assert.equal(
       resolveWeeklyOfferSearchFilters("meat counter steaks", { fulfilment: "counter" })
