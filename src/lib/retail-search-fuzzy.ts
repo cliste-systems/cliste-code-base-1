@@ -78,7 +78,7 @@ export function retailSearchTokenSimilarity(text: string, token: string): number
   const words = normalizedText
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .map(normalizedToken)
+    .map(normalizedRetailSearchToken)
     .filter(Boolean);
 
   let best = 0;
