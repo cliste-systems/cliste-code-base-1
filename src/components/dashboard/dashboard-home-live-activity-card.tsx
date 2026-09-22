@@ -57,7 +57,7 @@ export function DashboardHomeLiveActivityCard({
         <h2 className={HOME_FIRST_ROW_TITLE}>Recent activity</h2>
         <span className={HOME_FIRST_ROW_HEADER_META}>
           <span className="size-1.5 rounded-full bg-slate-400" aria-hidden />
-          Now
+          Live
         </span>
       </div>
 
