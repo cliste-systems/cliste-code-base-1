@@ -4,14 +4,13 @@ import { normalizeCustomerPhoneE164 } from "@/lib/booking-reference";
 import {
   assessSyncedOffersFreshness,
   inferWeeklyOfferFulfilmentFromQuery,
+  inferWeeklyOfferServiceAreaFromQuery,
   loadLatestRetailOfferWeekEnd,
-  offerSearchProductTokens,
 } from "@/lib/retail-weekly-offers-search";
-import type { SupervaluFulfilment } from "@/lib/supervalu-offers-types";
+import type { SupervaluFulfilment, SupervaluServiceArea } from "@/lib/supervalu-offers-types";
 import { resolveProductSearchResponse } from "@/lib/retail-product-clarification";
 import {
   formatCatalogStockNoMatchQuote,
-  formatOfferFulfilmentMissQuote,
   inferCatalogSearchIntent,
   searchSupervaluCatalogLiveWithFallback,
   SUPERVALU_CATALOG_SEARCH_MAX_QUERY_CHARS,
@@ -35,6 +34,7 @@ type SearchSupervaluProductsBody = {
   query?: string;
   intent?: CatalogQuoteIntent;
   fulfilment?: "counter" | "prepack";
+  service_area?: SupervaluServiceArea;
 };
 
 /**
@@ -162,6 +162,22 @@ export async function POST(request: Request) {
       ? body.fulfilment
       : inferWeeklyOfferFulfilmentFromQuery(query);
 
+  const allowedServiceAreas = new Set<SupervaluServiceArea>([
+    "butcher",
+    "deli",
+    "fish",
+    "produce",
+    "bakery",
+    "dairy",
+    "off_licence",
+    "grocery",
+  ]);
+  const requestedServiceArea = String(body.service_area ?? "").trim() as SupervaluServiceArea;
+  const serviceArea: SupervaluServiceArea | null =
+    allowedServiceAreas.has(requestedServiceArea)
+      ? requestedServiceArea
+      : inferWeeklyOfferServiceAreaFromQuery(query);
+
   const latestOfferWeekEnd = await loadLatestRetailOfferWeekEnd(admin, retailBanner);
   const offersFreshness = assessSyncedOffersFreshness({
     syncedAt:
@@ -179,6 +195,7 @@ export async function POST(request: Request) {
       supabase: admin,
       retailBanner,
       fulfilment,
+      serviceArea,
       storeId: sourceStoreId ?? undefined,
     },
   );
@@ -309,52 +326,10 @@ export async function POST(request: Request) {
       ? ownBrandFallbackQuote ?? formatCatalogStockNoMatchQuote(query)
       : null;
 
-  if (
-    responseMatches.length === 0 &&
-    fulfilment &&
-    intent === "offer" &&
-    offerSearchProductTokens(query).length > 0
-  ) {
-    const alternateFulfilment: SupervaluFulfilment =
-      fulfilment === "counter" ? "prepack" : "counter";
-    const { matches: alternateRaw } = await searchSupervaluCatalogLiveWithFallback(query, {
-      intent,
-      supabase: admin,
-      retailBanner,
-      fulfilment: alternateFulfilment,
-      storeId: sourceStoreId ?? undefined,
-    });
-    const alternateMapped = alternateRaw.map((match) => ({
-      product_name: match.productName,
-      department: match.department,
-      sku: match.sku,
-      current_price_eur: match.currentPriceEur,
-      was_price_eur: match.wasPriceEur,
-      discount_label: match.discountLabel,
-      is_on_offer: match.isOnOffer,
-      service_area: match.serviceArea ?? null,
-      fulfilment: match.fulfilment ?? null,
-      is_alcohol: match.isAlcohol === true,
-      score: match.score,
-      quote_text: match.quoteText,
-      source: match.source ?? null,
-    }));
-    const { matches: alternateMatches } = resolveProductSearchResponse(query, alternateMapped, {
-      fulfilment: alternateFulfilment,
-      intent,
-    });
-    noMatchQuote = formatOfferFulfilmentMissQuote({
-      query,
-      requestedFulfilment: fulfilment,
-      alternateMatches: alternateMatches.map((match) => ({
-        quoteText: match.quote_text,
-      })),
-    });
-  }
-
   return NextResponse.json({
     ok: true,
     intent,
+    service_area: serviceArea,
     fulfilment,
     clarification_hint: clarificationHint,
     offers_freshness: offersFreshness.stale ? offersFreshness.message : null,
