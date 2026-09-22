@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, local-dev]
 
 # Default to read-only token. Individual jobs that need write access (e.g.
 # pushing back to the repo) must opt in explicitly. Reduces blast radius if
