@@ -13,7 +13,6 @@ set is_internal_test = true,
 where is_internal_test = false
   and (
     slug in ('hello-cara-baseline', 'hello-cara-demo')
-    or notification_email ilike '%@cliste.test'
     or name ilike '[smoke test]%'
     or name in ('Hello Cara Baseline', 'Hello Cara Demo', 'Murphy''s SuperValu Killarney')
   );
