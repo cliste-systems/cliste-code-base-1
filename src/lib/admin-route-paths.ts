@@ -29,6 +29,10 @@ export function adminTextRehearsalPath(): string {
   return "/admin/demo-calls/text-rehearsal";
 }
 
+export function adminInboxPath(): string {
+  return "/admin/inbox";
+}
+
 export function adminSupportPath(): string {
   return "/admin/support";
 }
