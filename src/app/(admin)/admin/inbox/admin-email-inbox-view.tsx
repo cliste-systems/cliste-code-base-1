@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "archived" | "sent";
 type GrammarTarget = "reply" | "compose";
+type MessageViewMode = "formatted" | "plain";
 type EmailIdentityKey = "hello" | "billing";
 
 type EmailIdentity = {
@@ -52,6 +53,7 @@ type EmailMessage = EmailListItem & {
   replyToAddresses: string[];
   ccAddresses: string[];
   textBody: string;
+  htmlBody: string | null;
   attachments: Array<Record<string, unknown>>;
   replies: EmailListItem[];
 };
@@ -136,6 +138,7 @@ export function AdminEmailInboxView({
   const [changingState, setChangingState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [messageView, setMessageView] = useState<MessageViewMode>("formatted");
 
   const activeIdentity =
     identities.find((identity) => identity.key === identityKey) ??
@@ -193,6 +196,7 @@ export function AdminEmailInboxView({
         `/api/admin/inbox/${encodeURIComponent(id)}`,
       );
       setSelected(data.message);
+      setMessageView(data.message.htmlBody ? "formatted" : "plain");
       setMessages((current) =>
         current.map((message) =>
           message.id === id
