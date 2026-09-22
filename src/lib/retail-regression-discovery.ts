@@ -129,7 +129,7 @@ function intentSignals(callerText: string): Set<"offer" | "price" | "stock"> {
     signals.add("price");
   }
   if (
-    /\b(?:in stock|stock|do you have|have you got|have ye got|do ye have|sell|available|in today|carry)\b/.test(
+    /\b(?:in stock|stock|do you have|have you got|have ye got|do ye have|sell|available|in today|carry|looking for|i'm after|im after|i need|need some|want to buy|can i get|got any|reckon you've got)\b/.test(
       text,
     )
   ) {
@@ -242,6 +242,7 @@ function sanitizeExpectations(
 
   const canRequireProductTool =
     raw.requiredTool === "searchSuperValuProducts" &&
+    signals.size > 0 &&
     !(callerTurns.length === 1 && wantsClarification);
   if (canRequireProductTool) {
     expectation.requiredTool = "searchSuperValuProducts";
