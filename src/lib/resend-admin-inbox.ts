@@ -41,6 +41,7 @@ export type AdminEmailMessage = AdminEmailListItem & {
   ccAddresses: string[];
   textBody: string;
   htmlBody: string | null;
+  senderBlocked: boolean;
   attachments: Array<Record<string, unknown>>;
   replies: AdminEmailListItem[];
 };
@@ -299,6 +300,16 @@ async function syncInboundMetadata(): Promise<void> {
   if (received.length === 0) return;
 
   const admin = createAdminClient();
+  const { data: blockedRows, error: blockedError } = await admin
+    .from("admin_email_blocked_senders")
+    .select("email");
+
+  if (blockedError) throw new Error(blockedError.message);
+
+  const blockedSenders = new Set(
+    (blockedRows ?? []).map((row) => String(row.email).trim().toLowerCase()),
+  );
+
   const ids = received.map((email) => email.id);
   const { data: existingRows, error: existingError } = await admin
     .from("admin_email_messages")
@@ -375,6 +386,9 @@ async function syncInboundMetadata(): Promise<void> {
       resend_email_id: summary.id,
       direction: "inbound",
       ...values,
+      archived_at: blockedSenders.has(from.email)
+        ? new Date().toISOString()
+        : null,
     });
     if (error) throw new Error(error.message);
   }
@@ -509,6 +523,21 @@ export async function getAdminEmailMessage(
     replies = ((replyRows ?? []) as AdminEmailRow[]).map(rowToListItem);
   }
 
+  let senderBlocked = false;
+  if (row.direction === "inbound") {
+    const senderEmail = row.from_address.trim().toLowerCase();
+    if (senderEmail) {
+      const { data: blockedSender, error: blockedSenderError } = await admin
+        .from("admin_email_blocked_senders")
+        .select("email")
+        .eq("email", senderEmail)
+        .maybeSingle();
+
+      if (blockedSenderError) throw new Error(blockedSenderError.message);
+      senderBlocked = Boolean(blockedSender);
+    }
+  }
+
   const item = rowToListItem(row);
   return {
     ...item,
@@ -518,11 +547,85 @@ export async function getAdminEmailMessage(
     textBody:
       row.text_body || (row.html_body ? stripHtml(row.html_body) : "(No text body)"),
     htmlBody: row.html_body?.trim() || null,
+    senderBlocked,
     attachments: Array.isArray(row.attachments)
       ? (row.attachments as Array<Record<string, unknown>>)
       : [],
     replies,
   };
+}
+
+export async function setAdminEmailSenderBlocked(input: {
+  resendEmailId: string;
+  blocked: boolean;
+}): Promise<{ email: string }> {
+  const id = input.resendEmailId.trim();
+  if (!id) throw new Error("Email ID is required.");
+
+  const admin = createAdminClient();
+  const { data: row, error: rowError } = await admin
+    .from("admin_email_messages")
+    .select("direction,from_address")
+    .eq("resend_email_id", id)
+    .maybeSingle();
+
+  if (rowError) throw new Error(rowError.message);
+  if (!row) throw new Error("Email not found.");
+  if (row.direction !== "inbound") {
+    throw new Error("Only received email senders can be blocked.");
+  }
+
+  const email = String(row.from_address ?? "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("This message does not have a valid sender address.");
+  }
+
+  const protectedAddresses = new Set<string>([
+    ...adminInboxIdentities().map((identity) => identity.email.toLowerCase()),
+    ...LEGACY_HELLO_ADDRESSES.map((value) => value.toLowerCase()),
+  ]);
+  if (protectedAddresses.has(email)) {
+    throw new Error("HelloCara mailbox addresses cannot be blocked.");
+  }
+
+  if (input.blocked) {
+    const { data: existingBlock, error: existingBlockError } = await admin
+      .from("admin_email_blocked_senders")
+      .select("email")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingBlockError) throw new Error(existingBlockError.message);
+
+    if (!existingBlock) {
+      const { error: insertError } = await admin
+        .from("admin_email_blocked_senders")
+        .insert({ email });
+      if (insertError) throw new Error(insertError.message);
+    }
+
+    const now = new Date().toISOString();
+    const { error: archiveError } = await admin
+      .from("admin_email_messages")
+      .update({
+        archived_at: now,
+        read_at: now,
+        updated_at: now,
+      })
+      .eq("direction", "inbound")
+      .eq("from_address", email);
+
+    if (archiveError) throw new Error(archiveError.message);
+  } else {
+    const { error: deleteError } = await admin
+      .from("admin_email_blocked_senders")
+      .delete()
+      .eq("email", email);
+
+    if (deleteError) throw new Error(deleteError.message);
+  }
+
+  return { email };
 }
 
 export async function setAdminEmailState(input: {
