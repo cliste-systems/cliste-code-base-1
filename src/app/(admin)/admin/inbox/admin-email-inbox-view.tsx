@@ -927,7 +927,15 @@ export function AdminEmailInboxView({
                     </button>
                     <button
                       type="button"
-                      disabled={changingState}
+                      disabled={
+                        changingState ||
+                        (selected.senderBlocked && Boolean(selected.archivedAt))
+                      }
+                      title={
+                        selected.senderBlocked && selected.archivedAt
+                          ? "Unblock this sender before restoring the email"
+                          : undefined
+                      }
                       onClick={() =>
                         void updateSelectedState({
                           archived: !selected.archivedAt,
