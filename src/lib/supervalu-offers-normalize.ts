@@ -193,7 +193,18 @@ export function classifySupervaluOfferServiceArea(input: {
     return { serviceArea: "bakery", fulfilment: "counter" };
   }
 
-  if (crumb.includes("fresh fruit & veg") || dept.includes("fruit") || dept.includes("veg")) {
+  const produceBreadcrumb =
+    crumb.includes("fresh fruit & veg") ||
+    /(?:^|\/)fruit(?:\/|$)/i.test(crumb) ||
+    /(?:^|\/)vegetables(?:\/|$)/i.test(crumb) ||
+    /(?:^|\/)fruit-vegetables(?:\/|$)/i.test(crumb);
+  const produceDepartmentWithoutBreadcrumb =
+    !crumb &&
+    /\b(?:berries|grapes?|citrus|bananas?|apples?|pears?|rhubarb|kiwis?|peaches?|plums?|nectarines?|prepared fruit|exotic fruit|vegetables?|potatoes?|carrots?|broccoli|cauliflower|cabbage|onions?|garlic|mushrooms?|leeks?|celery|peppers?)\b/i.test(
+      dept,
+    );
+
+  if (produceBreadcrumb || produceDepartmentWithoutBreadcrumb) {
     if (isLooseFresh(product) || isWeightSold(product)) {
       return { serviceArea: "produce", fulfilment: "counter" };
     }

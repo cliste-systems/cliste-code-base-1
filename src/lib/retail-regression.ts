@@ -1,3 +1,5 @@
+import { resolveWeeklyOfferSearchFilters } from "@/lib/retail-weekly-offers-search";
+
 export type RetailRegressionCategory =
   | "openings"
   | "products"
@@ -24,9 +26,11 @@ export type RetailRegressionExpectation = {
   forbiddenQueryTerms?: string[];
   requiredServiceArea?: string;
   forbiddenServiceAreas?: string[];
+  requiredFulfilment?: "counter" | "prepack";
   assistantMustIncludeAny?: string[];
   assistantMustNotInclude?: string[];
   mustAskClarifyingQuestion?: boolean;
+  lastTurnMustNotAskClarifyingQuestion?: boolean;
   noError?: boolean;
 };
 
@@ -106,16 +110,28 @@ function queryValue(tool: { name: string; args: Record<string, unknown> }): stri
 }
 
 function serviceAreaValues(tool: { name: string; args: Record<string, unknown> }): string[] {
-  return [
+  const explicit = [
     tool.args.serviceArea,
     tool.args.service_area,
-    tool.args.fulfillment,
-    tool.args.fulfilment,
     tool.args.department,
     tool.args.area,
   ]
     .map(normalize)
     .filter(Boolean);
+  const query = queryValue(tool);
+  if (!query) return explicit;
+  const inferred = resolveWeeklyOfferSearchFilters(query).serviceArea;
+  return inferred ? [...explicit, normalize(inferred)] : explicit;
+}
+
+function fulfilmentValues(tool: { name: string; args: Record<string, unknown> }): string[] {
+  const explicit = [tool.args.fulfillment, tool.args.fulfilment]
+    .map(normalize)
+    .filter(Boolean);
+  const query = queryValue(tool);
+  if (!query) return explicit;
+  const inferred = resolveWeeklyOfferSearchFilters(query).fulfilment;
+  return inferred ? [...explicit, normalize(inferred)] : explicit;
 }
 
 function intentValue(tool: { name: string; args: Record<string, unknown> }): string {
@@ -212,6 +228,18 @@ export function gradeRetailRegressionScenario(
         }
       }
 
+      if (exp.requiredFulfilment) {
+        const expectedFulfilment = normalize(exp.requiredFulfilment);
+        const found = matching.some((tool) =>
+          fulfilmentValues(tool).some((value) => value === expectedFulfilment),
+        );
+        if (!found) {
+          reasons.push(
+            `Expected fulfilment "${exp.requiredFulfilment}" was not used.`,
+          );
+        }
+      }
+
       if (exp.forbiddenServiceAreas?.length) {
         const bad = matching.find((tool) => {
           const areas = serviceAreaValues(tool);
@@ -264,6 +292,15 @@ export function gradeRetailRegressionScenario(
     !execution.turns.some((turn) => hasClarifyingQuestion(turn.assistant))
   ) {
     reasons.push("Cara should have asked a clarifying question before answering.");
+  }
+
+  if (exp.lastTurnMustNotAskClarifyingQuestion) {
+    const lastTurn = execution.turns.at(-1);
+    if (lastTurn && hasClarifyingQuestion(lastTurn.assistant)) {
+      reasons.push(
+        "Cara asked another clarifying question after the caller had already provided a decisive selection.",
+      );
+    }
   }
 
   if (errors.length > 0 && reasons.length === 0) {

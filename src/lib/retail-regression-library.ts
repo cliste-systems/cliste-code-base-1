@@ -54,6 +54,13 @@ const groups: ScenarioGroup[] = [
       requiredIntent: "stock",
       queryMustInclude: ["wine", "gums"],
       forbiddenServiceAreas: ["off_licence", "off licence", "alcohol"],
+      assistantMustNotInclude: [
+        "we definitely have",
+        "definitely in stock",
+        "guaranteed in stock",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -212,7 +219,12 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "stock",
       queryMustInclude: ["weetabix"],
-      assistantMustNotInclude: ["definitely on the shelf", "guaranteed in stock right now"],
+      assistantMustNotInclude: [
+        "definitely on the shelf",
+        "guaranteed in stock right now",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -232,7 +244,12 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "stock",
       queryMustIncludeAny: ["gluten free", "gluten-free"],
-      assistantMustNotInclude: ["definitely on the shelf", "guaranteed in stock right now"],
+      assistantMustNotInclude: [
+        "definitely on the shelf",
+        "guaranteed in stock right now",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -252,6 +269,12 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "stock",
       queryMustIncludeAny: ["formula", "baby", "infant"],
+      assistantMustNotInclude: [
+        "we definitely have",
+        "definitely in stock",
+        "we stock it",
+        "we carry it",
+      ],
     },
   },
   {
@@ -267,11 +290,11 @@ const groups: ScenarioGroup[] = [
       "Have you Guinness cans on special?",
     ],
     expectations: {
-      summary: "Treat Guinness as an alcohol offer and preserve Guinness in the product query.",
+      summary: "Treat Guinness as an alcohol product offer, preserve Guinness in the query, and give the age reminder.",
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "offer",
       queryMustInclude: ["guinness"],
-      requiredServiceArea: "off_licence",
+      assistantMustIncludeAny: ["18", "eighteen"],
     },
   },
   {
@@ -311,6 +334,7 @@ const groups: ScenarioGroup[] = [
       requiredIntent: "offer",
       queryMustInclude: ["sirloin"],
       requiredServiceArea: "butcher",
+      requiredFulfilment: "counter",
     },
   },
   {
@@ -349,6 +373,7 @@ const groups: ScenarioGroup[] = [
       requiredIntent: "offer",
       queryMustInclude: ["salmon"],
       requiredServiceArea: "fish",
+      requiredFulfilment: "counter",
     },
   },
   {
@@ -368,6 +393,7 @@ const groups: ScenarioGroup[] = [
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "offer",
       requiredServiceArea: "butcher",
+      requiredFulfilment: "counter",
     },
   },
   {
@@ -612,10 +638,11 @@ const groups: ScenarioGroup[] = [
     ],
     followups: ["Fresh ones, cheapest SuperValu one if there is one."],
     expectations: {
-      summary: "Keep avocado context through the refinement and perform a price lookup.",
+      summary: "Keep avocado context, honor the explicit cheapest selection, and do not ask another type/brand question.",
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "price",
       queryMustIncludeAny: ["avocado", "avocados"],
+      lastTurnMustNotAskClarifyingQuestion: true,
     },
   },
   {
@@ -637,6 +664,7 @@ const groups: ScenarioGroup[] = [
       requiredIntent: "offer",
       queryMustIncludeAny: ["steak", "steaks"],
       requiredServiceArea: "butcher",
+      requiredFulfilment: "counter",
     },
   },
   {
@@ -714,10 +742,10 @@ const groups: ScenarioGroup[] = [
       "Dairy section offers please.",
     ],
     expectations: {
-      summary: "Explicit dairy-area wording should remain a department browse.",
+      summary: "Explicit dairy-area wording should remain a grocery dairy-section browse.",
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "offer",
-      requiredServiceArea: "dairy",
+      requiredServiceArea: "grocery",
     },
   },
   {
@@ -771,10 +799,15 @@ const groups: ScenarioGroup[] = [
       "Cheapest avocardo you've got?",
     ],
     expectations: {
-      summary: "Recover from a plausible avocado transcription/spelling error and keep price intent.",
+      summary: "Recover from a plausible avocado transcription/spelling error, keep price intent, and do not give up on the misspelling.",
       requiredTool: PRODUCT_TOOL,
       requiredIntent: "price",
       queryMustIncludeAny: ["avocado", "avacado", "avocardo"],
+      assistantMustNotInclude: [
+        "couldn't find the price",
+        "can't see the price",
+        "could not find the price",
+      ],
     },
   },
   {
