@@ -439,6 +439,51 @@ describe("supervalu offers sync helpers", () => {
     assert.match(quote, /Usually twenty nine euro ninety nine per kilo/i);
   });
 
+  it("speaks Rewards multibuy terms without treating the single price as the offer price", () => {
+    const quote = formatWeeklyOfferQuote({
+      productName: "Kellogg's Rice Krispies Caramel & Chocolate Squares 4 Pack (36 g)",
+      serviceArea: "grocery",
+      fulfilment: "prepack",
+      currentPriceEur: 2.99,
+      wasPriceEur: null,
+      discountLabel: "3 for €5 Rewards Price",
+      pricePerUnit: "€20.76/kg",
+    });
+
+    assert.match(quote, /three for five euro with Real Rewards/i);
+    assert.match(quote, /Single price two euro ninety nine each/i);
+    assert.doesNotMatch(quote, /Now two euro ninety nine/i);
+  });
+
+  it("returns a synced Rewards multibuy for the exact product search", () => {
+    const rows = [
+      mockOfferRow({
+        id: "rice-krispies-multibuy",
+        product_name: "Kellogg's Rice Krispies Caramel & Chocolate Squares 4 Pack (36 g)",
+        department: "Cereal Bars",
+        service_area: "grocery",
+        fulfilment: "prepack",
+        offer_channel: "grocery",
+        current_price_eur: 2.99,
+        was_price_eur: null,
+        discount_label: "3 for €5 Rewards Price",
+        price_per_unit: "€20.76/kg",
+        sku: "1023070000",
+        search_text:
+          "kelloggs rice krispies caramel chocolate squares 4 pack cereal bars 1023070000",
+      }),
+    ];
+
+    const matches = searchSyncedWeeklyOffersInRows(
+      rows,
+      "Kellogg's Rice Krispies Caramel Chocolate Squares",
+    );
+
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0]?.discountLabel, "3 for €5 Rewards Price");
+    assert.match(matches[0]?.quoteText ?? "", /three for five euro with Real Rewards/i);
+  });
+
   it("leads with percent off and uses Usually for was price", () => {
     const quote = formatWeeklyOfferQuote({
       productName: "Pork Loin Chops",
