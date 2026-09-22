@@ -40,6 +40,7 @@ export type AdminEmailMessage = AdminEmailListItem & {
   replyToAddresses: string[];
   ccAddresses: string[];
   textBody: string;
+  htmlBody: string | null;
   attachments: Array<Record<string, unknown>>;
   replies: AdminEmailListItem[];
 };
@@ -472,6 +473,7 @@ export async function getAdminEmailMessage(
     ccAddresses: row.cc_addresses ?? [],
     textBody:
       row.text_body || (row.html_body ? stripHtml(row.html_body) : "(No text body)"),
+    htmlBody: row.html_body?.trim() || null,
     attachments: Array.isArray(row.attachments)
       ? (row.attachments as Array<Record<string, unknown>>)
       : [],
