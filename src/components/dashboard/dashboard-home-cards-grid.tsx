@@ -118,7 +118,14 @@ export function DashboardHomeCardsGrid({
       className={cn("hidden min-h-0 flex-1 lg:block", className)}
     >
       <section className={cn(DASHBOARD_HOME_UNIFIED_PANEL, "grid h-full grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.8fr)]")}>
-        <div className="grid min-h-0 grid-rows-[minmax(0,1.05fr)_minmax(0,0.95fr)] divide-y divide-[#e3e9e5]">
+        <div
+          className={cn(
+            "grid min-h-0 divide-y divide-[#e3e9e5]",
+            openActions > 0
+              ? "grid-rows-[minmax(0,1.05fr)_minmax(0,0.95fr)]"
+              : "grid-rows-[auto_minmax(0,1fr)]",
+          )}
+        >
           <div className="min-h-0 p-4">
             <DashboardHomeNeedsAttentionCard
               rows={needsAttention}
@@ -139,7 +146,14 @@ export function DashboardHomeCardsGrid({
           </div>
         </div>
 
-        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] border-l border-[#e3e9e5]">
+        <div
+          className={cn(
+            "grid min-h-0 border-l border-[#e3e9e5]",
+            activity.length > 0
+              ? "grid-rows-[minmax(0,1fr)_auto]"
+              : "grid-rows-[auto_minmax(0,1fr)]",
+          )}
+        >
           <div className="min-h-0 p-4">
             <DashboardHomeLiveActivityCard
               activity={activity}
