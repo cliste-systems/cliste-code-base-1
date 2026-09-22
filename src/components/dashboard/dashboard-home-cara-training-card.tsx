@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 
 import {
@@ -23,15 +24,15 @@ import { cn } from "@/lib/utils";
 
 function CaraTrainingEmptyState() {
   return (
-    <div className="flex min-h-0 flex-1 items-center rounded-lg border border-[#e3e9e5] bg-[#f6faf7] px-4 py-4">
-      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-0 mr-3 size-10")} aria-hidden>
-        <GraduationCap className="size-5" />
+    <div className="flex min-h-[5.75rem] flex-1 items-center gap-3 px-1">
+      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-0 size-9 shrink-0 shadow-none")} aria-hidden>
+        <GraduationCap className="size-4" />
       </div>
       <div className="min-w-0 text-left">
-        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[14px]")}>
+        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[13px]")}>
           Cara is up to date
         </p>
-        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-0.5 max-w-none text-[12px]")}>
+        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-0.5 max-w-none text-[11.5px]")}>
           Questions she could not answer will appear here for the team to teach.
         </p>
       </div>
@@ -73,9 +74,18 @@ export function DashboardHomeCaraTrainingCard({
           />
 
           <div className={cn(HOME_FIRST_ROW_FOOTER, "mt-auto")}>
-            <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.caraKnowledgeNeedsInput}>
-              Open needs your input
-            </DashboardHomeFirstRowButton>
+            {embedded ? (
+              <Link
+                href={DASHBOARD_ROUTES.caraKnowledgeNeedsInput}
+                className="inline-flex text-[11px] font-medium text-[#4d5f58] transition-colors hover:text-[#11181d]"
+              >
+                Open needs your input →
+              </Link>
+            ) : (
+              <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.caraKnowledgeNeedsInput}>
+                Open needs your input
+              </DashboardHomeFirstRowButton>
+            )}
           </div>
         </>
       ) : (
