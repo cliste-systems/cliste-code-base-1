@@ -302,39 +302,83 @@ async function syncInboundMetadata(): Promise<void> {
   const ids = received.map((email) => email.id);
   const { data: existingRows, error: existingError } = await admin
     .from("admin_email_messages")
-    .select("resend_email_id")
+    .select("resend_email_id,text_body,html_body")
     .in("resend_email_id", ids);
 
   if (existingError) throw new Error(existingError.message);
 
-  const existing = new Set(
-    (existingRows ?? []).map((row) => String(row.resend_email_id)),
+  const existing = new Map(
+    (existingRows ?? []).map((row) => [String(row.resend_email_id), row]),
   );
-  const newMessages = received.filter((email) => !existing.has(email.id));
-  if (newMessages.length === 0) return;
+  const needsHydration = received.filter((email) => {
+    const row = existing.get(email.id);
+    return !row || (!row.text_body && !row.html_body);
+  });
+  if (needsHydration.length === 0) return;
 
-  const rows = newMessages.map((email) => {
-    const from = parseMailbox(email.from);
-    return {
-      resend_email_id: email.id,
-      direction: "inbound",
-      message_id: email.message_id ?? null,
+  const hydrated: Array<{
+    summary: ResendReceivedListItem;
+    detail: ResendReceivedDetail | null;
+  }> = [];
+
+  // Keep concurrency modest so a large first sync cannot hammer Resend.
+  for (let index = 0; index < needsHydration.length; index += 8) {
+    const batch = needsHydration.slice(index, index + 8);
+    const resolved = await Promise.all(
+      batch.map(async (summary) => {
+        try {
+          return { summary, detail: await getResendReceived(summary.id) };
+        } catch {
+          return { summary, detail: null };
+        }
+      }),
+    );
+    hydrated.push(...resolved);
+  }
+
+  for (const { summary, detail } of hydrated) {
+    const source = detail ?? summary;
+    const from = parseMailbox(source.from);
+    const textBody =
+      detail?.text?.trim() ||
+      (detail?.html ? stripHtml(detail.html) : null);
+    const values = {
+      message_id: source.message_id ?? null,
       from_address: from.email,
       from_name: from.name,
-      to_addresses: asAddressArray(email.to),
-      cc_addresses: asAddressArray(email.cc),
-      bcc_addresses: asAddressArray(email.bcc),
-      reply_to_addresses: asAddressArray(email.reply_to),
-      subject: email.subject?.trim() || "(no subject)",
-      attachments: Array.isArray(email.attachments) ? email.attachments : [],
-      received_at: email.created_at ?? new Date().toISOString(),
+      to_addresses: asAddressArray(source.to),
+      cc_addresses: asAddressArray(source.cc),
+      bcc_addresses: asAddressArray(source.bcc),
+      reply_to_addresses: asAddressArray(source.reply_to),
+      subject: source.subject?.trim() || "(no subject)",
+      text_body: textBody,
+      html_body: detail?.html ?? null,
+      headers:
+        detail?.headers && typeof detail.headers === "object"
+          ? detail.headers
+          : {},
+      attachments: Array.isArray(source.attachments) ? source.attachments : [],
+      received_at: source.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
-  });
 
-  const { error } = await admin.from("admin_email_messages").insert(rows);
-  if (error) throw new Error(error.message);
+    if (existing.has(summary.id)) {
+      const { error } = await admin
+        .from("admin_email_messages")
+        .update(values)
+        .eq("resend_email_id", summary.id);
+      if (error) throw new Error(error.message);
+      continue;
+    }
+
+    const { error } = await admin.from("admin_email_messages").insert({
+      resend_email_id: summary.id,
+      direction: "inbound",
+      ...values,
+    });
+    if (error) throw new Error(error.message);
+  }
 }
-
 export async function listAdminInbox(
   folder: AdminEmailFolder,
   identity: AdminEmailIdentityKey = "hello",
