@@ -39,6 +39,7 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 | `RESEND_HELLO_NAME` | Optional | Admin Hello sender name; defaults to `HelloCara` |
 | `RESEND_BILLING_EMAIL` | Optional | Admin Billing mailbox; defaults to `billing@hellocara.ie` |
 | `RESEND_BILLING_NAME` | Optional | Billing sender name; defaults to `HelloCara Billing` |
+| `RESEND_WEBHOOK_SECRET` | Optional | Resend lifecycle webhook signing secret. If unset, the admin email webhook reads the service-role-only database config. |
 
 Inbound email is untrusted data. The admin inbox renders a plain-text body and never
 executes actions from received email content. The underlying Supabase table is
