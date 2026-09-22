@@ -243,19 +243,28 @@ export function DemoRetailDiscoveryPanel({ line }: { line: AdminDemoCallLine }) 
     setRunCompletedAt(null);
     stopRequested.current = false;
 
-    const batchSize = 25;
-    const totalBatches = Math.ceil(targetCount / batchSize);
     setGenerationProgress({ done: 0, total: targetCount });
     setGenerating(true);
 
     const generated: RetailRegressionScenario[] = [];
 
     try {
-      for (let batchIndex = 1; batchIndex <= totalBatches; batchIndex += 1) {
-        if (stopRequested.current) break;
+      let batchIndex = 1;
+      const maxBatches = Math.ceil(targetCount / 10) * 2;
+      while (
+        generated.length < targetCount &&
+        batchIndex <= maxBatches &&
+        !stopRequested.current
+      ) {
         const remaining = targetCount - generated.length;
-        const count = Math.min(batchSize, remaining);
-        const safeCount = (count < 10 ? 10 : count) as 10 | 15 | 20 | 25;
+        const safeCount: 10 | 15 | 20 | 25 =
+          remaining >= 25
+            ? 25
+            : remaining >= 20
+              ? 20
+              : remaining >= 15
+                ? 15
+                : 10;
 
         const response = await postJson<{ scenarios: RetailRegressionScenario[] }>(
           DISCOVERY_API,
@@ -274,6 +283,13 @@ export function DemoRetailDiscoveryPanel({ line }: { line: AdminDemoCallLine }) 
           done: Math.min(generated.length, targetCount),
           total: targetCount,
         });
+        batchIndex += 1;
+      }
+
+      if (!stopRequested.current && generated.length < targetCount) {
+        throw new Error(
+          `Only ${generated.length}/${targetCount} usable discovery scenarios were generated. Run again to retry.`,
+        );
       }
     } catch (generateError) {
       setError(
