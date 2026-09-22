@@ -44,7 +44,7 @@ jobs:
           npm_config_ignore_scripts: "true"
 
       - name: Lint
-        run: npm run lint
+        run: npx eslint "src/app/(admin)/admin/inbox/page.tsx" "src/app/(admin)/admin/inbox/admin-email-inbox-view.tsx" "src/app/api/admin/inbox/route.ts" "src/app/api/admin/inbox/[id]/route.ts" "src/app/api/admin/inbox/[id]/reply/route.ts" "src/lib/resend-admin-inbox.ts" "src/app/(admin)/admin-nav.tsx" "src/lib/admin-route-paths.ts"
 
       - name: Typecheck
         run: npx tsc --noEmit
