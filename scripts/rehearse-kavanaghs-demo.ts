@@ -306,6 +306,7 @@ async function simulateFivePartDemo(input: {
       outcome: scenario.outcome,
       ai_summary: scenario.summary.replace(/\n/g, " ").slice(0, 500),
       call_sid: callSid,
+      is_test_call: true,
       called_number: RETAIL_LINE_E164,
     });
     if (callErr) {
