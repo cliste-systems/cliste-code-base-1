@@ -156,6 +156,7 @@ export async function POST(request: Request) {
     body.service_area === "fish" ||
     body.service_area === "produce" ||
     body.service_area === "bakery" ||
+    body.service_area === "dairy" ||
     body.service_area === "off_licence" ||
     body.service_area === "grocery"
       ? body.service_area

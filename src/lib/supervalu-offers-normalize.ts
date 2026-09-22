@@ -207,6 +207,17 @@ export function classifySupervaluOfferServiceArea(input: {
     return { serviceArea: "deli", fulfilment: "prepack" };
   }
 
+  if (
+    crumb.includes("milk, yogurt, butter & eggs") ||
+    crumb.includes("/fresh-milk/") ||
+    crumb.includes("/yogurts/") ||
+    crumb.includes("/cheese/") ||
+    crumb.includes("/butter-spreads/") ||
+    /milk|yogurt|yoghurt|cheese|butter|cream|dairy/i.test(dept)
+  ) {
+    return { serviceArea: "dairy", fulfilment: "prepack" };
+  }
+
   return { serviceArea: "grocery", fulfilment: "prepack" };
 }
 

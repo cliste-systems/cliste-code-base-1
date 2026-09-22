@@ -13,6 +13,7 @@ import {
   isRetailOfferPriceSemanticallyValid,
   resolveWeeklyOfferSearchFilters,
   searchRetailWeeklyOffers,
+  searchSyncedWeeklyOffersInRows,
   scoreSupervaluSearchText,
 } from "./retail-weekly-offers-search";
 import type { RetailWeeklyOfferRow } from "./supervalu-offers-types";
@@ -195,6 +196,25 @@ describe("supervalu offers sync helpers", () => {
     });
     assert.equal(frozen.serviceArea, "fish");
     assert.equal(frozen.fulfilment, "prepack");
+  });
+
+  it("classifies dairy wall products separately from generic grocery", () => {
+    const dairy = classifySupervaluOfferServiceArea({
+      product: {
+        name: "SuperValu Whole Milk 2L",
+        priceNumeric: 2.2,
+        defaultCategory: [
+          {
+            categoryBreadcrumb: "Grocery/Milk, Yogurt, Butter & Eggs/Fresh Milk/Whole Milk",
+          },
+        ],
+        attributes: { altCategory: "Whole Milk" },
+      },
+      productName: "SuperValu Whole Milk 2L",
+      department: "Whole Milk",
+    });
+    assert.equal(dairy.serviceArea, "dairy");
+    assert.equal(dairy.fulfilment, "prepack");
   });
 
   it("classifies grocery promos separately from meat", () => {
@@ -680,11 +700,11 @@ describe("retail weekly offers search", () => {
     );
   });
 
-  it("does not infer fulfilment from caller phrasing alone", () => {
+  it("infers fulfilment when the caller explicitly names the counter", () => {
     assert.equal(
       resolveWeeklyOfferSearchFilters("what's on offer in the meat counter this week")
         .fulfilment,
-      null,
+      "counter",
     );
     assert.equal(
       resolveWeeklyOfferSearchFilters("meat counter steaks", { fulfilment: "counter" })
@@ -719,7 +739,7 @@ describe("retail weekly offers search", () => {
   });
 
   it("infers store section service areas from varied caller phrasing", () => {
-    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "grocery");
+    assert.equal(inferWeeklyOfferServiceAreaFromQuery("dairy wall offers"), "dairy");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("back store specials"), "grocery");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("provisions on offer"), "grocery");
     assert.equal(inferWeeklyOfferServiceAreaFromQuery("fruit and veg offers"), "produce");

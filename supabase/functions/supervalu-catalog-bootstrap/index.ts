@@ -40,10 +40,18 @@ function clean(s: string | null | undefined) {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 function eur(s: string | null | undefined): number | null {
-  const m = String(s ?? "").match(/€\s*([0-9]+(?:[.,][0-9]{1,2})?)/);
-  if (!m) return null;
-  const n = Number(m[1].replace(",", "."));
-  return Number.isFinite(n) ? n : null;
+  const text = String(s ?? "");
+  const euro = text.match(/€\s*([0-9]+(?:[.,][0-9]{1,2})?)/);
+  if (euro) {
+    const n = Number(euro[1].replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  const cents = text.match(/\b([0-9]{1,2})\s*c\b/i);
+  if (cents) {
+    const n = Number(cents[1]) / 100;
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 function currentOfferWeek(d = new Date()) {
   const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -72,6 +80,7 @@ function classify(categoryName: string, href: string) {
   else if (/meat|poultry|butcher|beef|pork|lamb|sausage|rasher/.test(x)) serviceArea = "butcher";
   else if (/fruit|vegetable|produce/.test(x)) serviceArea = "produce";
   else if (/bakery|bread|cake/.test(x)) serviceArea = "bakery";
+  else if (/fresh.?milk|yogurt|yoghurt|cheese|butter|dairy/.test(x)) serviceArea = "dairy";
   const explicitlyPrepack = /pre.?pack|packaged/.test(x);
   const counterPath =
     /\/butcher(?:\/|-)|\/deli-counter(?:\/|-)|\/fish-counter(?:\/|-)|\bcounter\b|\bloose\b|by.?weight/.test(x);
@@ -117,7 +126,9 @@ function parseCards(html: string, categoryName: string, href: string) {
 function promoRows(card: any, storeProductId: string, week: {start:string,end:string}, now: string) {
   return card.badges.map((label: string) => {
     const loyalty = /rewards?\s+price|real\s+rewards?/i.test(label);
-    const multi = label.match(/\b(\d+)\s+for\s+€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i);
+    const multi = label.match(
+      /\b(\d+)\s+for\s+(?:€\s*)?([0-9]+(?:[.,][0-9]{1,2})?)(?:\s*euro)?\b/i,
+    );
     let promotionType = "standard_offer";
     if (multi) promotionType = "multibuy";
     else if (loyalty) promotionType = "loyalty";
@@ -126,7 +137,10 @@ function promoRows(card: any, storeProductId: string, week: {start:string,end:st
     // Badge amounts are not always selling prices. For example "Save €2"
     // means a €2 saving, while the actual selling price is the card's display
     // price. Only loyalty badges explicitly encode a separate offer price.
-    const saveAmountMatch = label.match(/\bsave\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i);
+    const saveAmountEuroMatch = label.match(
+      /\bsave\s*€\s*([0-9]+(?:[.,][0-9]{1,2})?)/i,
+    );
+    const saveAmountCentsMatch = label.match(/\bsave\s*([0-9]{1,2})\s*c\b/i);
     const savePercentMatch = label.match(/\bsave\s*([0-9]+(?:[.,][0-9]+)?)\s*%/i);
     const badgePrice = eur(label);
     let offerPrice: number | null = null;
@@ -142,8 +156,10 @@ function promoRows(card: any, storeProductId: string, week: {start:string,end:st
     }
 
     const metadata: Record<string, unknown> = { source: "supervalu_public_storefront" };
-    if (saveAmountMatch) {
-      metadata.save_amount_eur = Number(saveAmountMatch[1].replace(",", "."));
+    if (saveAmountEuroMatch) {
+      metadata.save_amount_eur = Number(saveAmountEuroMatch[1].replace(",", "."));
+    } else if (saveAmountCentsMatch) {
+      metadata.save_amount_eur = Number(saveAmountCentsMatch[1]) / 100;
     }
     if (savePercentMatch) {
       metadata.save_percent = Number(savePercentMatch[1].replace(",", "."));
@@ -152,6 +168,20 @@ function promoRows(card: any, storeProductId: string, week: {start:string,end:st
       metadata.multibuy_quantity = Number(multi[1]);
       metadata.multibuy_total_eur = Number(multi[2].replace(",", "."));
     }
+    metadata.mechanic =
+      multi
+        ? "multibuy"
+        : loyalty
+          ? "loyalty"
+          : savePercentMatch
+            ? "save_percent"
+            : (saveAmountEuroMatch || saveAmountCentsMatch)
+              ? "save_amount"
+              : /half\s+price/i.test(label)
+                ? "half_price"
+                : /^only\b/i.test(label)
+                  ? "fixed_price"
+                  : "named_or_generic";
     return {
       store_product_id: storeProductId,
       promotion_key: [promotionType, week.start, label].join(":").slice(0, 240),

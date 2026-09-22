@@ -303,8 +303,11 @@ export function inferWeeklyOfferServiceAreaFromQuery(
   if (/bakery|in[- ]store bakery|bread counter|croissant|scone|baguette/i.test(q)) {
     return "bakery";
   }
+  if (/dairy wall|dairy section|milk|yogurt|yoghurt|cheese|butter|cream/i.test(q)) {
+    return "dairy";
+  }
   if (
-    /dairy wall|dairy|ambient|provisions|back store|backstore|household|frozen|grocery|milk|yogurt|cheese|butter|centre aisle|center aisle/i.test(
+    /ambient|provisions|back store|backstore|household|frozen|grocery|centre aisle|center aisle/i.test(
       q,
     )
   ) {
@@ -994,15 +997,26 @@ export function searchSyncedWeeklyOffersInRows(
   // clarification. Detect it from catalogue metadata instead of hardcoding.
   if (!listIntent && categoryMatches.length > 0) {
     const tokens = offerSearchProductTokens(trimmed);
-    return categoryMatches
-      .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
-      .sort(
-        (a, b) =>
-          b.score - a.score ||
-          a.row.product_name.localeCompare(b.row.product_name),
-      )
-      .slice(0, tokenLimit)
-      .map((entry) => rowToMatch(entry.row, entry.score));
+    const directProductMatches = categoryMatches.filter((row) =>
+      tokens.every((token) =>
+        retailSearchTokenMatchesText(row.product_name, token),
+      ),
+    );
+    // If at least one actual product name matches the caller's words, do not
+    // let a department/category breadcrumb turn unrelated products into hits.
+    // Example: "steaks" should not return battered fish merely because its
+    // category is "Breaded Fillets & Steaks".
+    if (directProductMatches.length === 0) {
+      return categoryMatches
+        .map((row) => ({ row, score: scoreOfferRow(row, tokens) }))
+        .sort(
+          (a, b) =>
+            b.score - a.score ||
+            a.row.product_name.localeCompare(b.row.product_name),
+        )
+        .slice(0, tokenLimit)
+        .map((entry) => rowToMatch(entry.row, entry.score));
+    }
   }
 
   if (listIntent) {

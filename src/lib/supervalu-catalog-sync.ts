@@ -50,7 +50,7 @@ type CatalogProduct = {
   brand: string | null;
   department: string;
   categoryBreadcrumb: string | null;
-  serviceArea: "butcher" | "deli" | "fish" | "produce" | "bakery" | "off_licence" | "grocery";
+  serviceArea: "butcher" | "deli" | "fish" | "produce" | "bakery" | "dairy" | "off_licence" | "grocery";
   fulfilment: "counter" | "prepack";
   sellBy: string | null;
   priceUnitType: string | null;
