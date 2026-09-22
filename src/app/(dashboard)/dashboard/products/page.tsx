@@ -28,8 +28,7 @@ import {
 } from "@/lib/retail-search-fuzzy";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-import { setProductAssortmentStatus } from "./actions";
-import { ProductPriceSummary } from "./product-price-summary";
+import { ProductListRow } from "./product-list-row";
 
 type ProductArea =
   | "all"
@@ -142,6 +141,12 @@ function productFulfilmentLabel(product: ProductRow): string | null {
   }
   return null;
 }
+
+const ASSORTMENT_BADGE_LABEL: Record<RetailStoreAssortmentStatus, string> = {
+  stocked: "Stocked",
+  not_stocked: "No stock",
+  not_confirmed: "Unconfirmed",
+};
 
 const STATUS_COPY: Record<
   RetailStoreAssortmentStatus,
@@ -409,16 +414,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               </p>
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
               <form
                 method="get"
-                className={`${DASHBOARD_CARD_SURFACE} shrink-0 px-3 py-3 sm:px-4`}
+                className="shrink-0 rounded-lg border border-[#dfe7e2] bg-white px-3 py-2.5 sm:px-4"
               >
                 <div
                   className={
                     hasMixedCounterAndPrepack(area)
-                      ? "grid gap-2.5 lg:grid-cols-[minmax(20rem,1fr)_10rem_10rem_10.5rem_auto] lg:items-end"
-                      : "grid gap-2.5 lg:grid-cols-[minmax(20rem,1fr)_10rem_10.5rem_auto] lg:items-end"
+                      ? "grid gap-2 lg:grid-cols-[minmax(16rem,1fr)_11rem_11rem_11rem_auto] lg:items-end"
+                      : "grid gap-2 lg:grid-cols-[minmax(16rem,1fr)_11rem_11rem_auto] lg:items-end"
                   }
                 >
                   <label className="block min-w-0">
@@ -491,15 +496,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </button>
                 </div>
 
-                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-[#e3e9e5] pt-2.5 text-[11px] leading-4 text-[#6b7c75]">
-                  <span>
-                    Name, brand, category or SKU.
-                  </span>
-                  <span>
-                    <strong className="font-medium text-[#35443f]">Safe default:</strong>{" "}
-                    unconfirmed products are never presented as normally stocked.
-                  </span>
-                </div>
+                <p className="mt-2 text-[10.5px] leading-4 text-[#87958f]">
+                  Name, brand, category or SKU. Unconfirmed products are never
+                  presented as normally stocked.
+                </p>
               </form>
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-gutter:stable]">
@@ -520,111 +520,71 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     No matching products for this search and filter.
                   </div>
                 ) : (
-                  <div className="space-y-2.5 pb-1">
-                    <div className="flex items-center justify-between px-1">
-                      <p className="text-[11px] font-medium text-slate-500">
-                        {visibleProducts.length === 1
-                          ? "1 matching product"
-                          : `${visibleProducts.length} matching products`}
-                        {products.length >= 50 ? " · refine your search for more" : ""}
-                      </p>
-                    </div>
-                    {visibleProducts.map((product) => {
-                      const status = overrides.get(product.id) ?? "not_confirmed";
-                      const copy = STATUS_COPY[status];
-                      const StatusIcon = statusIcon(status);
-                      const areaLabel = productAreaLabel(product);
-                      const fulfilmentLabel = productFulfilmentLabel(product);
-                      const pricing = pricingByProductId.get(product.id);
+                  <div className="rounded-lg border border-[#dfe7e2] bg-white">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[920px]">
+                        <caption className="border-b border-[#e8efeb] px-4 py-2 text-left text-[11px] font-medium text-[#87958f]">
+                          {visibleProducts.length === 1
+                            ? "1 matching product"
+                            : `${visibleProducts.length} matching products`}
+                          {products.length >= 50 ? " · refine your search for more" : ""}
+                        </caption>
+                        <colgroup>
+                          <col />
+                          <col className="w-[11rem]" />
+                          <col className="w-[22rem]" />
+                        </colgroup>
+                        <thead>
+                          <tr className="border-b border-[#e8efeb] bg-[#fafbfa] text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[#87958f]">
+                            <th className="px-4 py-2.5 font-semibold">Product</th>
+                            <th className="px-4 py-2.5 font-semibold">Price</th>
+                            <th className="px-4 py-2.5 font-semibold">Store status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleProducts.map((product) => {
+                            const status = overrides.get(product.id) ?? "not_confirmed";
+                            const copy = STATUS_COPY[status];
+                            const StatusIcon = statusIcon(status);
+                            const areaLabel = productAreaLabel(product);
+                            const fulfilmentLabel = productFulfilmentLabel(product);
+                            const pricing = pricingByProductId.get(product.id);
+                            const metaLine = [
+                              product.brand,
+                              product.department,
+                              product.sku ? `SKU ${product.sku}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ");
 
-                      return (
-                        <div
-                          key={product.id}
-                          className={`${DASHBOARD_CARD_SURFACE} px-4 py-3.5`}
-                        >
-                          <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1fr)_15.5rem_17rem] xl:items-center">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h2 className="text-[15px] font-semibold text-[#11181d]">
-                                  {product.product_name}
-                                </h2>
-                                <span
-                                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${copy.className}`}
-                                >
-                                  <StatusIcon className="h-3 w-3" />
-                                  {copy.label}
-                                </span>
-                                {areaLabel ? (
-                                  <span className="inline-flex items-center rounded-full border border-[#d6dfda] bg-[#f7faf8] px-2 py-0.5 text-[11px] font-semibold text-[#4d5f58]">
-                                    {areaLabel}
-                                  </span>
-                                ) : null}
-                                {fulfilmentLabel ? (
-                                  <span
-                                    className={
-                                      product.fulfilment === "counter"
-                                        ? "inline-flex items-center rounded-full border border-[#9da9a4] bg-[#f3f6f4] px-2 py-0.5 text-[11px] font-semibold text-[#11181d]"
-                                        : "inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600"
-                                    }
-                                  >
-                                    {fulfilmentLabel}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {[product.brand, product.department, product.sku ? `SKU ${product.sku}` : null]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </p>
-                            </div>
-
-                            {pricing ? (
-                              <ProductPriceSummary
-                                price={pricing.price}
-                                sourceLabel={pricing.sourceLabel}
-                                syncedAt={pricing.syncedAt}
-                              />
-                            ) : null}
-
-                            <div className="min-w-0">
-                              <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6b7c75]">
-                                Store status
-                              </p>
-                              <div className="grid grid-cols-3 rounded-lg border border-[#d9e2dd] bg-[#f6faf7] p-0.5">
-                                {(
-                                  [
-                                    ["stocked", "Stocked"],
-                                    ["not_stocked", "Not stocked"],
-                                    ["not_confirmed", "Unconfirmed"],
-                                  ] as const
-                                ).map(([nextStatus, label]) => (
-                                  <form
-                                    key={nextStatus}
-                                    action={setProductAssortmentStatus}
-                                    className="min-w-0"
-                                  >
-                                    <input type="hidden" name="product_id" value={product.id} />
-                                    <input type="hidden" name="status" value={nextStatus} />
-                                    <button
-                                      type="submit"
-                                      aria-pressed={status === nextStatus}
-                                      disabled={status === nextStatus}
-                                      className={
-                                        status === nextStatus
-                                          ? "h-8 w-full rounded-md bg-[#11181d] px-2 text-[11px] font-medium text-white shadow-sm"
-                                          : "h-8 w-full rounded-md px-2 text-[11px] font-medium text-[#5b6b65] transition-colors hover:bg-white hover:text-[#11181d]"
+                            return (
+                              <ProductListRow
+                                key={product.id}
+                                productId={product.id}
+                                productName={product.product_name}
+                                metaLine={metaLine}
+                                status={status}
+                                statusLabel={ASSORTMENT_BADGE_LABEL[status]}
+                                statusClassName={copy.className}
+                                StatusIcon={StatusIcon}
+                                areaLabel={areaLabel}
+                                fulfilmentLabel={fulfilmentLabel}
+                                fulfilment={product.fulfilment}
+                                pricing={
+                                  pricing
+                                    ? {
+                                        price: pricing.price,
+                                        sourceLabel: pricing.sourceLabel,
+                                        syncedAt: pricing.syncedAt,
                                       }
-                                    >
-                                      {label}
-                                    </button>
-                                  </form>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                                    : null
+                                }
+                              />
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
