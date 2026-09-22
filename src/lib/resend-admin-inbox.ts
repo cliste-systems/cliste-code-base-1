@@ -6,7 +6,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 const RESEND_API_BASE = "https://api.resend.com";
 const DEFAULT_FROM_EMAIL = "brendan@hellocara.ie";
-const DEFAULT_FROM_NAME = "Brendan";
+const DEFAULT_FROM_NAME = "HelloCara";
 
 export type AdminEmailFolder = "inbox" | "archived" | "sent";
 
@@ -89,7 +89,9 @@ export function adminInboxFromEmail(): string {
 }
 
 export function adminInboxFromName(): string {
-  return process.env.RESEND_FROM_NAME?.trim() || DEFAULT_FROM_NAME;
+  const configured = process.env.RESEND_FROM_NAME?.trim();
+  if (!configured) return DEFAULT_FROM_NAME;
+  return /^hello\s*cara$/i.test(configured) ? "HelloCara" : configured;
 }
 
 async function resendFetch<T>(
@@ -205,7 +207,21 @@ async function syncInboundMetadata(): Promise<void> {
   if (received.length === 0) return;
 
   const admin = createAdminClient();
-  const rows = received.map((email) => {
+  const ids = received.map((email) => email.id);
+  const { data: existingRows, error: existingError } = await admin
+    .from("admin_email_messages")
+    .select("resend_email_id")
+    .in("resend_email_id", ids);
+
+  if (existingError) throw new Error(existingError.message);
+
+  const existing = new Set(
+    (existingRows ?? []).map((row) => String(row.resend_email_id)),
+  );
+  const newMessages = received.filter((email) => !existing.has(email.id));
+  if (newMessages.length === 0) return;
+
+  const rows = newMessages.map((email) => {
     const from = parseMailbox(email.from);
     return {
       resend_email_id: email.id,
@@ -220,13 +236,10 @@ async function syncInboundMetadata(): Promise<void> {
       subject: email.subject?.trim() || "(no subject)",
       attachments: Array.isArray(email.attachments) ? email.attachments : [],
       received_at: email.created_at ?? new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
   });
 
-  const { error } = await admin
-    .from("admin_email_messages")
-    .upsert(rows, { onConflict: "resend_email_id" });
+  const { error } = await admin.from("admin_email_messages").insert(rows);
   if (error) throw new Error(error.message);
 }
 
@@ -394,6 +407,58 @@ export async function setAdminEmailState(input: {
     .eq("resend_email_id", input.resendEmailId.trim());
 
   if (error) throw new Error(error.message);
+}
+
+export async function sendNewAdminEmail(input: {
+  to: string;
+  subject: string;
+  text: string;
+}): Promise<{ id: string }> {
+  const to = input.to.trim().toLowerCase();
+  const subject = input.subject.trim();
+  const text = input.text.trim();
+
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    throw new Error("Enter a valid recipient email address.");
+  }
+  if (!subject) throw new Error("Subject is required.");
+  if (subject.length > 500) throw new Error("Subject is too long.");
+  if (!text) throw new Error("Email body cannot be empty.");
+  if (text.length > 20_000) throw new Error("Email body is too long.");
+
+  const fromEmail = adminInboxFromEmail();
+  const fromName = adminInboxFromName();
+  const response = await resendFetch<{ id: string }>("/emails", {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": `admin-compose-${randomUUID()}`,
+    },
+    body: JSON.stringify({
+      from: `${fromName} <${fromEmail}>`,
+      to: [to],
+      subject,
+      text,
+    }),
+  });
+
+  if (!response.id) throw new Error("Resend did not return an email ID.");
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("admin_email_messages").insert({
+    resend_email_id: response.id,
+    direction: "outbound",
+    parent_resend_email_id: null,
+    from_address: fromEmail,
+    from_name: fromName,
+    to_addresses: [to],
+    subject,
+    text_body: text,
+    sent_at: new Date().toISOString(),
+    read_at: new Date().toISOString(),
+  });
+
+  if (error) throw new Error(error.message);
+  return { id: response.id };
 }
 
 export async function replyToAdminEmail(input: {

@@ -16,7 +16,7 @@ test("invite subject includes name without leading comma", () => {
     businessName: "Last Look Hair",
     productName: "Salon",
   });
-  assert.equal(bodies.subject, "Jane, you've been invited to Hello Cara");
+  assert.equal(bodies.subject, "Jane, you've been invited to HelloCara");
   assert.equal(bodies.subject.startsWith(","), false);
 });
 
@@ -27,10 +27,10 @@ test("invite subject omits name when empty", () => {
     businessName: "Last Look Hair",
     productName: "Salon",
   });
-  assert.equal(bodies.subject, "You've been invited to Hello Cara");
+  assert.equal(bodies.subject, "You've been invited to HelloCara");
 });
 
-test("invite html uses Hello Cara branding and first-party link", () => {
+test("invite html uses HelloCara branding and first-party link", () => {
   const bodies = buildInviteEmailBodies({
     actionLink,
     logoUrl,
@@ -39,7 +39,7 @@ test("invite html uses Hello Cara branding and first-party link", () => {
   });
   assert.match(bodies.html, /m8x4p2n7\.png/);
   assert.match(bodies.html, /Accept invitation/);
-  assert.match(bodies.html, /Join Last Look Hair on Hello Cara/);
+  assert.match(bodies.html, /Join Last Look Hair on HelloCara/);
   assert.doesNotMatch(bodies.text, /supabase\.co/);
   assert.ok(bodies.text.includes(actionLink));
 });

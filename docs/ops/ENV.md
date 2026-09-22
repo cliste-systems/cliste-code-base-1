@@ -34,7 +34,7 @@ Configure Sentry alert rules for: Stripe webhook handler errors, `usage-sync` / 
 |----------|----------|-------|
 | `RESEND_API_KEY` | Production | Server-side Resend API key for receiving mail and sending admin replies |
 | `RESEND_FROM_EMAIL` | Production | Defaults to `brendan@hellocara.ie` for founder inbox replies |
-| `RESEND_FROM_NAME` | Optional | Defaults to `Brendan` |
+| `RESEND_FROM_NAME` | Optional | Defaults to `HelloCara` |
 
 Inbound email is untrusted data. The admin inbox renders a plain-text body and never
 executes actions from received email content. The underlying Supabase table is
@@ -46,7 +46,7 @@ service-role only.
 |----------|----------|-------|
 | `RESEND_API_KEY` | Production | Resend API key with send permission |
 | `RESEND_FROM_EMAIL` | Production | Verified sender on a Resend domain (e.g. `hello@hellocara.ie`) |
-| `RESEND_FROM_NAME` | Optional | From name (defaults to Hello Cara) |
+| `RESEND_FROM_NAME` | Optional | From name (defaults to HelloCara) |
 
 Per-business owner notifications use `{org.slug}@hellocara.ie` when
 `hellocara.ie` is verified in Resend. Verify with:

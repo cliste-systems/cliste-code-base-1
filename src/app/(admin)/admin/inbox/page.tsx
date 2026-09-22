@@ -35,7 +35,7 @@ export default function AdminInboxPage() {
       }
       fillViewport
     >
-      <AdminEmailInboxView fromAddress={fromEmail} />
+      <AdminEmailInboxView fromAddress={fromEmail} fromName={fromName} />
     </AdminPageShell>
   );
 }
