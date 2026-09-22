@@ -73,13 +73,19 @@ export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput,
 ): Promise<SendTransactionalEmailResult> {
   const client = getResendClient();
+  const configuredFromEmail =
+    process.env.RESEND_FROM_EMAIL?.trim().toLowerCase();
   const platformFromEmail =
-    process.env.RESEND_FROM_EMAIL?.trim().toLowerCase() || DEFAULT_FROM_EMAIL;
+    !configuredFromEmail || configuredFromEmail === "brendan@hellocara.ie"
+      ? DEFAULT_FROM_EMAIL
+      : configuredFromEmail;
   const configuredFromName = process.env.RESEND_FROM_NAME?.trim();
   const platformFromName =
-    configuredFromName && /^hello\s*cara$/i.test(configuredFromName)
-      ? "HelloCara"
-      : configuredFromName || PRODUCT_NAME;
+    configuredFromName &&
+    !/^hello\s*cara$/i.test(configuredFromName) &&
+    !/^brendan$/i.test(configuredFromName)
+      ? configuredFromName
+      : PRODUCT_NAME;
   const fromEmail = input.from?.email.trim() || platformFromEmail;
   const fromName = input.from?.name?.trim() || platformFromName;
 
