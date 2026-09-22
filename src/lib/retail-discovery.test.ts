@@ -6,6 +6,7 @@ import {
   buildRetailDiscoveryScenarioDraft,
   type RetailDiscoveryGeneratedItem,
 } from "@/lib/retail-discovery";
+import { gradeRetailRegressionScenario } from "@/lib/retail-regression";
 
 function generated(
   slot: number,
@@ -140,4 +141,90 @@ test("ambiguity discovery is graded as clarification rather than a forced lookup
   assert.equal(scenario.category, "clarification");
   assert.equal(scenario.expectations.mustAskClarifyingQuestion, true);
   assert.equal(scenario.expectations.requiredTool, undefined);
+});
+
+
+test("generated fulfilment scenario grades through the normal regression evaluator", () => {
+  const scenario = buildRetailDiscoveryScenarioDraft(
+    {
+      slot: 0,
+      profile: "explicit_fulfilment",
+      intent: "offer",
+      serviceArea: "fish",
+      fulfilment: "counter",
+    },
+    generated(0, {
+      turns: ["Any hake deals at the fish counter?"],
+      queryTerms: ["hake"],
+    }),
+  );
+
+  const grade = gradeRetailRegressionScenario(
+    { expectations: scenario.expectations },
+    {
+      durationMs: 100,
+      turns: [
+        {
+          caller: scenario.turns[0]!.caller,
+          assistant: "I checked the fresh fish counter hake offers.",
+          transcriptLines: [],
+          tools: [
+            {
+              name: "searchSuperValuProducts",
+              args: {
+                intent: "offer",
+                query: "hake",
+                service_area: "fish",
+                fulfilment: "counter",
+              },
+            },
+          ],
+        },
+      ],
+    },
+  );
+
+  assert.equal(grade.status, "pass");
+});
+
+test("generated ambiguity scenario passes only for a real selection clarification", () => {
+  const scenario = buildRetailDiscoveryScenarioDraft(
+    { slot: 0, profile: "ambiguity_clarification" },
+    generated(0, {
+      turns: ["Any salmon on offer?"],
+      queryTerms: [],
+    }),
+  );
+
+  const good = gradeRetailRegressionScenario(
+    { expectations: scenario.expectations },
+    {
+      durationMs: 100,
+      turns: [
+        {
+          caller: scenario.turns[0]!.caller,
+          assistant: "Do you mean the fresh fish counter or the pre-packed salmon?",
+          transcriptLines: [],
+          tools: [],
+        },
+      ],
+    },
+  );
+  assert.equal(good.status, "pass");
+
+  const bad = gradeRetailRegressionScenario(
+    { expectations: scenario.expectations },
+    {
+      durationMs: 100,
+      turns: [
+        {
+          caller: scenario.turns[0]!.caller,
+          assistant: "Would you like me to get the team to ring you back?",
+          transcriptLines: [],
+          tools: [],
+        },
+      ],
+    },
+  );
+  assert.equal(bad.status, "fail");
 });
