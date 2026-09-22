@@ -25,12 +25,14 @@ import { createAdminClient } from "@/utils/supabase/admin";
  */
 
 const METER_EVENT_NAME = "cliste_call_minute";
+const TERMINAL_SKIP_REASONS = new Set(["test_data", "engineer_test_call", "test_call"]);
 
 type UnsyncedRow = {
   id: string;
   organization_id: string;
   ended_at: string | null;
   minutes_billable: number | null;
+  sync_skip_reason: string | null;
 };
 
 type OrgCustomerRow = {
@@ -62,7 +64,7 @@ export async function syncUsageToStripe(): Promise<UsageSyncResult> {
   // below the Stripe meter-events rate limit even under churn spikes.
   const { data: rows, error } = await admin
     .from("usage_records")
-    .select("id, organization_id, ended_at, minutes_billable")
+    .select("id, organization_id, ended_at, minutes_billable, sync_skip_reason")
     .not("ended_at", "is", null)
     .is("synced_to_stripe_at", null)
     .limit(500);
@@ -97,6 +99,19 @@ export async function syncUsageToStripe(): Promise<UsageSyncResult> {
       typeof row.minutes_billable === "number"
         ? Math.max(0, Math.round(row.minutes_billable * 100) / 100)
         : 0;
+
+    if (
+      row.sync_skip_reason &&
+      TERMINAL_SKIP_REASONS.has(row.sync_skip_reason)
+    ) {
+      await admin
+        .from("usage_records")
+        .update({ synced_to_stripe_at: new Date().toISOString() })
+        .eq("id", row.id);
+      result.rowsSkipped += 1;
+      bumpOrgBucket(result, row.organization_id, minutes, row.sync_skip_reason);
+      continue;
+    }
 
     if (!org?.platform_customer_id) {
       result.rowsSkipped += 1;

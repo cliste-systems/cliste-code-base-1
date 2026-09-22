@@ -64,41 +64,64 @@ export default async function AdminHomePage({ searchParams }: AdminHomePageProps
   try {
     const admin = createAdminClient();
 
-    const [orgsRes, callsRes, supportRes, listRes, callsDetailRes] = await Promise.all([
-      admin.from("organizations").select("id", { count: "exact", head: true }),
+    const [orgsRes, listRes] = await Promise.all([
+      admin
+        .from("organizations")
+        .select("id", { count: "exact", head: true })
+        .eq("is_internal_test", false)
+        .eq("is_active", true),
+      admin
+        .from("organizations")
+        .select("id, name, slug, tier, niche, created_at")
+        .eq("is_internal_test", false)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (orgsRes.error) throw new Error(orgsRes.error.message);
+    if (listRes.error) throw new Error(listRes.error.message);
+
+    orgCount = orgsRes.count ?? 0;
+    organizations = listRes.data ?? [];
+
+    const realOrgIds = organizations.map((org) => org.id);
+    const scopedOrgIds =
+      realOrgIds.length > 0
+        ? realOrgIds
+        : ["00000000-0000-0000-0000-000000000000"];
+
+    const [callsRes, supportRes, callsDetailRes] = await Promise.all([
       admin
         .from("call_logs")
         .select("id", { count: "exact", head: true })
+        .in("organization_id", scopedOrgIds)
+        .eq("is_test_call", false)
+        .eq("engineer_test_call", false)
         .gte("created_at", rangeStartIso)
         .lt("created_at", rangeEndExclusiveIso),
       admin
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
+        .in("organization_id", scopedOrgIds)
         .eq("status", "open"),
-      admin
-        .from("organizations")
-        .select("id, name, slug, tier, niche, created_at")
-        .order("created_at", { ascending: false }),
       admin
         .from("call_logs")
         .select(
           "id, outcome, duration_seconds, created_at, caller_number, caller_name, organization_id, organizations ( name )",
         )
+        .in("organization_id", scopedOrgIds)
+        .eq("is_test_call", false)
+        .eq("engineer_test_call", false)
         .gte("created_at", rangeStartIso)
         .lt("created_at", rangeEndExclusiveIso)
         .order("created_at", { ascending: false })
         .limit(500),
     ]);
 
-    if (orgsRes.error) throw new Error(orgsRes.error.message);
     if (callsRes.error) throw new Error(callsRes.error.message);
-    if (listRes.error) throw new Error(listRes.error.message);
     if (callsDetailRes.error) throw new Error(callsDetailRes.error.message);
 
-    orgCount = orgsRes.count ?? 0;
     callsInRange = callsRes.count ?? 0;
     openSupportTickets = supportRes.error ? 0 : (supportRes.count ?? 0);
-    organizations = listRes.data ?? [];
 
     const stageByOrg = await loadProvisioningStagesByOrgId(
       organizations.map((o) => o.id),

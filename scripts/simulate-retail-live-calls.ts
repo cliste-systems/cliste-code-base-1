@@ -98,6 +98,7 @@ async function insertLiveEvent(
     outcome,
     ai_summary: `${SMOKE_TAG} ${summary}`,
     call_sid: callSid,
+    is_test_call: true,
     created_at: now.toISOString(),
   });
 
@@ -124,6 +125,7 @@ async function insertLiveEvent(
       caller_name: caller.name,
       summary: ticketSummary,
       status: "open",
+      engineer_test_call: true,
       created_at: now.toISOString(),
     });
 
