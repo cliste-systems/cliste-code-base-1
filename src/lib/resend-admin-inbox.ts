@@ -438,11 +438,12 @@ export async function getAdminEmailMessage(
   if (!id) throw new Error("Email ID is required.");
 
   const admin = createAdminClient();
+  const messageSelect =
+    "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,created_at";
+
   const { data: existing, error: existingError } = await admin
     .from("admin_email_messages")
-    .select(
-      "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,created_at",
-    )
+    .select(messageSelect)
     .eq("resend_email_id", id)
     .maybeSingle();
 
@@ -451,82 +452,89 @@ export async function getAdminEmailMessage(
 
   let row = existing as AdminEmailRow;
 
-  if (row.direction === "inbound") {
+  // Opening a message should normally be a local database read only.
+  // Resend is used as a one-time recovery path when an older row has no body.
+  if (row.direction === "inbound" && !row.text_body && !row.html_body) {
     try {
       const detail = await getResendReceived(id);
       const from = parseMailbox(detail.from);
       const textBody =
-        detail.text?.trim() ||
-        (detail.html ? stripHtml(detail.html) : row.text_body || "");
-
-      const update = {
-        message_id: detail.message_id ?? row.message_id,
-        from_address: from.email || row.from_address,
-        from_name: from.name ?? row.from_name,
-        to_addresses: asAddressArray(detail.to),
-        cc_addresses: asAddressArray(detail.cc),
-        bcc_addresses: asAddressArray(detail.bcc),
-        reply_to_addresses: asAddressArray(detail.reply_to),
-        subject: detail.subject?.trim() || row.subject,
-        text_body: textBody,
-        html_body: detail.html ?? row.html_body,
-        headers:
-          detail.headers && typeof detail.headers === "object"
-            ? detail.headers
-            : row.headers ?? {},
-        attachments: Array.isArray(detail.attachments)
-          ? detail.attachments
-          : row.attachments ?? [],
-        received_at: detail.created_at ?? row.received_at,
-        read_at: row.read_at ?? new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+        detail.text?.trim() || (detail.html ? stripHtml(detail.html) : "");
+      const readAt = row.read_at ?? new Date().toISOString();
 
       const { data: updated, error: updateError } = await admin
         .from("admin_email_messages")
-        .update(update)
+        .update({
+          message_id: detail.message_id ?? row.message_id,
+          from_address: from.email || row.from_address,
+          from_name: from.name ?? row.from_name,
+          to_addresses: asAddressArray(detail.to),
+          cc_addresses: asAddressArray(detail.cc),
+          bcc_addresses: asAddressArray(detail.bcc),
+          reply_to_addresses: asAddressArray(detail.reply_to),
+          subject: detail.subject?.trim() || row.subject,
+          text_body: textBody || null,
+          html_body: detail.html ?? null,
+          headers:
+            detail.headers && typeof detail.headers === "object"
+              ? detail.headers
+              : row.headers ?? {},
+          attachments: Array.isArray(detail.attachments)
+            ? detail.attachments
+            : row.attachments ?? [],
+          received_at: detail.created_at ?? row.received_at,
+          read_at: readAt,
+          updated_at: new Date().toISOString(),
+        })
         .eq("resend_email_id", id)
-        .select(
-          "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,created_at",
-        )
+        .select(messageSelect)
         .single();
 
       if (updateError) throw new Error(updateError.message);
       row = updated as AdminEmailRow;
     } catch (error) {
-      // If Resend has aged the message out, retain the local snapshot.
-      if (!row.text_body && !row.html_body) throw error;
+      // Keep the local metadata usable even if Resend no longer has the body.
       if (!row.read_at) {
-        await admin
+        const readAt = new Date().toISOString();
+        const { error: readError } = await admin
           .from("admin_email_messages")
-          .update({ read_at: new Date().toISOString() })
+          .update({ read_at: readAt, updated_at: readAt })
           .eq("resend_email_id", id);
-        row = { ...row, read_at: new Date().toISOString() };
+        if (readError) throw new Error(readError.message);
+        row = { ...row, read_at: readAt };
       }
     }
+  } else if (row.direction === "inbound" && !row.read_at) {
+    const readAt = new Date().toISOString();
+    const { error: readError } = await admin
+      .from("admin_email_messages")
+      .update({ read_at: readAt, updated_at: readAt })
+      .eq("resend_email_id", id);
+
+    if (readError) throw new Error(readError.message);
+    row = { ...row, read_at: readAt };
   }
 
   const parentId =
     row.direction === "inbound" ? row.resend_email_id : row.parent_resend_email_id;
-  let replies: AdminEmailListItem[] = [];
-  if (parentId) {
-    const { data: replyRows, error: repliesError } = await admin
-      .from("admin_email_messages")
-      .select(
-        "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,created_at",
-      )
-      .eq("direction", "outbound")
-      .eq("parent_resend_email_id", parentId)
-      .order("sent_at", { ascending: true });
+  const senderEmail =
+    row.direction === "inbound" ? row.from_address.trim().toLowerCase() : "";
 
-    if (repliesError) throw new Error(repliesError.message);
-    replies = ((replyRows ?? []) as AdminEmailRow[]).map(rowToListItem);
-  }
+  const [replies, senderBlocked] = await Promise.all([
+    (async (): Promise<AdminEmailListItem[]> => {
+      if (!parentId) return [];
+      const { data: replyRows, error: repliesError } = await admin
+        .from("admin_email_messages")
+        .select(messageSelect)
+        .eq("direction", "outbound")
+        .eq("parent_resend_email_id", parentId)
+        .order("sent_at", { ascending: true });
 
-  let senderBlocked = false;
-  if (row.direction === "inbound") {
-    const senderEmail = row.from_address.trim().toLowerCase();
-    if (senderEmail) {
+      if (repliesError) throw new Error(repliesError.message);
+      return ((replyRows ?? []) as AdminEmailRow[]).map(rowToListItem);
+    })(),
+    (async (): Promise<boolean> => {
+      if (!senderEmail) return false;
       const { data: blockedSender, error: blockedSenderError } = await admin
         .from("admin_email_blocked_senders")
         .select("email")
@@ -534,9 +542,9 @@ export async function getAdminEmailMessage(
         .maybeSingle();
 
       if (blockedSenderError) throw new Error(blockedSenderError.message);
-      senderBlocked = Boolean(blockedSender);
-    }
-  }
+      return Boolean(blockedSender);
+    })(),
+  ]);
 
   const item = rowToListItem(row);
   return {
