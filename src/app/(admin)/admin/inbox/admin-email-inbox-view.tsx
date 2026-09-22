@@ -866,14 +866,22 @@ export function AdminEmailInboxView({
                       {whenLabel(message.occurredAt)}
                     </span>
                   </div>
-                  <p
-                    className={cn(
-                      "mt-0.5 truncate text-xs text-slate-700",
-                      unread && "font-medium text-slate-900",
-                    )}
-                  >
-                    {message.subject || "(no subject)"}
-                  </p>
+                  <div className="mt-0.5 flex min-w-0 items-center gap-2">
+                    <p
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-xs text-slate-700",
+                        unread && "font-medium text-slate-900",
+                      )}
+                    >
+                      {message.subject || "(no subject)"}
+                    </p>
+                    {folder === "sent" ? (
+                      <DeliveryStatusBadge
+                        status={message.deliveryStatus}
+                        compact
+                      />
+                    ) : null}
+                  </div>
                   {message.preview ? (
                     <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">
                       {message.preview}
