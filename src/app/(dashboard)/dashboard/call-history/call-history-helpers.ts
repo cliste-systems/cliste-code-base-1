@@ -77,6 +77,23 @@ export function callDisplayName(
   return resolveCallerDisplayName([item.callerName], item.callerDisplay);
 }
 
+/** Compact list label — name on top, number below. */
+export function callListCallerLabel(
+  item: Pick<
+    CallHistoryListItem,
+    "callerName" | "callerDisplay" | "callerDataErasedAt" | "engineerTestCall"
+  >,
+): { title: string; subtitle?: string } {
+  if (item.engineerTestCall) {
+    return { title: ENGINEER_TEST_CALL_LIST_LABEL };
+  }
+  if (isCallerDataErased(item)) return { title: "Caller data erased" };
+  const name = callDisplayName(item);
+  const phone = item.callerDisplay.trim() || "Unknown number";
+  if (name === phone || isUnknownCallerLabel(name)) return { title: phone };
+  return { title: name, subtitle: phone };
+}
+
 /** Compact list primary line — name and number on one scan line. */
 export function callListPrimaryLine(
   item: Pick<
@@ -88,10 +105,7 @@ export function callListPrimaryLine(
     return ENGINEER_TEST_CALL_LIST_LABEL;
   }
   if (isCallerDataErased(item)) return "Caller data erased";
-  const name = callDisplayName(item);
-  const phone = item.callerDisplay.trim() || "Unknown number";
-  if (name === phone || isUnknownCallerLabel(name)) return phone;
-  return `${name} ${phone}`;
+  return callListCallerLabel(item).title;
 }
 
 /** Time-only label for same-day call lists. */

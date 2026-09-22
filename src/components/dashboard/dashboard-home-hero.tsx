@@ -5,6 +5,7 @@ import {
 import { DashboardHomeResizeItem } from "@/components/dashboard/dashboard-home-resize-motion";
 import {
   DASHBOARD_HOME_HERO,
+  DASHBOARD_HOME_HERO_BACKGROUND,
   DASHBOARD_HOME_HERO_STAT_STRIP,
 } from "@/components/dashboard/dashboard-surface";
 import { PUBLIC_ASSETS } from "@/lib/public-assets";
@@ -29,7 +30,8 @@ export function DashboardHomeHero({
     <DashboardHomeResizeItem
       className={cn(
         DASHBOARD_HOME_HERO,
-        "aspect-[5/1] min-h-[220px] max-h-[240px] shrink-0 bg-cover bg-right bg-no-repeat",
+        DASHBOARD_HOME_HERO_BACKGROUND,
+        "aspect-[5/1] min-h-[220px] max-h-[240px] shrink-0",
         className,
       )}
       style={{ backgroundImage: `url('${HERO_BACKGROUND}')` }}

@@ -99,5 +99,6 @@ describe("buildHomeLiveActivityFeed", () => {
     assert.equal(rows[0]?.title, "HelloCara Engineer");
     assert.equal(rows[0]?.subtitle, "2 test calls today");
     assert.equal(rows[1]?.title, "Brendan");
+    assert.equal(rows[1]?.subtitle, "+353 87 271 5938");
   });
 });

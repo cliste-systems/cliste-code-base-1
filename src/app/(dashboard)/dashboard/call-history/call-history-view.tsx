@@ -24,6 +24,7 @@ import {
 } from "@/components/dashboard/list-detail";
 import {
   DASHBOARD_CARD_SURFACE,
+  DASHBOARD_HOME_LIVE_CALL_ROW_CLASS,
   DASHBOARD_INPUT_CLASS,
   DASHBOARD_SELECT_CLASS,
 } from "@/components/dashboard/dashboard-surface";
@@ -36,6 +37,8 @@ import {
 } from "@/lib/calls-page-date";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Input } from "@/components/ui/input";
+import { incomingCallListLabel } from "@/lib/dashboard-feed-time";
+import { RETAIL_DEPARTMENT_HOME_ICON_CHIP } from "@/lib/retail-department-home-icon";
 import { cn } from "@/lib/utils";
 import {
   ANONYMOUS_CALLER_E164,
@@ -62,7 +65,7 @@ import { useDashboardVertical } from "../dashboard-vertical-context";
 import {
   OUTCOME_FILTER_OPTIONS,
   callDisplayName,
-  callListPrimaryLine,
+  callListCallerLabel,
   callListTimeLabel,
   fullTranscriptForDisplay,
   matchesOutcomeFilter,
@@ -359,38 +362,46 @@ export function CallHistoryView({
   );
 }
 
+const CALL_LIST_SUBTITLE_CLASS =
+  "mt-0.5 block truncate text-[11px] leading-snug text-slate-500";
+
 function CallIncomingPlaceholderRow({
   placeholder,
 }: {
   placeholder: CallsIncomingPlaceholder;
 }) {
-  const callerLabel = formatIncomingCallerLabel(placeholder.callerNumber);
   const isLoading = placeholder.phase === "loading";
+  const label = incomingCallListLabel(placeholder.callerNumber);
 
   return (
     <li aria-live="polite">
       <div
         className={cn(
-          "rounded-lg border border-dashed px-3 py-2.5",
-          "border-[#9da9a4] bg-[#f4f7f5]",
+          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+          DASHBOARD_HOME_LIVE_CALL_ROW_CLASS,
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-semibold leading-snug text-[#0b1220]">
-              {callerLabel}
-            </p>
-            <p className="mt-1 text-[12px] text-slate-600">
-              {isLoading
-                ? "A new call has come in and it's currently loading."
-                : "Call in progress — details will appear when the call ends."}
-            </p>
-          </div>
-          <Loader2
-            className="mt-0.5 size-4 shrink-0 animate-spin text-[#353D42]"
-            aria-hidden
-          />
+        <span className={RETAIL_DEPARTMENT_HOME_ICON_CHIP} aria-hidden>
+          <Phone className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold leading-snug text-[#0b1220]">
+            {label.title}
+          </p>
+          {label.subtitle ? (
+            <p className={CALL_LIST_SUBTITLE_CLASS}>{label.subtitle}</p>
+          ) : null}
         </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5">
+          {isLoading ? (
+            <Loader2 className="size-3 animate-spin text-[#64748b]" aria-hidden />
+          ) : (
+            <span className="size-1.5 rounded-full bg-[#94a3b8]" aria-hidden />
+          )}
+          <span className="text-[11px] font-medium leading-none text-slate-500">
+            {isLoading ? "Loading" : "Live"}
+          </span>
+        </span>
       </div>
     </li>
   );
@@ -416,16 +427,11 @@ function CallIncomingDetailPlaceholder({
             : "Cara is speaking with this caller now. The call log will update as soon as the call finishes."}
         </p>
         <p className="mt-4 text-[13px] font-medium text-[#353D42]">
-          {formatIncomingCallerLabel(placeholder.callerNumber)}
+          {incomingCallListLabel(placeholder.callerNumber).title}
         </p>
       </div>
     </DetailPanelShell>
   );
-}
-
-function formatIncomingCallerLabel(callerNumber: string | null): string {
-  if (!callerNumber?.trim()) return "Incoming call";
-  return formatE164ForDisplay(callerNumber) || callerNumber;
 }
 
 function CallListRow({
@@ -437,11 +443,12 @@ function CallListRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const primary = callListPrimaryLine(row);
+  const label = callListCallerLabel(row);
   const time = callListTimeLabel(row.createdAt);
   const engineerTestCall = row.engineerTestCall;
+  const callerDataErased = isCallerDataErased(row);
   const callStatus = engineerTestCall
-    ? { tone: "neutral" as const, label: ENGINEER_TEST_CALL_BADGE_LABEL }
+    ? ({ tone: "neutral" as const } as const)
     : resolveCallHistoryListStatus({
         outcome: row.outcome,
         aiSummary: row.aiSummary,
@@ -450,7 +457,6 @@ function CallListRow({
         hasOpenAction: row.hasOpenAction,
         callResolution: row.callResolution,
       });
-  const callerDataErased = isCallerDataErased(row);
   const statusAccent = engineerTestCall
     ? {
         rowAccentClass: "border-l-2 border-l-slate-200",
@@ -459,8 +465,6 @@ function CallListRow({
     : callerDataErased
       ? CALLER_DATA_ERASED_ROW_ACCENT
       : CALL_HISTORY_STATUS_ROW_ACCENT_CLASSES[callStatus.tone];
-  const mediaRetentionExpired =
-    !callerDataErased && isCallMediaRetentionExpired(row.createdAt);
 
   return (
     <li>
@@ -470,7 +474,7 @@ function CallListRow({
         aria-selected={selected}
         onClick={onSelect}
         className={cn(
-          "w-full cursor-pointer rounded-lg border px-3 py-2 text-left",
+          "flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-left",
           selected
             ? cn(
                 "border-[#353D42] bg-[#f6faf7] shadow-[0_1px_0_rgba(17,24,29,0.04)]",
@@ -479,60 +483,20 @@ function CallListRow({
             : cn("border-[#dfe7e2] bg-white", statusAccent.rowAccentClass),
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <p className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-snug text-[#0b1220]">
-            {primary}
+        <span className={RETAIL_DEPARTMENT_HOME_ICON_CHIP} aria-hidden>
+          <Phone className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold leading-snug text-[#0b1220]">
+            {label.title}
           </p>
-          <span className="shrink-0 text-[12px] tabular-nums text-slate-500">
-            {time}
-          </span>
+          {label.subtitle ? (
+            <p className={CALL_LIST_SUBTITLE_CLASS}>{label.subtitle}</p>
+          ) : null}
         </div>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[12px] text-slate-500">
-            {engineerTestCall ? (
-              <>
-                {row.engineerTestCallCount != null && row.engineerTestCallCount > 1
-                  ? `${row.engineerTestCallCount} test calls today`
-                  : ENGINEER_TEST_CALL_ROW_SUBTITLE}
-              </>
-            ) : (
-              <>
-                <span className="tabular-nums">{row.durationLabel}</span>
-                <span className="text-slate-300"> · </span>
-                {row.outcomeLabel}
-                {mediaRetentionExpired ? (
-                  <>
-                    <span className="text-slate-300"> · </span>
-                    <span className="text-slate-400">Media deleted</span>
-                  </>
-                ) : null}
-              </>
-            )}
-          </p>
-          {callerDataErased ? (
-            <span
-              className={cn(
-                "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
-                CALLER_DATA_ERASED_BADGE_CLASS,
-              )}
-            >
-              Erased
-            </span>
-          ) : row.engineerTestCall ? (
-            <span className="shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
-              {ENGINEER_TEST_CALL_BADGE_LABEL}
-            </span>
-          ) : (
-            <span
-              className={cn(
-                "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
-                CALL_HISTORY_STATUS_BADGE_CLASSES[callStatus.tone],
-              )}
-            >
-              {callStatus.label}
-            </span>
-          )}
-        </div>
+        <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
+          {time}
+        </span>
       </button>
     </li>
   );

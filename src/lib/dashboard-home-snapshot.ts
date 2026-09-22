@@ -27,8 +27,6 @@ import {
 } from "@/lib/dashboard-feed-time";
 import { buildHomeUsageSnapshot } from "@/lib/dashboard-home-analytics";
 import { buildHomeCallTimesBuckets } from "@/lib/dashboard-home-call-times";
-import { DASHBOARD_HOME_MOCK } from "@/lib/dashboard-home-mock-data";
-import { isDashboardHomeMockEnabled } from "@/lib/dashboard-home-mock";
 import {
   buildHomeCaraTrainingRows,
   mergeHomeNeedsAttentionRows,
@@ -262,8 +260,8 @@ export async function loadDashboardHomeSnapshot(input: {
     applyOrganizationScope(
       supabase
         .from("cara_training_items")
-        .select("id, gap_summary, status, updated_at")
-        .neq("status", "dismissed")
+        .select("id, gap_summary, status, updated_at, knowledge_folder_id, knowledge_topic_labels")
+        .in("status", ["awaiting_answer", "draft_ready"])
         .order("updated_at", { ascending: false })
         .limit(DASHBOARD_HOME_CARA_TRAINING_ROW_LIMIT),
       scopedOrgIds,
@@ -272,7 +270,7 @@ export async function loadDashboardHomeSnapshot(input: {
       supabase
         .from("cara_training_items")
         .select("id", { count: "exact", head: true })
-        .neq("status", "dismissed"),
+        .in("status", ["awaiting_answer", "draft_ready"]),
       scopedOrgIds,
     ),
   ]);
@@ -389,40 +387,7 @@ export async function loadDashboardHomeSnapshot(input: {
     includedMinutes: plan.includedMinutes,
   });
 
-  const useHomeMock = isDashboardHomeMockEnabled(organizationSlug);
-
-  const activity = useHomeMock ? [...DASHBOARD_HOME_MOCK.activity] : activityLive;
-  const needsAttention = useHomeMock
-    ? [...DASHBOARD_HOME_MOCK.needsAttention]
-    : needsAttentionLive;
-  const openActions = useHomeMock ? DASHBOARD_HOME_MOCK.openActions : openActionsLive;
-  const caraTraining = useHomeMock
-    ? [...DASHBOARD_HOME_MOCK.caraTraining]
-    : caraTrainingLive;
-  const openTrainingCount = useHomeMock
-    ? DASHBOARD_HOME_MOCK.openTrainingCount
-    : openTrainingCountLive;
-  const topTopics = useHomeMock ? [...DASHBOARD_HOME_MOCK.topTopics] : topTopicsLive;
-  const callsToReview = useHomeMock
-    ? [...DASHBOARD_HOME_MOCK.callsToReview]
-    : callsToReviewLive;
-  const callsToReviewCount = useHomeMock
-    ? DASHBOARD_HOME_MOCK.callsToReviewCount
-    : callsToReviewCountLive;
-  const callTimes = useHomeMock ? [...DASHBOARD_HOME_MOCK.callTimes] : callTimesLive;
-  const callsAnswered = useHomeMock
-    ? DASHBOARD_HOME_MOCK.hero.callsAnswered
-    : callsAnsweredLive;
-  const actionsCreated = useHomeMock
-    ? DASHBOARD_HOME_MOCK.hero.requestsCaptured
-    : actionsCreatedLive;
-  const routedCount = useHomeMock ? DASHBOARD_HOME_MOCK.hero.routed : routedCountLive;
-  const callbackCount = useHomeMock
-    ? DASHBOARD_HOME_MOCK.hero.callbacks
-    : callbackCountLive;
-  const minutesUsedDisplay = useHomeMock
-    ? DASHBOARD_HOME_MOCK.hero.minutesUsed
-    : usageSnapshotLive.minutesUsed;
+  const minutesUsedDisplay = usageSnapshotLive.minutesUsed;
 
   const firstName = getFirstName(profile?.name);
   const greeting = dashboardTimeGreeting(firstName);
@@ -434,33 +399,33 @@ export async function loadDashboardHomeSnapshot(input: {
     kind: "routed" as const,
   };
   const thirdStatValue =
-    thirdStat.kind === "callbacks" ? callbackCount : routedCount;
+    thirdStat.kind === "callbacks" ? callbackCountLive : routedCountLive;
 
   const stats: DashboardHomeStat[] =
     homeCopy.vertical.id === "retail"
       ? [
           {
             label: "Calls answered",
-            value: String(callsAnswered),
+            value: String(callsAnsweredLive),
             href: DASHBOARD_ROUTES.calls,
           },
           {
             label: "Enquiries captured",
-            value: String(actionsCreated),
+            value: String(actionsCreatedLive),
             href: followUpHubHref,
           },
           {
             label: "Needs action",
-            value: String(openActions),
+            value: String(openActionsLive),
             href: followUpHubHref,
           },
           {
-            label: "Needs your input",
-            value: String(openTrainingCount),
+            label: "Needs input",
+            value: String(openTrainingCountLive),
             href: DASHBOARD_ROUTES.caraKnowledgeNeedsInput,
           },
           {
-            label: "Minutes this period",
+            label: "Minutes used",
             value: formatMinutes(minutesUsedDisplay),
             href: DASHBOARD_ROUTES.usage,
           },
@@ -468,12 +433,12 @@ export async function loadDashboardHomeSnapshot(input: {
       : [
           {
             label: "Calls answered",
-            value: String(callsAnswered),
+            value: String(callsAnsweredLive),
             href: DASHBOARD_ROUTES.calls,
           },
           {
             label: "Enquiries captured",
-            value: String(actionsCreated),
+            value: String(actionsCreatedLive),
             href: followUpHubHref,
           },
           {
@@ -483,11 +448,11 @@ export async function loadDashboardHomeSnapshot(input: {
           },
           {
             label: "Needs attention",
-            value: String(openActions),
+            value: String(openActionsLive),
             href: followUpHubHref,
           },
           {
-            label: "Minutes this period",
+            label: "Minutes used",
             value: formatMinutes(minutesUsedDisplay),
             href: DASHBOARD_ROUTES.usage,
           },
@@ -497,14 +462,14 @@ export async function loadDashboardHomeSnapshot(input: {
     greeting,
     subheading: homeCopy.home.heroSubheading,
     stats,
-    activity,
-    needsAttention,
-    openActions,
-    caraTraining,
-    openTrainingCount,
-    topTopics,
-    callsToReview,
-    callsToReviewCount,
-    callTimes,
+    activity: activityLive,
+    needsAttention: needsAttentionLive,
+    openActions: openActionsLive,
+    caraTraining: caraTrainingLive,
+    openTrainingCount: openTrainingCountLive,
+    topTopics: topTopicsLive,
+    callsToReview: callsToReviewLive,
+    callsToReviewCount: callsToReviewCountLive,
+    callTimes: callTimesLive,
   };
 }

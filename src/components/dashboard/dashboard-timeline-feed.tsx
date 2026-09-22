@@ -35,6 +35,8 @@ export type TimelineFeedRow = {
   urgent?: boolean;
   /** Source timestamp (ISO) — used by the Activity page to group rows by day. */
   isoDate?: string;
+  /** Active incoming / in-progress call row. */
+  liveCall?: boolean;
 };
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;

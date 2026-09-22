@@ -5,7 +5,62 @@ export type CallsIncomingPlaceholder = {
   callerNumber: string | null;
   callLogId: string | null;
   startedAt: string;
+  usageRecordId?: string | null;
 };
+
+export function incomingCallPlaceholderKey(
+  placeholder: Pick<
+    CallsIncomingPlaceholder,
+    "callLogId" | "usageRecordId" | "startedAt"
+  >,
+): string {
+  if (placeholder.callLogId) return `call-${placeholder.callLogId}`;
+  if (placeholder.usageRecordId) return `usage-${placeholder.usageRecordId}`;
+  return `started-${placeholder.startedAt}`;
+}
+
+export function upsertIncomingCallPlaceholder(
+  current: CallsIncomingPlaceholder[],
+  detail: DashboardIncomingCallDetail,
+): CallsIncomingPlaceholder[] {
+  const map = new Map(
+    current.map((placeholder) => [
+      incomingCallPlaceholderKey(placeholder),
+      placeholder,
+    ]),
+  );
+
+  const linked =
+    (detail.callLogId
+      ? current.find((placeholder) => placeholder.callLogId === detail.callLogId)
+      : null) ??
+    (detail.startedAt
+      ? current.find((placeholder) => {
+          if (placeholder.callLogId) return false;
+          const delta = Math.abs(
+            new Date(placeholder.startedAt).getTime() -
+              new Date(detail.startedAt!).getTime(),
+          );
+          return delta <= 5_000;
+        })
+      : null);
+
+  const merged = mergeIncomingCallEvent(linked ?? null, detail);
+  map.set(incomingCallPlaceholderKey(merged), merged);
+
+  return [...map.values()].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+  );
+}
+
+export function filterActiveIncomingCallPlaceholders(
+  placeholders: CallsIncomingPlaceholder[],
+  calls: ReadonlyArray<{ id: string; createdAt: string }>,
+): CallsIncomingPlaceholder[] {
+  return placeholders.filter(
+    (placeholder) => !shouldClearCallsIncomingPlaceholder(placeholder, calls),
+  );
+}
 
 /** Hide the placeholder when viewing past days or paginated history. */
 export function shouldShowCallsIncomingPlaceholder(options: {
@@ -47,6 +102,7 @@ export function mergeIncomingCallEvent(
       phase: "loading",
       callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
       callLogId: event.callLogId ?? current?.callLogId ?? null,
+      usageRecordId: current?.usageRecordId ?? event.usageRecordId ?? null,
       startedAt,
     };
   }
@@ -55,6 +111,7 @@ export function mergeIncomingCallEvent(
     phase: "in_progress",
     callerNumber: event.callerNumber ?? current?.callerNumber ?? null,
     callLogId: current?.callLogId ?? null,
+    usageRecordId: event.usageRecordId ?? current?.usageRecordId ?? null,
     startedAt,
   };
 }

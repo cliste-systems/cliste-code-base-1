@@ -1,6 +1,5 @@
 /**
  * Remove seeded demo rows from a tenant dashboard (calls, inbox, training, usage).
- * Overview (/dashboard) keeps static preview charts via dashboard-home-mock.
  *
  *   npx tsx scripts/cleanup-dashboard-mock-activity.ts
  *   npx tsx scripts/cleanup-dashboard-mock-activity.ts --org e79ac0f3-...

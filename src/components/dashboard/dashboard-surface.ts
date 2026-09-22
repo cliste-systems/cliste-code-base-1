@@ -52,6 +52,13 @@ export const DASHBOARD_REBUILD_SHELL = false;
 export const DASHBOARD_HOME_HERO =
   "relative w-full rounded-lg border border-[#d9e2dd] bg-[#fbfcfb] shadow-[0_1px_0_rgba(17,24,29,0.05),0_14px_34px_-28px_rgba(17,24,29,0.26)]";
 
+/** Wavy grey hero art — home hero block only. */
+export const DASHBOARD_HOME_HERO_BACKGROUND =
+  "bg-[#fbfcfb] bg-cover bg-right bg-no-repeat";
+
+/** Solid grey matching the hero tone — no wave artwork. */
+export const DASHBOARD_HOME_HERO_GREY = "bg-[#f3f6f4]";
+
 /** Home dashboard card shell — flex column, clip overflow when viewport is tight. */
 export const DASHBOARD_HOME_CARD_BODY =
   "flex h-full min-h-0 flex-col overflow-hidden p-4";
@@ -73,12 +80,16 @@ export const DASHBOARD_HOME_UNIFIED_PANEL_GRID_OPS =
 export const DASHBOARD_HOME_UNIFIED_PANEL_GRID_INSIGHTS =
   "grid h-full min-h-0 grid-cols-4 divide-x divide-slate-100";
 
+/** Overview home cards — standalone columns on the dashboard grid. */
+export const DASHBOARD_HOME_OVERVIEW_CARD =
+  `${DASHBOARD_CARD_SURFACE} flex h-full min-h-0 flex-col overflow-hidden`;
+
 export function dashboardHomeCardShellClassName(
   embedded: boolean,
   className?: string,
 ): string {
   return embedded
-    ? cn(DASHBOARD_HOME_CARD_EMBEDDED_BODY, className)
+    ? cn(DASHBOARD_HOME_OVERVIEW_CARD, className)
     : cn(DASHBOARD_CARD_SURFACE, DASHBOARD_HOME_CARD_BODY, className);
 }
 
@@ -139,6 +150,17 @@ export const DASHBOARD_ICON_CHIP_HEADER =
   `mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg p-2 ${DASHBOARD_ICON_CHIP_FILL}`;
 
 export const DASHBOARD_HOME_ATTENTION_ROW_HOVER = "hover:bg-[#353D42]/[0.06]";
+
+/** Overview list rows — Recent activity, Needs action, Needs input. */
+export const DASHBOARD_HOME_FIRST_ROW_LIST_HOVER =
+  "cursor-pointer rounded-lg px-2.5 py-2.5 transition-colors hover:bg-[#f3f6f4]";
+
+/** Slight grey tint for live / in-progress call rows — matches dept icon chips. */
+export const DASHBOARD_HOME_LIVE_CALL_ROW_CLASS =
+  "border border-[#d6dfda] bg-[#f3f6f4] hover:bg-[#eef2f0]";
+
+export const DASHBOARD_HOME_FIRST_ROW_LIST_CHEVRON =
+  "size-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500";
 
 export const DASHBOARD_HOME_ATTENTION_DIVIDER = "divide-y divide-[#d9e2dd]";
 

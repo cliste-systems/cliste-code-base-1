@@ -10,6 +10,7 @@ export type DashboardIncomingCallDetail = {
   phase: DashboardIncomingCallPhase;
   callerNumber?: string | null;
   callLogId?: string | null;
+  usageRecordId?: string | null;
   startedAt?: string;
 };
 

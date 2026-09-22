@@ -26,7 +26,7 @@ const DEFAULT_STAT_ICONS: Record<string, LucideIcon> = {
   Callbacks: PhoneForwarded,
   "Follow-ups due": Clock3,
   "Needs attention": AlertCircle,
-  "Minutes this period": Timer,
+  "Minutes used": Timer,
 };
 
 /**

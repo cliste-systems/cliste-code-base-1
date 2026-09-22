@@ -37,10 +37,9 @@ export function dashboardSidebarHeaderClassName(onSectionRoute: boolean): string
   );
 }
 
-export function dashboardSidebarBadgeClassName(active: boolean): string {
+export function dashboardSidebarBadgeClassName(_active: boolean): string {
   return cn(
-    "shrink-0 text-[12px] font-semibold tabular-nums",
-    active ? "text-slate-500" : "text-slate-400",
+    "inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-[#0f172a] px-1.5 text-[10px] font-semibold text-white tabular-nums",
   );
 }
 

@@ -46,7 +46,7 @@ import {
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import { dashboardVersionDisplay } from "@/lib/dashboard-versions";
 
-import { DASHBOARD_INTERACTIVE_CURSOR, DASHBOARD_REBUILD_SHELL } from "@/components/dashboard/dashboard-surface";
+import { DASHBOARD_CONTENT_COLUMN, DASHBOARD_INTERACTIVE_CURSOR, DASHBOARD_REBUILD_SHELL } from "@/components/dashboard/dashboard-surface";
 import { cn } from "@/lib/utils";
 
 import { DashboardViewportLock } from "./dashboard-viewport-lock";
@@ -238,11 +238,13 @@ export default async function DashboardLayout({
               <DashboardChromeBar versionDisplay={versionDisplay} />
             ) : null}
             {!DASHBOARD_REBUILD_SHELL ? (
-              <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] px-4 py-3 lg:hidden">
-                <DashboardMobileNav
-                  items={mobileNavItems}
-                  accountNav={accountNav}
-                />
+              <div className="shrink-0 border-b border-[#d9e2dd] bg-[#f3f6f4] py-3 lg:hidden">
+                <div className={DASHBOARD_CONTENT_COLUMN}>
+                  <DashboardMobileNav
+                    items={mobileNavItems}
+                    accountNav={accountNav}
+                  />
+                </div>
               </div>
             ) : null}
             {!DASHBOARD_REBUILD_SHELL && needsPassword ? (

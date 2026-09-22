@@ -1,11 +1,16 @@
-/** Rows shown in Live activity on the hybrid home board. */
-export const DASHBOARD_HOME_LIVE_ACTIVITY_DISPLAY_LIMIT = 3;
+/** Rows shown in each overview column (Recent activity, Needs action, Needs input). */
+export const DASHBOARD_HOME_SIDE_PANEL_DISPLAY_LIMIT = 5;
+
+export const DASHBOARD_HOME_LIVE_ACTIVITY_DISPLAY_LIMIT =
+  DASHBOARD_HOME_SIDE_PANEL_DISPLAY_LIMIT;
 
 /** Rows shown in Action Inbox on the hybrid home board. */
-export const DASHBOARD_HOME_INBOX_DISPLAY_LIMIT = 3;
+export const DASHBOARD_HOME_INBOX_DISPLAY_LIMIT =
+  DASHBOARD_HOME_SIDE_PANEL_DISPLAY_LIMIT;
 
 /** Rows shown in Cara training on the hybrid home board. */
-export const DASHBOARD_HOME_CARA_TRAINING_DISPLAY_LIMIT = 3;
+export const DASHBOARD_HOME_CARA_TRAINING_DISPLAY_LIMIT =
+  DASHBOARD_HOME_SIDE_PANEL_DISPLAY_LIMIT;
 
 /** Rows shown in the second home analytics row. */
 export const DASHBOARD_HOME_SECOND_ROW_DISPLAY_LIMIT = 3;
@@ -14,8 +19,8 @@ export const DASHBOARD_HOME_SECOND_ROW_DISPLAY_LIMIT = 3;
 export const DASHBOARD_HOME_FIRST_ROW_DISPLAY_LIMIT =
   DASHBOARD_HOME_INBOX_DISPLAY_LIMIT;
 
-/** Height of one list row in the first home card row (matches HOME_FIRST_ROW_LIST_ROW). */
-export const DASHBOARD_HOME_FIRST_ROW_ITEM_HEIGHT_PX = 44;
+/** Fixed overview row height — shared across all three home columns. */
+export const DASHBOARD_HOME_OVERVIEW_ROW_HEIGHT_CLASS = "h-[3.25rem] shrink-0";
 
 /** Top chrome bar (breadcrumbs + versions) — reserve in home viewport budget. */
 export const DASHBOARD_CHROME_BAR_HEIGHT_PX = 48;

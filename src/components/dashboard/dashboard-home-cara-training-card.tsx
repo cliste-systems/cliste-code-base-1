@@ -1,44 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 
 import {
-  DashboardHomeFirstRowButton,
+  DashboardHomeFirstRowBody,
+  DashboardHomeFirstRowHeader,
   DashboardHomeFirstRowList,
-  HOME_FIRST_ROW_COUNT_BADGE,
-  HOME_FIRST_ROW_FOOTER,
-  HOME_FIRST_ROW_HEADER,
-  HOME_FIRST_ROW_TITLE,
+  DashboardHomePanelEmptyState,
 } from "@/components/dashboard/dashboard-home-first-row";
-import {
-  DASHBOARD_HOME_PANEL_EMPTY_BODY,
-  DASHBOARD_HOME_PANEL_EMPTY_ICON,
-  DASHBOARD_HOME_PANEL_EMPTY_TITLE,
-  dashboardHomeCardShellClassName,
-} from "@/components/dashboard/dashboard-surface";
+import { dashboardHomeCardShellClassName } from "@/components/dashboard/dashboard-surface";
 import type { HomeCaraTrainingRow } from "@/lib/dashboard-home-requests";
 import { DASHBOARD_HOME_CARA_TRAINING_DISPLAY_LIMIT } from "@/lib/dashboard-home-panel-limit";
-import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
-import { cn } from "@/lib/utils";
-
-function CaraTrainingEmptyState() {
-  return (
-    <div className="flex min-h-[5.75rem] flex-1 items-center gap-3 px-1">
-      <div className={cn(DASHBOARD_HOME_PANEL_EMPTY_ICON, "mb-0 size-9 shrink-0 shadow-none")} aria-hidden>
-        <GraduationCap className="size-4" />
-      </div>
-      <div className="min-w-0 text-left">
-        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_TITLE, "text-[13px]")}>
-          Cara is up to date
-        </p>
-        <p className={cn(DASHBOARD_HOME_PANEL_EMPTY_BODY, "mt-0.5 max-w-none text-[11.5px]")}>
-          Questions she could not answer will appear here for the team to teach.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function DashboardHomeCaraTrainingCard({
   rows,
@@ -56,41 +28,36 @@ export function DashboardHomeCaraTrainingCard({
 
   return (
     <Shell className={dashboardHomeCardShellClassName(embedded, className)}>
-      <div className={HOME_FIRST_ROW_HEADER}>
-        <h2 className={HOME_FIRST_ROW_TITLE}>Needs your input</h2>
-        <span className={HOME_FIRST_ROW_COUNT_BADGE}>{openTrainingCount}</span>
-      </div>
+      <DashboardHomeFirstRowHeader
+        title="Needs input"
+        icon={GraduationCap}
+        count={openTrainingCount}
+        embedded={embedded}
+      />
 
-      {displayRows.length > 0 ? (
-        <>
+      <DashboardHomeFirstRowBody embedded={embedded}>
+        {displayRows.length > 0 ? (
           <DashboardHomeFirstRowList
+            embedded={embedded}
+            showDepartmentIcons
             rows={displayRows.map((row) => ({
               id: row.id,
               href: row.href,
               title: row.title,
               subtitle: row.description,
               time: row.time,
+              departmentSlug: row.departmentSlug,
             }))}
           />
-
-          <div className={cn(HOME_FIRST_ROW_FOOTER, "mt-auto")}>
-            {embedded ? (
-              <Link
-                href={DASHBOARD_ROUTES.caraKnowledgeNeedsInput}
-                className="inline-flex text-[11px] font-medium text-[#4d5f58] transition-colors hover:text-[#11181d]"
-              >
-                Open needs your input →
-              </Link>
-            ) : (
-              <DashboardHomeFirstRowButton href={DASHBOARD_ROUTES.caraKnowledgeNeedsInput}>
-                Open needs your input
-              </DashboardHomeFirstRowButton>
-            )}
-          </div>
-        </>
-      ) : (
-        <CaraTrainingEmptyState />
-      )}
+        ) : (
+          <DashboardHomePanelEmptyState
+            embedded={embedded}
+            icon={GraduationCap}
+            title="Cara is up to date"
+            body="Questions she could not answer will appear here for the team to teach."
+          />
+        )}
+      </DashboardHomeFirstRowBody>
     </Shell>
   );
 }

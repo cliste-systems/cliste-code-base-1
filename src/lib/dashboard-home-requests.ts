@@ -1,5 +1,4 @@
 import {
-  ACTION_CATEGORY_LABELS,
   classifyActionCategory,
   type ActionCategory,
 } from "@/app/(dashboard)/dashboard/action-inbox/categories";
@@ -10,13 +9,18 @@ import {
 } from "@/lib/dashboard-home-attention";
 import { normalizeCallOutcome } from "@/lib/call-history-types";
 import { isPostCallAttentionStatus } from "@/lib/post-call-processing-types";
-import { ticketCallerLabel } from "@/lib/dashboard-feed-time";
 import { DASHBOARD_ROUTES } from "@/lib/dashboard-routes";
 import {
   departmentTicketHref,
   resolveTicketDepartmentSlug,
 } from "@/app/(dashboard)/dashboard/departments/department-helpers";
-import { departmentListPreview } from "@/app/(dashboard)/dashboard/action-inbox/action-inbox-helpers";
+import { formatActivityFeedBadge } from "@/lib/dashboard-live-activity";
+import { classifyActionDepartment } from "@/lib/classify-action-department";
+import {
+  isRetailDepartmentSlug,
+  retailDepartmentBySlug,
+  type RetailDepartmentSlug,
+} from "@/lib/retail-department-pack";
 
 /** Max characters for home panel list subtitles (Needs attention, Cara training). */
 export const HOME_PANEL_LIST_DESCRIPTION_MAX = 48;
@@ -48,6 +52,7 @@ export type HomeRequestRow = {
   title: string;
   description: string;
   time: string;
+  departmentSlug?: RetailDepartmentSlug;
 };
 
 export type HomeTodaysRequestStats = {
@@ -67,31 +72,63 @@ const FOLLOW_UP_CATEGORIES: readonly ActionCategory[] = [
   "follow_up",
 ];
 
-function homeRequestTitle(category: ActionCategory): string {
-  switch (category) {
-    case "booking_request":
-      return "Booking request";
-    case "quote":
-      return "Pricing question";
-    case "callback":
-      return "Callback request";
-    case "lead":
-      return "Product enquiry";
-    case "follow_up":
-      return "Follow-up needed";
-    case "confirm":
-      return "Confirmation needed";
-    case "urgent":
-      return "Urgent request";
-    case "complaint":
-      return "Complaint";
-    case "unclear":
-      return "General enquiry";
-    case "failed":
-      return "Failed call follow-up";
-    default:
-      return ACTION_CATEGORY_LABELS[category];
+export function homeNeedsActionDepartmentSlug(input: {
+  summary: string | null | undefined;
+  department_slug?: string | null;
+}): RetailDepartmentSlug {
+  return resolveTicketDepartmentSlug({
+    department_slug: input.department_slug ?? null,
+    summary: input.summary ?? "",
+  });
+}
+
+export function homeNeedsActionRowTitle(input: {
+  summary: string | null | undefined;
+  department_slug?: string | null;
+}): string {
+  return retailDepartmentBySlug(homeNeedsActionDepartmentSlug(input)).shortLabel;
+}
+
+/** Needs action second line — Complaint, Enquiry, Order, etc. */
+export function homeNeedsActionRowSubtitle(input: {
+  summary: string | null | undefined;
+}): string {
+  return formatActivityFeedBadge({ summary: input.summary });
+}
+
+export function homeKnowledgeGapDepartmentSlug(input: {
+  gap_summary?: string | null;
+  knowledge_folder_id?: string | null;
+  knowledge_topic_labels?: string[] | null;
+}): Exclude<RetailDepartmentSlug, "general"> {
+  const folderId = String(input.knowledge_folder_id ?? "").trim();
+
+  if (folderId && isRetailDepartmentSlug(folderId) && folderId !== "general") {
+    return folderId;
   }
+
+  const fromSummary = classifyActionDepartment({ summary: input.gap_summary ?? "" });
+  if (fromSummary !== "general") {
+    return fromSummary;
+  }
+
+  return "management";
+}
+
+/** Single second-line label for every Needs input row on the home overview. */
+export const HOME_NEEDS_INPUT_ROW_SUBTITLE = "Knowledge gap";
+
+export function homeKnowledgeGapRowTitle(input: {
+  gap_summary?: string | null;
+  knowledge_folder_id?: string | null;
+  knowledge_topic_labels?: string[] | null;
+}): string {
+  return retailDepartmentBySlug(homeKnowledgeGapDepartmentSlug(input)).shortLabel;
+}
+
+/** Needs input second line — one term for every row. */
+export function homeKnowledgeGapRowSubtitle(): string {
+  return HOME_NEEDS_INPUT_ROW_SUBTITLE;
 }
 
 function summaryPreview(summary: string | null | undefined): string {
@@ -120,14 +157,10 @@ export function buildHomeTodaysRequestRows(input: {
       return {
         id: ticket.id,
         href: departmentTicketHref(ticket.id, departmentSlug),
-        title: ticketCallerLabel(ticket),
-        description: truncateHomePanelDescription(
-          departmentListPreview({
-            summary: ticket.summary ?? "",
-            briefSummary: ticket.brief_summary?.trim() || undefined,
-          }),
-        ),
+        title: homeNeedsActionRowTitle(ticket),
+        description: homeNeedsActionRowSubtitle(ticket),
         time: input.formatTime(ticket.created_at),
+        departmentSlug,
       };
     });
 }
@@ -170,11 +203,10 @@ export function buildHomePostCallAttentionRows(input: {
     .map((call) => ({
       id: `post-call-${call.id}`,
       href: `${DASHBOARD_ROUTES.calls}?call=${encodeURIComponent(call.id)}`,
-      title: ticketCallerLabel(call),
-      description: truncateHomePanelDescription(
-        "Processing issue — the shop order may not be fully synced yet.",
-      ),
+      title: "Management",
+      description: "Review",
       time: input.formatTime(call.created_at),
+      departmentSlug: "management" as const,
     }));
 }
 
@@ -242,6 +274,8 @@ export type HomeCaraTrainingItemRow = {
   gap_summary: string | null;
   status: string | null;
   updated_at: string;
+  knowledge_folder_id?: string | null;
+  knowledge_topic_labels?: string[] | null;
 };
 
 export type HomeCaraTrainingRow = {
@@ -250,11 +284,8 @@ export type HomeCaraTrainingRow = {
   title: string;
   description: string;
   time: string;
+  departmentSlug: RetailDepartmentSlug;
 };
-
-function caraTrainingRowTitle(_status: string | null | undefined): string {
-  return "Knowledge gap";
-}
 
 export function buildHomeCaraTrainingRows(input: {
   items: HomeCaraTrainingItemRow[];
@@ -269,14 +300,12 @@ export function buildHomeCaraTrainingRows(input: {
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     )
     .slice(0, limit)
-    .map((item) => {
-      const summary = summaryPreview(item.gap_summary);
-      return {
-        id: item.id,
-        href: DASHBOARD_ROUTES.caraKnowledgeNeedsInputItem(item.id),
-        title: caraTrainingRowTitle(item.status),
-        description: truncateHomePanelDescription(summary),
-        time: input.formatTime(item.updated_at),
-      };
-    });
+    .map((item) => ({
+      id: item.id,
+      href: DASHBOARD_ROUTES.caraKnowledgeNeedsInputItem(item.id),
+      title: homeKnowledgeGapRowTitle(item),
+      description: homeKnowledgeGapRowSubtitle(),
+      time: input.formatTime(item.updated_at),
+      departmentSlug: homeKnowledgeGapDepartmentSlug(item),
+    }));
 }

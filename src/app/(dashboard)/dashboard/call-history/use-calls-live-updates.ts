@@ -37,6 +37,7 @@ function incomingDetailFromUsageRecord(
     phase: "in_progress",
     callerNumber: readStringField(row, "caller_number"),
     startedAt: readStringField(row, "started_at") ?? new Date().toISOString(),
+    usageRecordId: readStringField(row, "id"),
   };
 }
 
@@ -56,6 +57,8 @@ type UseCallsLiveUpdatesOptions = {
   calls: ReadonlyArray<{ id: string; createdAt: string }>;
   viewingToday: boolean;
   page: number;
+  /** When false, skip list polling/router refresh (e.g. dashboard home). Default true. */
+  refreshList?: boolean;
 };
 
 export function useCallsLiveUpdates({
@@ -63,6 +66,7 @@ export function useCallsLiveUpdates({
   calls,
   viewingToday,
   page,
+  refreshList = true,
 }: UseCallsLiveUpdatesOptions): CallsIncomingPlaceholder | null {
   const router = useRouter();
   const [placeholder, setPlaceholder] = useState<CallsIncomingPlaceholder | null>(
@@ -92,6 +96,7 @@ export function useCallsLiveUpdates({
   );
 
   const scheduleRefresh = useCallback(() => {
+    if (!refreshList) return;
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
       return;
     }
@@ -100,7 +105,7 @@ export function useCallsLiveUpdates({
       refreshDebounceRef.current = null;
       router.refresh();
     }, REFRESH_DEBOUNCE_MS);
-  }, [router]);
+  }, [refreshList, router]);
 
   const handleIncomingDetail = useCallback(
     (detail: DashboardIncomingCallDetail) => {
@@ -138,7 +143,9 @@ export function useCallsLiveUpdates({
 
     if (!restoredRef.current) {
       restoredRef.current = true;
-      router.refresh();
+      if (refreshList) {
+        router.refresh();
+      }
     }
 
     let cancelled = false;
@@ -266,7 +273,7 @@ export function useCallsLiveUpdates({
   }, [handleIncomingDetail, liveEnabled, organizationId]);
 
   useEffect(() => {
-    if (!liveEnabled) return;
+    if (!liveEnabled || !refreshList) return;
 
     const poll = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") {
@@ -277,7 +284,7 @@ export function useCallsLiveUpdates({
 
     const interval = window.setInterval(poll, CALLS_POLL_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [liveEnabled, router]);
+  }, [liveEnabled, refreshList, router]);
 
   useEffect(() => {
     if (!placeholder) return;

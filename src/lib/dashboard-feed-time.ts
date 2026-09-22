@@ -128,7 +128,36 @@ export function callerFirstName(input: {
   return name.split(/\s+/)[0] ?? name;
 }
 
-/** Home Live activity: first name + phone, nothing else. */
+/** Home Live activity row title only (prefer callerLiveActivityLabel for name + number). */
+export function liveActivityListTitle(input: {
+  caller_name?: string | null;
+  caller_number?: string | null;
+  caller_data_erased_at?: string | null;
+}): string {
+  const label = callerLiveActivityLabel(input);
+  if (label.subtitle && label.title !== label.subtitle) {
+    return `${label.title} ${label.subtitle}`;
+  }
+  return label.title;
+}
+
+/** Incoming call row on home / calls — number only when no name yet. */
+export function incomingCallListLabel(callerNumber: string | null | undefined): {
+  title: string;
+  subtitle?: string;
+} {
+  const phone = String(callerNumber ?? "").trim();
+  if (!phone) return { title: "Incoming call" };
+  const formatted = formatE164ForDisplay(phone) || phone;
+  return { title: formatted };
+}
+
+/** @deprecated Use incomingCallListLabel */
+export function incomingCallListTitle(callerNumber: string | null | undefined): string {
+  return incomingCallListLabel(callerNumber).title;
+}
+
+/** Home Live activity: first name on top, phone below. */
 export function callerLiveActivityLabel(input: {
   caller_name?: string | null;
   caller_number?: string | null;

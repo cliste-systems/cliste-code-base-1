@@ -24,7 +24,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useDashboardVertical } from "@/app/(dashboard)/dashboard/dashboard-vertical-context";
+import { formatNavBadgeCount } from "@/lib/dashboard-nav-badges";
 import { dashboardFollowUpHubHref } from "@/lib/dashboard-follow-up-hub";
+import { dashboardSidebarBadgeClassName } from "@/components/dashboard/dashboard-sidebar-nav-shared";
 import { cn } from "@/lib/utils";
 
 import type { DashboardSidebarNavItem } from "./dashboard-sidebar";
@@ -64,21 +66,32 @@ function MobileNavLink({
   const Icon = NAV_ICONS[item.href] ?? LayoutDashboard;
   const active = isDashboardNavItemActive(pathname, item);
   const label = item.href === "/dashboard" ? "Overview" : item.label;
+  const showBadge = typeof item.badge === "number" && item.badge > 0;
 
   return (
     <Link
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors",
+        "flex min-w-0 items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors",
         active
           ? "bg-slate-100 text-slate-950"
           : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
       )}
       aria-current={active ? "page" : undefined}
     >
-      <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
-      <span className="truncate">{label}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
+        <span className="truncate">{label}</span>
+      </span>
+      {showBadge ? (
+        <span
+          className={dashboardSidebarBadgeClassName(active)}
+          aria-label={`${formatNavBadgeCount(item.badge!)} pending`}
+        >
+          {formatNavBadgeCount(item.badge!)}
+        </span>
+      ) : null}
     </Link>
   );
 }

@@ -17,6 +17,7 @@ const REFRESH_DEBOUNCE_MS = 400;
 
 type DashboardHomeLiveProps = {
   metricRange: DashboardMetricRangeKey;
+  organizationId: string;
   initialSnapshot: DashboardHomeSnapshot;
   heroClassName?: string;
   cardsClassName?: string;
@@ -25,6 +26,7 @@ type DashboardHomeLiveProps = {
 
 export function DashboardHomeLive({
   metricRange,
+  organizationId,
   initialSnapshot,
   heroClassName,
   cardsClassName,
@@ -90,6 +92,7 @@ export function DashboardHomeLive({
 
       <DashboardHomeCardsGrid
         className={cardsClassName}
+        organizationId={organizationId}
         activity={snapshot.activity}
         needsAttention={snapshot.needsAttention}
         openActions={snapshot.openActions}
