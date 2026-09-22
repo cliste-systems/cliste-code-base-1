@@ -409,6 +409,41 @@ export function AdminEmailInboxView({
     [identityKey, selectedId],
   );
 
+  const refreshDeliveryStatus = useCallback(async (id: string) => {
+    try {
+      const delivery = await apiJson<{
+        ok: true;
+        status: DeliveryStatus;
+        statusAt: string | null;
+      }>(`/api/admin/inbox/${encodeURIComponent(id)}/delivery`, {
+        method: "POST",
+      });
+
+      setSelected((current) =>
+        current?.id === id
+          ? {
+              ...current,
+              deliveryStatus: delivery.status,
+              deliveryStatusAt: delivery.statusAt,
+            }
+          : current,
+      );
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === id
+            ? {
+                ...message,
+                deliveryStatus: delivery.status,
+                deliveryStatusAt: delivery.statusAt,
+              }
+            : message,
+        ),
+      );
+    } catch {
+      // Keep the last known state visible if the live status check fails.
+    }
+  }, []);
+
   const loadMessage = useCallback(async (id: string) => {
     const requestId = ++messageRequestRef.current;
     const cached = messageCacheRef.current.get(id);
@@ -461,38 +496,7 @@ export function AdminEmailInboxView({
       );
 
       if (data.message.direction === "outbound") {
-        void apiJson<{
-          ok: true;
-          status: DeliveryStatus;
-          statusAt: string | null;
-        }>(`/api/admin/inbox/${encodeURIComponent(id)}/delivery`, {
-          method: "POST",
-        })
-          .then((delivery) => {
-            setSelected((current) =>
-              current?.id === id
-                ? {
-                    ...current,
-                    deliveryStatus: delivery.status,
-                    deliveryStatusAt: delivery.statusAt,
-                  }
-                : current,
-            );
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === id
-                  ? {
-                      ...message,
-                      deliveryStatus: delivery.status,
-                      deliveryStatusAt: delivery.statusAt,
-                    }
-                  : message,
-              ),
-            );
-          })
-          .catch(() => {
-            // Webhook/local status remains visible if the live Resend check fails.
-          });
+        void refreshDeliveryStatus(id);
       }
 
       if (data.message.direction === "inbound" && !data.message.readAt) {
@@ -516,7 +520,7 @@ export function AdminEmailInboxView({
         setLoadingMessage(false);
       }
     }
-  }, []);
+  }, [refreshDeliveryStatus]);
 
   useEffect(() => {
     void loadFolder(folder);
@@ -531,15 +535,18 @@ export function AdminEmailInboxView({
 
     const refreshFolder = () => {
       if (document.visibilityState !== "visible") return;
+
       void loadFolder(folder, true, true);
+
       if (folder === "sent" && selectedId && !composing) {
-        void loadMessage(selectedId);
+        // Refresh only the delivery/open state. Never remount the email body.
+        void refreshDeliveryStatus(selectedId);
       }
     };
 
     const timer = window.setInterval(
       refreshFolder,
-      folder === "sent" ? 8_000 : 5_000,
+      folder === "sent" ? 5_000 : 5_000,
     );
     window.addEventListener("focus", refreshFolder);
     document.addEventListener("visibilitychange", refreshFolder);
@@ -549,7 +556,13 @@ export function AdminEmailInboxView({
       window.removeEventListener("focus", refreshFolder);
       document.removeEventListener("visibilitychange", refreshFolder);
     };
-  }, [folder, selectedId, composing, loadFolder, loadMessage]);
+  }, [
+    folder,
+    selectedId,
+    composing,
+    loadFolder,
+    refreshDeliveryStatus,
+  ]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
