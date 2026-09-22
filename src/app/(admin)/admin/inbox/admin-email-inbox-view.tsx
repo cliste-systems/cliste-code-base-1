@@ -24,6 +24,14 @@ import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "archived" | "sent";
 type GrammarTarget = "reply" | "compose";
+type EmailIdentityKey = "hello" | "billing";
+
+type EmailIdentity = {
+  key: EmailIdentityKey;
+  label: string;
+  email: string;
+  name: string;
+};
 
 type EmailListItem = {
   id: string;
@@ -103,13 +111,14 @@ async function apiJson<T>(
 }
 
 export function AdminEmailInboxView({
-  fromAddress,
-  fromName,
+  identities,
 }: {
-  fromAddress: string;
-  fromName: string;
+  identities: EmailIdentity[];
 }) {
   const [folder, setFolder] = useState<Folder>("inbox");
+  const [identityKey, setIdentityKey] = useState<EmailIdentityKey>(
+    identities[0]?.key ?? "hello",
+  );
   const [messages, setMessages] = useState<EmailListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<EmailMessage | null>(null);
@@ -128,6 +137,15 @@ export function AdminEmailInboxView({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const activeIdentity =
+    identities.find((identity) => identity.key === identityKey) ??
+    identities[0] ?? {
+      key: "hello" as const,
+      label: "Hello",
+      email: "hello@hellocara.ie",
+      name: "HelloCara",
+    };
+
   const loadFolder = useCallback(
     async (
       nextFolder: Folder,
@@ -140,7 +158,7 @@ export function AdminEmailInboxView({
       }
       try {
         const data = await apiJson<{ messages: EmailListItem[] }>(
-          `/api/admin/inbox?folder=${nextFolder}`,
+          `/api/admin/inbox?folder=${nextFolder}&identity=${identityKey}`,
         );
         setMessages(data.messages);
         if (
@@ -164,7 +182,7 @@ export function AdminEmailInboxView({
         if (!silent) setLoadingList(false);
       }
     },
-    [selectedId],
+    [identityKey, selectedId],
   );
 
   const loadMessage = useCallback(async (id: string) => {
@@ -197,7 +215,7 @@ export function AdminEmailInboxView({
 
   useEffect(() => {
     void loadFolder(folder);
-  }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [folder, identityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedId && !composing) void loadMessage(selectedId);
@@ -327,6 +345,7 @@ export function AdminEmailInboxView({
             to: composeTo,
             subject: composeSubject,
             text: composeBody,
+            identity: identityKey,
           }),
         },
       );
@@ -379,6 +398,38 @@ export function AdminEmailInboxView({
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <aside className="flex w-[22rem] min-w-[19rem] shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="shrink-0 border-b border-slate-100 p-3">
+          <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+            {identities.map((identity) => (
+              <button
+                key={identity.key}
+                type="button"
+                onClick={() => {
+                  setIdentityKey(identity.key);
+                  setFolder("inbox");
+                  setComposing(false);
+                  setSelected(null);
+                  setSelectedId(null);
+                  setReply("");
+                  setNotice(null);
+                  setError(null);
+                }}
+                className={cn(
+                  "min-w-0 cursor-pointer rounded-md px-2.5 py-2 text-left transition-colors",
+                  identity.key === identityKey
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900",
+                )}
+              >
+                <span className="block text-xs font-semibold">
+                  {identity.label}
+                </span>
+                <span className="mt-0.5 block truncate text-[10px]">
+                  {identity.email}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <button
             type="button"
             onClick={() => {
@@ -563,7 +614,7 @@ export function AdminEmailInboxView({
                   New email
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  From {fromName} &lt;{fromAddress}&gt;
+                  From {activeIdentity.name} &lt;{activeIdentity.email}&gt;
                 </p>
               </div>
               <button
@@ -705,12 +756,12 @@ export function AdminEmailInboxView({
                   </div>
                   {selected.direction === "inbound" ? (
                     <p className="mt-1 text-[11px] text-slate-400">
-                      To {selected.toAddresses.join(", ") || fromAddress}
+                      To {selected.toAddresses.join(", ") || activeIdentity.email}
                     </p>
                   ) : (
                     <p className="mt-1 text-[11px] text-slate-400">
-                      From {selected.fromName || fromName} &lt;
-                      {selected.fromAddress || fromAddress}&gt;
+                      From {selected.fromName || activeIdentity.name} &lt;
+                      {selected.fromAddress || activeIdentity.email}&gt;
                     </p>
                   )}
                 </div>
@@ -796,7 +847,8 @@ export function AdminEmailInboxView({
                         >
                           <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
                             <span>
-                              {fromName} &lt;{fromAddress}&gt; →{" "}
+                              {sent.fromName || activeIdentity.name} &lt;
+                              {sent.fromAddress || activeIdentity.email}&gt; →{" "}
                               {sent.toAddresses[0] || "recipient"}
                             </span>
                             <span className="shrink-0">
@@ -819,7 +871,7 @@ export function AdminEmailInboxView({
                 <div className="mx-auto max-w-4xl">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <p className="text-xs font-medium text-slate-700">
-                      Reply as {fromName} &lt;{fromAddress}&gt;
+                      Reply as {activeIdentity.name} &lt;{activeIdentity.email}&gt;
                     </p>
                     <span className="text-[10px] text-slate-400">
                       {reply.length.toLocaleString()}/20,000
