@@ -95,7 +95,7 @@ function displaySender(item: EmailListItem): string {
 
 function buildEmailFrameDocument(html: string): string {
   const safeHtml = html.replace(
-    /<meta\b[^>]*http-equiv\s*=\s*["\']?refresh["\']?[^>]*>/gi,
+    /<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi,
     "",
   );
   const head = [
@@ -108,10 +108,10 @@ function buildEmailFrameDocument(html: string): string {
     "</style>",
   ].join("");
 
-  if (/<head(?:\\s|>)/i.test(safeHtml)) {
+  if (/<head(?:\s|>)/i.test(safeHtml)) {
     return safeHtml.replace(/<head([^>]*)>/i, `<head$1>${head}`);
   }
-  if (/<html(?:\\s|>)/i.test(safeHtml)) {
+  if (/<html(?:\s|>)/i.test(safeHtml)) {
     return safeHtml.replace(/<html([^>]*)>/i, `<html$1><head>${head}</head>`);
   }
   return `<!doctype html><html><head>${head}</head><body>${safeHtml}</body></html>`;
