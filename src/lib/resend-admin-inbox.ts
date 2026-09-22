@@ -318,6 +318,7 @@ function deliveryStatusFromRow(row: AdminEmailRow): {
     [
       "sent",
       "delayed",
+      "delivery_delayed",
       "delivered",
       "opened",
       "clicked",
