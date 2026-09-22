@@ -121,6 +121,7 @@ async function seed() {
       .insert({
         account_id: account.id,
         is_primary_location: true,
+        is_internal_test: true,
         name,
         slug,
         tier: "native",
