@@ -899,6 +899,34 @@ export function formatWeeklyOfferQuote(input: {
   const sentences = [`${channelPrefix}. ${productName}.`];
 
   const spokenLabel = formatSpokenDiscountLabel(input.discountLabel);
+  const multibuyMatch = String(input.discountLabel ?? "").match(
+    /\b(\d+)\s+for\s+€?\s*(\d+(?:[.,]\d{1,2})?)/i,
+  );
+  if (multibuyMatch) {
+    const quantity = Number(multibuyMatch[1]);
+    const total = Number(multibuyMatch[2]?.replace(",", "."));
+    if (Number.isFinite(quantity) && quantity >= 2 && Number.isFinite(total) && total > 0) {
+      const rewards = /real\s+rewards?|rewards?\s+price/i.test(
+        String(input.discountLabel ?? ""),
+      );
+      sentences.push(
+        `${formatSpokenInteger(quantity)} for ${formatSpokenEurAmount(total)}${rewards ? " with Real Rewards" : ""}.`,
+      );
+      sentences.push(
+        perKilo ? `Single price ${price} per kilo.` : `Single price ${price} each.`,
+      );
+
+      if (
+        !perKilo &&
+        input.pricePerUnit?.trim() &&
+        /\/kg/i.test(input.pricePerUnit)
+      ) {
+        sentences.push(`${speakEmbeddedEurAmounts(input.pricePerUnit.trim())}.`);
+      }
+      return sentences.join(" ");
+    }
+  }
+
   const percentOff = formatOfferPercentOff(
     input.currentPriceEur,
     input.wasPriceEur,
