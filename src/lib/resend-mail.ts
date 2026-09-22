@@ -62,7 +62,11 @@ export async function sendTransactionalEmail(
 ): Promise<SendTransactionalEmailResult> {
   const client = getResendClient();
   const platformFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
-  const platformFromName = process.env.RESEND_FROM_NAME?.trim() || PRODUCT_NAME;
+  const configuredFromName = process.env.RESEND_FROM_NAME?.trim();
+  const platformFromName =
+    configuredFromName && /^hello\s*cara$/i.test(configuredFromName)
+      ? "HelloCara"
+      : configuredFromName || PRODUCT_NAME;
   const fromEmail = input.from?.email.trim() || platformFromEmail;
   const fromName = input.from?.name?.trim() || platformFromName;
 
