@@ -13,6 +13,24 @@ const LEGACY_HELLO_ADDRESSES = ["brendan@hellocara.ie"] as const;
 
 export type AdminEmailFolder = "inbox" | "archived" | "sent";
 export type AdminEmailIdentityKey = "hello" | "billing";
+export type AdminEmailDeliveryStatus =
+  | "sent"
+  | "delayed"
+  | "delivered"
+  | "opened"
+  | "clicked"
+  | "complained"
+  | "suppressed"
+  | "bounced"
+  | "failed"
+  | "unknown";
+
+export type AdminEmailDeliveryEvent = {
+  id: string;
+  type: string;
+  occurredAt: string;
+  detail: string | null;
+};
 
 export type AdminEmailIdentity = {
   key: AdminEmailIdentityKey;
@@ -33,6 +51,8 @@ export type AdminEmailListItem = {
   occurredAt: string;
   readAt: string | null;
   archivedAt: string | null;
+  deliveryStatus: AdminEmailDeliveryStatus | null;
+  deliveryStatusAt: string | null;
 };
 
 export type AdminEmailMessage = AdminEmailListItem & {
@@ -44,6 +64,7 @@ export type AdminEmailMessage = AdminEmailListItem & {
   senderBlocked: boolean;
   attachments: Array<Record<string, unknown>>;
   replies: AdminEmailListItem[];
+  deliveryEvents: AdminEmailDeliveryEvent[];
 };
 
 type ResendReceivedListItem = {
@@ -86,6 +107,18 @@ type AdminEmailRow = {
   sent_at: string | null;
   read_at: string | null;
   archived_at: string | null;
+  resend_sent_at: string | null;
+  delivered_at: string | null;
+  delivery_delayed_at: string | null;
+  bounced_at: string | null;
+  failed_at: string | null;
+  suppressed_at: string | null;
+  complained_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
+  last_delivery_event: string | null;
+  last_delivery_event_at: string | null;
+  delivery_detail: unknown;
   created_at: string;
 };
 
@@ -263,8 +296,53 @@ function previewText(value: string | null | undefined, max = 130): string {
   return `${normalized.slice(0, max).trim()}…`;
 }
 
+function deliveryStatusFromRow(row: AdminEmailRow): {
+  status: AdminEmailDeliveryStatus | null;
+  at: string | null;
+} {
+  if (row.direction !== "outbound") return { status: null, at: null };
+  if (row.failed_at) return { status: "failed", at: row.failed_at };
+  if (row.bounced_at) return { status: "bounced", at: row.bounced_at };
+  if (row.suppressed_at) return { status: "suppressed", at: row.suppressed_at };
+  if (row.complained_at) return { status: "complained", at: row.complained_at };
+  if (row.clicked_at) return { status: "clicked", at: row.clicked_at };
+  if (row.opened_at) return { status: "opened", at: row.opened_at };
+  if (row.delivered_at) return { status: "delivered", at: row.delivered_at };
+  if (row.delivery_delayed_at) {
+    return { status: "delayed", at: row.delivery_delayed_at };
+  }
+  if (row.resend_sent_at || row.sent_at) {
+    return { status: "sent", at: row.resend_sent_at || row.sent_at };
+  }
+  return { status: "unknown", at: row.last_delivery_event_at };
+}
+
+function deliveryEventDetail(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  const candidates = [
+    record.bounce,
+    record.failed,
+    record.suppressed,
+    record.complaint,
+    record.click,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const detail = candidate as Record<string, unknown>;
+    for (const key of ["message", "reason", "type", "link"]) {
+      const value = detail[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+  return null;
+}
+
 function rowToListItem(row: AdminEmailRow): AdminEmailListItem {
   const body = row.text_body || (row.html_body ? stripHtml(row.html_body) : "");
+  const delivery = deliveryStatusFromRow(row);
   return {
     id: row.resend_email_id,
     direction: row.direction,
@@ -278,6 +356,8 @@ function rowToListItem(row: AdminEmailRow): AdminEmailListItem {
       row.received_at || row.sent_at || row.created_at || new Date().toISOString(),
     readAt: row.read_at,
     archivedAt: row.archived_at,
+    deliveryStatus: delivery.status,
+    deliveryStatusAt: delivery.at,
   };
 }
 
@@ -405,7 +485,7 @@ export async function listAdminInbox(
   let query = admin
     .from("admin_email_messages")
     .select(
-      "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,created_at",
+      "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,resend_sent_at,delivered_at,delivery_delayed_at,bounced_at,failed_at,suppressed_at,complained_at,opened_at,clicked_at,last_delivery_event,last_delivery_event_at,delivery_detail,created_at",
     )
     .limit(250);
 
@@ -439,7 +519,7 @@ export async function getAdminEmailMessage(
 
   const admin = createAdminClient();
   const messageSelect =
-    "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,created_at";
+    "resend_email_id,direction,parent_resend_email_id,message_id,in_reply_to,from_address,from_name,to_addresses,cc_addresses,bcc_addresses,reply_to_addresses,subject,text_body,html_body,headers,attachments,received_at,sent_at,read_at,archived_at,resend_sent_at,delivered_at,delivery_delayed_at,bounced_at,failed_at,suppressed_at,complained_at,opened_at,clicked_at,last_delivery_event,last_delivery_event_at,delivery_detail,created_at";
 
   const { data: existing, error: existingError } = await admin
     .from("admin_email_messages")
@@ -500,7 +580,7 @@ export async function getAdminEmailMessage(
   const senderEmail =
     row.direction === "inbound" ? row.from_address.trim().toLowerCase() : "";
 
-  const [replies, senderBlocked] = await Promise.all([
+  const [replies, senderBlocked, deliveryEvents] = await Promise.all([
     (async (): Promise<AdminEmailListItem[]> => {
       if (!parentId) return [];
       const { data: replyRows, error: repliesError } = await admin
@@ -524,6 +604,22 @@ export async function getAdminEmailMessage(
       if (blockedSenderError) throw new Error(blockedSenderError.message);
       return Boolean(blockedSender);
     })(),
+    (async (): Promise<AdminEmailDeliveryEvent[]> => {
+      if (row.direction !== "outbound") return [];
+      const { data: eventRows, error: eventError } = await admin
+        .from("admin_email_events")
+        .select("id,event_type,occurred_at,payload")
+        .eq("resend_email_id", row.resend_email_id)
+        .order("occurred_at", { ascending: true });
+
+      if (eventError) throw new Error(eventError.message);
+      return (eventRows ?? []).map((event) => ({
+        id: String(event.id),
+        type: String(event.event_type),
+        occurredAt: String(event.occurred_at),
+        detail: deliveryEventDetail(event.payload),
+      }));
+    })(),
   ]);
 
   const item = rowToListItem(row);
@@ -540,6 +636,7 @@ export async function getAdminEmailMessage(
       ? (row.attachments as Array<Record<string, unknown>>)
       : [],
     replies,
+    deliveryEvents,
   };
 }
 
@@ -704,6 +801,7 @@ export async function sendNewAdminEmail(input: {
   if (!response.id) throw new Error("Resend did not return an email ID.");
 
   const admin = createAdminClient();
+  const sentAt = new Date().toISOString();
   const { error } = await admin.from("admin_email_messages").insert({
     resend_email_id: response.id,
     direction: "outbound",
@@ -713,8 +811,11 @@ export async function sendNewAdminEmail(input: {
     to_addresses: [to],
     subject,
     text_body: text,
-    sent_at: new Date().toISOString(),
-    read_at: new Date().toISOString(),
+    sent_at: sentAt,
+    read_at: sentAt,
+    resend_sent_at: sentAt,
+    last_delivery_event: "email.sent",
+    last_delivery_event_at: sentAt,
   });
 
   if (error) throw new Error(error.message);
@@ -771,6 +872,7 @@ export async function replyToAdminEmail(input: {
   if (!response.id) throw new Error("Resend did not return an email ID.");
 
   const admin = createAdminClient();
+  const sentAt = new Date().toISOString();
   const { error: insertError } = await admin.from("admin_email_messages").insert({
     resend_email_id: response.id,
     direction: "outbound",
@@ -781,8 +883,11 @@ export async function replyToAdminEmail(input: {
     to_addresses: [replyAddress],
     subject,
     text_body: text,
-    sent_at: new Date().toISOString(),
-    read_at: new Date().toISOString(),
+    sent_at: sentAt,
+    read_at: sentAt,
+    resend_sent_at: sentAt,
+    last_delivery_event: "email.sent",
+    last_delivery_event_at: sentAt,
   });
 
   if (insertError) throw new Error(insertError.message);
