@@ -53,7 +53,7 @@ export function DashboardHomeInsightsCard({
         <div>
           <h2 className={DASHBOARD_SECTION_TITLE_CLASS}>Today&apos;s insights</h2>
           <p className="mt-0.5 text-[11px] leading-4 text-[#6b7c75]">
-            Useful patterns, kept secondary to the work queue.
+            Patterns from today’s customer calls.
           </p>
         </div>
         <span className={DASHBOARD_ICON_CHIP_SM} aria-hidden>
