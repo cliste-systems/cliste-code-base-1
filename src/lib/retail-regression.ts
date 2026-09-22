@@ -138,12 +138,31 @@ function intentValue(tool: { name: string; args: Record<string, unknown> }): str
   return normalize(tool.args.intent ?? "");
 }
 
+function queryContainsExpectedTerm(query: string, term: string): boolean {
+  const expected = normalize(term);
+  if (!expected) return true;
+  if (query.includes(expected)) return true;
+
+  const aliasGroups = [
+    ["fiver", "5 euro", "five euro", "€5", "5.00"],
+    ["two fifty", "2.50", "two euro fifty", "€2.50"],
+    ["half price", "50% off", "50 percent off"],
+    ["multibuy", "multi-buy", "multi buy"],
+    ["cheapest", "lowest price", "cheap"],
+  ];
+
+  return aliasGroups.some(
+    (group) =>
+      group.includes(expected) && group.some((alias) => query.includes(alias)),
+  );
+}
+
 function hasProductSelectionClarifyingQuestion(text: string): boolean {
   const normalized = normalize(text);
   if (!normalized) return false;
 
   if (
-    /\b(which|what type|what kind|what one|which one|which brand|what brand|which size|what size|do you mean|are you looking for|were you looking for)\b/i.test(
+    /\b(?:which(?:\s+one|\s+brand|\s+size|\s+type|\s+kind)?|what\s+(?:type|kind|brand|size|flavou?r)|do you mean|are you looking for|were you looking for|would you be looking for|are you after|were you after|were you thinking of|are you thinking of|did you have .* in mind|was there (?:any|a) particular|any particular (?:brand|type|kind|size|flavou?r)|do you remember (?:the )?name)\b/i.test(
       normalized,
     )
   ) {
@@ -151,7 +170,7 @@ function hasProductSelectionClarifyingQuestion(text: string): boolean {
   }
 
   if (
-    /\b(?:counter|pre[- ]?pack(?:ed)?|fresh|organic|ripe|mini|brand|size|type|kind)\b[^?!.]{0,80}\bor\b|\bor\b[^?!.]{0,80}\b(?:counter|pre[- ]?pack(?:ed)?|fresh|organic|ripe|mini|brand|size|type|kind)\b/i.test(
+    /\b(?:counter|pre[- ]?pack(?:ed)?|fresh|organic|ripe|mini|brand|size|type|kind|flavou?r)\b[^?!.]{0,80}\bor\b|\bor\b[^?!.]{0,80}\b(?:counter|pre[- ]?pack(?:ed)?|fresh|organic|ripe|mini|brand|size|type|kind|flavou?r)\b/i.test(
       normalized,
     )
   ) {
@@ -196,7 +215,9 @@ export function gradeRetailRegressionScenario(
       if (exp.queryMustInclude?.length) {
         const found = matching.some((tool) => {
           const query = queryValue(tool);
-          return exp.queryMustInclude!.every((term) => query.includes(normalize(term)));
+          return exp.queryMustInclude!.every((term) =>
+            queryContainsExpectedTerm(query, term),
+          );
         });
         if (!found) {
           reasons.push(
@@ -208,7 +229,9 @@ export function gradeRetailRegressionScenario(
       if (exp.queryMustIncludeAny?.length) {
         const found = matching.some((tool) => {
           const query = queryValue(tool);
-          return exp.queryMustIncludeAny!.some((term) => query.includes(normalize(term)));
+          return exp.queryMustIncludeAny!.some((term) =>
+            queryContainsExpectedTerm(query, term),
+          );
         });
         if (!found) {
           reasons.push(

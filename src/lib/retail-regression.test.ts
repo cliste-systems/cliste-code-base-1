@@ -286,6 +286,74 @@ test("ambiguous product clarification does not pass on a generic callback questi
   assert.match(grade.reasons.join(" "), /should have asked a clarifying question/i);
 });
 
+test("natural product-selection questions count as clarification", () => {
+  const scenario = {
+    expectations: {
+      summary: "Ask a genuine product-selection question.",
+      mustAskClarifyingQuestion: true,
+    },
+  };
+
+  for (const assistant of [
+    "Were you thinking of fruit juices, or something else like energy drinks?",
+    "Was there a particular type you were looking for?",
+    "Any particular brand or size you're after?",
+    "Would you be looking for the butcher counter or the pre-pack aisle?",
+    "Do you remember the name of it, or maybe the cut?",
+  ]) {
+    const grade = gradeRetailRegressionScenario(scenario, {
+      durationMs: 50,
+      turns: [
+        {
+          caller: "Can you check that for me?",
+          assistant,
+          transcriptLines: [],
+          tools: [],
+        },
+      ],
+    });
+    assert.equal(grade.status, "pass", assistant);
+  }
+});
+
+test("query grading accepts common supermarket phrasing aliases", () => {
+  for (const [expected, query] of [
+    ["fiver", "offers at 5 euro"],
+    ["two fifty", "Rewards 2.50"],
+    ["half price", "cheese 50% off"],
+    ["multibuy", "crisps multi-buy"],
+    ["cheapest", "lowest price beer"],
+  ]) {
+    const grade = gradeRetailRegressionScenario(
+      {
+        expectations: {
+          summary: "Preserve the caller's material search mechanic.",
+          requiredTool: "searchSuperValuProducts",
+          requiredIntent: "offer",
+          queryMustInclude: [expected],
+        },
+      },
+      {
+        durationMs: 50,
+        turns: [
+          {
+            caller: "test",
+            assistant: "Checking that.",
+            transcriptLines: [],
+            tools: [
+              {
+                name: "searchSuperValuProducts",
+                args: { intent: "offer", query },
+              },
+            ],
+          },
+        ],
+      },
+    );
+    assert.equal(grade.status, "pass", `${expected} -> ${query}`);
+  }
+});
+
 test("recurrence classifier distinguishes new, recurring, and returned regressions", () => {
   assert.deepEqual(
     classifyRegressionFailure({
