@@ -223,7 +223,7 @@ export function AdminMfaSetup() {
   const digits = Array.from({ length: 6 }, (_, index) => code[index] ?? "");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
         {[
           { label: "Authenticator", complete: mode === "verify" },
@@ -238,7 +238,7 @@ export function AdminMfaSetup() {
             <div
               key={item.label}
               className={[
-                "rounded-xl border px-3 py-2.5 transition-colors",
+                "rounded-xl border px-3 py-2 transition-colors",
                 active
                   ? "border-slate-300 bg-slate-50"
                   : "border-slate-200 bg-white",
@@ -261,7 +261,7 @@ export function AdminMfaSetup() {
       </div>
 
       {mode === "enroll" ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
               <ScanLine className="size-4 text-slate-700" aria-hidden />
@@ -270,7 +270,7 @@ export function AdminMfaSetup() {
               <p className="text-sm font-semibold text-slate-950">
                 Scan with your authenticator app
               </p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
+              <p className="mt-1 text-xs leading-4.5 text-slate-500">
                 Use 1Password, Microsoft Authenticator, Google Authenticator,
                 Authy or Apple Passwords.
               </p>
@@ -278,26 +278,26 @@ export function AdminMfaSetup() {
           </div>
 
           {qrCode ? (
-            <div className="mt-4 flex justify-center">
-              <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mt-3 flex justify-center">
+              <div className="rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm">
                 {/* Supabase returns the QR code as a data URL. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qrCode}
                   alt="Authenticator setup QR code"
-                  className="size-44 sm:size-48"
+                  className="size-36 sm:size-40"
                 />
               </div>
             </div>
           ) : null}
 
           {secret ? (
-            <details className="group mt-4 rounded-xl border border-slate-200 bg-white">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-xs font-medium text-slate-700">
+            <details className="group mt-3 rounded-xl border border-slate-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 text-xs font-medium text-slate-700">
                 Can’t scan the QR code?
                 <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
               </summary>
-              <div className="border-t border-slate-100 px-3.5 py-3">
+              <div className="border-t border-slate-100 px-3.5 py-2.5">
                 <p className="text-[11px] leading-5 text-slate-500">
                   Enter this setup key manually in your authenticator app.
                 </p>
@@ -309,7 +309,7 @@ export function AdminMfaSetup() {
           ) : null}
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
               <ShieldCheck className="size-4 text-slate-700" aria-hidden />
@@ -360,12 +360,12 @@ export function AdminMfaSetup() {
             aria-label="6-digit authenticator code"
           />
 
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-6 gap-1.5">
             {digits.map((digit, index) => (
               <div
                 key={index}
                 className={[
-                  "flex aspect-square min-w-0 items-center justify-center rounded-xl border bg-white font-mono text-xl font-semibold shadow-sm transition",
+                  "flex h-12 min-w-0 items-center justify-center rounded-xl border bg-white font-mono text-lg font-semibold shadow-sm transition",
                   code.length === index
                     ? "border-slate-400 ring-2 ring-slate-200"
                     : "border-slate-200",
@@ -391,7 +391,7 @@ export function AdminMfaSetup() {
         type="button"
         disabled={submitting || code.length !== 6 || !factorId}
         onClick={() => void verify()}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -401,8 +401,8 @@ export function AdminMfaSetup() {
         {submitting ? "Verifying…" : "Verify and continue"}
       </button>
 
-      <p className="text-center text-[11px] leading-5 text-slate-400">
-        This check protects admin-only access and your internal company inbox.
+      <p className="text-center text-[11px] leading-4 text-slate-400">
+        Admin verification
       </p>
     </div>
   );
