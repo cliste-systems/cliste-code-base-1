@@ -5,7 +5,9 @@ import {
   Archive,
   ArchiveRestore,
   Ban,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Eye,
   Inbox,
@@ -26,6 +28,14 @@ import {
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
 } from "@/components/admin/admin-interactive";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "archived" | "sent";
@@ -769,36 +779,74 @@ export function AdminEmailInboxView({
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <aside className="flex w-[22rem] min-w-[19rem] shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="shrink-0 border-b border-slate-100 p-3">
-          <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-            {identities.map((identity) => (
-              <button
-                key={identity.key}
-                type="button"
-                onClick={() => {
-                  setIdentityKey(identity.key);
-                  setFolder("inbox");
-                  setComposing(false);
-                  setSelected(null);
-                  setSelectedId(null);
-                  setReply("");
-                  setNotice(null);
-                  setError(null);
-                }}
-                className={cn(
-                  "min-w-0 cursor-pointer rounded-md px-2.5 py-2 text-left transition-colors",
-                  identity.key === identityKey
-                    ? "bg-white text-slate-950 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900",
-                )}
+          <div className="mb-3">
+            <p className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+              Mailbox
+            </p>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm outline-none transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-200"
               >
-                <span className="block text-xs font-semibold">
-                  {identity.label}
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-semibold text-slate-900">
+                    {activeIdentity.label}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[10px] text-slate-500">
+                    {activeIdentity.email}
+                  </span>
                 </span>
-                <span className="mt-0.5 block truncate text-[10px]">
-                  {identity.email}
-                </span>
-              </button>
-            ))}
+                <ChevronDown
+                  className="size-4 shrink-0 text-slate-400"
+                  aria-hidden
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[18rem]"
+              >
+                <DropdownMenuLabel>Choose mailbox</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {identities.map((identity) => {
+                  const selectedIdentity = identity.key === identityKey;
+                  return (
+                    <DropdownMenuItem
+                      key={identity.key}
+                      className={cn(
+                        "cursor-pointer py-2.5",
+                        selectedIdentity && "bg-slate-50",
+                      )}
+                      onSelect={() => {
+                        setIdentityKey(identity.key);
+                        setFolder("inbox");
+                        setComposing(false);
+                        setSelected(null);
+                        setSelectedId(null);
+                        setReply("");
+                        setNotice(null);
+                        setError(null);
+                      }}
+                    >
+                      <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-semibold text-slate-900">
+                            {identity.label}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[10px] text-slate-500">
+                            {identity.email}
+                          </span>
+                        </span>
+                        {selectedIdentity ? (
+                          <Check
+                            className="size-4 shrink-0 text-slate-700"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <button
