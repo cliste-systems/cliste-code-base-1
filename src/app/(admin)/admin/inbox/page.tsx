@@ -20,7 +20,7 @@ export default function AdminInboxPage() {
     <AdminPageShell
       icon={Mail}
       title="Inbox"
-      description="Switch between Hello and Billing mailboxes. Replies automatically use the address the customer contacted."
+      description="Switch between Hello, Billing and Cliste Systems mailboxes. Replies automatically use the address the sender contacted."
       fillViewport
     >
       <AdminEmailInboxView identities={identities} />
