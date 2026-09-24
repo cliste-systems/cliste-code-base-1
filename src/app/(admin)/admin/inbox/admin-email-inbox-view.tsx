@@ -229,9 +229,17 @@ function deliveryFailed(status: DeliveryStatus | null): boolean {
   );
 }
 
+function emailHasExternalImages(html: string): boolean {
+  return (
+    /<img\b[^>]*\bsrc\s*=\s*["']?https?:\/\//i.test(html) ||
+    /url\(\s*["']?https?:\/\//i.test(html)
+  );
+}
+
 function buildEmailFrameDocument(
   html: string,
   stripOpenTrackingPixel = false,
+  allowExternalImages = false,
 ): string {
   let safeHtml = html.replace(
     /<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi,
@@ -243,9 +251,14 @@ function buildEmailFrameDocument(
       "",
     );
   }
+  const frameCsp = allowExternalImages
+    ? "default-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';"
+    : "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';";
+
   const head = [
+    `<meta http-equiv="Content-Security-Policy" content="${frameCsp}">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    '<base target="_blank">',
+    '<base target="_blank" rel="noopener noreferrer">',
     "<style>",
     "html{background:#fff;color-scheme:light;}",
     "html,body{margin:0!important;min-height:100%;}",
@@ -266,16 +279,23 @@ function buildEmailFrameDocument(
 function EmailHtmlFrame({
   html,
   stripOpenTrackingPixel = false,
+  allowExternalImages = false,
 }: {
   html: string;
   stripOpenTrackingPixel?: boolean;
+  allowExternalImages?: boolean;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const observerRef = useRef<ResizeObserver | null>(null);
   const [height, setHeight] = useState(560);
   const srcDoc = useMemo(
-    () => buildEmailFrameDocument(html, stripOpenTrackingPixel),
-    [html, stripOpenTrackingPixel],
+    () =>
+      buildEmailFrameDocument(
+        html,
+        stripOpenTrackingPixel,
+        allowExternalImages,
+      ),
+    [html, stripOpenTrackingPixel, allowExternalImages],
   );
 
   useEffect(() => {
@@ -370,6 +390,7 @@ export function AdminEmailInboxView({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [messageView, setMessageView] = useState<MessageViewMode>("formatted");
+  const [allowExternalImages, setAllowExternalImages] = useState(false);
 
   const activeIdentity =
     identities.find((identity) => identity.key === identityKey) ??
@@ -537,6 +558,7 @@ export function AdminEmailInboxView({
   }, [folder, identityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    setAllowExternalImages(false);
     if (selectedId && !composing) void loadMessage(selectedId);
   }, [selectedId, composing, loadMessage]);
 
@@ -1294,11 +1316,27 @@ export function AdminEmailInboxView({
                     ) : null}
                   </div>
                 ) : null}
-                <div className="mb-3 flex min-h-9 items-center justify-between">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                    Message
-                  </p>
-                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
+                <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      Message
+                    </p>
+                    {selected.direction === "inbound" &&
+                    selected.htmlBody &&
+                    emailHasExternalImages(selected.htmlBody) &&
+                    !allowExternalImages ? (
+                      <button
+                        type="button"
+                        onClick={() => setAllowExternalImages(true)}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:text-slate-900"
+                        title="Remote images are blocked by default to prevent tracking pixels and external requests."
+                      >
+                        <Eye className="size-3" aria-hidden />
+                        Load external images
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-100 p-1">
                     <button
                       type="button"
                       disabled={!selected.htmlBody}
@@ -1336,6 +1374,10 @@ export function AdminEmailInboxView({
                           stripOpenTrackingPixel={
                             selected.direction === "outbound"
                           }
+                          allowExternalImages={
+                            selected.direction === "outbound" ||
+                            allowExternalImages
+                          }
                         />
                       </div>
                     </div>
@@ -1351,6 +1393,11 @@ export function AdminEmailInboxView({
                     <p className="text-xs font-medium text-slate-700">
                       {selected.attachments.length} attachment
                       {selected.attachments.length === 1 ? "" : "s"}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                      Attachments are quarantined. Preview and download stay disabled
+                      unless the file type is allowed and a malware scan records a
+                      clean result.
                     </p>
                     <div className="mt-2 space-y-1">
                       {selected.attachments.map((attachment, index) => (
