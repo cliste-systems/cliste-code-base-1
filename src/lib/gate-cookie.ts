@@ -52,7 +52,8 @@ export async function createGateCookieValue(
 export async function isValidGateCookieValue(
   raw: string | null | undefined,
   prefix: string,
-  secret: string
+  secret: string,
+  maxFutureSeconds?: number,
 ): Promise<boolean> {
   const token = raw?.trim();
   if (!token) return false;
@@ -60,7 +61,15 @@ export async function isValidGateCookieValue(
   if (!expiresAtRaw || !sig) return false;
   const expiresAt = Number(expiresAtRaw);
   if (!Number.isFinite(expiresAt)) return false;
-  if (expiresAt <= Math.floor(Date.now() / 1000)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (expiresAt <= now) return false;
+  if (
+    typeof maxFutureSeconds === "number" &&
+    Number.isFinite(maxFutureSeconds) &&
+    expiresAt > now + maxFutureSeconds
+  ) {
+    return false;
+  }
   const expected = await sign(`${prefix}:${expiresAt}`, secret);
   return timingSafeEqualUtf8(sig, expected);
 }
