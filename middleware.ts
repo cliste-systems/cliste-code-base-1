@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { DEFAULT_APP_SITE_URL } from "./src/lib/company-details";
 import {
-  ADMIN_GATE_COOKIE_PREFIX,
+  ADMIN_GATE_COOKIE_NAME_NAME,
+  ADMIN_GATE_COOKIE_NAME_PREFIX,
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
@@ -14,8 +15,6 @@ import { isPublicSignupEnabled } from "./src/lib/public-signup";
 import { pathIsAdminLogin, pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
 import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
-
-const ADMIN_GATE_COOKIE = "cliste_admin_gate";
 
 const LEGACY_APP_HOSTS = new Set(["app.clistesystems.ie"]);
 
@@ -152,10 +151,10 @@ async function adminGate(
 
   if (pathIsAdminLogin(path)) return response;
 
-  const cookie = request.cookies.get(ADMIN_GATE_COOKIE)?.value ?? "";
+  const cookie = request.cookies.get(ADMIN_GATE_COOKIE_NAME)?.value ?? "";
   const ok = await isValidGateCookieValue(
     cookie,
-    ADMIN_GATE_COOKIE_PREFIX,
+    ADMIN_GATE_COOKIE_NAME_PREFIX,
     secret,
   );
   if (!ok) {
