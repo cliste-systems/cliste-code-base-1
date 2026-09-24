@@ -395,6 +395,87 @@ function deliveryEventDetail(payload: unknown): string | null {
   return null;
 }
 
+function attachmentFieldString(
+  attachment: unknown,
+  keys: string[],
+): string | null {
+  if (!attachment || typeof attachment !== "object") return null;
+  const record = attachment as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function attachmentFieldNumber(
+  attachment: unknown,
+  keys: string[],
+): number | null {
+  if (!attachment || typeof attachment !== "object") return null;
+  const record = attachment as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+async function ensureAttachmentQuarantineRows(
+  admin: ReturnType<typeof createAdminClient>,
+  resendEmailId: string,
+  attachments: unknown[],
+): Promise<void> {
+  if (attachments.length === 0) return;
+
+  const rows = attachments
+    .map((attachment, index) => {
+      const attachmentId =
+        attachmentFieldString(attachment, ["id", "attachment_id", "attachmentId"]) ||
+        `index-${index}`;
+      const filename =
+        attachmentFieldString(attachment, ["filename", "name"]) ||
+        `attachment-${index + 1}`;
+      const contentType = attachmentFieldString(attachment, [
+        "content_type",
+        "contentType",
+        "mime_type",
+        "mimeType",
+      ]);
+      const sizeBytes = attachmentFieldNumber(attachment, [
+        "size",
+        "size_bytes",
+        "sizeBytes",
+      ]);
+
+      return {
+        resend_email_id: resendEmailId,
+        attachment_id: attachmentId,
+        filename,
+        content_type: contentType,
+        size_bytes: sizeBytes,
+        scan_status: "pending",
+        updated_at: new Date().toISOString(),
+      };
+    })
+    .filter((row) => row.attachment_id && row.filename);
+
+  if (rows.length === 0) return;
+
+  const { error } = await admin
+    .from("admin_email_attachment_scans")
+    .upsert(rows, {
+      onConflict: "resend_email_id,attachment_id",
+      ignoreDuplicates: true,
+    });
+
+  if (error) throw new Error(error.message);
+}
+
 function rowToListItem(row: AdminEmailRow): AdminEmailListItem {
   const body = row.text_body || (row.html_body ? stripHtml(row.html_body) : "");
   const delivery = deliveryStatusFromRow(row);
@@ -514,6 +595,11 @@ async function syncInboundMetadata(): Promise<void> {
         .update(values)
         .eq("resend_email_id", summary.id);
       if (error) throw new Error(error.message);
+      await ensureAttachmentQuarantineRows(
+        admin,
+        summary.id,
+        Array.isArray(source.attachments) ? source.attachments : [],
+      );
       continue;
     }
 
@@ -526,6 +612,11 @@ async function syncInboundMetadata(): Promise<void> {
         : null,
     });
     if (error) throw new Error(error.message);
+    await ensureAttachmentQuarantineRows(
+      admin,
+      summary.id,
+      Array.isArray(source.attachments) ? source.attachments : [],
+    );
   }
 }
 export async function listAdminInbox(
