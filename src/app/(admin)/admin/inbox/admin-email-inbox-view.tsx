@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 type Folder = "inbox" | "archived" | "sent";
 type GrammarTarget = "reply" | "compose";
 type MessageViewMode = "formatted" | "plain";
-type EmailIdentityKey = "hello" | "billing";
+type EmailIdentityKey = "hello" | "billing" | "cliste";
 type DeliveryStatus =
   | "sent"
   | "delayed"
@@ -1324,7 +1324,7 @@ export function AdminEmailInboxView({
                 {selected.replies.length > 0 ? (
                   <div className="mt-8 border-t border-slate-200 pt-5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Replies from HelloCara
+                      Replies from {activeIdentity.name}
                     </p>
                     <div className="mt-3 space-y-3">
                       {selected.replies.map((sent) => (
