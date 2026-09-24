@@ -10,8 +10,8 @@ import {
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
 import {
-  ADMIN_GATE_COOKIE_NAME_NAME,
-  ADMIN_GATE_COOKIE_NAME_PREFIX,
+  ADMIN_GATE_COOKIE_NAME,
+  ADMIN_GATE_COOKIE_PREFIX,
   ADMIN_GATE_TTL_SECONDS,
   createGateCookieValue,
 } from "@/lib/gate-cookie";
@@ -92,7 +92,7 @@ export async function submitAdminLogin(formData: FormData): Promise<void> {
 
   await clearRateLimit("admin_login", fingerprint);
   const cookieValue = await createGateCookieValue(
-    ADMIN_GATE_COOKIE_NAME_PREFIX,
+    ADMIN_GATE_COOKIE_PREFIX,
     secret,
     ADMIN_GATE_TTL_SECONDS
   );
