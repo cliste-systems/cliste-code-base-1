@@ -1,13 +1,6 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { canAccessAdminConsole } from "@/lib/admin-session";
-import {
-  ADMIN_GATE_COOKIE_NAME,
-  ADMIN_GATE_COOKIE_PREFIX,
-  ADMIN_GATE_TTL_SECONDS,
-  isValidGateCookieValue,
-} from "@/lib/gate-cookie";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
@@ -17,30 +10,6 @@ export const dynamic = "force-dynamic";
 const ADMIN_MFA_FRIENDLY_NAME = "Cliste Systems Admin";
 
 export async function POST() {
-  const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "Admin access is not configured." },
-      { status: 500 },
-    );
-  }
-
-  const jar = await cookies();
-  const gateCookie = jar.get(ADMIN_GATE_COOKIE_NAME)?.value ?? "";
-  const gateValid = await isValidGateCookieValue(
-    gateCookie,
-    ADMIN_GATE_COOKIE_PREFIX,
-    secret,
-    ADMIN_GATE_TTL_SECONDS,
-  );
-
-  if (!gateValid) {
-    return NextResponse.json(
-      { error: "Admin gate authentication is required.", code: "gate_required" },
-      { status: 401 },
-    );
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
