@@ -99,3 +99,37 @@ export const requireAdminSessionUser = cache(async (): Promise<User> => {
     "/authenticate?error=admin&message=Sign%20in%20with%20an%20authorized%20Admin%20account."
   );
 });
+
+
+export const requireAdminMfaSessionUser = cache(async (): Promise<User> => {
+  const user = await requireAdminSessionUser();
+
+  // Local shell-only development may run without Supabase auth.
+  // Production always requires AAL2.
+  if (allowAdminDevWithoutSupabase()) {
+    return user;
+  }
+
+  const supabase = await createClient();
+  const { data, error } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  if (error || data.currentLevel !== "aal2") {
+    redirect("/admin/mfa");
+  }
+
+  return user;
+});
+
+export async function adminMfaAssuranceLevel(): Promise<"aal1" | "aal2" | null> {
+  if (allowAdminDevWithoutSupabase()) return "aal2";
+  try {
+    const supabase = await createClient();
+    const { data, error } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error) return null;
+    return data.currentLevel ?? null;
+  } catch {
+    return null;
+  }
+}
