@@ -88,10 +88,11 @@ export async function POST() {
     });
 
     if (deleteError) {
-      return NextResponse.json(
-        { error: "Could not reset the unfinished MFA setup." },
-        { status: 500 },
-      );
+      console.warn("[admin-mfa] stale_factor_cleanup_failed", {
+        factorId: factor.id,
+        message: deleteError.message,
+      });
+      continue;
     }
   }
 
