@@ -68,12 +68,36 @@ export function AdminMfaSetup() {
         return;
       }
 
-      // Remove stale, unfinished TOTP enrolments so the QR code shown below
-      // always corresponds to the factor being verified.
-      for (const factor of totpFactors) {
-        if (factor.status !== "verified") {
-          await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      // Client-side listFactors only returns enabled factors, while a failed
+      // enrollment can leave an unverified factor behind. Clear only that stale
+      // admin setup server-side before creating a fresh QR code.
+      const prepareResponse = await fetch("/api/admin/mfa/prepare", {
+        method: "POST",
+        cache: "no-store",
+      });
+
+      if (!prepareResponse.ok) {
+        const prepareBody = (await prepareResponse.json().catch(() => null)) as
+          | { error?: string; code?: string }
+          | null;
+
+        if (prepareBody?.code === "gate_required") {
+          window.location.assign("/admin/login");
+          return;
         }
+        if (prepareBody?.code === "session_required") {
+          window.location.assign("/authenticate");
+          return;
+        }
+
+        if (!cancelled) {
+          setError(
+            prepareBody?.error ||
+              "Could not reset the unfinished authenticator setup.",
+          );
+          setMode("verify");
+        }
+        return;
       }
 
       const { data: enrolled, error: enrollError } =
