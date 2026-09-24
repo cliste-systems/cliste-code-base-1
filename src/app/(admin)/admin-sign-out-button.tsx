@@ -7,7 +7,6 @@ import { LogOut } from "lucide-react";
 import { adminNavLinkBaseClass } from "@/components/admin/admin-interactive";
 import { createClient } from "@/utils/supabase/client";
 
-import { clearAdminSessionCookies } from "../admin/login/actions";
 
 export function AdminSignOutButton() {
   const router = useRouter();
@@ -17,7 +16,6 @@ export function AdminSignOutButton() {
     setPending(true);
     const supabase = createClient();
     await supabase.auth.signOut();
-    await clearAdminSessionCookies();
     router.push("/authenticate");
     router.refresh();
     setPending(false);
