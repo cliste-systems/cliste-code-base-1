@@ -86,10 +86,6 @@ export function AdminMfaSetup() {
           | { error?: string; code?: string }
           | null;
 
-        if (prepareBody?.code === "gate_required") {
-          window.location.assign("/admin/login");
-          return;
-        }
         if (prepareBody?.code === "session_required") {
           window.location.assign("/authenticate");
           return;
