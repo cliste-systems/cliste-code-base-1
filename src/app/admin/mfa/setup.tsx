@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  ScanLine,
+  ShieldCheck,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/client";
@@ -10,6 +17,7 @@ type Mode = "loading" | "enroll" | "verify" | "done";
 
 export function AdminMfaSetup() {
   const router = useRouter();
+  const codeInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("loading");
   const [factorId, setFactorId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -68,9 +76,6 @@ export function AdminMfaSetup() {
         return;
       }
 
-      // Client-side listFactors only returns enabled factors, while a failed
-      // enrollment can leave an unverified factor behind. Clear only that stale
-      // admin setup server-side before creating a fresh QR code.
       const prepareResponse = await fetch("/api/admin/mfa/prepare", {
         method: "POST",
         cache: "no-store",
@@ -136,9 +141,16 @@ export function AdminMfaSetup() {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (mode === "verify") {
+      codeInputRef.current?.focus();
+    }
+  }, [mode]);
+
   async function verify() {
     if (!factorId || !/^\d{6}$/.test(code.trim())) {
       setError("Enter the 6-digit code from your authenticator app.");
+      codeInputRef.current?.focus();
       return;
     }
 
@@ -154,7 +166,9 @@ export function AdminMfaSetup() {
         });
 
       if (verifyError) {
-        setError(verifyError.message || "That verification code was not accepted.");
+        setError(
+          verifyError.message || "That verification code was not accepted.",
+        );
         return;
       }
 
@@ -168,116 +182,228 @@ export function AdminMfaSetup() {
 
   if (mode === "loading") {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        Checking admin security…
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+            <Loader2 className="size-4 animate-spin text-slate-600" aria-hidden />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Preparing secure verification
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Checking your account security…
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (mode === "done") {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-        <CheckCircle2 className="size-5" aria-hidden />
-        Verification complete.
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
+            <CheckCircle2 className="size-5" aria-hidden />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-emerald-950">
+              Verification complete
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-700">
+              Taking you to the admin console…
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
+  const digits = Array.from({ length: 6 }, (_, index) => code[index] ?? "");
+
   return (
     <div className="space-y-5">
-      {mode === "enroll" ? (
-        <>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-slate-700" aria-hidden />
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Set up an authenticator app
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Scan this QR code with an authenticator app such as 1Password,
-                  Microsoft Authenticator, Google Authenticator or Authy.
-                </p>
-              </div>
-            </div>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Authenticator", complete: mode === "verify" },
+          { label: "Code", complete: false },
+          { label: "Admin", complete: false },
+        ].map((item, index) => {
+          const active =
+            (mode === "enroll" && index === 0) ||
+            (mode === "verify" && index === 1);
 
-            {qrCode ? (
-              <div className="mt-4 flex justify-center rounded-xl bg-white p-4">
+          return (
+            <div
+              key={item.label}
+              className={[
+                "rounded-xl border px-3 py-2.5 transition-colors",
+                active
+                  ? "border-slate-300 bg-slate-50"
+                  : "border-slate-200 bg-white",
+              ].join(" ")}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold tracking-[0.12em] text-slate-400">
+                  0{index + 1}
+                </span>
+                {item.complete ? (
+                  <Check className="size-3.5 text-slate-700" aria-hidden />
+                ) : null}
+              </div>
+              <p className="mt-1 text-[11px] font-medium text-slate-700">
+                {item.label}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {mode === "enroll" ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+              <ScanLine className="size-4 text-slate-700" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-950">
+                Scan with your authenticator app
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Use 1Password, Microsoft Authenticator, Google Authenticator,
+                Authy or Apple Passwords.
+              </p>
+            </div>
+          </div>
+
+          {qrCode ? (
+            <div className="mt-4 flex justify-center">
+              <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
                 {/* Supabase returns the QR code as a data URL. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qrCode}
                   alt="Authenticator setup QR code"
-                  className="size-48"
+                  className="size-44 sm:size-48"
                 />
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {secret ? (
-              <details className="mt-3 text-xs text-slate-600">
-                <summary className="cursor-pointer font-medium text-slate-700">
-                  Can’t scan the QR code?
-                </summary>
-                <p className="mt-2 break-all rounded-lg bg-white p-2 font-mono">
+          {secret ? (
+            <details className="group mt-4 rounded-xl border border-slate-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-xs font-medium text-slate-700">
+                Can’t scan the QR code?
+                <ChevronDown className="size-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-slate-100 px-3.5 py-3">
+                <p className="text-[11px] leading-5 text-slate-500">
+                  Enter this setup key manually in your authenticator app.
+                </p>
+                <p className="mt-2 break-all rounded-lg bg-slate-50 p-2.5 font-mono text-[11px] text-slate-700">
                   {secret}
                 </p>
-              </details>
-            ) : null}
-          </div>
-        </>
+              </div>
+            </details>
+          ) : null}
+        </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-slate-900">
-            Enter your authenticator code
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-600">
-            Your account already has MFA configured. Enter the current 6-digit
-            code to continue.
-          </p>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+              <ShieldCheck className="size-4 text-slate-700" aria-hidden />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">
+                Authenticator ready
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Open your authenticator app and enter the current 6-digit code.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
       <div>
-        <label
-          htmlFor="admin-mfa-code"
-          className="mb-1.5 block text-xs font-medium text-slate-700"
+        <div className="mb-2 flex items-center justify-between">
+          <label
+            htmlFor="admin-mfa-code"
+            className="text-xs font-semibold text-slate-700"
+          >
+            Verification code
+          </label>
+          <span className="text-[10px] text-slate-400">6 digits</span>
+        </div>
+
+        <div
+          className="relative cursor-text"
+          onClick={() => codeInputRef.current?.focus()}
         >
-          6-digit code
-        </label>
-        <input
-          id="admin-mfa-code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          pattern="[0-9]*"
-          maxLength={6}
-          value={code}
-          onChange={(event) =>
-            setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-          }
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void verify();
-          }}
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center font-mono text-xl tracking-[0.35em] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-          placeholder="000000"
-        />
+          <input
+            ref={codeInputRef}
+            id="admin-mfa-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]*"
+            maxLength={6}
+            value={code}
+            onChange={(event) => {
+              setError(null);
+              setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void verify();
+            }}
+            className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+            aria-label="6-digit authenticator code"
+          />
+
+          <div className="grid grid-cols-6 gap-2">
+            {digits.map((digit, index) => (
+              <div
+                key={index}
+                className={[
+                  "flex aspect-square min-w-0 items-center justify-center rounded-xl border bg-white font-mono text-xl font-semibold shadow-sm transition",
+                  code.length === index
+                    ? "border-slate-400 ring-2 ring-slate-200"
+                    : "border-slate-200",
+                ].join(" ")}
+                aria-hidden
+              >
+                {digit || (
+                  <span className="size-1.5 rounded-full bg-slate-200" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-xs leading-5 text-red-700">
           {error}
-        </p>
+        </div>
       ) : null}
 
       <button
         type="button"
         disabled={submitting || code.length !== 6 || !factorId}
         onClick={() => void verify()}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {submitting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+        {submitting ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+        ) : (
+          <ShieldCheck className="size-4" aria-hidden />
+        )}
         {submitting ? "Verifying…" : "Verify and continue"}
       </button>
+
+      <p className="text-center text-[11px] leading-5 text-slate-400">
+        This check protects admin-only access and your internal company inbox.
+      </p>
     </div>
   );
 }
