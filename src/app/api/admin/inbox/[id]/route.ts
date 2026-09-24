@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { checkAdminInboxApiAccess } from "@/lib/admin-inbox-access";
 import {
   getAdminEmailMessage,
   setAdminEmailSenderBlocked,
@@ -15,10 +15,12 @@ type RouteContext = {
 };
 
 export async function GET(_request: Request, context: RouteContext) {
-  try {
-    await requireAdminSessionUser();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const access = await checkAdminInboxApiAccess();
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.message, code: access.code },
+      { status: access.status },
+    );
   }
 
   const { id } = await context.params;
@@ -34,10 +36,12 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  try {
-    await requireAdminSessionUser();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const access = await checkAdminInboxApiAccess();
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.message, code: access.code },
+      { status: access.status },
+    );
   }
 
   let body: { read?: boolean; archived?: boolean; blocked?: boolean };
