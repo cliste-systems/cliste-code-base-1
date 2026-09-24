@@ -10,9 +10,10 @@ import {
   recordRateLimitFailure,
 } from "@/lib/auth-rate-limit";
 import {
-  ADMIN_GATE_COOKIE_PREFIX,
+  ADMIN_GATE_COOKIE_NAME_NAME,
+  ADMIN_GATE_COOKIE_NAME_PREFIX,
+  ADMIN_GATE_TTL_SECONDS,
   createGateCookieValue,
-  DEFAULT_GATE_TTL_SECONDS,
 } from "@/lib/gate-cookie";
 import {
   buildSecurityEventContext,
@@ -22,12 +23,11 @@ import { ADMIN_LOGIN_PATH } from "@/lib/staff-route-paths";
 import { timingSafeEqualUtf8 } from "@/lib/timing-safe-equal";
 import { SUPPORT_DASHBOARD_COOKIE } from "@/lib/support-dashboard-cookie";
 
-const ADMIN_GATE_COOKIE = "cliste_admin_gate";
 const DASHBOARD_GATE_COOKIE = "cliste_dashboard_gate";
 
 export async function clearAdminSessionCookies(): Promise<void> {
   const jar = await cookies();
-  jar.delete(ADMIN_GATE_COOKIE);
+  jar.delete(ADMIN_GATE_COOKIE_NAME);
   jar.delete(SUPPORT_DASHBOARD_COOKIE);
   jar.delete(DASHBOARD_GATE_COOKIE);
 }
@@ -92,14 +92,14 @@ export async function submitAdminLogin(formData: FormData): Promise<void> {
 
   await clearRateLimit("admin_login", fingerprint);
   const cookieValue = await createGateCookieValue(
-    ADMIN_GATE_COOKIE_PREFIX,
+    ADMIN_GATE_COOKIE_NAME_PREFIX,
     secret,
-    DEFAULT_GATE_TTL_SECONDS
+    ADMIN_GATE_TTL_SECONDS
   );
-  (await cookies()).set(ADMIN_GATE_COOKIE, cookieValue, {
+  (await cookies()).set(ADMIN_GATE_COOKIE_NAME, cookieValue, {
     httpOnly: true,
     path: "/",
-    maxAge: DEFAULT_GATE_TTL_SECONDS,
+    maxAge: ADMIN_GATE_TTL_SECONDS,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
   });
