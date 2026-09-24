@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { checkAdminInboxApiAccess } from "@/lib/admin-inbox-access";
 import { completeOpenRouterChat } from "@/lib/openrouter-chat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  try {
-    await requireAdminSessionUser();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const access = await checkAdminInboxApiAccess();
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.message, code: access.code },
+      { status: access.status },
+    );
   }
 
   let body: { text?: string };
