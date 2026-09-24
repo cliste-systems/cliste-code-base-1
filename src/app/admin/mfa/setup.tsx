@@ -100,10 +100,15 @@ export function AdminMfaSetup() {
         return;
       }
 
+      const enrollmentSuffix =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID().slice(0, 8)
+          : Date.now().toString(36);
+
       const { data: enrolled, error: enrollError } =
         await supabase.auth.mfa.enroll({
           factorType: "totp",
-          friendlyName: "Cliste Systems Admin",
+          friendlyName: `Cliste Systems Admin ${enrollmentSuffix}`,
         });
 
       if (enrollError || !enrolled?.totp) {
