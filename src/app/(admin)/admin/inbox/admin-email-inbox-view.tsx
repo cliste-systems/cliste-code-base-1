@@ -354,8 +354,25 @@ async function apiJson<T>(
     },
     cache: "no-store",
   });
-  const data = (await response.json()) as T & { error?: string };
+  const data = (await response.json()) as T & {
+    error?: string;
+    code?: string;
+  };
   if (!response.ok) {
+    if (typeof window !== "undefined") {
+      if (data.code === "gate_required") {
+        window.location.assign("/admin/login");
+        throw new Error("Admin gate authentication is required.");
+      }
+      if (data.code === "mfa_required") {
+        window.location.assign("/admin/mfa");
+        throw new Error("Multi-factor authentication is required.");
+      }
+      if (data.code === "session_required") {
+        window.location.assign("/authenticate");
+        throw new Error("Admin sign-in is required.");
+      }
+    }
     throw new Error(data.error || "Request failed.");
   }
   return data;
