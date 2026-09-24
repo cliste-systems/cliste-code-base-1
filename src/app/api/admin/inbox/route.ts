@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { checkAdminInboxApiAccess } from "@/lib/admin-inbox-access";
 import {
   isAdminEmailIdentityKey,
   listAdminInbox,
@@ -13,10 +13,12 @@ export const dynamic = "force-dynamic";
 const FOLDERS = new Set<AdminEmailFolder>(["inbox", "archived", "sent"]);
 
 export async function GET(request: Request) {
-  try {
-    await requireAdminSessionUser();
-  } catch {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const access = await checkAdminInboxApiAccess();
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.message, code: access.code },
+      { status: access.status },
+    );
   }
 
   const url = new URL(request.url);
