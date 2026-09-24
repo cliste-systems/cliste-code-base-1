@@ -4,6 +4,7 @@ import { DEFAULT_APP_SITE_URL } from "./src/lib/company-details";
 import {
   ADMIN_GATE_COOKIE_NAME,
   ADMIN_GATE_COOKIE_PREFIX,
+  ADMIN_GATE_TTL_SECONDS,
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
@@ -156,6 +157,7 @@ async function adminGate(
     cookie,
     ADMIN_GATE_COOKIE_PREFIX,
     secret,
+    ADMIN_GATE_TTL_SECONDS,
   );
   if (!ok) {
     const redirectRes = NextResponse.redirect(
