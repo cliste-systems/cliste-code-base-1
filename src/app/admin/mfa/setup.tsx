@@ -143,12 +143,16 @@ export function AdminMfaSetup() {
     }
   }, [mode]);
 
-  async function verify() {
-    if (!factorId || !/^\d{6}$/.test(code.trim())) {
+  async function verify(codeOverride?: string) {
+    const verificationCode = (codeOverride ?? code).trim();
+
+    if (!factorId || !/^\d{6}$/.test(verificationCode)) {
       setError("Enter the 6-digit code from your authenticator app.");
       codeInputRef.current?.focus();
       return;
     }
+
+    if (submitting) return;
 
     setSubmitting(true);
     setError(null);
@@ -158,7 +162,7 @@ export function AdminMfaSetup() {
       const { error: verifyError } =
         await supabase.auth.mfa.challengeAndVerify({
           factorId,
-          code: code.trim(),
+          code: verificationCode,
         });
 
       if (verifyError) {
@@ -346,8 +350,16 @@ export function AdminMfaSetup() {
             maxLength={6}
             value={code}
             onChange={(event) => {
+              const nextCode = event.target.value
+                .replace(/\D/g, "")
+                .slice(0, 6);
+
               setError(null);
-              setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+              setCode(nextCode);
+
+              if (nextCode.length === 6 && factorId && !submitting) {
+                void verify(nextCode);
+              }
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter") void verify();
