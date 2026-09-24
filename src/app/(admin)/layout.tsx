@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { DashboardViewportLock } from "@/app/(dashboard)/dashboard/dashboard-viewport-lock";
 import { ClisteLogoMark } from "@/components/cliste-logo-mark";
-import { requireAdminSessionUser } from "@/lib/admin-session";
+import { requireAdminMfaSessionUser } from "@/lib/admin-session";
 import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
 
 import { AdminNav } from "./admin-nav";
@@ -18,7 +18,7 @@ export default async function AdminShellLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await requireAdminSessionUser();
+  const user = await requireAdminMfaSessionUser();
   const loggedInAs =
     user.email?.trim().toLowerCase() || adminSessionLabel();
   const supabaseOffline = allowAdminDevWithoutSupabase();
