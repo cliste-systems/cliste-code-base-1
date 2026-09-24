@@ -65,5 +65,7 @@ export async function isValidGateCookieValue(
   return timingSafeEqualUtf8(sig, expected);
 }
 
+export const ADMIN_GATE_COOKIE_NAME = "cliste_admin_gate";
 export const ADMIN_GATE_COOKIE_PREFIX = "admin-gate";
+export const ADMIN_GATE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 export const DEFAULT_GATE_TTL_SECONDS = DEFAULT_TTL_SECONDS;
