@@ -6,6 +6,7 @@ import { canAccessAdminConsole } from "@/lib/admin-session";
 import {
   ADMIN_GATE_COOKIE_NAME,
   ADMIN_GATE_COOKIE_PREFIX,
+  ADMIN_GATE_TTL_SECONDS,
   isValidGateCookieValue,
 } from "@/lib/gate-cookie";
 import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
@@ -37,6 +38,7 @@ export async function checkAdminInboxApiAccess(): Promise<AdminInboxAccessCheck>
     gateCookie,
     ADMIN_GATE_COOKIE_PREFIX,
     secret,
+    ADMIN_GATE_TTL_SECONDS,
   );
 
   if (!gateValid) {
