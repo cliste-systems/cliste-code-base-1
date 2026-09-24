@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { DEFAULT_APP_SITE_URL } from "./src/lib/company-details";
-import {
-  ADMIN_GATE_COOKIE_NAME,
-  ADMIN_GATE_COOKIE_PREFIX,
-  ADMIN_GATE_TTL_SECONDS,
-  isValidGateCookieValue,
-} from "./src/lib/gate-cookie";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
 import { LEGACY_DASHBOARD_REDIRECTS } from "./src/lib/dashboard-routes";
 import { DASHBOARD_LEGAL_ACCEPT_PATH, LEGAL_DOCUMENT_VERSIONS } from "./src/lib/legal-documents";
 import { dashboardPathNeedsLegalAcceptance } from "./src/lib/legal-acceptance-middleware";
 import { onboardingPathNeedsLegalAcceptance } from "./src/lib/onboarding-legal-middleware";
 import { isPublicSignupEnabled } from "./src/lib/public-signup";
-import { pathIsAdminLogin, pathIsAgencyAdminSection } from "./src/lib/staff-route-paths";
 import { createAdminClient } from "./src/utils/supabase/admin";
 import { updateSession } from "./src/utils/supabase/middleware";
 
@@ -113,7 +106,7 @@ function dashboardUnlockRedirect(
   return redirectRes;
 }
 
-/** Legacy URL — renamed to /admin/login. */
+/** Legacy internal-admin URL now uses the same account sign-in as everyone else. */
 function legacyAdminUnlockRedirect(
   request: NextRequest,
   response: NextResponse,
@@ -122,52 +115,11 @@ function legacyAdminUnlockRedirect(
   if (path !== "/admin-unlock" && !path.startsWith("/admin-unlock/")) {
     return response;
   }
-  const url = new URL("/admin/login", request.url);
+  const url = new URL("/authenticate", request.url);
   url.search = request.nextUrl.search;
   const redirectRes = NextResponse.redirect(url);
   copySessionCookies(response, redirectRes);
   return redirectRes;
-}
-
-/**
- * Extra password gate for /admin routes. This is separate from tenant sign-in and
- * must be set in deploy envs to keep internal pages private.
- */
-async function adminGate(
-  request: NextRequest,
-  response: NextResponse,
-): Promise<NextResponse> {
-  const path = request.nextUrl.pathname;
-  if (!pathIsAgencyAdminSection(path)) return response;
-
-  const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
-  if (!secret) {
-    if (pathIsAdminLogin(path)) return response;
-    const redirectRes = NextResponse.redirect(
-      new URL("/admin/login?error=config", request.url),
-    );
-    copySessionCookies(response, redirectRes);
-    return redirectRes;
-  }
-
-  if (pathIsAdminLogin(path)) return response;
-
-  const cookie = request.cookies.get(ADMIN_GATE_COOKIE_NAME)?.value ?? "";
-  const ok = await isValidGateCookieValue(
-    cookie,
-    ADMIN_GATE_COOKIE_PREFIX,
-    secret,
-    ADMIN_GATE_TTL_SECONDS,
-  );
-  if (!ok) {
-    const redirectRes = NextResponse.redirect(
-      new URL("/admin/login", request.url),
-    );
-    copySessionCookies(response, redirectRes);
-    return redirectRes;
-  }
-
-  return response;
 }
 
 function buildForwardRequestHeaders(request: NextRequest): Headers {
@@ -268,7 +220,7 @@ export async function middleware(request: NextRequest) {
   if (unlockRedirect !== response) return unlockRedirect;
   const legacyAdminRedirect = legacyAdminUnlockRedirect(request, response);
   if (legacyAdminRedirect !== response) return legacyAdminRedirect;
-  return adminGate(request, response);
+  return response;
 }
 
 export const config = {
