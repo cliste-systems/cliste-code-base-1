@@ -55,7 +55,8 @@ export function AdminMfaSetup() {
         return;
       }
 
-      const verifiedTotp = factors.totp.find(
+      const totpFactors = factors.totp ?? [];
+      const verifiedTotp = totpFactors.find(
         (factor) => factor.status === "verified",
       );
 
@@ -69,7 +70,7 @@ export function AdminMfaSetup() {
 
       // Remove stale, unfinished TOTP enrolments so the QR code shown below
       // always corresponds to the factor being verified.
-      for (const factor of factors.totp) {
+      for (const factor of totpFactors) {
         if (factor.status !== "verified") {
           await supabase.auth.mfa.unenroll({ factorId: factor.id });
         }
@@ -81,7 +82,7 @@ export function AdminMfaSetup() {
           friendlyName: "Cliste Systems Admin",
         });
 
-      if (enrollError || !enrolled) {
+      if (enrollError || !enrolled?.totp) {
         if (!cancelled) {
           setError(
             enrollError?.message ||
