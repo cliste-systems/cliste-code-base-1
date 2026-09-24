@@ -1,5 +1,3 @@
-import "server-only";
-
 const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
