@@ -9,7 +9,6 @@
  *   npx tsx scripts/bootstrap-env-local.ts
  */
 
-import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -97,7 +96,6 @@ function renderEnv(map: Map<string, string>): string {
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
-    "CLISTE_ADMIN_SECRET",
     "SUPABASE_ACCESS_TOKEN",
   ];
   const lines = [
@@ -173,12 +171,7 @@ async function main() {
   existing.set("NEXT_PUBLIC_SUPABASE_URL", supabaseUrl);
   existing.set("NEXT_PUBLIC_SUPABASE_ANON_KEY", anonKey);
   existing.set("SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey);
-  if (!existing.get("CLISTE_ADMIN_SECRET")?.trim()) {
-    existing.set(
-      "CLISTE_ADMIN_SECRET",
-      randomBytes(24).toString("base64url"),
-    );
-  }
+  existing.delete("CLISTE_ADMIN_SECRET");
   if (!existing.has("SUPABASE_ACCESS_TOKEN")) {
     existing.set("SUPABASE_ACCESS_TOKEN", token);
   }
@@ -189,7 +182,6 @@ async function main() {
   console.log(`  NEXT_PUBLIC_SUPABASE_URL=${supabaseUrl}`);
   console.log("  NEXT_PUBLIC_SUPABASE_ANON_KEY=***");
   console.log("  SUPABASE_SERVICE_ROLE_KEY=***");
-  console.log("  CLISTE_ADMIN_SECRET=***");
   console.log("");
   console.log("Restart the dev server: npm run dev");
   console.log("Patch auth redirect URLs: npx tsx scripts/patch-supabase-auth-urls.ts");
