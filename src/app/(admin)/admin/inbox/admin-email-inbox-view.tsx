@@ -231,9 +231,31 @@ function deliveryFailed(status: DeliveryStatus | null): boolean {
 
 function emailHasExternalImages(html: string): boolean {
   return (
-    /<img\b[^>]*\bsrc\s*=\s*["']?https?:\/\//i.test(html) ||
-    /url\(\s*["']?https?:\/\//i.test(html)
+    /<(?:img|source)\b[^>]*\b(?:src|srcset|poster)\s*=\s*["']?(?:https?:)?\/\//i.test(
+      html,
+    ) ||
+    /\bbackground\s*=\s*["']?(?:https?:)?\/\//i.test(html) ||
+    /url\(\s*["']?(?:https?:)?\/\//i.test(html)
   );
+}
+
+function blockExternalImageSources(html: string): string {
+  const transparentPixel =
+    "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+
+  return html
+    .replace(
+      /(\b(?:src|srcset|poster|background)\s*=\s*["'])\s*(?:https?:)?\/\/[^"']*(["'])/gi,
+      `$1${transparentPixel}$2`,
+    )
+    .replace(
+      /(\b(?:src|srcset|poster|background)\s*=\s*)(?:https?:)?\/\/[^\s>]+/gi,
+      `$1${transparentPixel}`,
+    )
+    .replace(
+      /url\(\s*(["']?)(?:https?:)?\/\/[^)]*\1\s*\)/gi,
+      "none",
+    );
 }
 
 function buildEmailFrameDocument(
@@ -251,8 +273,12 @@ function buildEmailFrameDocument(
       "",
     );
   }
+  if (!allowExternalImages) {
+    safeHtml = blockExternalImageSources(safeHtml);
+  }
+
   const frameCsp = allowExternalImages
-    ? "default-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';"
+    ? "default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';"
     : "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';";
 
   const head = [
