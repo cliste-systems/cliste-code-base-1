@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { DEFAULT_APP_SITE_URL } from "./src/lib/company-details";
 import {
-  ADMIN_GATE_COOKIE_NAME_NAME,
-  ADMIN_GATE_COOKIE_NAME_PREFIX,
+  ADMIN_GATE_COOKIE_NAME,
+  ADMIN_GATE_COOKIE_PREFIX,
   isValidGateCookieValue,
 } from "./src/lib/gate-cookie";
 import { LEGACY_AUTH_REDIRECTS } from "./src/lib/auth-routes";
@@ -154,7 +154,7 @@ async function adminGate(
   const cookie = request.cookies.get(ADMIN_GATE_COOKIE_NAME)?.value ?? "";
   const ok = await isValidGateCookieValue(
     cookie,
-    ADMIN_GATE_COOKIE_NAME_PREFIX,
+    ADMIN_GATE_COOKIE_PREFIX,
     secret,
   );
   if (!ok) {
