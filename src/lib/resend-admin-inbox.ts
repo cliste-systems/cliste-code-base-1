@@ -9,10 +9,12 @@ const DEFAULT_HELLO_EMAIL = "hello@hellocara.ie";
 const DEFAULT_HELLO_NAME = "HelloCara";
 const DEFAULT_BILLING_EMAIL = "billing@hellocara.ie";
 const DEFAULT_BILLING_NAME = "HelloCara Billing";
+const DEFAULT_CLISTE_EMAIL = "hello@clistesystems.ie";
+const DEFAULT_CLISTE_NAME = "Cliste Systems";
 const LEGACY_HELLO_ADDRESSES = ["brendan@hellocara.ie"] as const;
 
 export type AdminEmailFolder = "inbox" | "archived" | "sent";
-export type AdminEmailIdentityKey = "hello" | "billing";
+export type AdminEmailIdentityKey = "hello" | "billing" | "cliste";
 export type AdminEmailDeliveryStatus =
   | "sent"
   | "delayed"
@@ -161,13 +163,22 @@ export function adminInboxIdentities(): AdminEmailIdentity[] {
       name:
         process.env.RESEND_BILLING_NAME?.trim() || DEFAULT_BILLING_NAME,
     },
+    {
+      key: "cliste",
+      label: "Cliste Systems",
+      email:
+        process.env.RESEND_CLISTE_EMAIL?.trim().toLowerCase() ||
+        DEFAULT_CLISTE_EMAIL,
+      name:
+        process.env.RESEND_CLISTE_NAME?.trim() || DEFAULT_CLISTE_NAME,
+    },
   ];
 }
 
 export function isAdminEmailIdentityKey(
   value: string | null | undefined,
 ): value is AdminEmailIdentityKey {
-  return value === "hello" || value === "billing";
+  return value === "hello" || value === "billing" || value === "cliste";
 }
 
 function adminInboxIdentityByKey(
@@ -209,6 +220,8 @@ function identityForInboundRecipients(
   const parsed = recipients.map((value) => parseMailbox(value).email);
   const billing = adminInboxIdentityByKey("billing");
   if (parsed.includes(billing.email.toLowerCase())) return billing;
+  const cliste = adminInboxIdentityByKey("cliste");
+  if (parsed.includes(cliste.email.toLowerCase())) return cliste;
   return adminInboxIdentityByKey("hello");
 }
 
@@ -773,7 +786,7 @@ export async function setAdminEmailSenderBlocked(input: {
     ...LEGACY_HELLO_ADDRESSES.map((value) => value.toLowerCase()),
   ]);
   if (protectedAddresses.has(email)) {
-    throw new Error("HelloCara mailbox addresses cannot be blocked.");
+    throw new Error("Admin mailbox addresses cannot be blocked.");
   }
 
   if (input.blocked) {
