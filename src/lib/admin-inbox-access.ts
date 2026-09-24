@@ -1,14 +1,6 @@
 import "server-only";
 
-import { cookies } from "next/headers";
-
 import { canAccessAdminConsole } from "@/lib/admin-session";
-import {
-  ADMIN_GATE_COOKIE_NAME,
-  ADMIN_GATE_COOKIE_PREFIX,
-  ADMIN_GATE_TTL_SECONDS,
-  isValidGateCookieValue,
-} from "@/lib/gate-cookie";
 import { allowAdminDevWithoutSupabase } from "@/lib/supabase-env";
 import { createClient } from "@/utils/supabase/server";
 
@@ -17,39 +9,11 @@ export type AdminInboxAccessCheck =
   | {
       ok: false;
       status: 401 | 403 | 500;
-      code: "gate_required" | "session_required" | "forbidden" | "mfa_required" | "config_error";
+      code: "session_required" | "forbidden" | "mfa_required" | "config_error";
       message: string;
     };
 
 export async function checkAdminInboxApiAccess(): Promise<AdminInboxAccessCheck> {
-  const secret = process.env.CLISTE_ADMIN_SECRET?.trim();
-  if (!secret) {
-    return {
-      ok: false,
-      status: 500,
-      code: "config_error",
-      message: "Admin access is not configured.",
-    };
-  }
-
-  const jar = await cookies();
-  const gateCookie = jar.get(ADMIN_GATE_COOKIE_NAME)?.value ?? "";
-  const gateValid = await isValidGateCookieValue(
-    gateCookie,
-    ADMIN_GATE_COOKIE_PREFIX,
-    secret,
-    ADMIN_GATE_TTL_SECONDS,
-  );
-
-  if (!gateValid) {
-    return {
-      ok: false,
-      status: 401,
-      code: "gate_required",
-      message: "Admin gate authentication is required.",
-    };
-  }
-
   // Local shell-only development may run without Supabase auth configured.
   // Production never takes this branch.
   if (allowAdminDevWithoutSupabase()) {
