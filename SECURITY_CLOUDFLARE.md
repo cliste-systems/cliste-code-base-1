@@ -52,8 +52,8 @@ Last applied: 2026-04-17 via `scripts/cloudflare-harden.py` and direct API.
 
 ### Rate limit (phase `http_ratelimit`)
 
-1. **Brute-force lockout** for `/admin/login`, `/dashboard-unlock`,
-   `/authenticate`, `/signup`, and `POST /api/onboarding/voice-preview`:
+1. **Brute-force lockout** for `/dashboard-unlock`, `/authenticate`,
+   `/signup`, and `POST /api/onboarding/voice-preview`:
    5 hits in 10 s per IP → 429 for 10 s.
 
    The free plan caps both `period` and `mitigation_timeout` at 10 s and
@@ -84,10 +84,9 @@ Everything else is already applied.
 
 ## Stuff I deliberately didn't do
 
-- **Zero Trust / Access SSO** in front of `/admin` — replacing the current
-  password gate with Google-Workspace-backed Access is the strongest move,
-  but it requires an identity provider decision and a user listing. Happy
-  to wire it up when you're ready.
+- **Zero Trust / Access SSO** in front of `/admin` — admin access currently
+  uses the normal account sign-in, an admin allowlist/role check, and MFA.
+  Cloudflare Access could be added later as another identity layer if needed.
 - **Authenticated Origin Pulls (mTLS) to Vercel** — Vercel doesn't support
   client-cert auth on Hobby/Team. The practical equivalent is a shared
   secret header in a Cloudflare Transform Rule checked by the Next.js
