@@ -209,7 +209,7 @@ def push_custom_rules(list_id: str | None) -> None:
 def push_rate_limit_rules() -> None:
     # Try to PUT into the rate-limit entrypoint ruleset directly
     # Free plan: only 1 rate-limit rule allowed. Pick the highest-value target:
-    # brute-force of the password gates and the login endpoint. 10 POSTs in
+    # brute-force of sign-in and sensitive setup endpoints. 10 POSTs in
     # 5 min per IP -> block 30 min. Legitimate users will never trip this.
     rules = [
         {
@@ -225,7 +225,7 @@ def push_rate_limit_rules() -> None:
             "enabled": True,
             "expression": (
                 '(http.request.method eq "POST") and ('
-                'http.request.uri.path in {"/admin/login" "/dashboard-unlock" "/signup"} '
+                'http.request.uri.path in {"/dashboard-unlock" "/signup"} '
                 'or starts_with(http.request.uri.path, "/authenticate") '
                 'or http.request.uri.path eq "/api/onboarding/voice-preview"'
                 ')'
